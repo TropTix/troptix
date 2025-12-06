@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import {
   ArrowUpRight,
@@ -16,14 +16,13 @@ export default function CTA() {
   return (
     <section className="py-24 bg-gradient-to-br from-primary/5 via-background to-primary/10">
       <div className="container mx-auto px-4">
-        <div className="grid lg:grid-cols-1 gap-12 items-center max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-1 gap-12 items-center max-w-6xl mx-auto  text-center ">
           {/* Left Column - CTA Content */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center "
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
               Ready to create your next event?

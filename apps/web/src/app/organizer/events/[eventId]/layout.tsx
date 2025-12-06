@@ -20,19 +20,24 @@ async function getEvent(eventId: string, userId: string, userEmail?: string) {
   return event;
 }
 
-export default async function EventManagementLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: { eventId: string };
-}) {
+export default async function EventManagementLayout(
+  props: {
+    children: React.ReactNode;
+    params: Promise<{ eventId: string }>;
+  }
+) {
+  const params = await props.params;
+
+  const {
+    children
+  } = props;
+
   // Get user and verify authentication
   const user = await getUserFromIdTokenCookie();
   if (!user) {
     redirect('/auth/signin');
   }
-  
+
   const event = await getEvent(params.eventId, user.uid, user.email);
 
   return (

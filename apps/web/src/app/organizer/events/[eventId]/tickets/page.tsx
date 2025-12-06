@@ -110,14 +110,13 @@ function calculateTicketStats(ticketTypes: FetchedTicketType[]) {
 }
 
 interface EventTicketsPageProps {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 }
 
-export default async function EventTicketsPage({
-  params,
-}: EventTicketsPageProps) {
+export default async function EventTicketsPage(props: EventTicketsPageProps) {
+  const params = await props.params;
   const { eventId } = params;
   const user = await getUserFromIdTokenCookie();
   if (!user) {

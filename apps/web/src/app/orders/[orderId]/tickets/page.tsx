@@ -47,14 +47,13 @@ async function getOrderWithTicketsData(orderId: string) {
 }
 
 interface OrderTicketsPageProps {
-  params: { orderId: string };
-  searchParams: { ticketId: string | undefined };
+  params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ ticketId: string | undefined }>;
 }
 
-export default async function OrderTicketsPage({
-  params,
-  searchParams,
-}: OrderTicketsPageProps) {
+export default async function OrderTicketsPage(props: OrderTicketsPageProps) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const { orderId } = params;
   const { ticketId } = searchParams;
 

@@ -129,15 +129,14 @@ function calculateOrderStats(orders: FetchedOrder[]) {
 }
 
 interface EventOrdersPageProps {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 }
 
 // The main page component
-export default async function EventOrdersPage({
-  params,
-}: EventOrdersPageProps) {
+export default async function EventOrdersPage(props: EventOrdersPageProps) {
+  const params = await props.params;
   const { eventId } = params;
   const user = await getUserFromIdTokenCookie();
   if (!user) {

@@ -73,11 +73,12 @@ async function getOrder(orderId: string): Promise<EnrichedOrder | null> {
   }
 }
 
-export default async function OrderDetailsPage({
-  params,
-}: {
-  params: { orderId: string };
-}) {
+export default async function OrderDetailsPage(
+  props: {
+    params: Promise<{ orderId: string }>;
+  }
+) {
+  const params = await props.params;
   const orderId = params.orderId;
   const order = await getOrder(orderId);
   const now = new Date();

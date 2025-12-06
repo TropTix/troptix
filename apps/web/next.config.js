@@ -29,10 +29,22 @@ const nextConfig = {
   },
   reactStrictMode: false,
   images: {
-    domains: [
-      'firebasestorage.googleapis.com',
-      'placehold.co',
-      'images.unsplash.com',
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
     ],
   },
   transpilePackages: [

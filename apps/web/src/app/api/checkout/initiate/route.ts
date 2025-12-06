@@ -93,7 +93,7 @@ export async function POST(
   let userId: string | null = null;
 
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const tokenCookie = cookieStore.get('fb-token');
     if (!tokenCookie?.value) {
       userId = null;

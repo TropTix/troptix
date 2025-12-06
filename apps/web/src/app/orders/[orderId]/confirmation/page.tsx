@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, use } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { StripeError, loadStripe } from '@stripe/stripe-js';
@@ -479,11 +479,12 @@ function CheckoutStatusContent({ params }: { params: { orderId: string } }) {
   );
 }
 
-export default function CheckoutStatusPage({
-  params,
-}: {
-  params: { orderId: string };
-}) {
+export default function CheckoutStatusPage(
+  props: {
+    params: Promise<{ orderId: string }>;
+  }
+) {
+  const params = use(props.params);
   return (
     <Suspense
       key={params.orderId} // Adding key helps ensure Suspense re-evaluates if orderId changes during navigation

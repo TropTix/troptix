@@ -3,11 +3,9 @@ import prisma from '@/server/prisma';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { eventId: string } }
-) {
-  const headersList = headers();
+export async function GET(request: NextRequest, props: { params: Promise<{ eventId: string }> }) {
+  const params = await props.params;
+  const headersList = await headers();
   const authorization = headersList.get('authorization');
 
   if (!authorization || !authorization.startsWith('Bearer ')) {
