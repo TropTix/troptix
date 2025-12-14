@@ -1,5 +1,5 @@
 'use client';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Calendar, Ticket, Users, BarChart3, Zap, Shield } from 'lucide-react';
 
 export default function Features() {
@@ -77,7 +77,7 @@ export default function Features() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          // className="text-center mb-16"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             Everything you need for amazing events
@@ -94,7 +94,7 @@ export default function Features() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          // className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
         >
           {features.map((feature, index) => (
             <FeatureTile
@@ -120,7 +120,7 @@ function FeatureTile({ feature, index, variants }) {
         scale: 1.05,
         transition: { type: 'spring', stiffness: 300, damping: 20 },
       }}
-      className="group relative p-8 bg-card rounded-2xl border border-border hover:border-primary/20 transition-all duration-300 hover:shadow-xl"
+      // className="group relative p-8 bg-card rounded-2xl border border-border hover:border-primary/20 transition-all duration-300 hover:shadow-xl"
     >
       {/* Gradient background on hover */}
       <div

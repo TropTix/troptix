@@ -113,11 +113,12 @@ function aggregateTicketsForReceipt(
   return Array.from(orderMap.values());
 }
 
-export default async function OrderReceiptPage({
-  params,
-}: {
-  params: { orderId: string };
-}) {
+export default async function OrderReceiptPage(
+  props: {
+    params: Promise<{ orderId: string }>;
+  }
+) {
+  const params = await props.params;
   const orderId = params.orderId;
   const order = await getOrderForReceipt(orderId);
 

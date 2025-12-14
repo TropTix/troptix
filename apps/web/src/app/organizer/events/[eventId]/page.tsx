@@ -79,11 +79,12 @@ function getEventStatusDisplay(eventData: EventOverview) {
   return { label: 'Published', variant: 'outline' as const };
 }
 
-export default async function EventOverviewPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default async function EventOverviewPage(
+  props: {
+    params: Promise<{ eventId: string }>;
+  }
+) {
+  const params = await props.params;
   const eventId = params.eventId;
   let eventData;
   const user = await getUserFromIdTokenCookie();

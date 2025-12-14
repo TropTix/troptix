@@ -88,14 +88,13 @@ async function fetchEventName(eventId: string, userId: string, userEmail?: strin
 }
 
 interface EventAttendeesPageProps {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 }
 
-export default async function EventAttendeesPage({
-  params,
-}: EventAttendeesPageProps) {
+export default async function EventAttendeesPage(props: EventAttendeesPageProps) {
+  const params = await props.params;
   const { eventId } = params;
   const user = await getUserFromIdTokenCookie();
 

@@ -56,11 +56,12 @@ async function getEventById(eventId: string): Promise<EventById | null> {
   return event;
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ eventId: string }>;
+  }
+) {
+  const params = await props.params;
   const event = await getEventById(params.eventId);
   return {
     title: event?.name,

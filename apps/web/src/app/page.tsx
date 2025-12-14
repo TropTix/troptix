@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <main>
       <LandingHero />
-      <Features />
+      {/* <Features /> */}
       <CTA />
     </main>
   );

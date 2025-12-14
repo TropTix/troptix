@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function PUT(request: NextRequest) {
   // 1. Authenticate the user
-  const headersList = headers();
+  const headersList = await headers();
   const authorization = headersList.get('authorization');
   const token = authorization?.split(' ')[1];
 

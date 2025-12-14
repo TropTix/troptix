@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useEffect, useState } from 'react';
 
 const caribbeanCountries = [
@@ -29,22 +29,27 @@ export default function CaribbeanFlags() {
     return () => clearInterval(interval);
   }, []);
 
+  const currentCountry = caribbeanCountries[currentIndex];
+
   return (
     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
       <span>Proudly serving event creators across the Caribbean</span>
       <div className="relative w-8 h-6 flex items-center justify-center">
         <AnimatePresence mode="wait">
-          <motion.span
+          <span
             key={currentIndex}
-            initial={{ opacity: 0, scale: 0.8, rotateY: -90 }}
-            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-            exit={{ opacity: 0, scale: 0.8, rotateY: 90 }}
-            transition={{ duration: 0.5 }}
             className="absolute text-2xl"
-            title={caribbeanCountries[currentIndex].name}
+            title={currentCountry.name}
           >
-            {caribbeanCountries[currentIndex].flag}
-          </motion.span>
+            <motion.span
+              initial={{ opacity: 0, scale: 0.8, rotateY: -90 }}
+              animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+              exit={{ opacity: 0, scale: 0.8, rotateY: 90 }}
+              transition={{ duration: 0.5 }}
+            >
+              {currentCountry.flag}
+            </motion.span>
+          </span>
         </AnimatePresence>
       </div>
     </div>

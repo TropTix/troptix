@@ -7,9 +7,9 @@ import { redirect } from 'next/navigation';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 
 interface EditEventPageProps {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 }
 
 async function getEvent(eventId: string, userId: string, userEmail?: string) {
@@ -42,7 +42,8 @@ async function getEvent(eventId: string, userId: string, userEmail?: string) {
   }
 }
 
-export default async function EditEventPage({ params }: EditEventPageProps) {
+export default async function EditEventPage(props: EditEventPageProps) {
+  const params = await props.params;
   const { eventId } = params;
 
   // Get user and verify authentication

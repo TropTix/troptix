@@ -8,10 +8,10 @@ import { redirect } from 'next/navigation';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 
 interface EditEventTicketPageProps {
-  params: {
+  params: Promise<{
     eventId: string;
     ticketId: string; // Add ticketId to params
-  };
+  }>;
 }
 
 async function getTicketTypeData(
@@ -51,9 +51,8 @@ async function getTicketTypeData(
 }
 
 // Server component to render the edit form
-export default async function EditEventTicketPage({
-  params,
-}: EditEventTicketPageProps) {
+export default async function EditEventTicketPage(props: EditEventTicketPageProps) {
+  const params = await props.params;
   const { eventId, ticketId } = params;
 
   // Get user and verify authentication

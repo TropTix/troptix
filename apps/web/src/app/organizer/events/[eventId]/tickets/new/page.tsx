@@ -7,14 +7,13 @@ import { verifyEventAccess } from '@/server/accessControl';
 import prisma from '@/server/prisma';
 
 interface CreateEventTicketPageProps {
-  params: {
+  params: Promise<{
     eventId: string;
-  };
+  }>;
 }
 
-export default async function CreateEventTicketPage({
-  params,
-}: CreateEventTicketPageProps) {
+export default async function CreateEventTicketPage(props: CreateEventTicketPageProps) {
+  const params = await props.params;
   const { eventId } = params;
 
   // Get user and verify authentication

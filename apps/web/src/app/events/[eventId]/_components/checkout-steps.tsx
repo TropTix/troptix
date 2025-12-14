@@ -11,8 +11,8 @@ const CheckoutSteps = ({ current, steps }: CheckoutStepsProps) => {
   return (
     <div className="flex items-center justify-center space-x-4">
       {steps.map((title, index) => (
-        <>
-          <div key={title} className="flex items-center">
+        <React.Fragment key={title}>
+          <div className="flex items-center">
             <div
               className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
                 index <= current
@@ -35,7 +35,7 @@ const CheckoutSteps = ({ current, steps }: CheckoutStepsProps) => {
           {index < steps.length - 1 && (
             <div className="w-12 h-px bg-border mx-2"></div>
           )}
-        </>
+        </React.Fragment>
       ))}
     </div>
   );
