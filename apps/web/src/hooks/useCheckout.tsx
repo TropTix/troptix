@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { trackEmailTicketPurchaseComplete } from '@/lib/emailTracking';
 
 import { UserDetailsFormData } from '@/lib/schemas/checkoutSchema';
 import {
@@ -55,6 +56,24 @@ const initiateCheckoutApiCall = async (
 export function useInitiateCheckout() {
   return useMutation<ValidationResponse, Error, InitiateCheckoutVariables>({
     mutationFn: initiateCheckoutApiCall,
+    onSuccess: (data, variables) => {
+      const totalTickets = Object.values(variables.selectedTickets).reduce(
+        (sum, count) => sum + count,
+        0
+      );
+
+      trackEmailTicketPurchaseComplete({
+        event_id: variables.eventId,
+        order_id: data.orderId,
+        total_amount: data.total,
+        subtotal: data.subtotal,
+        fees: data.fees,
+        total_tickets: totalTickets,
+        user_email: variables.userDetails.email,
+        is_free: data.isFree,
+        promotion_applied: data.promotionApplied,
+      });
+    },
     onError: (error) => {
       console.error('Initiate Checkout Error:', error);
       toast.error('Checkout failed. Please try again.');

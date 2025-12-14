@@ -19,7 +19,12 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Calendar, DollarSign, MapPin, Ticket } from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import {
+  trackEmailEventPageView,
+  trackEmailTicketPurchaseStart,
+} from '@/lib/emailTracking';
 import { EventById } from '../page';
 
 export default function EventDetail({ event }: { event: EventById }) {
@@ -28,12 +33,45 @@ export default function EventDetail({ event }: { event: EventById }) {
   const { isMobile } = useScreenSize();
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const isDraft = event.isDraft;
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!searchParams) return;
+
+    const utmSource = searchParams.get('utm_source');
+    const utmMedium = searchParams.get('utm_medium');
+    const utmCampaign = searchParams.get('utm_campaign');
+    const utmContent = searchParams.get('utm_content');
+
+    if (utmSource === 'email' && utmMedium && utmCampaign && utmContent) {
+      trackEmailEventPageView(
+        {
+          event_id: event.id,
+          event_name: event.name,
+          organizer: event.organizer,
+        },
+        {
+          utm_source: utmSource,
+          utm_medium: utmMedium,
+          utm_campaign: utmCampaign,
+          utm_content: utmContent,
+        }
+      );
+    }
+  }, [searchParams, event.id, event.name, event.organizer]);
+
   function closeModal() {
     setIsTicketModalOpen(false);
   }
 
   function openModal() {
     setIsTicketModalOpen(true);
+
+    trackEmailTicketPurchaseStart({
+      event_id: event.id,
+      event_name: event.name,
+      organizer: event.organizer,
+    });
   }
   const displayImageUrl =
     event.imageUrl ?? 'https://placehold.co/400x400?text=Add+Event+Flyer';
