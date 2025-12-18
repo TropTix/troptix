@@ -292,6 +292,7 @@ function formatCurrency(amount: number) {
 
 function formatDateTime(date: Date) {
   return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -303,6 +304,7 @@ function formatDateTime(date: Date) {
 
 function formatTime(date: Date) {
   return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
