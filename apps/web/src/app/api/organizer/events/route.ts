@@ -1,3 +1,4 @@
+import { isPlatformOwner } from '@/server/accessControl';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
 import { headers } from 'next/headers';
@@ -31,6 +32,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const whereClause = isPlatformOwner(organizerId.email) ? {} : { organizerUserId: organizerId.uid };
+
     const events = await prisma.events.findMany({
       select: {
         id: true,
@@ -40,10 +43,9 @@ export async function GET(request: NextRequest) {
         organizer: true,
         venue: true,
         address: true,
+        isDraft: false,
       },
-      where: {
-        organizerUserId: organizerId.uid,
-      },
+      where: whereClause,
       orderBy: {
         startDate: 'desc', // Optional: order events by start date
       },
