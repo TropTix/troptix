@@ -24,7 +24,7 @@ export const getOrganizerDashboardDataOptimized = async (
   ] = await Promise.all([
     // 1. Total Revenue
     prisma.orders.aggregate({
-      _sum: { total: true },
+      _sum: { subtotal: true },
       where: {
         status: OrderStatus.COMPLETED,
         event: { organizerUserId: organizerUserId },
@@ -116,7 +116,7 @@ export const getOrganizerDashboardDataOptimized = async (
 
   // --- Process Results ---
 
-  const totalRevenue = revenueResult._sum.total ?? 0;
+  const totalRevenue = revenueResult._sum.subtotal ?? 0;
   const totalTicketsSold = ticketsSoldResult; // Direct count from prisma.tickets.count
   const activeEventsCount = activeEventsCountResult;
 

@@ -67,7 +67,7 @@ function MobileCardView({
             const formattedAmount = new Intl.NumberFormat('en-US', {
               style: 'currency',
               currency: 'USD',
-            }).format(order.total);
+            }).format(order.subtotal);
 
             return (
               <Card key={order.id} className="w-full overflow-hidden">

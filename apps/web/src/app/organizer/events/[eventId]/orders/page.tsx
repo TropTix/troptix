@@ -28,7 +28,7 @@ export interface FetchedOrder {
   firstName: string | null;
   lastName: string | null;
   email: string | null;
-  total: number;
+  subtotal: number;
   createdAt: Date | null;
   telephoneNumber: string | null;
   billingAddress1: string | null;
@@ -48,7 +48,7 @@ async function fetchOrders(
   try {
     // Verify access first
     await verifyEventAccess(userId, userEmail, eventId);
-    
+
     const orders = await prisma.orders.findMany({
       where: {
         eventId: eventId,
@@ -60,7 +60,7 @@ async function fetchOrders(
         firstName: true,
         lastName: true,
         email: true,
-        total: true,
+        subtotal: true,
         createdAt: true,
         telephoneNumber: true,
         billingAddress1: true,
@@ -113,7 +113,7 @@ async function fetchEventName(
 
 function calculateOrderStats(orders: FetchedOrder[]) {
   const totalOrders = orders.length;
-  const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
+  const totalRevenue = orders.reduce((sum, order) => sum + order.subtotal, 0);
   const totalTickets = orders.reduce(
     (sum, order) => sum + order.tickets.length,
     0
