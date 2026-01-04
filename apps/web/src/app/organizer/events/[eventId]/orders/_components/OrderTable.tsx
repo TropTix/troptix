@@ -170,10 +170,10 @@ export default function OrderTable({ initialOrders }: OrderTableProps) {
         },
       },
       {
-        accessorKey: 'total',
+        accessorKey: 'subtotal',
         header: () => <div className="text-right">Total</div>,
         cell: ({ row }) => {
-          const amount = parseFloat(row.getValue('total'));
+          const amount = parseFloat(row.getValue('subtotal'));
           const formatted = new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'USD',
