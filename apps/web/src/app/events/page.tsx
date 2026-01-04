@@ -7,6 +7,8 @@ import { Calendar, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import EventCard from './_components/EventCard';
 
+export const revalidate = 86400; // 24 hours in seconds
+
 const EventSelect = {
   id: true,
   name: true,

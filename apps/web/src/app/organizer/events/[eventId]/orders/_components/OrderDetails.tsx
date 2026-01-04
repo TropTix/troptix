@@ -3,7 +3,15 @@ import { format } from 'date-fns';
 import { FetchedOrder } from '../page'; // Import the shared type
 import { Separator } from '@/components/ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { User, Mail, Phone, MapPin, Calendar, CreditCard, Ticket } from 'lucide-react';
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  CreditCard,
+  Ticket,
+} from 'lucide-react';
 // import { Badge } from '@/components/ui/badge'; // Removed Badge import
 // import StatusBadge from './StatusBadge'; // Removed StatusBadge import
 
@@ -59,16 +67,24 @@ export default function OrderDetails({ order }: OrderDetailsProps) {
             <div className="flex items-start gap-3">
               <User className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div>
-                <div className="font-medium text-sm text-muted-foreground">Name</div>
-                <div className="text-base">{formatName(order.firstName, order.lastName)}</div>
+                <div className="font-medium text-sm text-muted-foreground">
+                  Name
+                </div>
+                <div className="text-base">
+                  {formatName(order.firstName, order.lastName)}
+                </div>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
               <Mail className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div>
-                <div className="font-medium text-sm text-muted-foreground">Email</div>
-                <div className="text-base break-all">{order.email || 'N/A'}</div>
+                <div className="font-medium text-sm text-muted-foreground">
+                  Email
+                </div>
+                <div className="text-base break-all">
+                  {order.email || 'N/A'}
+                </div>
               </div>
             </div>
 
@@ -76,7 +92,9 @@ export default function OrderDetails({ order }: OrderDetailsProps) {
               <div className="flex items-start gap-3">
                 <Phone className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div>
-                  <div className="font-medium text-sm text-muted-foreground">Phone</div>
+                  <div className="font-medium text-sm text-muted-foreground">
+                    Phone
+                  </div>
                   <div className="text-base">{order.telephoneNumber}</div>
                 </div>
               </div>
@@ -86,7 +104,9 @@ export default function OrderDetails({ order }: OrderDetailsProps) {
               <div className="flex items-start gap-3">
                 <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div>
-                  <div className="font-medium text-sm text-muted-foreground">Billing Address</div>
+                  <div className="font-medium text-sm text-muted-foreground">
+                    Billing Address
+                  </div>
                   <div className="text-base">{billingAddress}</div>
                 </div>
               </div>
@@ -103,7 +123,9 @@ export default function OrderDetails({ order }: OrderDetailsProps) {
             <div className="flex items-start gap-3">
               <CreditCard className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div>
-                <div className="font-medium text-sm text-muted-foreground">Order ID</div>
+                <div className="font-medium text-sm text-muted-foreground">
+                  Order ID
+                </div>
                 <div className="text-base font-mono">{order.id}</div>
               </div>
             </div>
@@ -111,7 +133,9 @@ export default function OrderDetails({ order }: OrderDetailsProps) {
             <div className="flex items-start gap-3">
               <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div>
-                <div className="font-medium text-sm text-muted-foreground">Date Purchased</div>
+                <div className="font-medium text-sm text-muted-foreground">
+                  Date Purchased
+                </div>
                 <div className="text-base">{formatDate(order.createdAt)}</div>
               </div>
             </div>
@@ -119,8 +143,12 @@ export default function OrderDetails({ order }: OrderDetailsProps) {
             <div className="flex items-start gap-3">
               <CreditCard className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
               <div>
-                <div className="font-medium text-sm text-muted-foreground">Total Amount</div>
-                <div className="text-lg font-semibold text-green-600">{formatCurrency(order.total)}</div>
+                <div className="font-medium text-sm text-muted-foreground">
+                  Total Amount
+                </div>
+                <div className="text-lg font-semibold text-green-600">
+                  {formatCurrency(order.subtotal)}
+                </div>
               </div>
             </div>
           </div>
@@ -134,13 +162,18 @@ export default function OrderDetails({ order }: OrderDetailsProps) {
           {order.tickets.length > 0 ? (
             <div className="space-y-3">
               {order.tickets.map((ticket) => (
-                <div key={ticket.id} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                <div
+                  key={ticket.id}
+                  className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg"
+                >
                   <Ticket className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
                     <div className="font-medium text-base">
                       {ticket.ticketType?.name || 'Unknown Ticket Type'}
                     </div>
-                    <div className="text-sm text-muted-foreground">Quantity: 1</div>
+                    <div className="text-sm text-muted-foreground">
+                      Quantity: 1
+                    </div>
                   </div>
                   <div className="font-semibold text-base">
                     {ticket.ticketType?.price != null
@@ -201,7 +234,7 @@ export default function OrderDetails({ order }: OrderDetailsProps) {
           <div>{formatDate(order.createdAt)}</div>
 
           <div className="font-medium">Total Amount:</div>
-          <div className="font-semibold">{formatCurrency(order.total)}</div>
+          <div className="font-semibold">{formatCurrency(order.subtotal)}</div>
         </div>
       </section>
 
@@ -231,6 +264,7 @@ export default function OrderDetails({ order }: OrderDetailsProps) {
           </p>
         )}
       </section>
+      {/*TODO: Add Payment breakdown showing fees and total*/}
 
       {/* TODO: Add Payment Details section once Stripe info is available */}
     </div>
