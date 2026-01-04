@@ -164,7 +164,7 @@ export async function getEventOverview(
         where: { status: OrderStatus.COMPLETED },
         select: {
           id: true,
-          total: true,
+          subtotal: true,
           name: true,
           email: true,
           createdAt: true,
@@ -189,7 +189,7 @@ export async function getEventOverview(
       status: OrderStatus.COMPLETED,
       createdAt: { gte: chartStartDate },
     },
-    _sum: { total: true },
+    _sum: { subtotal: true },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -214,7 +214,7 @@ export async function getEventOverview(
 
   // Process financial data
   const totalRevenue = eventData.orders.reduce(
-    (sum, order) => sum + order.total,
+    (sum, order) => sum + (order.subtotal ?? 0),
     0
   );
   const totalOrders = eventData.orders.length;
@@ -287,7 +287,7 @@ export async function getEventOverview(
   const recentOrders = eventData.orders.slice(0, 5).map((order) => ({
     id: `#${order.id.substring(0, 6)}`,
     customerName: order.name || order.email || 'Guest',
-    amount: order.total,
+    amount: order.subtotal ?? 0,
     ticketCount: order._count.tickets,
     date: order.createdAt?.toLocaleDateString() || '',
   }));
@@ -307,7 +307,7 @@ export async function getEventOverview(
       if (revenueMap.has(dateStr)) {
         revenueMap.set(
           dateStr,
-          (revenueMap.get(dateStr) || 0) + (group._sum.total || 0)
+          (revenueMap.get(dateStr) || 0) + (group._sum.subtotal ?? 0)
         );
       }
     }

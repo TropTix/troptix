@@ -47,7 +47,7 @@ async function fetchEvents(): Promise<Event[]> {
     select: EventSelect,
     where: {
       isDraft: false,
-      endDate: { gte: new Date() },
+      endDate: { gt: new Date() },
     },
     orderBy: {
       startDate: Prisma.SortOrder.desc,
