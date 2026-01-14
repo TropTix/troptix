@@ -165,14 +165,10 @@ const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
 
   const columns: ColumnDef<FetchedTicketData>[] = [
     {
-      accessorKey: 'name',
+      id: 'name',
+      accessorFn: (row) =>
+        [row.firstName, row.lastName].filter(Boolean).join(' ') || 'N/A',
       header: 'Attendee Name',
-      cell: ({ row }) => {
-        const name = [row.original.firstName, row.original.lastName]
-          .filter(Boolean)
-          .join(' ');
-        return name || 'N/A';
-      },
     },
     {
       accessorKey: 'email',
