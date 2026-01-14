@@ -209,8 +209,8 @@ function parseCsvFile(filePath: string): CsvRecord[] {
     }
 
     return records;
-  } catch (error) {
-    console.error('❌ Error parsing CSV file:', error.message);
+  } catch (error: any) {
+    console.error('❌ Error parsing CSV file:', error?.message);
     process.exit(1);
   }
 }
@@ -376,8 +376,8 @@ async function createOrdersBatched(
       console.log(
         `   ✓ Batch ${i + 1} complete (${batchOrderIds.length} orders)`
       );
-    } catch (error) {
-      console.error(`   ✗ Batch ${i + 1} failed:`, error.message);
+    } catch (error: any) {
+      console.error(`   ✗ Batch ${i + 1} failed:`, error?.message);
       console.error(
         `   Failed recipients: ${batch.map((r) => r.email).join(', ')}`
       );
@@ -479,10 +479,10 @@ async function renderEmails(orderIds: string[]): Promise<EmailPayload[]> {
       if ((i + 1) % 50 === 0 || i === orderIds.length - 1) {
         console.log(`   Rendered ${i + 1}/${orderIds.length} emails...`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         `   ⚠ Failed to render email for order ${orderId}:`,
-        error.message
+        error?.message
       );
     }
   }
@@ -522,7 +522,7 @@ async function sendEmailsBatched(
       if (i < emailBatches.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`   ✗ Email batch ${i + 1} error:`, error.message);
       failedEmails.push(...batch.map((b) => b.to));
     }
