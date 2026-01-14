@@ -111,14 +111,17 @@ export default function EmailConfirmationTemplate({
       },
     ],
   },
+  baseUrl: baseUrlProp,
 }: {
   order: EmailOrder;
+  baseUrl?: string;
 }) {
   const { event, tickets = [] } = order;
   const baseUrl =
-    process.env.NODE_ENV === 'development'
+    baseUrlProp ??
+    (process.env.NODE_ENV === 'development'
       ? 'http://localhost:3000'
-      : 'https://usetroptix.com';
+      : 'https://usetroptix.com');
   const ticketUrl = `${baseUrl}/orders/${order.id}/tickets`;
   const ticketGroups = groupTicketsByType(tickets);
   const fullName =

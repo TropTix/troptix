@@ -86,14 +86,17 @@ export default function ComplementaryTicketEmail({
       },
     ],
   },
+  baseUrl: baseUrlProp,
 }: {
   order: EmailOrder;
+  baseUrl?: string;
 }) {
   const { event, tickets = [] } = order;
   const baseUrl =
-    process.env.NODE_ENV === 'development'
+    baseUrlProp ??
+    (process.env.NODE_ENV === 'development'
       ? 'http://localhost:3000'
-      : 'https://usetroptix.com';
+      : 'https://usetroptix.com');
   const ticketUrl = `${baseUrl}/orders/${order.id}/tickets?utm_source=complementary_email&utm_medium=email&utm_campaign=complementary_tickets`;
   const ticketGroups = groupTicketsByType(tickets);
 

@@ -15,7 +15,7 @@ import { TicketType, OrderStatus, TicketStatus, Prisma } from '@prisma/client';
 
 const BATCH_SIZE = 50; // Orders per database transaction
 const EMAIL_BATCH_SIZE = 100; // Resend batch API limit
-const TICKET_TYPE_NAME = '2 day Ticket - Complementary';
+const TICKET_TYPE_NAME = 'Two Day Ticket - Complementary';
 const EMAIL_FROM = 'TropTix <info@usetroptix.com>';
 const REQUIRED_CSV_COLUMNS = ['email', 'firstName', 'lastName'];
 
@@ -400,6 +400,14 @@ async function createOrdersBatched(
 async function renderEmails(orderIds: string[]): Promise<EmailPayload[]> {
   const emailPayloads: EmailPayload[] = [];
 
+  // Determine base URL based on NODE_ENV
+  const baseUrl =
+    process.env.NODE_ENV === 'development'
+      ? 'http://localhost:3000'
+      : 'https://usetroptix.com';
+
+  console.log(`   Using base URL: ${baseUrl}`);
+
   for (let i = 0; i < orderIds.length; i++) {
     const orderId = orderIds[i];
 
@@ -454,7 +462,10 @@ async function renderEmails(orderIds: string[]): Promise<EmailPayload[]> {
 
       // Render HTML using ComplementaryTicketEmail template
       const html = await render(
-        createElement(ComplementaryTicketEmail, { order: orderForEmail })
+        createElement(ComplementaryTicketEmail, {
+          order: orderForEmail,
+          baseUrl: baseUrl,
+        })
       );
 
       emailPayloads.push({
