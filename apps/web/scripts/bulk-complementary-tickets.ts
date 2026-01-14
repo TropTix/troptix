@@ -364,6 +364,14 @@ async function createOrdersBatched(
             orderIds.push(orderId);
           }
 
+          // Update quantitySold for the ticket type
+          await tx.ticketTypes.update({
+            where: { id: ticketType.id },
+            data: {
+              quantitySold: { increment: batch.length },
+            },
+          });
+
           return orderIds;
         },
         {
