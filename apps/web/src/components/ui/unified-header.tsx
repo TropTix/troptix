@@ -156,10 +156,18 @@ export default function UnifiedHeader() {
   return (
     <header
       className={cn(
-        'fixed w-full z-30 transition duration-300 ease-in-out border-b',
-        'bg-background/80 backdrop-blur-sm',
+        'fixed w-full z-30 transition-all duration-300 ease-in-out border-b',
+        // Frosted glass nav — heavier blur, softer fill. Reads as part of the dark
+        // hero at the top of the page; settles into a clean translucent bar on scroll.
+        hasScrolled
+          ? 'bg-background/85 backdrop-blur-md backdrop-saturate-150'
+          : 'bg-background/55 backdrop-blur-md backdrop-saturate-150',
         hasScrolled && !isOrganizerRoute ? 'shadow-lg' : '',
-        isOrganizerRoute ? 'border-primary/20' : 'border-border'
+        isOrganizerRoute
+          ? 'border-primary/20'
+          : hasScrolled
+            ? 'border-border'
+            : 'border-transparent'
       )}
     >
       <div className="container flex items-center justify-between h-16">
@@ -175,8 +183,8 @@ export default function UnifiedHeader() {
           )}
         </Link>
 
-        <div className="flex items-center gap-2">
-          <nav className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <nav className="flex items-center gap-0.5 sm:gap-1">
             {isOrganizerRoute ? (
               organizerNavItems.map((item) => (
                 <Button
