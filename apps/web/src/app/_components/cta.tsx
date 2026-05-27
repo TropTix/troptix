@@ -5,11 +5,9 @@ import { motion } from 'motion/react';
 import {
   ArrowRight,
   ArrowUpRight,
-  Calendar,
   CheckCircle2,
   Copy,
   MessageCircle,
-  Sparkles,
   TrendingUp,
   Wallet,
   Wifi,
@@ -49,19 +47,16 @@ function OrganizerBackground() {
         className="absolute inset-0"
         style={{
           backgroundImage: [
-            'radial-gradient(60% 50% at 90% 10%, hsl(var(--primary) / 0.32), transparent 60%)',
-            'radial-gradient(50% 50% at 10% 90%, rgba(56, 189, 248, 0.18), transparent 65%)',
-            'linear-gradient(180deg, #07051a 0%, #08061f 50%, #050314 100%)',
+            // Single quiet bloom upper-right to mirror the hero's upper-left source
+            'radial-gradient(50% 50% at 88% 8%, hsl(var(--primary) / 0.18), transparent 65%)',
+            'linear-gradient(180deg, #07051a 0%, #06051a 60%, #050318 100%)',
           ].join(', '),
         }}
       />
-      {/* Top seam — continues the hero's dark canvas without a visible boundary */}
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#07051a] to-transparent" />
-      {/* Bottom soft fade — gentle transition into the footer */}
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-black/40" />
-      {/* Subtle grain */}
       <div
-        className="absolute inset-0 opacity-[0.12] mix-blend-overlay"
+        className="absolute inset-0 opacity-[0.08] mix-blend-overlay"
         style={{
           backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(
             "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>"
@@ -89,9 +84,9 @@ function OrganizerCopy() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: '-80px' }}
         transition={{ duration: 0.5 }}
-        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-1.5 text-xs sm:text-sm text-white/80 backdrop-blur"
+        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] sm:text-xs text-white/65"
       >
-        <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden />
+        <span className="h-1 w-1 rounded-full bg-primary/80" />
         <span>Organizer Headquarters</span>
       </motion.div>
 
@@ -101,13 +96,10 @@ function OrganizerCopy() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: '-80px' }}
         transition={{ duration: 0.7, delay: 0.1 }}
-        className="mt-6 text-[2.25rem] leading-[1.05] sm:text-5xl lg:text-6xl font-extrabold tracking-tight"
+        className="mt-5 text-[2.25rem] leading-[1.05] sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-balance"
       >
-        Run sold-out{' '}
-        <span className="bg-gradient-to-r from-primary via-fuchsia-400 to-primary bg-clip-text text-transparent">
-          Caribbean events
-        </span>{' '}
-        like a pro.
+        Run sold-out <span className="text-primary">Caribbean events</span> like
+        a pro.
       </motion.h2>
 
       <motion.p
@@ -115,7 +107,7 @@ function OrganizerCopy() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: '-80px' }}
         transition={{ duration: 0.6, delay: 0.2 }}
-        className="mt-5 sm:mt-6 max-w-xl text-base sm:text-lg text-white/70 leading-relaxed"
+        className="mt-5 max-w-xl text-base sm:text-lg text-white/60 leading-[1.55]"
       >
         Real-time sales, frictionless check-in, instant payouts. Built for the
         rhythm of Caribbean nightlife &mdash; from a sunset fete to a 5,000-cap
@@ -132,9 +124,9 @@ function OrganizerCopy() {
         {features.map(({ icon: Icon, label }) => (
           <li
             key={label}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs sm:text-sm text-white/80 backdrop-blur"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.025] px-3 py-1 text-xs text-white/70"
           >
-            <Icon className="h-3.5 w-3.5 text-primary" aria-hidden />
+            <Icon className="h-3 w-3 text-white/45" aria-hidden />
             {label}
           </li>
         ))}
@@ -150,13 +142,12 @@ function OrganizerCopy() {
         <Button
           asChild
           size="lg"
-          className="h-12 w-full sm:w-auto px-7 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_20px_60px_-15px_hsl(var(--primary)/0.7)]"
+          className="h-12 w-full sm:w-auto px-7 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_10px_30px_-15px_hsl(var(--primary)/0.5)]"
         >
           <Link
             href="/organizer/events/new"
             className="inline-flex items-center gap-2"
           >
-            <Calendar className="h-4 w-4" aria-hidden />
             Create Your Event
           </Link>
         </Button>
@@ -164,8 +155,8 @@ function OrganizerCopy() {
         <Button
           asChild
           size="lg"
-          variant="outline"
-          className="h-12 w-full sm:w-auto px-7 text-base font-semibold border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white backdrop-blur"
+          variant="ghost"
+          className="h-12 w-full sm:w-auto px-5 text-base font-medium text-white/70 hover:text-white hover:bg-white/[0.04]"
         >
           <Link
             href="/organizer"
@@ -183,24 +174,24 @@ function OrganizerCopy() {
 function DashboardPreview() {
   return (
     <div className="lg:col-span-6 relative">
-      {/* Stage glow behind the dashboard card */}
+      {/* Faint glow behind the dashboard — barely there */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10 mx-auto blur-3xl"
         style={{
           background:
-            'radial-gradient(60% 60% at 60% 40%, hsl(var(--primary) / 0.35), transparent 70%)',
+            'radial-gradient(50% 50% at 60% 40%, hsl(var(--primary) / 0.16), transparent 75%)',
         }}
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
+        initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: '-80px' }}
         transition={{ duration: 0.8 }}
         className="relative mx-auto w-full max-w-[560px]"
       >
-        <div className="rounded-[22px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.02] backdrop-blur-xl shadow-[0_50px_120px_-30px_rgba(0,0,0,0.85)] ring-1 ring-white/5 overflow-hidden">
+        <div className="rounded-[20px] border border-white/[0.07] bg-white/[0.025] backdrop-blur-xl shadow-[0_25px_70px_-25px_rgba(0,0,0,0.65)] overflow-hidden">
           <DashboardHeader />
           <div className="p-4 sm:p-5 space-y-4">
             <KpiGrid />
@@ -209,19 +200,19 @@ function DashboardPreview() {
           </div>
         </div>
 
-        {/* Floating payout chip */}
+        {/* Payout chip — quieter, less aggressive shadow */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-80px' }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="absolute -bottom-5 -left-3 sm:-left-6 hidden sm:flex items-center gap-2.5 rounded-2xl border border-white/10 bg-slate-900/90 backdrop-blur-xl px-3.5 py-2.5 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)]"
+          className="absolute -bottom-5 -left-3 sm:-left-6 hidden sm:flex items-center gap-2.5 rounded-2xl border border-white/[0.07] bg-slate-900/80 backdrop-blur-xl px-3.5 py-2.5 shadow-[0_12px_30px_-12px_rgba(0,0,0,0.55)]"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
             <Wallet className="h-4 w-4" aria-hidden />
           </div>
           <div className="leading-tight">
-            <p className="text-[10px] uppercase tracking-wider text-white/50">
+            <p className="text-[10px] uppercase tracking-wider text-white/45">
               Payout sent
             </p>
             <p className="text-sm font-semibold text-white tabular-nums">
@@ -236,23 +227,20 @@ function DashboardPreview() {
 
 function DashboardHeader() {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] bg-white/[0.02] px-4 sm:px-5 py-3">
+    <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] px-4 sm:px-5 py-3">
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-fuchsia-500 text-white font-bold text-sm shadow-lg shadow-primary/30">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/90 text-primary-foreground font-semibold text-sm">
           T
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-white truncate">
+          <p className="text-sm font-medium text-white truncate">
             Organizer Dashboard
           </p>
-          <p className="text-[11px] text-white/50">Sunset Fete · Kingston</p>
+          <p className="text-[11px] text-white/45">Sunset Fete · Kingston</p>
         </div>
       </div>
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-400/30">
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
-          <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-400" />
-        </span>
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-300/90">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
         Live
       </span>
     </div>
@@ -270,15 +258,15 @@ function KpiGrid() {
       {kpis.map((k) => (
         <div
           key={k.label}
-          className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3"
+          className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3"
         >
-          <p className="text-[10px] uppercase tracking-wider text-white/45 truncate">
+          <p className="text-[10px] uppercase tracking-wider text-white/40 truncate">
             {k.label}
           </p>
-          <p className="mt-1 text-lg sm:text-xl font-bold text-white tabular-nums">
+          <p className="mt-1 text-lg sm:text-xl font-semibold text-white tabular-nums">
             {k.value}
           </p>
-          <p className="text-[10px] text-emerald-300/90 mt-0.5 truncate">
+          <p className="text-[10px] text-emerald-300/80 mt-0.5 truncate">
             {k.delta}
           </p>
         </div>
@@ -303,17 +291,17 @@ function RevenueChart() {
   const areaPath = `${linePath} L ${width} ${height} L 0 ${height} Z`;
 
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4">
       <div className="flex items-end justify-between mb-3">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-white/45">
+          <p className="text-[10px] uppercase tracking-wider text-white/40">
             Revenue · last 30 days
           </p>
           <p className="text-sm font-semibold text-white tabular-nums mt-0.5">
             $312,840
           </p>
         </div>
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-300">
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-300/85">
           <TrendingUp className="h-3 w-3" aria-hidden />
           +24%
         </span>
@@ -326,20 +314,17 @@ function RevenueChart() {
       >
         <defs>
           <linearGradient id="rev-area" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.45" />
+            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
             <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="rev-line" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stopColor="hsl(var(--primary))" />
-            <stop offset="100%" stopColor="#f0abfc" />
           </linearGradient>
         </defs>
         <path d={areaPath} fill="url(#rev-area)" />
         <path
           d={linePath}
           fill="none"
-          stroke="url(#rev-line)"
-          strokeWidth="2.5"
+          stroke="hsl(var(--primary))"
+          strokeOpacity="0.85"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -352,42 +337,42 @@ function ActivityFeed() {
   const rows = [
     {
       icon: CheckCircle2,
-      iconClass: 'text-emerald-300 bg-emerald-500/15 ring-emerald-400/30',
+      iconClass: 'text-emerald-300/85 bg-emerald-500/10',
       title: 'Sunset Fete',
       meta: 'Kingston · Sat 9PM',
-      pill: { text: 'Sold Out', class: 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30' },
+      pill: { text: 'Sold Out', class: 'bg-emerald-500/10 text-emerald-300/85' },
     },
     {
       icon: Wallet,
-      iconClass: 'text-primary bg-primary/15 ring-primary/30',
+      iconClass: 'text-primary/85 bg-primary/10',
       title: 'Carnival Cruise',
       meta: 'Payout · JMD $84,210',
-      pill: { text: 'Settled', class: 'bg-white/10 text-white/80 ring-white/15' },
+      pill: { text: 'Settled', class: 'bg-white/[0.06] text-white/65' },
     },
     {
       icon: ArrowRight,
-      iconClass: 'text-sky-300 bg-sky-500/15 ring-sky-400/30',
+      iconClass: 'text-sky-300/85 bg-sky-500/10',
       title: 'Beach Day Bash',
       meta: '128 tickets remaining',
-      pill: { text: 'On sale', class: 'bg-primary/15 text-primary ring-primary/30' },
+      pill: { text: 'On sale', class: 'bg-primary/10 text-primary/85' },
     },
   ];
 
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] divide-y divide-white/[0.05]">
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] divide-y divide-white/[0.04]">
       {rows.map((r) => (
         <div key={r.title} className="flex items-center gap-3 px-3.5 py-3">
           <div
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${r.iconClass}`}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${r.iconClass}`}
           >
             <r.icon className="h-3.5 w-3.5" aria-hidden />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-white truncate">{r.title}</p>
-            <p className="text-[11px] text-white/50 truncate">{r.meta}</p>
+            <p className="text-[11px] text-white/45 truncate">{r.meta}</p>
           </div>
           <span
-            className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ${r.pill.class}`}
+            className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${r.pill.class}`}
           >
             {r.pill.text}
           </span>
