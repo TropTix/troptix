@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from 'react-error-boundary';
 import { usePathname, useRouter } from 'next/navigation';
 import { ConfigProvider } from 'antd';
+import { MotionConfig } from 'motion/react';
 import posthog from 'posthog-js';
 import { PostHogProvider as PHProvider } from 'posthog-js/react';
 
@@ -65,7 +66,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <PostHogProvider>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              <GlobalLayout>{children}</GlobalLayout>
+              {/* Honor the OS "Reduce Motion" setting app-wide: disables
+                  transform/layout animations while keeping opacity fades. */}
+              <MotionConfig reducedMotion="user">
+                <GlobalLayout>{children}</GlobalLayout>
+              </MotionConfig>
             </AuthProvider>
           </QueryClientProvider>
         </PostHogProvider>

@@ -1,13 +1,22 @@
 'use client';
 
+import { useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion } from 'motion/react';
+import {
+  motion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  useReducedMotion,
+  type MotionValue,
+} from 'motion/react';
 import { ArrowRight } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
-const FEATURED_EVENT_IMAGE = '/images/events/sunset1.png';
+const FEATURED_EVENT_IMAGE = '/images/events/sunset-flyer.webp';
 
 export default function LandingHero() {
   return (
@@ -20,7 +29,7 @@ export default function LandingHero() {
       <div className="relative z-10 container mx-auto px-5 sm:px-6 lg:px-8 pt-6 pb-12 sm:pt-12 sm:pb-16 lg:pt-16 lg:pb-20">
         <div className="grid lg:grid-cols-12 gap-8 lg:gap-14 items-center">
           <HeroCopy />
-          <HeroVisuals />
+          <HeroPosterScene />
         </div>
 
         <StatsRow />
@@ -39,8 +48,8 @@ function HeroBackground() {
           backgroundImage: [
             // Whisper-soft lavender wash upper-left (brand presence, not brand glow)
             'radial-gradient(55% 45% at 12% 8%, hsl(var(--primary) / 0.10), transparent 65%)',
-            // Warm peach hint at lower-right (sunset implication, very subtle)
-            'radial-gradient(60% 50% at 92% 95%, rgba(255, 200, 170, 0.30), transparent 65%)',
+            // Warm sunset glow at lower-right, slightly stronger to feed the scene
+            'radial-gradient(65% 55% at 92% 92%, rgba(255, 190, 150, 0.38), transparent 65%)',
             // Base — warm cream gradient, top-to-bottom
             'linear-gradient(180deg, #fbfaf6 0%, #faf8f4 55%, #f4f0e8 100%)',
           ].join(', '),
@@ -157,22 +166,198 @@ function AccentWord({ children }: { children: React.ReactNode }) {
   return <span className="text-primary">{children}</span>;
 }
 
-function HeroVisuals() {
+/* ------------------------------------------------------------------ */
+/* Layered poster scene — the cinematic, dimensional centerpiece       */
+/* ------------------------------------------------------------------ */
+
+const PARALLAX_SPRING = { stiffness: 60, damping: 18, mass: 0.4 };
+
+/** Subscribe to a media query without tripping set-state-in-effect; SSR-safe. */
+function useMediaQuery(query: string) {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia(query);
+      mq.addEventListener('change', onChange);
+      return () => mq.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(query).matches,
+    () => false
+  );
+}
+
+function HeroPosterScene() {
+  const prefersReduced = useReducedMotion() ?? false;
+  // Parallax is desktop + fine-pointer only, and disabled for reduced motion.
+  const canParallax = useMediaQuery(
+    '(hover: hover) and (pointer: fine) and (min-width: 1024px)'
+  );
+  const parallaxOn = canParallax && !prefersReduced;
+
+  // Normalized pointer offset (-0.5 … 0.5), spring-smoothed for premium ease.
+  const pointerX = useMotionValue(0);
+  const pointerY = useMotionValue(0);
+  const sx = useSpring(pointerX, PARALLAX_SPRING);
+  const sy = useSpring(pointerY, PARALLAX_SPRING);
+
+  // Poster gets a gentle translate + 3D tilt that tracks the cursor.
+  const posterX = useTransform(sx, (v) => v * 14);
+  const posterY = useTransform(sy, (v) => v * 14);
+  const rotateY = useTransform(sx, (v) => v * 7);
+  const rotateX = useTransform(sy, (v) => v * -7);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!parallaxOn) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    pointerX.set((e.clientX - r.left) / r.width - 0.5);
+    pointerY.set((e.clientY - r.top) / r.height - 0.5);
+  };
+
+  const resetPointer = () => {
+    pointerX.set(0);
+    pointerY.set(0);
+  };
+
   return (
-    <div className="lg:col-span-5 relative">
-      <div className="relative mx-auto w-full max-w-[340px] sm:max-w-[380px] lg:max-w-[420px]">
-        {/* Featured poster — the single visual centerpiece */}
+    <div
+      className="lg:col-span-5 relative"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={resetPointer}
+    >
+      <div className="relative isolate mx-auto w-full max-w-[340px] sm:max-w-[380px] lg:max-w-[440px] [perspective:1200px]">
+        {/* Atmospheric gradient blobs — behind everything */}
+        <div aria-hidden className="absolute -inset-10 z-0">
+          <div
+            className="absolute left-[-6%] top-[2%] h-44 w-44 rounded-full blur-3xl"
+            style={{
+              background:
+                'radial-gradient(circle, hsl(var(--primary) / 0.28), transparent 70%)',
+            }}
+          />
+          <div
+            className="absolute right-[-8%] bottom-[2%] h-56 w-56 rounded-full blur-3xl"
+            style={{
+              background:
+                'radial-gradient(circle, rgba(255, 170, 120, 0.45), transparent 70%)',
+            }}
+          />
+        </div>
+
+        {/* The poster — the experience itself */}
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, delay: 0.2 }}
+          className="relative z-10 will-change-transform"
+          style={{
+            x: posterX,
+            y: posterY,
+            rotateX,
+            rotateY,
+            transformPerspective: 1200,
+          }}
         >
-          <FloatingWrapper offset={-5}>
+          <FloatingWrapper offset={-5} disabled={prefersReduced}>
             <FeaturedEventCard />
           </FloatingWrapper>
         </motion.div>
+
+        {/* Floating orb — escapes the top-right, sits in front for depth */}
+        <FloatingObject
+          px={sx}
+          py={sy}
+          depth={44}
+          reduceMotion={prefersReduced}
+          drift={{ y: -14, x: 4, duration: 10 }}
+          className="-right-4 top-8 sm:-right-6 sm:top-10 z-20 pointer-events-none"
+        >
+          <Orb className="h-16 w-16 sm:h-20 sm:w-20 lg:h-24 lg:w-24" />
+        </FloatingObject>
+
+        {/* Sparkles — front layer, desktop/tablet only */}
+        <FloatingObject
+          px={sx}
+          py={sy}
+          depth={36}
+          reduceMotion={prefersReduced}
+          drift={{ y: -10, rotate: 8, duration: 8 }}
+          className="hidden sm:block left-[-7%] top-[26%] z-20 pointer-events-none"
+        >
+          <Sparkle className="h-6 w-6 text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.6)]" />
+        </FloatingObject>
+        <FloatingObject
+          px={sx}
+          py={sy}
+          depth={30}
+          reduceMotion={prefersReduced}
+          drift={{ y: -8, rotate: -10, duration: 9, delay: 1.5 }}
+          className="hidden sm:block right-[12%] bottom-[16%] z-20 pointer-events-none"
+        >
+          <Sparkle className="h-4 w-4 text-primary/80 drop-shadow-[0_2px_10px_hsl(var(--primary)/0.55)]" />
+        </FloatingObject>
       </div>
     </div>
+  );
+}
+
+/**
+ * A decorative element that combines:
+ *  - cursor parallax (translate scaled by `depth`, in px), and
+ *  - a slow ambient drift loop (`drift`).
+ * Positioning + sizing come from `className`. Always decorative (aria-hidden).
+ */
+function FloatingObject({
+  children,
+  className,
+  depth = 1,
+  drift,
+  px,
+  py,
+  reduceMotion = false,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  depth?: number;
+  drift?: {
+    x?: number;
+    y?: number;
+    rotate?: number;
+    duration?: number;
+    delay?: number;
+  };
+  px: MotionValue<number>;
+  py: MotionValue<number>;
+  reduceMotion?: boolean;
+}) {
+  const tx = useTransform(px, (v) => v * depth);
+  const ty = useTransform(py, (v) => v * depth);
+
+  return (
+    <motion.div
+      aria-hidden
+      className={cn('absolute will-change-transform', className)}
+      style={{ x: tx, y: ty }}
+    >
+      <motion.div
+        animate={
+          reduceMotion
+            ? undefined
+            : {
+                y: [0, drift?.y ?? -10, 0],
+                x: [0, drift?.x ?? 0, 0],
+                rotate: [0, drift?.rotate ?? 0, 0],
+              }
+        }
+        transition={
+          reduceMotion
+            ? undefined
+            : {
+                duration: drift?.duration ?? 9,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: drift?.delay ?? 0,
+              }
+        }
+      >
+        {children}
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -180,23 +365,54 @@ function FloatingWrapper({
   children,
   offset = 6,
   delay = 0,
+  disabled = false,
 }: {
   children: React.ReactNode;
   offset?: number;
   delay?: number;
+  disabled?: boolean;
 }) {
   return (
     <motion.div
-      animate={{ y: [0, offset, 0] }}
-      transition={{
-        duration: 6,
-        repeat: Infinity,
-        ease: 'easeInOut',
-        delay,
-      }}
+      animate={disabled ? undefined : { y: [0, offset, 0] }}
+      transition={
+        disabled
+          ? undefined
+          : { duration: 6, repeat: Infinity, ease: 'easeInOut', delay }
+      }
     >
       {children}
     </motion.div>
+  );
+}
+
+/* --- Decorative primitives ---------------------------------------- */
+
+/** Warm sunset orb — coral→magenta gradient that echoes the hero's sunset glow. */
+function Orb({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn('relative rounded-full', className)}
+      style={{
+        background:
+          'radial-gradient(circle at 32% 26%, #ffffff 0%, #ffe2c0 16%, #ff9d6e 48%, #ec4a7d 100%)',
+        boxShadow:
+          '0 22px 44px -12px rgba(236,74,125,0.40), inset 0 -10px 20px rgba(150,40,80,0.45), inset 0 8px 14px rgba(255,255,255,0.55)',
+      }}
+    >
+      <span className="absolute left-[22%] top-[15%] h-1/4 w-1/4 rounded-full bg-white/80 blur-[5px]" />
+    </div>
+  );
+}
+
+function Sparkle({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden>
+      <path
+        d="M12 0c.6 7 4.4 10.9 12 12-7.6 1.1-11.4 5-12 12-.6-7-4.4-10.9-12-12C7.6 10.9 11.4 7 12 0Z"
+        fill="currentColor"
+      />
+    </svg>
   );
 }
 
@@ -212,6 +428,7 @@ function FeaturedEventCard() {
           src={FEATURED_EVENT_IMAGE}
           alt="Sunset Fete — Kingston, Jamaica"
           fill
+          priority
           sizes="(min-width: 1024px) 440px, 90vw"
           className="object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.03]"
         />
@@ -234,7 +451,7 @@ function FeaturedEventCard() {
         {/* Live signal — tiny dot + label, no pill chrome */}
         <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-white/85 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
           <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inset-0 animate-ping rounded-full bg-emerald-300/70" />
+            <span className="absolute inset-0 animate-ping motion-reduce:animate-none rounded-full bg-emerald-300/70" />
             <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-400" />
           </span>
           Selling fast
@@ -266,7 +483,7 @@ function FeaturedEventCard() {
             <Link
               href="/events"
               aria-label="Get tickets for Sunset Fete"
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur ring-1 ring-white/25 px-3.5 py-2 text-xs font-medium text-white hover:bg-white/25 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur ring-1 ring-white/25 px-3.5 py-2 text-xs font-medium text-white hover:bg-white/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
               Get tickets
               <ArrowRight className="h-3 w-3" aria-hidden />
@@ -280,10 +497,10 @@ function FeaturedEventCard() {
 
 function StatsRow() {
   const stats = [
-    { value: '25K+', label: 'Happy attendees' },
-    { value: '1.2K+', label: 'Tickets sold' },
-    { value: '12+', label: 'Islands & cities' },
-    { value: 'Trusted', label: 'by top organizers' },
+    { value: '1.8K+', label: 'Happy attendees' },
+    { value: '1K+', label: 'Tickets sold' },
+    { value: '7+', label: 'Events created' },
+    { value: 'Trusted', label: 'by organizers' },
   ];
 
   return (

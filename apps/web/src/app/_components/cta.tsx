@@ -74,7 +74,7 @@ function OrganizerCopy() {
     { icon: Zap, label: 'Fast check-in' },
     { icon: MessageCircle, label: 'WhatsApp-friendly sharing' },
     { icon: Wifi, label: 'Mobile-first checkout' },
-    { icon: Wallet, label: 'Caribbean-focused payouts' },
+    { icon: Wallet, label: 'Quick payouts' },
   ];
 
   return (
@@ -109,9 +109,8 @@ function OrganizerCopy() {
         transition={{ duration: 0.6, delay: 0.2 }}
         className="mt-5 max-w-xl text-base sm:text-lg text-slate-600 leading-[1.55]"
       >
-        Real-time sales, frictionless check-in, instant payouts. Built for the
-        rhythm of Caribbean nightlife &mdash; from a sunset fete to a 5,000-cap
-        carnival.
+        Real-time sales, frictionless check-in, quick payouts &mdash; built for
+        the Caribbean, from a sunset fete to corporate events.
       </motion.p>
 
       <motion.ul
@@ -144,7 +143,10 @@ function OrganizerCopy() {
           size="lg"
           className="h-12 w-full sm:w-auto px-7 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_10px_28px_-12px_hsl(var(--primary)/0.45)]"
         >
-          <Link href="/organizer/events/new" className="inline-flex items-center gap-2">
+          <Link
+            href="/organizer/events/new"
+            className="inline-flex items-center gap-2"
+          >
             Create Your Event
           </Link>
         </Button>
@@ -298,8 +300,16 @@ function RevenueChart() {
       >
         <defs>
           <linearGradient id="rev-area" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+            <stop
+              offset="0%"
+              stopColor="hsl(var(--primary))"
+              stopOpacity="0.18"
+            />
+            <stop
+              offset="100%"
+              stopColor="hsl(var(--primary))"
+              stopOpacity="0"
+            />
           </linearGradient>
         </defs>
         <path d={areaPath} fill="url(#rev-area)" />
@@ -322,8 +332,8 @@ function ActivityFeed() {
     {
       icon: CheckCircle2,
       iconClass: 'text-emerald-600 bg-emerald-50',
-      title: 'Sunset Fete',
-      meta: 'Kingston · Sat 9PM',
+      title: 'Reggae Sundown',
+      meta: 'Kingston · Last Sat',
       pill: { text: 'Sold Out', class: 'bg-emerald-50 text-emerald-700' },
     },
     {
