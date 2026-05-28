@@ -1,10 +1,12 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
+  AnimatePresence,
   motion,
+  useInView,
   useMotionValue,
   useSpring,
   useTransform,
@@ -294,6 +296,18 @@ function HeroPosterScene() {
         >
           <Sparkle className="h-4 w-4 text-primary/80 drop-shadow-[0_2px_10px_hsl(var(--primary)/0.55)]" />
         </FloatingObject>
+
+        {/* Ticket-confirmed chip — escapes the top-left, balances the orb */}
+        <FloatingObject
+          px={sx}
+          py={sy}
+          depth={40}
+          reduceMotion={prefersReduced}
+          drift={{ y: -8, duration: 11, delay: 0.6 }}
+          className="left-[-10px] top-[13%] sm:-left-4 z-20 pointer-events-none"
+        >
+          <TicketConfirmedChip reduceMotion={prefersReduced} />
+        </FloatingObject>
       </div>
     </div>
   );
@@ -419,6 +433,156 @@ function Sparkle({ className }: { className?: string }) {
   );
 }
 
+// Decorative QR thumbnail mask (purely illustrative).
+const MINI_QR = [
+  1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0,
+  1, 1, 0, 1, 1, 1, 0, 1, 1, 1,
+];
+
+function MiniQR() {
+  return (
+    <div
+      role="img"
+      aria-label="Ticket QR code"
+      className="grid h-11 w-11 shrink-0 grid-cols-6 grid-rows-6 gap-[2px] rounded-md bg-white ring-1 ring-slate-900/[0.06] p-1"
+    >
+      {MINI_QR.map((on, i) => (
+        <span
+          key={i}
+          className={on ? 'rounded-[1px] bg-slate-900' : 'bg-transparent'}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Small light card that floats over the poster and auto-plays a buy flow once
+ * on view: "Get ticket" → tap → confirmed → QR reveal. `reduceMotion` jumps
+ * straight to the final confirmed+QR state with no animation.
+ * Decorative illustration only (the parent FloatingObject is aria-hidden).
+ */
+function TicketConfirmedChip({ reduceMotion = false }: { reduceMotion?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-60px' });
+  // 0 = button, 1 = tapped, 2 = confirmed, 3 = QR revealed
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    if (reduceMotion || !inView) return;
+    const timers = [
+      setTimeout(() => setStep(1), 800),
+      setTimeout(() => setStep(2), 1250),
+      setTimeout(() => setStep(3), 1950),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, [inView, reduceMotion]);
+
+  // Reduced motion (incl. when resolved post-hydration) jumps to the final state.
+  const activeStep = reduceMotion ? 3 : step;
+  const confirmed = activeStep >= 2;
+
+  return (
+    <motion.div
+      ref={ref}
+      layout
+      initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.94 }}
+      animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+      className="w-[184px] rounded-2xl bg-white/90 backdrop-blur ring-1 ring-slate-900/[0.06] shadow-[0_12px_30px_-12px_rgba(15,23,42,0.22)] p-2.5"
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        {!confirmed ? (
+          <motion.div
+            key="buy"
+            layout
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="relative"
+          >
+            {/* Faux "Get ticket" button (not a real control — parent is aria-hidden) */}
+            <motion.div
+              animate={step === 1 ? { scale: 0.95 } : { scale: 1 }}
+              transition={{ duration: 0.16 }}
+              className="relative flex items-center justify-center rounded-xl bg-primary px-3 py-2 text-[12px] font-semibold text-primary-foreground"
+            >
+              Get ticket
+              {step === 1 && !reduceMotion && (
+                <motion.span
+                  className="absolute inset-0 rounded-xl ring-2 ring-primary/40"
+                  initial={{ opacity: 0.6, scale: 0.92 }}
+                  animate={{ opacity: 0, scale: 1.25 }}
+                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                />
+              )}
+            </motion.div>
+            {/* Tap cursor */}
+            {step === 1 && !reduceMotion && (
+              <motion.span
+                className="absolute -bottom-1 right-3 h-3 w-3 rounded-full bg-slate-900/70 ring-2 ring-white"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: [0, 1, 0.85, 1], opacity: 1 }}
+                transition={{ duration: 0.4 }}
+              />
+            )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="done"
+            layout
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-2.5"
+          >
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
+                  <motion.path
+                    d="M5 13l4 4L19 7"
+                    stroke="#059669"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    initial={reduceMotion ? false : { pathLength: 0 }}
+                    animate={reduceMotion ? undefined : { pathLength: 1 }}
+                    transition={{ duration: 0.45, ease: 'easeOut' }}
+                  />
+                </svg>
+              </span>
+              <div className="leading-tight">
+                <p className="text-[12px] font-semibold text-slate-900">
+                  Ticket confirmed
+                </p>
+                <p className="text-[10px] text-slate-500">General Admission</p>
+              </div>
+            </div>
+
+            {activeStep >= 3 && (
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+                animate={reduceMotion ? undefined : { opacity: 1, scale: 1 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className="flex items-center gap-2.5 rounded-xl bg-slate-50 ring-1 ring-slate-900/[0.05] p-2"
+              >
+                <MiniQR />
+                <div className="leading-tight">
+                  <p className="text-[9px] uppercase tracking-[0.12em] text-slate-400">
+                    Order #TT-4192
+                  </p>
+                  <p className="text-[11px] font-medium text-slate-900">
+                    Sunset Fete
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 function FeaturedEventCard() {
   return (
     <motion.article
@@ -474,23 +638,13 @@ function FeaturedEventCard() {
             Sat · 9PM
           </p>
 
-          <div className="mt-4 flex items-end justify-between gap-3">
-            <div className="leading-tight">
-              <p className="text-[9px] uppercase tracking-[0.16em] text-white/45">
-                From
-              </p>
-              <p className="text-[15px] font-semibold text-white tabular-nums mt-0.5">
-                J$3,500
-              </p>
-            </div>
-            <Link
-              href="/events"
-              aria-label="Get tickets for Sunset Fete"
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur ring-1 ring-white/25 px-3.5 py-2 text-xs font-medium text-white hover:bg-white/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-            >
-              Get tickets
-              <ArrowRight className="h-3 w-3" aria-hidden />
-            </Link>
+          <div className="mt-4 leading-tight">
+            <p className="text-[9px] uppercase tracking-[0.16em] text-white/45">
+              From
+            </p>
+            <p className="text-[15px] font-semibold text-white tabular-nums mt-0.5">
+              J$3,500
+            </p>
           </div>
         </div>
       </div>
