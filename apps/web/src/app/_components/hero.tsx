@@ -96,12 +96,15 @@ function HeroCopy() {
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.1 }}
-        className="mt-4 sm:mt-5 text-[2.375rem] leading-[1.04] sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight text-slate-900 text-balance"
+        className="mt-4 sm:mt-5 text-[clamp(2.625rem,11vw,3.25rem)] leading-[1.05] sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight text-slate-900 text-balance"
       >
-        Your next
-        <br className="sm:hidden" /> <AccentWord>unforgettable</AccentWord>{' '}
-        experience
-        <br className="sm:hidden" /> starts here.
+        Your next{' '}
+        <br className="sm:hidden" />
+        <AccentWord>unforgettable</AccentWord>{' '}
+        <br className="sm:hidden" />
+        experience{' '}
+        <br className="sm:hidden" />
+        starts here.
       </motion.h1>
 
       <motion.p
