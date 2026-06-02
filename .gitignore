@@ -16,4 +16,15 @@ apps/web/.env
 .vercel
 
 # Documentation
-docs/
+# docs/ is tracked. Use docs/private/ for personal notes you don't want committed.
+docs/private/
+
+# Pre-existing local-only plan docs (predate the tracked-docs convention).
+# Leave them where they are to stay private, or move them under docs/private/.
+docs/CREATE_TICKET_TYPE_PLAN.md
+docs/EDIT_TICKET_TYPE_PLAN.md
+docs/PROJECT_PLAN.md
+docs/event-form-refactor-plan.md
+docs/organizer-orders-plan.md
+docs/web-codebase-audit-and-plan.md
+docs/technical-roadmap.md
