@@ -1,8 +1,8 @@
 ---
 title: Database Migrations Adoption
-status: proposed
+status: active
 created: 2026-06-02
-tracking-issue: TBD
+tracking-issue: #280
 ---
 
 # Database Migrations Adoption
