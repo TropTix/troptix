@@ -1,6 +1,7 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled (6543) — used by the app at runtime
+  directUrl = env("DIRECT_URL")   // direct (5432) — required for migrations / diff
   // relationMode = "prisma"
 }
 
