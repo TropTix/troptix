@@ -1,4 +1,4 @@
-# 4. Reservation-based checkout on the current stack
+# 7. Reservation-based checkout on the current stack
 
 - **Status:** Proposed
 - **Date:** 2026-06-02
@@ -23,7 +23,7 @@ Three options were considered:
 
 Take option 3. Replace the inventory model with a reservation-based design **now, on Prisma + Postgres**, using raw SQL and Postgres functions for the concurrency-critical operations (`reserve`, `confirm`, `release`, `expire`). General-admission **counter inventory** (`capacity` / `reserved` / `sold`) with an atomic conditional decrement (`UPDATE … WHERE capacity - reserved - sold >= n`); an explicit `Reservation` with a TTL; orders materialized only on payment success; an idempotent, atomic webhook as the single source of truth. Fold in only the schema corrections the checkout functionally depends on (integer cents, `startsAt`/`endsAt`, meaningful ticket statuses, order-level type, non-null `createdAt`).
 
-This is consistent with the stated target architecture principle — *Drizzle for 90% CRUD, Postgres functions for concurrency-critical operations.* Authoring those functions on Prisma now makes the later Drizzle migration mechanical (the functions are stack-agnostic SQL).
+All schema and function changes ship through the Supabase migrations pipeline now in place ([ADR 0004](0004-supabase-migrations-as-source.md)): table/column DDL is generated from `schema.prisma` via `yarn db:new`, and the Postgres functions are hand-written SQL appended to the same migration (Prisma cannot express them). This is consistent with the stated target architecture principle — *Drizzle for 90% CRUD, Postgres functions for concurrency-critical operations.* Because `supabase/migrations/*.sql` is the source of truth, the functions are stack-agnostic SQL and survive the later Drizzle migration untouched.
 
 Assigned seating (per-unit inventory rows + `FOR UPDATE SKIP LOCKED`) is explicitly **not** built — events are general-admission only for the foreseeable future.
 

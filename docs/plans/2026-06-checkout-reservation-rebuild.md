@@ -7,7 +7,7 @@ tracking-issue: TBD
 
 # Checkout / Inventory / Payment — Reservation-Based Rebuild
 
-Spec and phased plan for replacing the inventory accounting model with a reservation-based design. Realizes roadmap **P4.3** (reservation checkout) and the **P2** schema corrections the checkout depends on, executed now on the current Prisma + Postgres stack. Backing decision: [ADR 0004](../adr/0004-reservation-based-checkout.md). Roadmap context: [`roadmap.md`](../roadmap.md) Priority 1 (bugs 1.1–1.3), Priority 2, Priority 4.3.
+Spec and phased plan for replacing the inventory accounting model with a reservation-based design. Realizes roadmap **P4.3** (reservation checkout) and the **P2** schema corrections the checkout depends on, executed now on the current Prisma + Postgres stack. Backing decision: [ADR 0007](../adr/0007-reservation-based-checkout.md). Schema/function changes ship through the Supabase migrations pipeline ([ADR 0004](../adr/0004-supabase-migrations-as-source.md), [migrations-adoption plan](2026-06-migrations-adoption.md)). Roadmap context: [`roadmap.md`](../roadmap.md) Priority 1 (bugs 1.1–1.3), Priority 2, Priority 4.3.
 
 ## Context
 
@@ -61,7 +61,7 @@ New `apps/web/src/server/lib/stripe.ts`: one shared client, `apiVersion: '2023-1
 
 ### 6. Postgres functions (concurrency-critical core)
 
-Authored as raw SQL in Prisma migrations, called via `$queryRaw`/`$executeRaw`: `reserve_tickets`, `confirm_reservation`, `release_reservation`, `expire_reservations`.
+Authored as hand-written SQL inside a Supabase migration (`supabase/migrations/<ts>_*.sql`), appended after the `db:new`-generated DDL since Prisma cannot express functions. Called from app code via `$queryRaw`/`$executeRaw`: `reserve_tickets`, `confirm_reservation`, `release_reservation`, `expire_reservations`.
 
 ### 7. Schema corrections the checkout depends on
 
@@ -79,7 +79,7 @@ Authored as raw SQL in Prisma migrations, called via `$queryRaw`/`$executeRaw`: 
 
 ## Files & Consumers
 
-**New:** `apps/web/src/server/lib/stripe.ts`; `apps/web/src/server/lib/reservations.ts` (TS wrappers over the SQL functions); Prisma migrations (additive, then cleanup) carrying the functions.
+**New:** `apps/web/src/server/lib/stripe.ts` (shipped in PR #279); `apps/web/src/server/lib/reservations.ts` (TS wrappers over the SQL functions); Supabase migrations under `supabase/migrations/` (additive, then cleanup) carrying the DDL + functions + backfill.
 
 **Checkout path:**
 - `app/api/checkout/initiate/route.ts` → "create reservation": call `reserve_tickets`, create PaymentIntent (idempotency key = reservation id), return `clientSecret` + `reservationId` + granted quantities. Delete PENDING-order creation, `validateTicketType` stock math, `getPrismaCreateOrderPayload`. Free orders run reservation→`confirm_reservation` immediately.
@@ -98,7 +98,8 @@ Authored as raw SQL in Prisma migrations, called via `$queryRaw`/`$executeRaw`: 
 
 ## Phases (one PR each)
 
-- **Phase A — Foundation (no behavior change).** Additive migration: new columns (`capacity`/`reserved`/`sold`, `*Cents`, `startsAt`/`endsAt`/`saleStartsAt`/`saleEndsAt`, order `type`, `checkinTimestamp`, new status enum values), new tables (`Reservation`, `ReservationItem`, `OutboxMessage`, optional `ProcessedStripeEvent`), and the Postgres functions. Backfill: `sold = quantitySold`; `capacity = quantity`; `*Cents = round(price*100)`; `startsAt = startDate (+ startTime)`; status mapping. Old columns retained. Add shared Stripe client + stand up the jest harness.
+- **PR 1 — Shared Stripe client (shipped, PR #279).** One `server/lib/stripe.ts` pinned to `2023-10-16`, replacing three ad-hoc clients; root fix for bug 1.3.
+- **Phase A — Schema + functions foundation (no behavior change).** Authored through the Supabase migrations pipeline against a per-PR **preview branch** (no local DB): edit `schema.prisma` → `yarn db:new checkout_reservation_foundation` generates the table/column DDL → **hand-append** to the migration the RLS-enable for the new tables, the data backfill, and the `CREATE FUNCTION` statements → `yarn db:apply` to the branch → verify the branch replays cleanly. Adds columns (`capacity`/`reserved`/`sold`, `*Cents`, `startsAt`/`endsAt`/`saleStartsAt`/`saleEndsAt`, order `type`, `checkinTimestamp`, new status enum values), new tables (`Reservation`, `ReservationItem`, `OutboxMessage`, optional `ProcessedStripeEvent` — all with RLS enabled per the #281 convention), and the Postgres functions. Backfill: `sold = quantitySold`; `capacity = quantity`; `*Cents = round(price*100)`; `startsAt = startDate (+ startTime)`; status mapping. Old columns retained (additive ⇒ all new columns nullable or defaulted). Also stand up the jest harness (jest is referenced in `package.json` but not installed).
 - **Phase B — Cut over checkout.** Switch initiate/config/apply-code/webhook/cron to the reservation model. **`reserved` seeded from in-flight PENDING holds at cutover** (the one genuine risk) — deploy in a low-traffic window with a brief checkout pause during seed+switch. Full test suite here.
 - **Phase C — Organizer reads.** Dashboard, scan/check-in, complementary path move to new columns/statuses.
 - **Phase D — Cleanup.** Drop `quantitySold`/`quantity`/`price`/`startDate`/`startTime`/old statuses; remove dead code. Optional deferred rename sweep.
@@ -107,7 +108,7 @@ Authored as raw SQL in Prisma migrations, called via `$queryRaw`/`$executeRaw`: 
 
 ## Verification
 
-- **Concurrency (headline):** integration test against a **real Postgres** — N concurrent `reserve_tickets` for `capacity = 1`; assert exactly one grant, `reserved` never exceeds `capacity`.
+- **Concurrency (headline):** integration test against the PR's **Supabase preview branch** (a real Postgres) — N concurrent `reserve_tickets` for `capacity = 1`; assert exactly one grant, `reserved` never exceeds `capacity`.
 - **Idempotency:** `confirm_reservation` twice for one payment intent → `sold` increments once, one Order.
 - **Expiry:** HELD reservation past `expiresAt` → `reserved` released, status EXPIRED.
 - **Money:** cents round-trips with Stripe amounts (no float drift).
