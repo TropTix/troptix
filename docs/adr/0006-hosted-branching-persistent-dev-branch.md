@@ -14,7 +14,7 @@ We want the common path — frontend iteration — to require **nothing installe
 
 All database environments are **hosted via Supabase Branching**; there is **no local Docker stack**.
 
-- **Persistent dev branch** (always-on, tracks `main`): the default target for app/frontend work. Schema stays current — migrations apply on merge. Its **data is loaded once** via a `pg_dump`/`pg_restore` from the (retiring) dev DB — real data that lives in the branch's database, never in git. Production data is never cloned in (`--with-data` is not used).
+- **Persistent dev branch** (always-on): the default target for app/frontend work. It can't link to `main` (the production database owns that git branch), so it syncs with a mirrored `dev` git branch that a secret-less GitHub Action (`.github/workflows/sync-dev-branch.yml`) fast-forwards to `main` on every merge — Supabase then applies any newly-merged migrations to it. Schema stays current that way. Its **data is loaded once** via a `pg_dump`/`pg_restore` from the (retiring) dev DB — real data that lives in the branch's database, never in git. Production data is never cloned in (`--with-data` is not used).
 - **Ephemeral preview branch** (per PR): spun up for schema changes, used to author and validate the migration in isolation, destroyed on PR close. Seeded from `supabase/seed.sql` — a **small synthetic fixture** (one demo organizer/event/ticket types), not real data. The Supabase↔Vercel integration auto-wires the PR's preview deploy to it.
 - **Prod**: fed by Branching on merge to `main`.
 

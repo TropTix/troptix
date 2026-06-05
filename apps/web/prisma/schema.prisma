@@ -1,7 +1,7 @@
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL") // pooled (6543) — used by the app at runtime
-  directUrl = env("DIRECT_URL")   // direct (5432) — required for migrations / diff
+  url       = env("POSTGRES_PRISMA_URL")      // pooled (pgbouncer) — managed by the Supabase↔Vercel integration
+  directUrl = env("POSTGRES_URL_NON_POOLING") // direct (5432) — migrations / diff
   // relationMode = "prisma"
 }
 
