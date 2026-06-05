@@ -36,9 +36,9 @@ Source of truth for schema changes becomes **`supabase/migrations/*.sql`** — p
 |---|---|---|
 | Migration store | `supabase/migrations/<timestamp>_<name>.sql` (committed) | git |
 | Authoring | edit `schema.prisma` → `prisma migrate diff` emits SQL, diffed against a **preview branch** at migration head | `yarn db:new <name>` |
-| Default dev environment (app/frontend work) | **persistent Supabase dev branch** (tracks `main`, schema current on merge; **data loaded once** from the retiring dev DB, lives in the branch not git) | always-on |
+| Default dev environment (app/frontend work) | **persistent Supabase dev branch** (synced to `main` via a mirrored `dev` git branch; schema current on merge; **data loaded once** from the retiring dev DB, lives in the branch not git) | always-on |
 | Per-PR ephemeral DB (apply on open / **destroy on close**) | **Supabase Branching** (native GitHub integration) | PR opened / closed |
-| Preview app → branch DB | Supabase↔Vercel integration auto-injects `DATABASE_URL`/`DIRECT_URL` into the preview | per preview deploy |
+| Preview app → branch DB | Supabase↔Vercel integration auto-injects `POSTGRES_PRISMA_URL`/`POSTGRES_URL_NON_POOLING` into the preview | per preview deploy |
 | **Prod apply on merge** | **Supabase Branching** auto-applies `supabase/migrations` to the production database when the PR merges to `main` | merge to `main` |
 
 Why not the alternatives:
@@ -60,7 +60,7 @@ The prod/dev DBs already have the full schema but no migration history. A fresh 
    Review the SQL — it should be the full `CREATE TABLE …` set matching prod.
 2. Verify no drift between the SQL and the live DBs:
    ```bash
-   npx prisma migrate diff --from-url "$DEV_DIRECT_URL" \
+   npx prisma migrate diff --from-url "<direct-url>" \
      --to-schema-datamodel prisma/schema.prisma --script   # expect empty
    ```
 3. Mark prod and dev as already at the baseline so `db push` won't try to re-create:
@@ -75,7 +75,7 @@ The prod/dev DBs already have the full schema but no migration history. A fresh 
 - Add `directUrl` to the datasource block in `schema.prisma`.
 
 ### Phase 2 — Enable Supabase Branching + integrations (one-time, dashboard)
-See the checklist at the bottom — these are console steps that can't be committed. Branching owns per-PR preview DBs, the **persistent dev branch**, **and** the prod apply on merge, so there is no CI workflow or GitHub secrets to configure. Includes creating the persistent dev branch (seed-only) and retiring the old standalone dev DB.
+See the checklist at the bottom — these are console steps that can't be committed. Branching owns per-PR preview DBs and the prod apply on merge. The persistent dev branch **can't link to `main`** (the prod DB owns that git branch), so it syncs with a mirrored `dev` git branch kept current by a secret-less GitHub Action (`.github/workflows/sync-dev-branch.yml`) — Supabase still does the actual migration apply. Includes creating the persistent dev branch and retiring the old standalone dev DB.
 
 ### Phase 3 — Cut over
 - Stop all use of `prisma db push`.
@@ -87,15 +87,17 @@ See the checklist at the bottom — these are console steps that can't be commit
 
 | Environment | What it is | Use it for |
 |---|---|---|
-| **Persistent dev branch** (Supabase) | Always-on branch tracking `main`; schema stays current (migrations apply on merge); **real data loaded once** from the dev DB (one-time `pg_dump` restore, lives in the branch, not git) | **App / frontend work that doesn't touch the schema** — fast iteration on real-ish data, nothing to install |
+| **Persistent dev branch** (Supabase) | Always-on branch synced to `main` via a mirrored `dev` git branch (a GitHub Action fast-forwards it on merge; Supabase applies the migrations); schema stays current; **real data loaded once** from the dev DB (one-time `pg_dump` restore, lives in the branch, not git) | **App / frontend work that doesn't touch the schema** — fast iteration on real-ish data, nothing to install |
 | **Preview branch** (ephemeral, per PR) | Created on PR open from `supabase/migrations` + the synthetic `seed.sql` fixture, **destroyed on close** | **Schema changes** — author + validate the migration in isolation |
 | **Prod** | Production database | Not used directly — fed by Branching on merge |
 
 Decision rule:
 - **Not touching the schema?** Point the app at the **persistent dev branch**. No Docker, real-ish (seed) data, always up.
-- **Touching the schema?** Open a PR (or `supabase branches create`) → a **preview branch** spins up. Point `DATABASE_URL`/`DIRECT_URL`/`DEV_DIRECT_URL` at that branch; the Vercel preview is wired to it automatically.
+- **Touching the schema?** Open a PR (or `supabase branches create`) → a **preview branch** spins up. Point `POSTGRES_PRISMA_URL`/`POSTGRES_URL_NON_POOLING` at that branch; the Vercel preview is wired to it automatically.
 
-**Diff baseline = a preview branch at migration head.** `db:new` diffs `DEV_DIRECT_URL` → `schema.prisma`. A freshly created preview branch is exactly at `main`'s migration head, so the diff yields precisely your new migration. **Keep the branch at head:** after generating each migration, `yarn db:apply` pushes it to the branch so the *next* diff is correct. (There is no local stack to diff against anymore.)
+> **Env var names:** the app's datasource reads `POSTGRES_PRISMA_URL` (pooled) and `POSTGRES_URL_NON_POOLING` (direct) — the names the Supabase↔Vercel integration manages. `db:new`/`db:apply` reuse `POSTGRES_URL_NON_POOLING` as the diff baseline, so there's no separate authoring var to set.
+
+**Diff baseline = a preview branch at migration head.** `db:new` diffs `POSTGRES_URL_NON_POOLING` → `schema.prisma`. A freshly created preview branch is exactly at `main`'s migration head, so the diff yields precisely your new migration. **Keep the branch at head:** after generating each migration, `yarn db:apply` pushes it to the branch so the *next* diff is correct. (There is no local stack to diff against anymore.)
 
 **"Replays from empty" validation now happens on the branch, not locally.** A preview branch builds from an empty DB by running every file in `supabase/migrations` + `seed.sql` — the same proof `db:reset` used to give, now on the real target. A green branch creation = the migration replays cleanly.
 
@@ -114,7 +116,7 @@ merge to main → dev branch + prod stay current
 **Schema change** — via a preview branch:
 ```
 open a PR (Branching auto-creates a preview branch)   # or: supabase branches create <name>
-point DEV_DIRECT_URL / DATABASE_URL at that branch
+point POSTGRES_PRISMA_URL / POSTGRES_URL_NON_POOLING at that branch
 edit apps/web/prisma/schema.prisma
 cd apps/web && yarn db:new add_promoter_payout_field   # diffs branch(at head) → schema → supabase/migrations/<ts>_*.sql
 # review the SQL, then apply it to the branch (keeps the branch at head + app testable):
@@ -123,7 +125,8 @@ git commit && push
   → the preview branch replays all migrations + seed from empty (the "replays cleanly" proof)
   → Vercel preview points at that branch DB automatically
 merge to main
-  → Supabase Branching applies the new migration to the production DB (and to the persistent dev branch)
+  → Supabase Branching applies the new migration to the production DB
+  → the sync-dev-branch Action fast-forwards the `dev` git branch → Supabase applies it to the dev branch too
 close/merge PR
   → Supabase destroys the preview branch DB
 ```
@@ -141,9 +144,8 @@ supabase branches create my-feature        # …or just open a PR — Branching 
 supabase branches get my-feature           # host/credentials (or read them from the dashboard)
 
 # 3. Point apps/web/.env at the branch
-#    DATABASE_URL   = <branch pooled 6543>
-#    DIRECT_URL     = <branch direct 5432>
-#    DEV_DIRECT_URL = <branch direct 5432>   # diff baseline
+#    POSTGRES_PRISMA_URL      = <branch pooled, pgbouncer>
+#    POSTGRES_URL_NON_POOLING = <branch direct 5432>   # also the db:new diff baseline
 
 # 4. Author + apply the migration
 #    edit apps/web/prisma/schema.prisma
@@ -162,15 +164,16 @@ supabase branches delete my-feature         # PR-created branches auto-destroy o
 ## One-time setup checklist (manual — dashboard / secrets)
 
 - [ ] Supabase → **Integrations → GitHub**: connect the repo, set Supabase directory to `./supabase`, enable **Branching** (automatic branch on PR). This also enables auto-apply to **production** on merge to `main` — the documented prod-apply authority for this plan.
-- [ ] Create the **persistent dev branch** (tracks `main`): `supabase branches create dev --persistent` (no `--with-data` → no prod clone).
-- [ ] Load real data into the dev branch **once**, before retiring the old dev DB: `pg_dump "$DEV_DIRECT_URL" --data-only --no-owner --no-privileges --disable-triggers -Fc -f /tmp/dev-data.dump` → `pg_restore --data-only --no-owner --no-privileges --disable-triggers -d "<dev-branch-direct-url>" /tmp/dev-data.dump`.
+- [ ] Create the **persistent dev branch**: `supabase branches create dev --persistent` (no `--with-data` → no prod clone).
+- [ ] Create a `dev` git branch (mirror of `main`), set the dev branch's Supabase **Sync with Git branch** = `dev`, and keep `dev` unprotected. The committed `.github/workflows/sync-dev-branch.yml` fast-forwards `dev` → `main` on every merge, so Supabase applies new migrations to the dev branch automatically.
+- [ ] Load real data into the dev branch **once**, before retiring the old dev DB: `pg_dump "<old-dev-db-direct-url>" --data-only --no-owner --no-privileges --disable-triggers -Fc -f /tmp/dev-data.dump` → `pg_restore --data-only --no-owner --no-privileges --disable-triggers -d "<dev-branch-direct-url>" /tmp/dev-data.dump`.
 - [ ] Supabase → **Integrations → Vercel**: connect so PR preview deploys get their **preview branch** URLs automatically, and point the **dev/staging** deploy at the **persistent dev branch**. Confirm preview env vars are *branch-scoped*, prod stays on prod.
-- [ ] `apps/web/.env`: default profile points at the **persistent dev branch** (pooled + direct). When doing schema work, repoint `DATABASE_URL`/`DIRECT_URL`/`DEV_DIRECT_URL` at the PR's preview branch.
+- [ ] `apps/web/.env`: default profile points at the **persistent dev branch** (pooled + direct). When doing schema work, repoint `POSTGRES_PRISMA_URL`/`POSTGRES_URL_NON_POOLING` at the PR's preview branch.
 - [ ] Retire the old standalone dev DB project once the persistent dev branch is serving traffic.
 
 ## Risks / notes
 
-- **Authoring diff baseline:** `db:new` diffs `DEV_DIRECT_URL` → new schema. Point it at a **preview branch at migration head**, and `yarn db:apply` after each migration so the branch stays at head — otherwise the next diff regenerates already-authored migrations. (No local stack to diff against anymore.)
+- **Authoring diff baseline:** `db:new`/`db:apply` use `POSTGRES_URL_NON_POOLING` (the app's own direct URL) as the baseline. Point it at a **preview branch at migration head**, and `yarn db:apply` after each migration so the branch stays at head — otherwise the next diff regenerates already-authored migrations. (No local stack to diff against anymore.)
 - **Pooler vs direct:** migrations need the direct (5432) connection; the app uses the pooled (6543) one. Hence `directUrl`.
 - **Data sources** ([ADR 0006](../adr/0006-hosted-branching-persistent-dev-branch.md)): the persistent dev branch holds real data (one-time dev-DB restore, in the branch not git); preview branches get only the synthetic `seed.sql` fixture. Nothing real is committed or cloned into per-PR branches. The dev branch holds real records, so access-control it accordingly.
 - **Branching is billed** — the persistent dev branch (always-on) and every preview branch are real Postgres instances with cost. Preview branches are torn down on PR close; the dev branch runs continuously.

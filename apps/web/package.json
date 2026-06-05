@@ -14,7 +14,7 @@
     "test:watch": "jest --watch",
     "postinstall": "prisma generate",
     "db:new": "tsx scripts/new-migration.ts",
-    "db:apply": "supabase db push --db-url \"$DEV_DIRECT_URL\"",
+    "db:apply": "supabase db push --db-url \"$POSTGRES_URL_NON_POOLING\"",
     "knip": "knip"
   },
   "engines": {

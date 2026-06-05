@@ -2,15 +2,16 @@
  * Generate a Supabase-format migration from the current Prisma schema.
  *
  * Usage:
- *   yarn db:new <name>          # diff: dev DB  -> schema.prisma
- *   yarn db:new <name> --init   # diff: empty   -> schema.prisma  (baseline, Phase 0)
+ *   yarn db:new <name>          # diff: current branch -> schema.prisma
+ *   yarn db:new <name> --init   # diff: empty          -> schema.prisma  (baseline, Phase 0)
  *
  * Writes supabase/migrations/<timestamp>_<name>.sql using `prisma migrate diff`.
  * Plain SQL is the source of truth (docs/adr/0004-supabase-migrations-as-source.md);
  * Prisma is only the generator. Review the emitted SQL before committing.
  *
  * Env:
- *   DEV_DIRECT_URL  direct (5432) connection to the dev DB, used as the diff baseline.
+ *   POSTGRES_URL_NON_POOLING  direct (5432) connection to the branch you're working on
+ *                             (a preview/dev branch, kept at migration head). The diff baseline.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -41,9 +42,9 @@ const outFile = join(migrationsDir, `${timestamp}_${name}.sql`);
 const fromArgs = isInit
   ? ["--from-empty"]
   : (() => {
-      const url = process.env.DEV_DIRECT_URL;
+      const url = process.env.POSTGRES_URL_NON_POOLING;
       if (!url) {
-        console.error("DEV_DIRECT_URL is required (direct 5432 connection to the dev DB).");
+        console.error("POSTGRES_URL_NON_POOLING is required (direct 5432 connection to the branch you're working on).");
         console.error("Use --init for the first baseline migration (diff from empty).");
         process.exit(1);
       }

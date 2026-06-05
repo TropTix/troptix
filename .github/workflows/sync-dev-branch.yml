@@ -1,0 +1,34 @@
+name: Sync dev branch with main
+
+# Keeps the `dev` git branch fast-forwarded to `main`. The Supabase persistent
+# "dev" database branch is linked to this `dev` git branch, so advancing it makes
+# Supabase apply any newly-merged migrations to the dev database automatically.
+#
+# Why a mirror branch: a git branch maps 1:1 to a Supabase DB branch, and `main`
+# is already owned by the production database — so the dev branch can't link to
+# `main` directly. This is dev-only and git-only (no Supabase/DB secrets); the
+# actual migration apply is done by Supabase's git-sync, not this workflow.
+#
+# NOTE: nothing should commit directly to `dev` — it is a pure mirror of `main`.
+# Keep `dev` unprotected (or exempt this workflow) so GITHUB_TOKEN can push.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-dev-branch
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fast-forward dev to main
+        run: git push origin HEAD:refs/heads/dev
