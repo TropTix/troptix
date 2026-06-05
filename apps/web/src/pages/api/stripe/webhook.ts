@@ -5,6 +5,7 @@ import {
   updateTicketTypeQuantitySold,
 } from '@/server/lib/orderHelper';
 import prisma from '@/server/prisma';
+import { stripe } from '@/server/lib/stripe';
 import { buffer } from 'micro';
 
 import { sendEmailConfirmationEmailToUser } from '@/server/lib/email';
@@ -15,11 +16,6 @@ export const config = {
     bodyParser: false,
   },
 };
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // @ts-ignore
-  apiVersion: '2023-08-16',
-});
 
 const endpointSecret = process.env.STRIPE_CHARGE_SUCCEEDED_WEBHOOK;
 

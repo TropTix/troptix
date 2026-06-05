@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers'; // For reading cookies in App Router
 import prisma from '@/server/prisma';
-import Stripe from 'stripe';
+import { stripe } from '@/server/lib/stripe';
 import { UserDetailsFormData } from '@/lib/schemas/checkoutSchema'; // Adjust path if needed
 import { OrderStatus, TicketFeeStructure, TicketStatus } from '@prisma/client';
 import { getFirebaseAdmin } from '@/server/lib/firebaseAdmin'; // Adjust path if needed
@@ -16,10 +16,6 @@ import {
 import { calculateFees } from '@/lib/fees'; // Adjust path if needed
 import { Prisma } from '@prisma/client';
 import { sendEmailConfirmationEmailToUser } from '@/server/lib/email';
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // @ts-ignore
-  apiVersion: '2024-04-10',
-});
 
 interface InitiateRequestData {
   eventId: string;

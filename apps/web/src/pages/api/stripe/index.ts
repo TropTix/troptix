@@ -1,13 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import Stripe from 'stripe';
 import { allowCors } from '@/server/lib/auth';
 import prisma from '@/server/prisma';
-
-const secretKey = process.env.STRIPE_SECRET_KEY as string;
-const stripe = new Stripe(secretKey, {
-  // @ts-ignore
-  apiVersion: '2023-08-16',
-});
+import { stripe, MOBILE_STRIPE_API_VERSION } from '@/server/lib/stripe';
 
 async function handler(request: VercelRequest, response: VercelResponse) {
   const { method } = request;
@@ -96,7 +90,7 @@ async function createCharge(body, response) {
 
     const ephemeralKey = await stripe.ephemeralKeys.create(
       { customer: customerId },
-      { apiVersion: '2020-08-27' }
+      { apiVersion: MOBILE_STRIPE_API_VERSION }
     );
 
     const paymentIntent = await stripe.paymentIntents.create({
