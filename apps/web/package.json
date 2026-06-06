@@ -13,8 +13,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "postinstall": "prisma generate",
-    "db:new": "tsx scripts/new-migration.ts",
-    "db:apply": "supabase db push --db-url \"$POSTGRES_URL_NON_POOLING\"",
+    "db:new": "tsx --env-file=.env scripts/new-migration.ts",
+    "db:apply": "tsx --env-file=.env scripts/apply-migration.ts",
     "knip": "knip"
   },
   "engines": {
