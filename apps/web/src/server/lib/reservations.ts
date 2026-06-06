@@ -74,23 +74,8 @@ export async function reserve(input: ReserveInput): Promise<ReserveResult> {
   const reservationId = generateId();
 
   return prisma.$transaction(async (tx) => {
-    await tx.reservation.create({
-      data: {
-        id: reservationId,
-        status: ReservationStatus.HELD,
-        expiresAt,
-        email: input.contact?.email ?? null,
-        firstName: input.contact?.firstName ?? null,
-        lastName: input.contact?.lastName ?? null,
-        totalCents: 0,
-        subtotalCents: 0,
-        feesCents: 0,
-        event: { connect: { id: input.eventId } },
-        ...(input.userId ? { user: { connect: { id: input.userId } } } : {}),
-      },
-    });
-
     const grantedItems: ReserveGrantedItem[] = [];
+    const itemRows: Prisma.ReservationItemCreateManyReservationInput[] = [];
     let subtotalCents = 0;
     let feesCents = 0;
 
@@ -120,15 +105,12 @@ export async function reserve(input: ReserveInput): Promise<ReserveResult> {
       }
 
       if (granted > 0) {
-        await tx.reservationItem.create({
-          data: {
-            id: generateId(),
-            reservationId,
-            ticketTypeId: item.ticketTypeId,
-            quantity: granted,
-            unitPriceCents: item.unitPriceCents,
-            feesCents: item.feesCents,
-          },
+        itemRows.push({
+          id: generateId(),
+          ticketTypeId: item.ticketTypeId,
+          quantity: granted,
+          unitPriceCents: item.unitPriceCents,
+          feesCents: item.feesCents,
         });
         subtotalCents += granted * item.unitPriceCents;
         feesCents += granted * item.feesCents;
@@ -139,9 +121,22 @@ export async function reserve(input: ReserveInput): Promise<ReserveResult> {
 
     const totalCents = subtotalCents + feesCents;
 
-    await tx.reservation.update({
-      where: { id: reservationId },
-      data: { subtotalCents, feesCents, totalCents },
+    // One write: create the hold with its items and final totals already known.
+    await tx.reservation.create({
+      data: {
+        id: reservationId,
+        status: ReservationStatus.HELD,
+        expiresAt,
+        email: input.contact?.email ?? null,
+        firstName: input.contact?.firstName ?? null,
+        lastName: input.contact?.lastName ?? null,
+        subtotalCents,
+        feesCents,
+        totalCents,
+        event: { connect: { id: input.eventId } },
+        ...(input.userId ? { user: { connect: { id: input.userId } } } : {}),
+        items: { createMany: { data: itemRows } },
+      },
     });
 
     return {
@@ -209,8 +204,10 @@ export async function confirm(input: ConfirmInput): Promise<ConfirmResult> {
     const orderType = isFree ? OrderType.FREE : OrderType.PAID;
     const ticketsType = isFree ? TicketType.FREE : TicketType.PAID;
 
-    // reserved → sold. Dual-write the legacy `quantitySold` until Phase C swaps
-    // the organizer dashboard read to `sold` (plan decision #3).
+    // In one pass per item: move reserved → sold (dual-writing the legacy
+    // `quantitySold` until Phase C swaps the dashboard read to `sold`), and
+    // build one VALID ticket row per reserved unit.
+    const ticketRows: Prisma.TicketsCreateManyOrderInput[] = [];
     for (const item of reservation.items) {
       await tx.ticketTypes.update({
         where: { id: item.ticketTypeId },
@@ -220,12 +217,9 @@ export async function confirm(input: ConfirmInput): Promise<ConfirmResult> {
           quantitySold: { increment: item.quantity },
         },
       });
-    }
 
-    // One ticket row per reserved unit.
-    const ticketRows: Prisma.TicketsCreateManyOrderInput[] =
-      reservation.items.flatMap((item) =>
-        Array.from({ length: item.quantity }, () => ({
+      for (let i = 0; i < item.quantity; i++) {
+        ticketRows.push({
           id: generateId(),
           status: TicketStatus.VALID,
           ticketsType,
@@ -238,8 +232,9 @@ export async function confirm(input: ConfirmInput): Promise<ConfirmResult> {
           eventId: reservation.eventId,
           ticketTypeId: item.ticketTypeId,
           ...(reservation.userId ? { userId: reservation.userId } : {}),
-        }))
-      );
+        });
+      }
+    }
 
     const orderId = generateId();
     await tx.orders.create({
