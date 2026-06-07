@@ -1,6 +1,6 @@
 ---
 title: Checkout / Inventory / Payment — Reservation-Based Rebuild
-status: proposed
+status: active
 created: 2026-06-02
 tracking-issue: TBD
 ---
@@ -8,6 +8,8 @@ tracking-issue: TBD
 # Checkout / Inventory / Payment — Reservation-Based Rebuild
 
 Spec and phased plan for replacing the inventory accounting model with a reservation-based design. Realizes roadmap **P4.3** (reservation checkout) and the **P2** schema corrections the checkout depends on, executed now on the current Prisma + Postgres stack. Backing decision: [ADR 0007](../adr/0007-reservation-based-checkout.md). Schema/function changes ship through the Supabase migrations pipeline ([ADR 0004](../adr/0004-supabase-migrations-as-source.md), [migrations-adoption plan](2026-06-migrations-adoption.md)). Roadmap context: [`roadmap.md`](../roadmap.md) Priority 1 (bugs 1.1–1.3), Priority 2, Priority 4.3.
+
+> **Status (2026-06): foundation merged; cutover folded into the checkout redesign.** Shipped to main: the shared Stripe client (#279), the reservation schema (#284, Phase A), and the `reserve`/`confirm`/`release`/`expire` primitives + tests (#285, B1) — the hard, UI-agnostic core. The remaining cutover (B2 server wiring + B3 client) is **deferred**: a checkout pages/flow redesign is imminent and bugs 1.1/1.2 are low-volume, so retrofitting the soon-to-be-replaced pages would be throwaway. The reservation flow will be built **into the redesigned checkout** instead — the redesign *is* the client half of this rebuild, against an API that's already built and tested. See Phase B.
 
 ## Context
 
@@ -106,18 +108,20 @@ Atomic at READ COMMITTED — the `UPDATE` row-locks and re-checks the predicate 
 
 - **PR 1 — Shared Stripe client (shipped, PR #279).** One `server/lib/stripe.ts` pinned to `2023-10-16`, replacing three ad-hoc clients; root fix for bug 1.3.
 - **Phase A — Schema foundation (shipped, PR #284).** Additive `schema.prisma` (new columns `capacity`/`reserved`/`sold`, `*Cents`, `startsAt`/`endsAt`/`saleStartsAt`/`saleEndsAt`, order `type`, `checkinTimestamp`, new `TicketStatus` values; new tables `Reservation`/`ReservationItem`/`OutboxMessage`/`ProcessedStripeEvent`) generated via `yarn db:new`, with RLS on the new tables hand-appended (per the #281 convention). **No stored functions, no backfill** (deferred to the cutover). Old columns retained; all new columns nullable or defaulted ⇒ behavior-neutral.
-- **Phase B — Cut over checkout (fixes 1.1 + 1.2).** The live-flow change. **Headline contract change:** the Order is materialized only on webhook `confirm`, so `/initiate` returns a `reservationId` and post-payment pages key off it (see *Client*, above). Split into reviewable sub-PRs:
-  - **B1** — `server/lib/reservations.ts` (`reserve`/`confirm`/`release`/`expire`) + jest harness (jest is referenced in `package.json` but not installed) + concurrency / idempotency / expire tests against the preview branch. *(isolated, no wiring — safest first)*
-  - **B2** — server cutover: `/initiate` → `reserve()`; `/config` + `/apply-code` → `capacity − reserved − sold`; webhook → App Router + `confirm()`; cron → `expire()`.
-  - **B3** — client: reservation-aware URLs + receipt/order polling.
-  - **B4** — cutover migration (backfill `sold ← quantitySold` + the static columns; seed `reserved` from in-flight PENDING holds) + the operational runbook.
+- **Phase B — Cut over checkout (fixes 1.1 + 1.2).** The live-flow change. **Headline contract change:** the Order is materialized only on webhook `confirm`, so `/initiate` returns a `reservationId` and post-payment pages key off it (see *Client*, above). **B1 is shipped; B2–B4 are deferred and fold into the upcoming checkout redesign** (see Status) — the new pages are built against the reservation API rather than retrofitting the old ones, and B2's server wiring lands atomically with that new client.
+  - **B1 — shipped (PR #285).** `server/lib/reservations.ts` (`reserve`/`confirm`/`release`/`expire`) + jest harness + concurrency / idempotency / expire tests. Isolated; unused until wired in.
+  - **B2 (deferred → redesign)** — server cutover: `/initiate` → `reserve()`; `/config` + `/apply-code` → `capacity − reserved − sold`; webhook → App Router + `confirm()`; cron → `expire()`.
+  - **B3 (deferred → redesign)** — the **new** checkout pages, built reservation-aware (reservationId URLs, processing/poll) — *replaces* the old `CheckoutContainer`/`payment-form`/receipt retrofit rather than adding to it.
+  - **B4 (deferred → redesign cutover)** — backfill `sold ← quantitySold` + the static columns; seed `reserved` from in-flight PENDING holds; the maintenance-window runbook.
 
   **Decisions:**
-  1. **Async order id** — post-payment URLs use `reservationId`; receipt/order resolve the order via the reservation and poll while it's unconverted. Confirmation page unchanged (already async-safe).
+  1. **Async order id (separate ids, chosen)** — the Order keeps its own `generateId()`, linked via `Reservation.orderId`. Post-payment URLs use `reservationId`; receipt/order resolve the order via the reservation and poll while it's unconverted. Confirmation page unchanged (already async-safe).
   2. **Reservation TTL** — 10 minutes (the client may show a countdown).
   3. **Dashboard during transition** — `confirm()` dual-writes `quantitySold` alongside `sold`, so the organizer dashboard stays correct until Phase C swaps its read to `sold`. Keeps B and C decoupled.
   4. **Idempotency** — `ProcessedStripeEvent` (Stripe event id) **and** the reservation-status guard (both; cheap).
   5. **Cutover runbook** — run B4's sweep in a brief checkout-pause window so there are ~no in-flight PENDING orders to migrate; then deploy + resume. `reserved` is seeded then — the one genuine risk.
+  6. **Cutover strategy** — maintenance-window coordinated deploy, **not** a feature flag (simpler; avoids dual code paths on a soon-to-be-redesigned flow).
+  7. **PR structure** — B2's server wiring + the new redesigned checkout client ship as **one atomic cutover PR** (neither works without the other).
 - **Phase C — Organizer reads.** Dashboard, scan/check-in, complementary path move to new columns/statuses.
 - **Phase D — Cleanup.** Drop `quantitySold`/`quantity`/`price`/`startDate`/`startTime`/old statuses; remove dead code. Optional deferred rename sweep.
 
