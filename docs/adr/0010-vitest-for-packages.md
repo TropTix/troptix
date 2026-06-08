@@ -7,7 +7,7 @@
 
 The shared packages ship raw ESM TypeScript ([ADR 0009](0009-shared-package-topology.md)). The core testability goal of the initiative is that services are pure `(db, input) => result` functions, so most new tests are package-local service tests. `apps/web` already has an entrenched Jest setup (jsdom, `@testing-library/react`) for component tests, and the B1 reservation harness (`reservations.test.ts`) uses Jest globals against a real preview Postgres.
 
-Jest needs `ts-jest`/babel and ESM workarounds to run raw-TS ESM packages; Vitest runs TS/ESM natively with near-zero config and is the de-facto runner for Drizzle/tRPC packages.
+Jest needs `ts-jest`/babel and ESM workarounds to run raw-TS ESM packages; Vitest runs TS/ESM natively with near-zero config and is the de-facto runner for modern Prisma/tRPC TypeScript packages.
 
 ## Decision
 
