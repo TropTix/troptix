@@ -1,4 +1,3 @@
-import * as React from 'react';
 import {
   Html,
   Head,
@@ -51,16 +50,16 @@ interface EmailOrder {
   tickets: EmailTicket[];
 }
 
-export default function EmailConfirmationTemplate({
+export default function ComplementaryTicketEmail({
   order = {
     id: 'TT-2024-001234',
-    firstName: 'Emmanuel',
-    lastName: 'Sylvester',
-    email: 'emmanuel.sylvester@usetroptix.com',
+    firstName: null,
+    lastName: null,
+    email: 'guest@example.com',
     total: 0,
     subtotal: 0,
     fees: 0,
-    cardLast4: '1234',
+    cardLast4: null,
     createdAt: new Date('2024-03-15'),
     event: {
       id: 'event-123',
@@ -80,32 +79,8 @@ export default function EmailConfirmationTemplate({
         fees: 0,
         ticketType: {
           id: '1',
-          name: 'General Admission',
-          description: 'Free admission ticket',
-          price: 0,
-        },
-      },
-      {
-        id: 'ticket-2',
-        total: 0,
-        subtotal: 0,
-        fees: 0,
-        ticketType: {
-          id: '1',
-          name: 'General Admission',
-          description: 'Free admission ticket',
-          price: 0,
-        },
-      },
-      {
-        id: 'ticket-3',
-        total: 0,
-        subtotal: 0,
-        fees: 0,
-        ticketType: {
-          id: '2',
-          name: 'General Admission Paid',
-          description: 'Free admission ticket',
+          name: 'VIP Pass',
+          description: 'Complimentary VIP access',
           price: 0,
         },
       },
@@ -122,12 +97,8 @@ export default function EmailConfirmationTemplate({
     (process.env.NODE_ENV === 'development'
       ? 'http://localhost:3000'
       : 'https://usetroptix.com');
-  const ticketUrl = `${baseUrl}/orders/${order.id}/tickets`;
+  const ticketUrl = `${baseUrl}/orders/${order.id}/tickets?utm_source=complementary_email&utm_medium=email&utm_campaign=complementary_tickets`;
   const ticketGroups = groupTicketsByType(tickets);
-  const fullName =
-    [order.firstName, order.lastName].filter(Boolean).join(' ') || 'Guest';
-  const totalPrice =
-    order.total && order.total > 0 ? formatCurrency(order.total) : 'FREE';
 
   return (
     <Html>
@@ -148,7 +119,7 @@ export default function EmailConfirmationTemplate({
             </Section>
 
             <Heading className="text-2xl text-center px-6 pt-4 text-slate-900">
-              {order.firstName}, you&apos;re confirmed!
+              You&apos;ve received complimentary tickets!
             </Heading>
 
             <Section className="p-6">
@@ -168,7 +139,7 @@ export default function EmailConfirmationTemplate({
                 href={ticketUrl}
                 className="block bg-indigo-500 text-white text-base font-semibold no-underline text-center py-3 px-5 rounded-md w-1/2 mx-auto"
               >
-                View Tickets
+                View Your Tickets
               </Button>
 
               <Section className="text-sm text-slate-600 mb-6">
@@ -205,48 +176,24 @@ export default function EmailConfirmationTemplate({
                   style={{ width: '100%', lineHeight: '1.6' }}
                 >
                   <tbody>
-                    <tr>
-                      <td className="text-sm text-slate-500 pr-4 align-top">
-                        Name
-                      </td>
-                      <td className="text-sm text-black font-medium text-right">
-                        {fullName}
-                      </td>
-                    </tr>
-
                     {ticketGroups.map((group, index) => (
                       <tr key={index}>
                         <td className="text-sm text-slate-900 font-medium pr-4 align-top pt-2">
                           {group.ticketType?.name || 'Ticket'}
                         </td>
                         <td className="text-sm text-slate-900 font-medium text-right pt-2">
-                          {group.quantity} ×{' '}
-                          {group.ticketType?.price && group.ticketType.price > 0
-                            ? formatCurrency(group.ticketType.price)
-                            : 'Free'}
+                          {group.quantity} ticket{group.quantity > 1 ? 's' : ''}
                         </td>
                       </tr>
                     ))}
-
-                    <tr>
-                      <td className="text-sm text-slate-500 pr-4 pt-3">
-                        Total price
-                      </td>
-                      <td className="text-sm text-black font-medium text-right pt-3">
-                        {totalPrice}
-                      </td>
-                    </tr>
-
-                    {!!order.total && order.total > 0 && !!order.cardLast4 && (
-                      <tr>
-                        <td></td>
-                        <td className="text-xs text-slate-500 text-right pt-1">
-                          Paid with card ending in ****{order.cardLast4}
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
+              </Section>
+
+              <Section className="mt-6 p-4 bg-indigo-50 rounded-lg">
+                <Text className="text-sm text-slate-600 m-0 text-center">
+                  These tickets were gifted to you by the event organizer
+                </Text>
               </Section>
             </Section>
 
@@ -287,10 +234,6 @@ function groupTicketsByType(tickets: EmailTicket[]) {
   }
 
   return Array.from(map.values());
-}
-
-function formatCurrency(amount: number) {
-  return `$${amount.toFixed(2)}`;
 }
 
 function formatDateTime(date: Date) {
