@@ -1,12 +1,13 @@
 datasource db {
-  provider  = "postgresql"
-  url       = env("POSTGRES_PRISMA_URL") // pooled (pgbouncer) — managed by the Supabase↔Vercel integration
-  directUrl = env("POSTGRES_URL_NON_POOLING") // direct (5432) — migrations / diff
-  // relationMode = "prisma"
+  provider = "postgresql"
+  // Prisma 7: connection URLs are no longer allowed in the schema.
+  //  - CLI / migrate diff: prisma.config.ts -> datasource.url (direct, 5432)
+  //  - runtime: pg driver adapter in src/server/prisma.ts (pooled URL)
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 enum Role {

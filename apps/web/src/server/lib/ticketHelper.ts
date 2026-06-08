@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient, TicketStatus } from '@prisma/client';
+import { Prisma, PrismaClient, TicketStatus } from '@/generated/prisma/client';
 import prisma from '@/server/prisma';
 
 const prismaClient = prisma as PrismaClient;

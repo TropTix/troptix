@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { TicketStatus } from '@prisma/client';
+import { TicketStatus } from '@/generated/prisma/client';
 import { getEventWhereClause, verifyEventAccess } from '@/server/accessControl';
 
 export async function toggleTicketStatus(ticketId: string, eventId: string) {

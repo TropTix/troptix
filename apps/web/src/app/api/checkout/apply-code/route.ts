@@ -2,7 +2,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/prisma';
-import { OrderStatus, Prisma, TicketFeeStructure } from '@prisma/client';
+import {
+  OrderStatus,
+  Prisma,
+  TicketFeeStructure,
+} from '@/generated/prisma/client';
 import { calculateFees } from '@/lib/fees'; // Make sure this utility is available
 import { CheckoutTicket } from '@/types/checkout'; // Import your types (CheckoutConfigResponse isn't directly returned here)
 

@@ -1,6 +1,6 @@
 import prisma from '@/server/prisma';
 import EventDetail from './_components/EventDetails';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 
@@ -56,11 +56,9 @@ async function getEventById(eventId: string): Promise<EventById | null> {
   return event;
 }
 
-export async function generateMetadata(
-  props: {
-    params: Promise<{ eventId: string }>;
-  }
-) {
+export async function generateMetadata(props: {
+  params: Promise<{ eventId: string }>;
+}) {
   const params = await props.params;
   const event = await getEventById(params.eventId);
   return {

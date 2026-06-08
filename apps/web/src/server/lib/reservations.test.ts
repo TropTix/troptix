@@ -9,7 +9,11 @@
  * @jest-environment node
  */
 import prisma from '@/server/prisma';
-import { OrderStatus, ReservationStatus, TicketStatus } from '@prisma/client';
+import {
+  OrderStatus,
+  ReservationStatus,
+  TicketStatus,
+} from '@/generated/prisma/client';
 import { generateId } from '@/lib/utils';
 import { confirm, expire, release, reserve } from './reservations';
 
@@ -39,7 +43,11 @@ afterAll(async () => {
   // FK-safe teardown, scoped to the test event.
   if (createdOrderIds.length > 0) {
     await prisma.outboxMessage.deleteMany({
-      where: { OR: createdOrderIds.map((id) => ({ payload: { path: ['orderId'], equals: id } })) },
+      where: {
+        OR: createdOrderIds.map((id) => ({
+          payload: { path: ['orderId'], equals: id },
+        })),
+      },
     });
   }
   await prisma.tickets.deleteMany({ where: { eventId: TEST_EVENT_ID } });
@@ -76,12 +84,22 @@ describe('reserve — concurrency (the headline guarantee)', () => {
       Array.from({ length: 8 }, () =>
         reserve({
           eventId: TEST_EVENT_ID,
-          items: [{ ticketTypeId: tt.id, quantity: 1, unitPriceCents: 1000, feesCents: 0 }],
+          items: [
+            {
+              ticketTypeId: tt.id,
+              quantity: 1,
+              unitPriceCents: 1000,
+              feesCents: 0,
+            },
+          ],
         })
       )
     );
 
-    const totalGranted = results.reduce((sum, r) => sum + r.items[0].granted, 0);
+    const totalGranted = results.reduce(
+      (sum, r) => sum + r.items[0].granted,
+      0
+    );
     expect(totalGranted).toBe(1);
     expect(results.filter((r) => r.granted).length).toBe(1);
 
@@ -97,7 +115,14 @@ describe('reserve — clamp to available (wasAdjusted UX)', () => {
 
     const result = await reserve({
       eventId: TEST_EVENT_ID,
-      items: [{ ticketTypeId: tt.id, quantity: 8, unitPriceCents: 1000, feesCents: 200 }],
+      items: [
+        {
+          ticketTypeId: tt.id,
+          quantity: 8,
+          unitPriceCents: 1000,
+          feesCents: 200,
+        },
+      ],
     });
 
     expect(result.items[0].requested).toBe(8);
@@ -116,8 +141,19 @@ describe('confirm — atomic + idempotent', () => {
     const tt = await makeTicketType(5);
     const r = await reserve({
       eventId: TEST_EVENT_ID,
-      items: [{ ticketTypeId: tt.id, quantity: 2, unitPriceCents: 1500, feesCents: 300 }],
-      contact: { email: 'buyer@example.com', firstName: 'Bud', lastName: 'Buyer' },
+      items: [
+        {
+          ticketTypeId: tt.id,
+          quantity: 2,
+          unitPriceCents: 1500,
+          feesCents: 300,
+        },
+      ],
+      contact: {
+        email: 'buyer@example.com',
+        firstName: 'Bud',
+        lastName: 'Buyer',
+      },
     });
 
     // The route assigns the PaymentIntent id after creating the intent.
@@ -127,7 +163,11 @@ describe('confirm — atomic + idempotent', () => {
       data: { stripePaymentIntentId: paymentIntentId },
     });
 
-    const first = await confirm({ paymentIntentId, cardType: 'visa', cardLast4: '4242' });
+    const first = await confirm({
+      paymentIntentId,
+      cardType: 'visa',
+      cardLast4: '4242',
+    });
     createdOrderIds.push(first.orderId);
     expect(first.alreadyProcessed).toBe(false);
 
@@ -135,7 +175,9 @@ describe('confirm — atomic + idempotent', () => {
     expect(second.alreadyProcessed).toBe(true);
     expect(second.orderId).toBe(first.orderId);
 
-    const ttAfter = await prisma.ticketTypes.findUnique({ where: { id: tt.id } });
+    const ttAfter = await prisma.ticketTypes.findUnique({
+      where: { id: tt.id },
+    });
     expect(ttAfter?.sold).toBe(2); // incremented once, not twice
     expect(ttAfter?.reserved).toBe(0);
 
@@ -146,9 +188,13 @@ describe('confirm — atomic + idempotent', () => {
     expect(orders).toHaveLength(1);
     expect(orders[0].status).toBe(OrderStatus.COMPLETED);
     expect(orders[0].tickets).toHaveLength(2);
-    expect(orders[0].tickets.every((t) => t.status === TicketStatus.VALID)).toBe(true);
+    expect(
+      orders[0].tickets.every((t) => t.status === TicketStatus.VALID)
+    ).toBe(true);
 
-    const resAfter = await prisma.reservation.findUnique({ where: { id: r.reservationId } });
+    const resAfter = await prisma.reservation.findUnique({
+      where: { id: r.reservationId },
+    });
     expect(resAfter?.status).toBe(ReservationStatus.CONVERTED);
     expect(resAfter?.orderId).toBe(first.orderId);
   });
@@ -159,16 +205,28 @@ describe('release', () => {
     const tt = await makeTicketType(3);
     const r = await reserve({
       eventId: TEST_EVENT_ID,
-      items: [{ ticketTypeId: tt.id, quantity: 2, unitPriceCents: 1000, feesCents: 0 }],
+      items: [
+        {
+          ticketTypeId: tt.id,
+          quantity: 2,
+          unitPriceCents: 1000,
+          feesCents: 0,
+        },
+      ],
     });
-    expect((await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved).toBe(2);
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(2);
 
     const didRelease = await release(r.reservationId);
     expect(didRelease).toBe(true);
-    expect((await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved).toBe(0);
-    expect((await prisma.reservation.findUnique({ where: { id: r.reservationId } }))?.status).toBe(
-      ReservationStatus.RELEASED
-    );
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(0);
+    expect(
+      (await prisma.reservation.findUnique({ where: { id: r.reservationId } }))
+        ?.status
+    ).toBe(ReservationStatus.RELEASED);
 
     // idempotent: releasing again is a no-op
     expect(await release(r.reservationId)).toBe(false);
@@ -180,17 +238,29 @@ describe('expire', () => {
     const tt = await makeTicketType(4);
     const r = await reserve({
       eventId: TEST_EVENT_ID,
-      items: [{ ticketTypeId: tt.id, quantity: 3, unitPriceCents: 1000, feesCents: 0 }],
+      items: [
+        {
+          ticketTypeId: tt.id,
+          quantity: 3,
+          unitPriceCents: 1000,
+          feesCents: 0,
+        },
+      ],
       ttlMinutes: -1, // already expired
     });
-    expect((await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved).toBe(3);
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(3);
 
     const count = await expire(new Date());
     expect(count).toBeGreaterThanOrEqual(1);
 
-    expect((await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved).toBe(0);
-    expect((await prisma.reservation.findUnique({ where: { id: r.reservationId } }))?.status).toBe(
-      ReservationStatus.EXPIRED
-    );
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(0);
+    expect(
+      (await prisma.reservation.findUnique({ where: { id: r.reservationId } }))
+        ?.status
+    ).toBe(ReservationStatus.EXPIRED);
   });
 });

@@ -1,6 +1,6 @@
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
-import { TicketStatus } from '@prisma/client';
+import { TicketStatus } from '@/generated/prisma/client';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
