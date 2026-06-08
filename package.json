@@ -7,7 +7,12 @@
     "test": "jest",
     "next": "yarn --cwd apps/web dev",
     "dev": "npm-run-all --parallel next",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs,json,css,scss,md,yml,yaml}": "prettier --write"
   },
   "workspaces": [
     "apps/server",
@@ -25,8 +30,10 @@
     "@testing-library/react": "^14.1.2",
     "@types/node": "^20.5.9",
     "create-jest": "^29.7.0",
+    "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
+    "lint-staged": "^17.0.7",
     "prettier": "^3.2.4",
     "ts-node": "^10.9.1"
   },
