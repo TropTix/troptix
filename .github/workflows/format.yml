@@ -1,0 +1,50 @@
+name: Format
+
+# Verifies that files changed in a PR are Prettier-clean. The husky pre-commit
+# hook formats staged files locally; this is the backstop that fails a PR if
+# anything unformatted slips through (e.g. a commit made with --no-verify or
+# from a tool that bypasses git hooks).
+#
+# Scope: only files changed in the PR are checked — the repo has not been fully
+# reformatted yet, so a whole-repo check would fail on pre-existing files. As
+# code gets touched it gets formatted, so coverage grows organically.
+#
+# Fix locally with `yarn format`, then push.
+
+on:
+  pull_request:
+
+# Cancel superseded runs on the same PR (e.g. rapid pushes to the branch).
+concurrency:
+  group: format-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Check formatting of changed files
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          # Three-dot diff: compare against the merge-base, so only files the PR
+          # actually changed are checked (matches GitHub's "Files changed" tab).
+          # Two-dot would also flag files changed on the base branch since fork.
+          mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR "$BASE_SHA...$HEAD_SHA" -- \
+            '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.json' '*.css' '*.scss' '*.md' '*.yml' '*.yaml')
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "No formattable files changed."
+            exit 0
+          fi
+          echo "Checking ${#FILES[@]} changed file(s):"
+          printf '  %s\n' "${FILES[@]}"
+          yarn prettier --check "${FILES[@]}"

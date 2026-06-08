@@ -1,12 +1,21 @@
-# Ignore artifacts:
+# Build artifacts
 **/dist
 **/build
+**/.next
+**/.expo
+**/out
+**/coverage
+.cache
 
+# Dependencies
 **/node_modules
 
-.cache
-.next
-
+# Generated / vendored
 *.log
 yarn.lock
 package-lock.json
+**/*.lock
+
+# Supabase generated SQL/migrations are managed separately
+supabase/.branches
+supabase/.temp
