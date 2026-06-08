@@ -48,6 +48,10 @@ const nextConfig = {
     ],
   },
   transpilePackages: [
+    // Shared workspace packages ship TS source (no build step) — Next must
+    // transpile them. See docs/adr/0009-shared-package-topology.md.
+    '@troptix/db',
+    '@troptix/api',
     // antd & deps
     '@ant-design',
     '@rc-component',

@@ -1,0 +1,27 @@
+{
+  "name": "@troptix/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TropTix shared database layer (Drizzle schema + client). Server-only; RN-safe inferred types under ./types.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "default": "./src/types.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  }
+}
