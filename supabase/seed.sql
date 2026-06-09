@@ -29,7 +29,3 @@ insert into public."TicketTypes" (
 ) values
   ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',     10, 500, 0, now(), '2026-08-15 18:00:00', 25.00, 'PASS_TICKET_FEES', 'seed_event_1'),
   ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks', 4,  50, 0, now(), '2026-08-15 18:00:00', 75.00, 'PASS_TICKET_FEES', 'seed_event_1');
-
--- Demo promo code
-insert into public."Promotions" (id, "createdAt", "updatedAt", code, "promotionType", value, "eventId")
-values ('seed_promo_1', now(), now(), 'DEMO10', 'PERCENTAGE', 10, 'seed_event_1');
