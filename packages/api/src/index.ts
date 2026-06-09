@@ -5,8 +5,7 @@
 // contract schemas/types. It must never re-export the router value, the
 // service layer, or anything that transitively imports @troptix/db.
 //
-// Stage 2 (see docs/plans/2026-06-shared-packages-platform.md) adds the zod
-// contracts and `export type { AppRouter }`. Placeholder for Stage 0 wiring.
-export type PlaceholderContract = {
-  readonly __placeholder: true;
-};
+// Stage 2 adds the zod contracts here (done) and, later, `export type
+// { AppRouter }` (PR 2c). The contracts are RN-safe: zod + type-only
+// `@troptix/db/types`, no DB runtime.
+export * from './contracts';
