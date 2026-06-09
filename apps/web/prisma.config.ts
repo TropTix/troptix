@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { defineConfig, env } from 'prisma/config';
+import { defineConfig } from 'prisma/config';
 
 /**
  * Prisma 7 moved schema location + the migrations datasource out of the
@@ -8,12 +8,16 @@ import { defineConfig, env } from 'prisma/config';
  * under supabase/migrations is the source of truth (ADR 0004). The runtime
  * client connects via the pg driver adapter in src/server/prisma.ts, not this.
  *
- * `url` here is the DIRECT (5432, non-pooling) connection the CLI uses for
- * migrate diff against the branch you're working on.
+ * `url` is the DIRECT (5432, non-pooling) connection the CLI uses for migrate
+ * diff. We read it via `process.env` rather than prisma's `env()` helper on
+ * purpose: `env()` resolves eagerly and THROWS when the var is absent, which
+ * breaks `prisma generate` during CI install (no .env there) even though
+ * generate never touches the datasource. The var is only needed by migrate
+ * diff, and new-migration.ts already guards its presence before invoking it.
  */
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   datasource: {
-    url: env('POSTGRES_URL_NON_POOLING'),
+    url: process.env.POSTGRES_URL_NON_POOLING ?? '',
   },
 });
