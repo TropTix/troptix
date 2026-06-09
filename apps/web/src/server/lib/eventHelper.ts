@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 
 export function getPrismaCreateTicketTypeQuery(ticket) {
   let ticketInput: Prisma.TicketTypesCreateInput;

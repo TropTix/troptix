@@ -1,6 +1,5 @@
-import { PrismaClient, OrderStatus, Prisma } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { OrderStatus, Prisma } from '@/generated/prisma/client';
+import prisma from '@/server/prisma';
 
 export const getOrganizerDashboardDataOptimized = async (
   organizerUserId: string

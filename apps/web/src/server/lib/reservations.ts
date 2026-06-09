@@ -14,7 +14,7 @@ import {
   ReservationStatus,
   TicketStatus,
   TicketType,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import { generateId } from '@/lib/utils';
 
 const DEFAULT_TTL_MINUTES = 10;
@@ -116,7 +116,11 @@ export async function reserve(input: ReserveInput): Promise<ReserveResult> {
         feesCents += granted * item.feesCents;
       }
 
-      grantedItems.push({ ticketTypeId: item.ticketTypeId, requested, granted });
+      grantedItems.push({
+        ticketTypeId: item.ticketTypeId,
+        requested,
+        granted,
+      });
     }
 
     const totalCents = subtotalCents + feesCents;

@@ -4,7 +4,7 @@ import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
-import { TicketStatus, TicketTypes, Orders } from '@prisma/client';
+import { TicketStatus, TicketTypes, Orders } from '@/generated/prisma/client';
 import {
   Card,
   CardContent,
@@ -30,11 +30,15 @@ export interface FetchedTicketData {
   order: Pick<Orders, 'id'> | null;
 }
 
-async function fetchTickets(eventId: string, userId: string, userEmail?: string) {
+async function fetchTickets(
+  eventId: string,
+  userId: string,
+  userEmail?: string
+) {
   try {
     // Verify access first
     await verifyEventAccess(userId, userEmail, eventId);
-    
+
     const tickets = await prisma.tickets.findMany({
       where: {
         eventId: eventId,
@@ -72,7 +76,11 @@ async function fetchTickets(eventId: string, userId: string, userEmail?: string)
   }
 }
 
-async function fetchEventName(eventId: string, userId: string, userEmail?: string) {
+async function fetchEventName(
+  eventId: string,
+  userId: string,
+  userEmail?: string
+) {
   try {
     const event = await prisma.events.findUnique({
       where: getEventWhereClause(userId, userEmail, eventId),
@@ -93,7 +101,9 @@ interface EventAttendeesPageProps {
   }>;
 }
 
-export default async function EventAttendeesPage(props: EventAttendeesPageProps) {
+export default async function EventAttendeesPage(
+  props: EventAttendeesPageProps
+) {
   const params = await props.params;
   const { eventId } = params;
   const user = await getUserFromIdTokenCookie();

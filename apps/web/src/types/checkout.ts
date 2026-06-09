@@ -1,7 +1,7 @@
 import {
   TicketType as PrismaTicketTypeEnum,
   TicketFeeStructure,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 
 export enum ValidationResponseMessage {
   SomeTicketsUnavailable = 'Some tickets were unavailable or sold out and cart was adjusted',

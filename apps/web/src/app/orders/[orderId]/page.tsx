@@ -5,7 +5,7 @@ import {
   Events as PrismaEvent,
   TicketTypes as PrismaTicketType,
   OrderStatus,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -73,11 +73,9 @@ async function getOrder(orderId: string): Promise<EnrichedOrder | null> {
   }
 }
 
-export default async function OrderDetailsPage(
-  props: {
-    params: Promise<{ orderId: string }>;
-  }
-) {
+export default async function OrderDetailsPage(props: {
+  params: Promise<{ orderId: string }>;
+}) {
   const params = await props.params;
   const orderId = params.orderId;
   const order = await getOrder(orderId);

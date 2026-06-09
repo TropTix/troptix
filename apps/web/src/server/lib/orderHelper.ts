@@ -1,4 +1,9 @@
-import { OrderStatus, Prisma, TicketStatus, TicketType } from '@prisma/client';
+import {
+  OrderStatus,
+  Prisma,
+  TicketStatus,
+  TicketType,
+} from '@/generated/prisma/client';
 import { buffer } from 'micro';
 
 export function updateSuccessfulOrder(paymentMethod) {

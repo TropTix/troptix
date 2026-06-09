@@ -4,7 +4,11 @@ import { cookies, headers } from 'next/headers'; // For reading cookies in App R
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { UserDetailsFormData } from '@/lib/schemas/checkoutSchema'; // Adjust path if needed
-import { OrderStatus, TicketFeeStructure, TicketStatus } from '@prisma/client';
+import {
+  OrderStatus,
+  TicketFeeStructure,
+  TicketStatus,
+} from '@/generated/prisma/client';
 import { getFirebaseAdmin } from '@/server/lib/firebaseAdmin'; // Adjust path if needed
 import { generateId } from '@/lib/utils'; // Adjust path if needed
 import {
@@ -14,7 +18,7 @@ import {
   ValidationResponseMessage,
 } from '@/types/checkout'; // Adjust path if needed
 import { calculateFees } from '@/lib/fees'; // Adjust path if needed
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { sendEmailConfirmationEmailToUser } from '@/server/lib/email';
 
 interface InitiateRequestData {
