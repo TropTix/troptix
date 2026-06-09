@@ -88,6 +88,7 @@ Mostly sequential (migration ordering is load-bearing). Each migration = its own
 - **M10 column renames:** `discountCode→password`, `organizer→hostName`.
 - **M11 table renames (last):** `Users→User`, `Events→Event`, `Orders→Order`, `TicketTypes→EventTicket`, `Tickets→OrderTicket` + explicit `RENAME CONSTRAINT`. Done last so prior migrations reference stable names. **`prisma generate` + `yarn typecheck` across the 40+ import sites is the cutover gate** (Prisma model names change with the tables). Empty-diff check after.
 - **M12 mandatory timestamps** NOT NULL + defaults everywhere.
+- **M13 id standardization ([ADR 0014](../adr/0014-uuidv7-pks-and-public-codes.md)):** PKs → **UUIDv7** (native `uuid`), and add unique, type-prefixed **`publicCode`** columns (`O…`/`T…`/`E…`/`ET…`/`R…`) for user-facing ids. Heavy — re-keys every PK + all ~80 FK columns + reconciles today's mixed uuid/short-code rows; coordinated with the app cutover. `generateId()` switches to UUIDv7; a `generatePublicCode(prefix)` util is added. **Gated on the app cutover (Stage 2/3)** like M8–M11.
 
 **1c. Supabase Auth migration (account-preserving, orphan-safe order)**
 
