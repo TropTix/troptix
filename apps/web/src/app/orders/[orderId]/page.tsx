@@ -5,7 +5,7 @@ import {
   Events as PrismaEvent,
   TicketTypes as PrismaTicketType,
   OrderStatus,
-} from '@/generated/prisma/client';
+} from '@troptix/db';
 import Link from 'next/link';
 import Image from 'next/image';
 import {

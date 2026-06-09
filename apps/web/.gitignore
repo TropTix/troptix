@@ -35,9 +35,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma 7 generated client (prisma-client generator output; regenerated on install)
-/src/generated/
-
 # supabase
 supabase/
 

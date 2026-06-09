@@ -1,4 +1,4 @@
-import { OrderStatus } from '@/generated/prisma/client';
+import { OrderStatus } from '@troptix/db';
 import prisma from '@/server/prisma';
 import Link from 'next/link';
 import Image from 'next/image';

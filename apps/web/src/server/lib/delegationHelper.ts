@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from '@/generated/prisma/client';
+import { Prisma, PrismaClient } from '@troptix/db';
 import prisma from '@/server/prisma';
 
 const prismaClient = prisma as PrismaClient;

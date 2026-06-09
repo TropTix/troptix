@@ -1,11 +1,11 @@
 // @troptix/db/types — RN-SAFE TYPES ENTRY.
 //
-// Zero runtime imports. Everything exported here must be erasable at compile
-// time (`export type` only) so `import type { ... } from '@troptix/db/types'`
-// disappears in client/RN bundles and never drags server runtime into Metro.
+// Zero runtime: re-exports only the *type* surface of the generated Prisma
+// client (model types, enum types, the `Prisma` namespace types). `export
+// type *` erases at compile time, so `import type { ... } from
+// '@troptix/db/types'` never drags the client or `pg` into a client/RN bundle.
 //
-// Stage 1 replaces this with inferred Drizzle row/enum types. The placeholder
-// below is the Stage 0 canary target for the Expo app's type-only import.
-export type PlaceholderRow = {
-  readonly __placeholder: true;
-};
+// Enum *values* (runtime const objects) are intentionally NOT here — server
+// code imports those from `@troptix/db`. A dedicated RN-safe enum-values entry
+// can be added when the Expo app needs them (Stage 3).
+export type * from './generated/prisma/client';

@@ -1,9 +1,4 @@
-import {
-  OrderStatus,
-  Prisma,
-  TicketStatus,
-  TicketType,
-} from '@/generated/prisma/client';
+import { OrderStatus, Prisma, TicketStatus, TicketType } from '@troptix/db';
 import { buffer } from 'micro';
 
 export function updateSuccessfulOrder(paymentMethod) {

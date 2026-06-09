@@ -1,6 +1,6 @@
 import prisma from '@/server/prisma';
 import EventDetail from './_components/EventDetails';
-import { Prisma } from '@/generated/prisma/client';
+import { Prisma } from '@troptix/db';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 

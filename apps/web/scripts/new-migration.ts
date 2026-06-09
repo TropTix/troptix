@@ -39,8 +39,13 @@ const timestamp =
   `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
 
 const webDir = join(__dirname, '..');
-const schemaPath = join(webDir, 'prisma', 'schema.prisma');
-const migrationsDir = join(webDir, '..', '..', 'supabase', 'migrations');
+const repoRoot = join(webDir, '..', '..');
+// Prisma lives in packages/db (the relocation). This script still runs from
+// apps/web (where .env is) and points the CLI at the package's schema + config.
+const dbDir = join(repoRoot, 'packages', 'db');
+const schemaPath = join(dbDir, 'prisma', 'schema.prisma');
+const configPath = join(dbDir, 'prisma.config.ts');
+const migrationsDir = join(repoRoot, 'supabase', 'migrations');
 const outFile = join(migrationsDir, `${timestamp}_${name}.sql`);
 
 // Prisma 7 flags: the baseline comes from prisma.config.ts (`--from-config-datasource`),
@@ -63,6 +68,8 @@ const sql = execFileSync(
     'prisma',
     'migrate',
     'diff',
+    '--config',
+    configPath,
     ...fromArgs,
     '--to-schema',
     schemaPath,

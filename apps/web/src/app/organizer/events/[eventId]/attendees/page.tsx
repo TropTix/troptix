@@ -4,7 +4,7 @@ import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
-import { TicketStatus, TicketTypes, Orders } from '@/generated/prisma/client';
+import { TicketStatus, TicketTypes, Orders } from '@troptix/db';
 import {
   Card,
   CardContent,
