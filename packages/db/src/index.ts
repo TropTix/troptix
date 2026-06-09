@@ -1,9 +1,16 @@
 // @troptix/db — SERVER ENTRY.
 //
 // Owns the Prisma 7 runtime: the generated client + the `pg` driver adapter.
-// `import 'server-only'` makes a build fail loudly if this is ever pulled into
-// a client/RN bundle. Clients import the type-only `@troptix/db/types` entry.
-import 'server-only';
+// Import only from server code.
+//
+// NB: we deliberately do NOT use the `server-only` package here. It throws
+// outside a React-Server-Components context, which would break the repo's
+// Pages-Router API routes (src/pages/api/*) and Node tooling/tests that
+// legitimately use the DB — it's an App-Router-only guard, too blunt for a DB
+// package consumed across mixed runtimes. The client/RN quarantine is instead
+// enforced by the two-entry split (clients import the type-only
+// `@troptix/db/types`) + the ESLint no-restricted-imports ban on this entry in
+// apps/organizer (Stage 2).
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/prisma/client';
 
