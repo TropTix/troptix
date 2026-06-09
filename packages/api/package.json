@@ -16,12 +16,17 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@troptix/db": "0.0.0"
+    "@troptix/db": "0.0.0",
+    "short-unique-id": "^5.0.3"
   },
   "devDependencies": {
-    "typescript": "^5.2.2"
+    "dotenv": "^17.2.0",
+    "typescript": "^5.2.2",
+    "vitest": "^4.1.8"
   }
 }

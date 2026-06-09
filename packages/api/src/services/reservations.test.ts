@@ -1,20 +1,21 @@
 /**
  * Integration tests for the reservation primitives. These hit a REAL Postgres
- * (the locking/atomicity behavior is not mockable), so point your env at the
- * dev or a preview branch before running: `yarn test reservations`.
+ * (the locking/atomicity behavior is not mockable), so point your env at a
+ * preview branch (or the dev branch) before running: `yarn workspace
+ * @troptix/api test`. The connection comes from `@troptix/db` (POSTGRES_PRISMA_URL),
+ * loaded by vitest.config.ts from apps/web/.env locally / CI env directly.
  *
  * Each test provisions its own ticket type and everything is cleaned up by event
  * id in afterAll.
- *
- * @jest-environment node
  */
-import prisma from '@/server/prisma';
-import { OrderStatus, ReservationStatus, TicketStatus } from '@troptix/db';
-import { generateId } from '@/lib/utils';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import prisma, {
+  OrderStatus,
+  ReservationStatus,
+  TicketStatus,
+} from '@troptix/db';
+import { generateId } from './_shared/ids';
 import { confirm, expire, release, reserve } from './reservations';
-
-// Integration tests hit a real DB; the default 5s is too tight.
-jest.setTimeout(30_000);
 
 const TEST_EVENT_ID = `test-evt-${generateId()}`;
 const createdOrderIds: string[] = [];
@@ -78,7 +79,7 @@ describe('reserve — concurrency (the headline guarantee)', () => {
 
     const results = await Promise.all(
       Array.from({ length: 8 }, () =>
-        reserve({
+        reserve(prisma, {
           eventId: TEST_EVENT_ID,
           items: [
             {
@@ -109,7 +110,7 @@ describe('reserve — clamp to available (wasAdjusted UX)', () => {
   it('grants min(requested, available) and reports the reduction', async () => {
     const tt = await makeTicketType(5);
 
-    const result = await reserve({
+    const result = await reserve(prisma, {
       eventId: TEST_EVENT_ID,
       items: [
         {
@@ -135,7 +136,7 @@ describe('reserve — clamp to available (wasAdjusted UX)', () => {
 describe('confirm — atomic + idempotent', () => {
   it('moves reserved→sold once and is a no-op on duplicate delivery', async () => {
     const tt = await makeTicketType(5);
-    const r = await reserve({
+    const r = await reserve(prisma, {
       eventId: TEST_EVENT_ID,
       items: [
         {
@@ -159,7 +160,7 @@ describe('confirm — atomic + idempotent', () => {
       data: { stripePaymentIntentId: paymentIntentId },
     });
 
-    const first = await confirm({
+    const first = await confirm(prisma, {
       paymentIntentId,
       cardType: 'visa',
       cardLast4: '4242',
@@ -167,7 +168,7 @@ describe('confirm — atomic + idempotent', () => {
     createdOrderIds.push(first.orderId);
     expect(first.alreadyProcessed).toBe(false);
 
-    const second = await confirm({ paymentIntentId });
+    const second = await confirm(prisma, { paymentIntentId });
     expect(second.alreadyProcessed).toBe(true);
     expect(second.orderId).toBe(first.orderId);
 
@@ -199,7 +200,7 @@ describe('confirm — atomic + idempotent', () => {
 describe('release', () => {
   it('hands held inventory back and marks the reservation RELEASED', async () => {
     const tt = await makeTicketType(3);
-    const r = await reserve({
+    const r = await reserve(prisma, {
       eventId: TEST_EVENT_ID,
       items: [
         {
@@ -214,7 +215,7 @@ describe('release', () => {
       (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
     ).toBe(2);
 
-    const didRelease = await release(r.reservationId);
+    const didRelease = await release(prisma, r.reservationId);
     expect(didRelease).toBe(true);
     expect(
       (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
@@ -225,14 +226,14 @@ describe('release', () => {
     ).toBe(ReservationStatus.RELEASED);
 
     // idempotent: releasing again is a no-op
-    expect(await release(r.reservationId)).toBe(false);
+    expect(await release(prisma, r.reservationId)).toBe(false);
   });
 });
 
 describe('expire', () => {
   it('releases inventory held by reservations past their TTL', async () => {
     const tt = await makeTicketType(4);
-    const r = await reserve({
+    const r = await reserve(prisma, {
       eventId: TEST_EVENT_ID,
       items: [
         {
@@ -248,7 +249,7 @@ describe('expire', () => {
       (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
     ).toBe(3);
 
-    const count = await expire(new Date());
+    const count = await expire(prisma, new Date());
     expect(count).toBeGreaterThanOrEqual(1);
 
     expect(

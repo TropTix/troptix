@@ -5,8 +5,12 @@
  * inventory hold; it is a single race-safe SQL statement (see `reserve`). The
  * rest (`confirm` / `release` / `expire`) are ordinary Prisma transactions — no
  * stored procedures (ADR 0007).
+ *
+ * Each function takes the Prisma client as its first argument (injected, not
+ * imported) so services are framework-agnostic and unit-testable. They are
+ * actor-agnostic — they key off reservation / payment-intent ids, so they carry
+ * no authorization (ADR 0013); the caller is responsible for who-can-do-what.
  */
-import prisma from '@/server/prisma';
 import {
   OrderStatus,
   OrderType,
@@ -15,7 +19,8 @@ import {
   TicketStatus,
   TicketType,
 } from '@troptix/db';
-import { generateId } from '@/lib/utils';
+import type { PrismaClient } from '@troptix/db';
+import { generateId } from './_shared/ids';
 
 const DEFAULT_TTL_MINUTES = 10;
 
@@ -68,7 +73,10 @@ export interface ReserveResult {
  * Business rules (maxPurchasePerUser, sale window, password gating) are the
  * caller's responsibility — this is purely the inventory hold.
  */
-export async function reserve(input: ReserveInput): Promise<ReserveResult> {
+export async function reserve(
+  prisma: PrismaClient,
+  input: ReserveInput
+): Promise<ReserveResult> {
   const ttlMinutes = input.ttlMinutes ?? DEFAULT_TTL_MINUTES;
   const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
   const reservationId = generateId();
@@ -176,7 +184,10 @@ export interface ConfirmResult {
  * Idempotent: Stripe delivers webhooks at-least-once, so a second call for an
  * already-CONVERTED reservation is a no-op returning the existing order id.
  */
-export async function confirm(input: ConfirmInput): Promise<ConfirmResult> {
+export async function confirm(
+  prisma: PrismaClient,
+  input: ConfirmInput
+): Promise<ConfirmResult> {
   return prisma.$transaction(async (tx) => {
     const reservation = await tx.reservation.findUnique({
       where: { stripePaymentIntentId: input.paymentIntentId },
@@ -314,7 +325,10 @@ async function releaseHeldInTx(
 }
 
 /** Hand a held reservation's inventory back (e.g. user abandons checkout). */
-export async function release(reservationId: string): Promise<boolean> {
+export async function release(
+  prisma: PrismaClient,
+  reservationId: string
+): Promise<boolean> {
   return prisma.$transaction((tx) =>
     releaseHeldInTx(tx, reservationId, ReservationStatus.RELEASED)
   );
@@ -325,7 +339,10 @@ export async function release(reservationId: string): Promise<boolean> {
  * cron. Idempotent and concurrency-safe (each release re-checks status in its
  * own transaction). Returns the number of reservations expired.
  */
-export async function expire(now: Date = new Date()): Promise<number> {
+export async function expire(
+  prisma: PrismaClient,
+  now: Date = new Date()
+): Promise<number> {
   const expired = await prisma.reservation.findMany({
     where: { status: ReservationStatus.HELD, expiresAt: { lt: now } },
     select: { id: true },
