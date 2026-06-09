@@ -9,11 +9,7 @@
  * @jest-environment node
  */
 import prisma from '@/server/prisma';
-import {
-  OrderStatus,
-  ReservationStatus,
-  TicketStatus,
-} from '@/generated/prisma/client';
+import { OrderStatus, ReservationStatus, TicketStatus } from '@troptix/db';
 import { generateId } from '@/lib/utils';
 import { confirm, expire, release, reserve } from './reservations';
 

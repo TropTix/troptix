@@ -14,7 +14,7 @@ import {
   ReservationStatus,
   TicketStatus,
   TicketType,
-} from '@/generated/prisma/client';
+} from '@troptix/db';
 import { generateId } from '@/lib/utils';
 
 const DEFAULT_TTL_MINUTES = 10;

@@ -1,0 +1,5 @@
+# Prisma 7 generated client (prisma-client generator output; regenerated on install)
+/src/generated/
+
+# deps
+node_modules/

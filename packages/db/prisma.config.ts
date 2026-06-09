@@ -6,7 +6,7 @@ import { defineConfig } from 'prisma/config';
  * `datasource` block and into this file. We only use the Prisma CLI as a SQL
  * *generator* (`prisma migrate diff` in scripts/new-migration.ts) — plain SQL
  * under supabase/migrations is the source of truth (ADR 0004). The runtime
- * client connects via the pg driver adapter in src/server/prisma.ts, not this.
+ * client connects via the pg driver adapter in src/index.ts, not this.
  *
  * `url` is the DIRECT (5432, non-pooling) connection the CLI uses for migrate
  * diff. We read it via `process.env` rather than prisma's `env()` helper on

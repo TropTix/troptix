@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { OrderStatus } from '@/generated/prisma/client';
+import { OrderStatus } from '@troptix/db';
 import prisma from '@/server/prisma';
 
 const ORDER_EXPIRATION_LIMIT = 5;

@@ -1,4 +1,4 @@
-import { Prisma } from '@/generated/prisma/client';
+import { Prisma } from '@troptix/db';
 
 export function getPrismaCreateTicketTypeQuery(ticket) {
   let ticketInput: Prisma.TicketTypesCreateInput;

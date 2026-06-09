@@ -1,4 +1,4 @@
-import { OrderStatus, Prisma } from '@/generated/prisma/client';
+import { OrderStatus, Prisma } from '@troptix/db';
 import prisma from '@/server/prisma';
 
 export const getOrganizerDashboardDataOptimized = async (
