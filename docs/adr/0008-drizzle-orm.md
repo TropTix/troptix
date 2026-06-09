@@ -1,13 +1,13 @@
 # 8. Drizzle as the ORM and SQL generator
 
-- **Status:** Proposed
+- **Status:** Superseded by [ADR 0012](0012-prisma-7-instead-of-drizzle.md)
 - **Date:** 2026-06-07
 
 ## Context
 
-We are building a shared `packages/db` consumed by `apps/web` (Next.js) and `apps/organizer` (Expo/React Native), and finalizing the database design in the same window. The roadmap already planned a Prisma → Drizzle migration (P4.1), deferred until *after* the schema redesign so we'd migrate onto a clean model. Building the shared package now forces the ORM choice now: building it on Prisma and re-building it on Drizzle later is wasted work.
+We are building a shared `packages/db` consumed by `apps/web` (Next.js) and `apps/organizer` (Expo/React Native), and finalizing the database design in the same window. The roadmap already planned a Prisma → Drizzle migration (P4.1), deferred until _after_ the schema redesign so we'd migrate onto a clean model. Building the shared package now forces the ORM choice now: building it on Prisma and re-building it on Drizzle later is wasted work.
 
-Prisma's runtime is a generated client + a query engine binary — awkward to share into a Metro/React Native bundle, and it keeps a codegen step in the critical path. Per [ADR 0004](0004-supabase-migrations-as-source.md), plain SQL under `supabase/migrations/` is already the source of truth and Prisma is only a *generator* (`prisma migrate diff` in `scripts/new-migration.ts`). That makes the ORM swappable: the pipeline only needs *some* tool to diff a schema model into reviewable SQL.
+Prisma's runtime is a generated client + a query engine binary — awkward to share into a Metro/React Native bundle, and it keeps a codegen step in the critical path. Per [ADR 0004](0004-supabase-migrations-as-source.md), plain SQL under `supabase/migrations/` is already the source of truth and Prisma is only a _generator_ (`prisma migrate diff` in `scripts/new-migration.ts`). That makes the ORM swappable: the pipeline only needs _some_ tool to diff a schema model into reviewable SQL.
 
 ## Decision
 
