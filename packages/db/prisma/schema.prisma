@@ -218,31 +218,7 @@ model Events {
   tickets      Tickets[]
   ticketTypes  TicketTypes[]
   orders       Orders[]
-  promotions   Promotions[]
   reservations Reservation[]
-
-  // Delegated User
-  delegatedUsers DelegatedUsers[]
-}
-
-enum PromotionType {
-  UNKNOWN
-  PERCENTAGE
-  DOLLAR_AMOUNT
-}
-
-model Promotions {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  code          String
-  promotionType PromotionType @default(UNKNOWN)
-  value         Float
-  event         Events?       @relation(fields: [eventId], references: [id])
-  eventId       String?
-
-  @@index([eventId])
 }
 
 enum TicketFeeStructure {
@@ -296,25 +272,6 @@ model TicketTypes {
   discountCode     String?
   tickets          Tickets[]
   reservationItems ReservationItem[]
-
-  @@index([eventId])
-}
-
-enum DelegatedAccess {
-  OWNER
-  TICKET_SCANNER
-}
-
-model DelegatedUsers {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  delegatedAccess DelegatedAccess
-  email           String
-  userId          String
-  event           Events          @relation(fields: [eventId], references: [id])
-  eventId         String
 
   @@index([eventId])
 }
