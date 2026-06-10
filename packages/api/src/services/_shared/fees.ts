@@ -35,13 +35,21 @@ export function calculateFeesCents(priceCents: number): number {
   return Math.round(baseFee + baseFee * FeeConfig.TAX_RATE);
 }
 
-/** Detailed fee breakdown (base / tax / total) in integer cents, for display. */
+/**
+ * Detailed fee breakdown (base / tax / total) in integer cents, for display.
+ *
+ * The `totalCents` is the **authoritative charged fee** (`calculateFeesCents`),
+ * and `taxCents` is the remainder after the rounded base — so `base + tax`
+ * always equals the amount actually charged. (Rounding base and tax
+ * independently could make the displayed total differ from the charge by 1¢.)
+ */
 export function getFeeBreakdownCents(priceCents: number): FeeBreakdownCents {
-  if (priceCents <= 0) {
+  const totalCents = calculateFeesCents(priceCents);
+  if (totalCents === 0) {
     return { baseFeeCents: 0, taxCents: 0, totalCents: 0 };
   }
 
   const baseFeeCents = Math.round(rawBaseFeeCents(priceCents));
-  const taxCents = Math.round(baseFeeCents * FeeConfig.TAX_RATE);
-  return { baseFeeCents, taxCents, totalCents: baseFeeCents + taxCents };
+  const taxCents = totalCents - baseFeeCents;
+  return { baseFeeCents, taxCents, totalCents };
 }
