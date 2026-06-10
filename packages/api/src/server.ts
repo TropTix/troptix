@@ -20,3 +20,12 @@ export {
   type ConfirmInput,
   type ConfirmResult,
 } from './services/reservations';
+
+export { getCheckoutConfig, applyCode } from './services/checkout';
+export {
+  calculateFeesCents,
+  getFeeBreakdownCents,
+  FeeConfig,
+  type FeeBreakdownCents,
+} from './services/_shared/fees';
+export { NotFoundError } from './services/_shared/errors';

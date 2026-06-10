@@ -22,7 +22,8 @@
   },
   "dependencies": {
     "@troptix/db": "0.0.0",
-    "short-unique-id": "^5.0.3"
+    "short-unique-id": "^5.0.3",
+    "zod": "^3.24.3"
   },
   "devDependencies": {
     "dotenv": "^17.2.0",
