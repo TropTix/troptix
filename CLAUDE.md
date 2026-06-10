@@ -69,3 +69,17 @@ created: YYYY-MM-DD
 tracking-issue: <#N or TBD>
 ---
 ```
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live in `TropTix/troptix`'s GitHub Issues, managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage roles use their default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) — all present in GitHub. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` (created lazily) + root `docs/adr/`. See `docs/agents/domain.md`.
