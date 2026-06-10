@@ -21,6 +21,11 @@ model Users {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   email               String                @unique
+  // Supabase Auth identity (ADR 0011). The auth key; `id` stays the app PK —
+  // never assume equality (migrated users have id != authUserId). FK to
+  // auth.users(id) is hand-appended in SQL (the auth schema isn't modeled in
+  // Prisma). Nullable until the 1c backfill + orphan gate clears it.
+  authUserId          String?               @unique @db.Uuid
   name                String?
   firstName           String?
   lastName            String?
