@@ -2,10 +2,11 @@
 
 - **Status:** Proposed
 - **Date:** 2026-06-07
+- **Amended by [ADR 0015](0015-passwordless-auth-and-trigger-provisioning.md) (2026-06-10):** the password-preserving `firebase_scrypt` import below is **superseded** — auth goes passwordless (email OTP/magic-link + social), no passwords are migrated, and new `Users` rows are provisioned by a DB trigger. Everything else in this ADR (the decoupled `authUserId` identity, orphan-safe sequencing, RLS keyed off `auth.uid() = authUserId`) still holds.
 
 ## Context
 
-`User.id` currently *is* the Firebase UID: `api/user/create/route.ts` does `users.create({ data: { id } })` with the client-supplied Firebase UID, and that value is propagated as the FK across `Orders.userId`, `Tickets.userId`, `Reservation.userId`, `SocialMediaAccounts.userId`. Auth verification (`server/authUser.ts`, `server/lib/auth.ts`) calls `firebase-admin verifyIdToken`; the Expo organizer app sends a Firebase Bearer token. RLS is enabled on all tables (#283) but inert, because the app connects as a privileged role and the DB session has no `auth.uid()`.
+`User.id` currently _is_ the Firebase UID: `api/user/create/route.ts` does `users.create({ data: { id } })` with the client-supplied Firebase UID, and that value is propagated as the FK across `Orders.userId`, `Tickets.userId`, `Reservation.userId`, `SocialMediaAccounts.userId`. Auth verification (`server/authUser.ts`, `server/lib/auth.ts`) calls `firebase-admin verifyIdToken`; the Expo organizer app sends a Firebase Bearer token. RLS is enabled on all tables (#283) but inert, because the app connects as a privileged role and the DB session has no `auth.uid()`.
 
 The roadmap plans Firebase → Supabase Auth (P4.2) to remove the JWT-cookie bridge (the auth flicker), drop the extra organizer-check call, and integrate natively with Postgres/RLS. Building the shared API layer needs an auth context, so the provider choice can't be deferred — building the context on Firebase and rewriting it for Supabase wires every client twice. Supabase `auth.users` ids are UUIDs; Firebase UIDs are 28-char strings, so the existing PK values **cannot** be reused as Supabase ids. **Existing accounts (and Orders/Tickets — financial/attendance records) must be preserved.**
 
@@ -21,4 +22,4 @@ Invariant going forward: `authUserId` is always the auth key, `id` is always the
 
 - **Good:** accounts preserved with zero FK rewrite; RLS (already enabled) becomes meaningful; the auth context + client token wiring are built once against Supabase; the JWT-cookie flicker goes away.
 - **Trade-off:** RLS policies route through a join to `authUserId` rather than a direct `auth.uid() = id`; a transient dual-verify shim; a careful one-time password import.
-- **Risk:** wrong scrypt params fail logins silently (mitigate: import a handful first, verify on a preview branch); returning `authUserId` instead of the stable `User.id` from the verify path would break every organizer query (mitigate: stamp `troptix_user_id` in the JWT, assert the return shape in a test). Going *live* on RLS (flipping the runtime connection to `authenticated`) is deferred until policies are proven.
+- **Risk:** wrong scrypt params fail logins silently (mitigate: import a handful first, verify on a preview branch); returning `authUserId` instead of the stable `User.id` from the verify path would break every organizer query (mitigate: stamp `troptix_user_id` in the JWT, assert the return shape in a test). Going _live_ on RLS (flipping the runtime connection to `authenticated`) is deferred until policies are proven.
