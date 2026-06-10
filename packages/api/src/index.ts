@@ -5,7 +5,10 @@
 // contract schemas/types. It must never re-export the router value, the
 // service layer, or anything that transitively imports @troptix/db.
 //
-// Stage 2 adds the zod contracts here (done) and, later, `export type
-// { AppRouter }` (PR 2c). The contracts are RN-safe: zod + type-only
-// `@troptix/db/types`, no DB runtime.
+// Exposes the zod contracts (runtime — zod is RN-safe) and the `AppRouter`
+// *type* (erased — `export type`, so the router value + @trpc/server + DB
+// runtime are NOT pulled into a client/RN bundle). That's the whole RN-safety
+// mechanism: clients import the router's type for their tRPC client, never the
+// value.
 export * from './contracts';
+export type { AppRouter } from './trpc/routers';
