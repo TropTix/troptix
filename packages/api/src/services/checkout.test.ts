@@ -90,9 +90,9 @@ describe('getCheckoutConfig', () => {
     expect(tickets[0]).toMatchObject({
       id: 'tt-1',
       priceCents: 5000,
-      // 5000*0.08 + 50 = 450 base; +15% tax → round(517.5) = 518. Literal, not
-      // calculateFeesCents(5000), so a wrong fee formula can't pass on both sides.
-      feesCents: 518,
+      // 5000*0.08 + 50 = 450 fee (no tax). Literal, not calculateFeesCents(5000),
+      // so a wrong fee formula can't pass on both sides.
+      feesCents: 450,
       maxAllowedToAdd: 10, // min(availability 100, maxPurchasePerUser 10)
       feeStructure: 'PASS_TICKET_FEES',
       ticketType: 'PAID',
