@@ -35,7 +35,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# supabase
-supabase/
+# supabase CLI local dir (anchored to app root so it doesn't catch
+# src/utils/supabase/, our @supabase/ssr client code)
+/supabase/
 
 .env.local
