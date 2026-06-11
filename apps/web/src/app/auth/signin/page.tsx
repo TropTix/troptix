@@ -1,4 +1,4 @@
-import SignInForm from '../_components/SignInForm';
+import { EmailAuthForm } from '../_components/EmailAuthForm';
 
 export default function SignInPage() {
   return (
@@ -11,8 +11,7 @@ export default function SignInPage() {
         <p className="text-xl text-gray-600">Sign in to your TropTix account</p>
       </div>
 
-      {/* Form */}
-      <SignInForm />
+      <EmailAuthForm />
     </>
   );
 }
