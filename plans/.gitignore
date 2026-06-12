@@ -1,0 +1,8 @@
+# Security-hardening plans are held locally until their fixes land (public repo).
+# See "Held plans (security)" in README.md. Remove the matching line when committing
+# a plan after its fix merges.
+002-*.md
+003-*.md
+004-*.md
+005-*.md
+012-*.md
