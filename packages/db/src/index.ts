@@ -24,13 +24,36 @@ import { PrismaClient } from './generated/prisma/client';
  * A single client is cached on `globalThis` in dev so HMR doesn't open a new
  * pool per reload.
  */
+
+/**
+ * Strip `sslmode` from the connection string so the adapter's `ssl` config below
+ * is authoritative. When `sslmode` is present, `pg-connection-string` parses it
+ * into its own ssl settings that can override the explicit `ssl` object, which
+ * re-enables cert validation and rejects Supabase's self-signed pooler cert
+ * ("self-signed certificate in certificate chain"). Some envs (e.g. the Supabase
+ * Vercel integration's preview branches) inject `sslmode`; our hand-set prod URL
+ * does not, so this is a no-op there.
+ */
+const connectionString = () => {
+  const raw = process.env.POSTGRES_PRISMA_URL;
+  if (!raw) return raw;
+  try {
+    const url = new URL(raw);
+    url.searchParams.delete('sslmode');
+    return url.toString();
+  } catch {
+    return raw;
+  }
+};
+
 const createPrismaClient = () =>
   new PrismaClient({
     adapter: new PrismaPg({
-      connectionString: process.env.POSTGRES_PRISMA_URL,
+      connectionString: connectionString(),
       // node-pg has no default connection timeout; Prisma v6 used 5s.
       connectionTimeoutMillis: 5000,
-      // Match pre-v7 SSL behavior (the Rust engine ignored cert validation).
+      // SSL is governed here (the Rust engine ignored cert validation pre-v7);
+      // see connectionString() for why sslmode is stripped from the URL.
       ssl: { rejectUnauthorized: false },
     }),
   });
