@@ -1,8 +1,8 @@
 ---
 title: Stage 3 — Checkout Cutover (reservation flow goes live)
-status: proposed
+status: active
 created: 2026-06-12
-tracking-issue: TBD
+tracking-issue: '#327'
 ---
 
 # Stage 3 — Checkout Cutover
