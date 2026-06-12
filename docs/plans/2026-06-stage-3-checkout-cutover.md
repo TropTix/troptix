@@ -73,10 +73,12 @@ stays nullable; when a session exists we attach the stable id.
    `userId` — closes the parked `createContext` seam.
 4. **Client rewire**: tRPC client via **`@trpc/tanstack-react-query`** (we
    already run TanStack Query v5; this is tRPC's current recommended
-   integration — resolves the parked classic-vs-new decision). New
-   reservation-aware checkout components; the flow keeps today's UX skeleton
-   (modal → ticket selection → Stripe Elements) — **visual redesign is out of
-   scope**, this is the plumbing rebuild.
+   integration — resolves the parked classic-vs-new decision). The checkout
+   components are rebuilt to the **decided flow structure below** — structure
+   ships with 3c; **visual/brand polish is deferred** to the design-system
+   track and stays out of the cutover. Build as **headless logic (reservation
+   state machine hooks) + thin presentational components** so the later polish
+   replaces only the thin layer.
 5. **Webhook rewrite** — new App Router `app/api/stripe/webhook/route.ts`
    (raw body via `req.text()`): `payment_intent.succeeded` → `confirm(prisma, …)`;
    `payment_intent.payment_failed` → `release()`. Idempotency: `ProcessedStripeEvent`
@@ -91,6 +93,53 @@ stays nullable; when a session exists we attach the stable id.
    _via_ the reservation and show the existing "processing" state while
    unconverted (poll `checkout.reservation`).
 8. **M4 backfill + `reserved` seed + runbook** (see Cutover).
+
+## Client flow structure (decided 2026-06-12)
+
+The reservation model forces UX that doesn't exist today (a timed hold,
+granted-quantity adjustment, async order materialization) — so 3c builds the
+**new flow structure**, with existing design-system primitives; the visual pass
+later is a pure reskin of the thin presentational layer.
+
+```
+Select  →  [RESERVE]  →  Details + Pay (countdown)  →  Processing  →  Confirmed
+  no hold                  the hold window              webhook lag
+```
+
+1. **Selection (no hold)** — on the event page: per-type steppers, live totals
+   pinned, "Have a code?" expands inline and reveals unlocked tickets in place.
+   Availability here is advisory ("only 4 left"). CTA: "Checkout — $XX".
+   **Reserve fires on commit, never on stepper taps** — browsing can't starve
+   buyers.
+2. **Reserve outcomes** — granted → proceed; **clamped** → proceed _with_ a calm
+   re-consent banner ("Only 2 were still available — your order was updated",
+   totals visibly updated, one-tap back-out); nothing → stay, mark sold out,
+   suggest other types.
+3. **Details + Pay (one screen)** — full-screen on mobile / sheet on desktop,
+   at a **routable URL carrying the reservation id** (`…/checkout/[reservationId]`)
+   so refresh/back/duplicate-tab resume the same hold (idempotent by
+   construction). Contact fields (prefilled when signed in; plain for guests)
+   above the Stripe Payment Element; one "Pay $XX" button. **Countdown as a
+   quiet pill** ("Tickets held · 9:42"), neutral until 2:00, then a gentle
+   tone shift — the hold is framed as a promise, not pressure. Free orders skip
+   payment (synchronous confirm → Confirmed). Payment failure: inline error,
+   hold stays live, retry freely. **Expiry mid-screen**: blocking overlay with
+   one-tap re-reserve of the same selections — a soft bounce, not a failure.
+4. **Processing** (`…/processing`) — exists because the order materializes on
+   the webhook: "Payment received — finalizing your tickets", **poll
+   `checkout.reservation`**, auto-advance on CONVERTED. Two reassurances on
+   screen: "usually a few seconds" + "your receipt will also be emailed to
+   you@x". Past ~30s, soften copy and keep polling — never an error state
+   unless the payment itself failed.
+5. **Confirmed** — tickets front and center, summary, "emailed to you@x".
+   Guests get the single auth moment of the whole flow: optional one-tap
+   magic-link claim ("access these tickets anytime") — never gates the
+   purchase, and the email already matches what the provisioning trigger links.
+
+**Flow rules:** never block browsing; the URL is the state; adjustment is
+re-consented before money is taken; every dead end has one obvious exit
+(expired → re-reserve, sold out → other types, failed → retry); email is the
+stated safety net; guest-first, account-optional.
 
 ## PR breakdown
 
@@ -163,8 +212,8 @@ Pre-land everything inert; keep the atomic PR as small as the contract allows.
 1. **`applyCode` UX**: service returns `isValid: true` with `maxAllowedToAdd: 0`
    for a sold-out code-gated ticket. Proposal: keep (the code _is_ valid; the UI
    shows sold-out) — confirm.
-2. **TTL/countdown UI**: 10-min reservation TTL decided; do we show a visible
-   countdown in the modal (proposed: yes, subtle) — confirm.
+2. ~~TTL/countdown UI~~ — **decided** (see Client flow structure): quiet pill,
+   tone shift at 2:00, expiry = one-tap re-reserve overlay.
 3. **Outbox drain transport**: reuse the existing SendGrid sender as-is
    (proposed) vs fold into the Resend migration — proposed: keep SendGrid here,
    email-provider consolidation is a separate concern.
