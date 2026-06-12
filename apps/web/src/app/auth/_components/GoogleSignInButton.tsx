@@ -1,22 +1,13 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { auth } from '@/config';
-import { createUser } from '@/firebase/auth';
-import { User } from '@/hooks/types/User';
-import {
-  GoogleAuthProvider,
-  getAdditionalUserInfo,
-  signInWithPopup,
-} from 'firebase/auth';
+import { signInWithGoogle } from '@/lib/supabaseAuth';
 import { Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import React from 'react';
 import { toast } from 'sonner';
 
 interface GoogleSignInButtonProps {
   text?: string;
-  onSuccess?: () => void;
   disabled?: boolean;
 }
 
@@ -25,38 +16,14 @@ export function GoogleSignInButton({
   disabled = false,
 }: GoogleSignInButtonProps) {
   const [isLoading, setIsLoading] = React.useState(false);
-  const router = useRouter();
-
-  const handleSuccess = () => {
-    toast.success('Successfully signed in with Google!');
-    router.back();
-  };
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    try {
-      const result = await signInWithPopup(auth, new GoogleAuthProvider());
-      const userResult = result.user;
-      const additionalInfo = getAdditionalUserInfo(result);
-
-      if (additionalInfo?.isNewUser) {
-        const user: User = {
-          id: userResult.uid,
-          email: userResult.email || '',
-        };
-
-        await createUser({
-          user,
-          onSuccess: handleSuccess,
-          onFailed: () => {},
-        });
-      } else {
-        handleSuccess();
-      }
-    } catch (error) {
-      console.error('Google sign-in error:', error);
+    // Redirects to Google, then back through /auth/callback. The provisioning
+    // trigger links/creates the Users row by email on first sign-in.
+    const { error } = await signInWithGoogle();
+    if (error) {
       toast.error('Failed to sign in with Google. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };

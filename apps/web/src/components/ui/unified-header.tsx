@@ -23,7 +23,7 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useContext, useEffect, useState } from 'react';
-import { auth } from '../../config'; // Assuming this is your Firebase config
+import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
 
 // Helper to check if the user is a platform owner
@@ -90,7 +90,7 @@ export default function UnifiedHeader() {
   }
 
   const handleSignOut = async () => {
-    await auth.signOut();
+    await supabaseSignOut();
   };
 
   const UserMenu = () => (

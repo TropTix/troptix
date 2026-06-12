@@ -79,7 +79,9 @@ export function CheckoutContainer({
   // This is the form methods for the checkout form for the user details
   const formMethods = useForm<UserDetailsFormData>({
     resolver: zodResolver(userDetailsSchema),
-    defaultValues: {
+    // `values` (not `defaultValues`) so the form fills in reactively once the
+    // signed-in user hydrates from /api/user/me, which now resolves async.
+    values: {
       firstName: user?.firstName || '',
       lastName: user?.lastName || '',
       email: user?.email || '',

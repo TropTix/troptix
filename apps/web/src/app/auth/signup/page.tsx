@@ -1,4 +1,4 @@
-import SignUpForm from '../_components/SignUpForm';
+import { EmailAuthForm } from '../_components/EmailAuthForm';
 
 export default function SignUpPage() {
   return (
@@ -13,8 +13,7 @@ export default function SignUpPage() {
         </p>
       </div>
 
-      {/* Form */}
-      <SignUpForm />
+      <EmailAuthForm />
     </>
   );
 }

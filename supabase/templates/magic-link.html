@@ -1,0 +1,66 @@
+<!--
+  TropTix passwordless sign-in email.
+
+  Paste this SAME html into BOTH templates in the Supabase dashboard
+  (Authentication -> Emails -> Templates) so new signups and returning logins
+  look identical:
+    - "Confirm signup"  (sent the first time an email is used)
+    - "Magic Link"      (sent for returning logins)
+
+  Supabase variables used:
+    {{ .ConfirmationURL }}  the one-click sign-in link
+    {{ .Token }}            the 6-digit code to type on the sign-in page
+-->
+<table
+  role="presentation"
+  width="100%"
+  cellpadding="0"
+  cellspacing="0"
+  style="background:#f4f4f5;margin:0;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
+>
+  <tr>
+    <td align="center">
+      <table
+        role="presentation"
+        width="100%"
+        cellpadding="0"
+        cellspacing="0"
+        style="max-width:480px;background:#ffffff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;"
+      >
+        <tr>
+          <td style="padding:32px 32px 8px 32px;">
+            <h1 style="margin:0 0 8px 0;font-size:22px;font-weight:700;color:#18181b;">
+              Sign in to TropTix
+            </h1>
+            <p style="margin:0 0 24px 0;font-size:15px;line-height:1.5;color:#52525b;">
+              Click the button below to sign in. This link works once and
+              expires in 1 hour.
+            </p>
+
+            <a
+              href="{{ .ConfirmationURL }}"
+              style="display:block;text-align:center;background:#4f46e5;color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:14px 24px;border-radius:8px;"
+            >
+              Sign in to TropTix
+            </a>
+
+            <p style="margin:24px 0 8px 0;font-size:14px;color:#52525b;">
+              Or enter this code on the sign-in page:
+            </p>
+            <div
+              style="font-size:30px;font-weight:700;letter-spacing:8px;color:#18181b;background:#f4f4f5;border-radius:8px;text-align:center;padding:16px 0;"
+            >
+              {{ .Token }}
+            </div>
+
+            <p style="margin:24px 0 0 0;font-size:13px;line-height:1.5;color:#a1a1aa;">
+              If you didn&rsquo;t request this, you can safely ignore this email.
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <p style="margin:16px 0 0 0;font-size:12px;color:#a1a1aa;">TropTix</p>
+    </td>
+  </tr>
+</table>
