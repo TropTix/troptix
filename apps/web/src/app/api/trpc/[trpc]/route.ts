@@ -3,6 +3,7 @@ import { appRouter, createContext } from '@troptix/api/server';
 import type { Actor } from '@troptix/api/server';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
+import { stripePaymentGateway } from '@/server/lib/paymentGateway';
 
 /**
  * Resolve the request actor from the Authorization header (Bearer token from
@@ -38,7 +39,8 @@ async function handler(req: Request) {
     endpoint: '/api/trpc',
     req,
     router: appRouter,
-    createContext: () => createContext({ prisma, actor }),
+    createContext: () =>
+      createContext({ prisma, actor, paymentGateway: stripePaymentGateway }),
   });
 }
 

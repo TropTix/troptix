@@ -11,15 +11,26 @@ export {
   confirm,
   release,
   expire,
+  getReservation,
   type ReserveInput,
   type ReserveResult,
   type ReserveItemInput,
   type ReserveGrantedItem,
   type ConfirmInput,
   type ConfirmResult,
+  type ReservationStatusResult,
 } from './services/reservations';
 
 export { getCheckoutConfig, applyCode } from './services/checkout';
+export {
+  initiateCheckout,
+  type InitiateCheckoutOptions,
+} from './services/initiate';
+export type {
+  PaymentGateway,
+  CreatePaymentIntentInput,
+  CreatePaymentIntentResult,
+} from './services/payments';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
 export { NotFoundError } from './services/_shared/errors';
 

@@ -21,6 +21,7 @@ import {
 } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
 import { generateId } from './_shared/ids';
+import { NotFoundError } from './_shared/errors';
 
 const DEFAULT_TTL_MINUTES = 10;
 
@@ -163,11 +164,21 @@ export async function reserve(
   });
 }
 
-export interface ConfirmInput {
-  paymentIntentId: string;
+interface ConfirmOptions {
   cardType?: string | null;
   cardLast4?: string | null;
 }
+
+/**
+ * Identify the reservation to confirm: by payment-intent id (the webhook path)
+ * or by reservation id (the synchronous free-order path, which has no
+ * PaymentIntent).
+ */
+export type ConfirmInput = ConfirmOptions &
+  (
+    | { paymentIntentId: string; reservationId?: undefined }
+    | { reservationId: string; paymentIntentId?: undefined }
+  );
 
 export interface ConfirmResult {
   orderId: string;
@@ -190,13 +201,19 @@ export async function confirm(
 ): Promise<ConfirmResult> {
   return prisma.$transaction(async (tx) => {
     const reservation = await tx.reservation.findUnique({
-      where: { stripePaymentIntentId: input.paymentIntentId },
+      where: input.paymentIntentId
+        ? { stripePaymentIntentId: input.paymentIntentId }
+        : { id: input.reservationId },
       include: { items: true },
     });
 
     if (!reservation) {
       throw new Error(
-        `No reservation found for payment intent ${input.paymentIntentId}`
+        `No reservation found for ${
+          input.paymentIntentId
+            ? `payment intent ${input.paymentIntentId}`
+            : `id ${input.reservationId}`
+        }`
       );
     }
 
@@ -257,7 +274,9 @@ export async function confirm(
         id: orderId,
         status: OrderStatus.COMPLETED,
         type: orderType,
-        stripePaymentId: input.paymentIntentId,
+        // Free orders confirmed by reservation id have no PaymentIntent.
+        stripePaymentId:
+          input.paymentIntentId ?? reservation.stripePaymentIntentId ?? null,
         total: reservation.totalCents / 100,
         subtotal: reservation.subtotalCents / 100,
         fees: reservation.feesCents / 100,
@@ -356,4 +375,38 @@ export async function expire(
     if (released) count++;
   }
   return count;
+}
+
+export interface ReservationStatusResult {
+  reservationId: string;
+  status: ReservationStatus;
+  /** Set once `confirm` materializes the order. */
+  orderId: string | null;
+  /** ISO-8601 (contract convention: dates cross the wire as strings). */
+  expiresAt: string;
+}
+
+/**
+ * Reservation status by id — the post-payment polling read (the order only
+ * exists once the webhook converts, so the client polls this until
+ * CONVERTED, then navigates by `orderId`). Throws `NotFoundError` for an
+ * unknown id.
+ */
+export async function getReservation(
+  prisma: PrismaClient,
+  reservationId: string
+): Promise<ReservationStatusResult> {
+  const reservation = await prisma.reservation.findUnique({
+    where: { id: reservationId },
+    select: { id: true, status: true, orderId: true, expiresAt: true },
+  });
+  if (!reservation) {
+    throw new NotFoundError(`Reservation ${reservationId} not found.`);
+  }
+  return {
+    reservationId: reservation.id,
+    status: reservation.status,
+    orderId: reservation.orderId,
+    expiresAt: reservation.expiresAt.toISOString(),
+  };
 }
