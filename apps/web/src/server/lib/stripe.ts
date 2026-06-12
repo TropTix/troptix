@@ -11,12 +11,3 @@ import Stripe from 'stripe';
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
 });
-
-/**
- * Stripe API version used when minting ephemeral keys for the mobile app.
- *
- * This must match the Stripe SDK version embedded in the mobile client, NOT
- * the server API version above — do not unify it with `stripe`'s apiVersion.
- * Confirm against the mobile app's Stripe SDK before changing.
- */
-export const MOBILE_STRIPE_API_VERSION = '2020-08-27';
