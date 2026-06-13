@@ -9,9 +9,10 @@
  * Plain SQL is the source of truth (docs/adr/0004-supabase-migrations-as-source.md);
  * Prisma is only the generator. Review the emitted SQL before committing.
  *
- * Env:
- *   POSTGRES_URL_NON_POOLING  direct (5432) connection to the branch you're working on
- *                             (a preview/dev branch, kept at migration head). The diff baseline.
+ * Prisma 7: the diff baseline connection is read from `prisma.config.ts`
+ * (`datasource.url` = env POSTGRES_URL_NON_POOLING, the direct 5432 connection
+ * to the branch you're working on) via `--from-config-datasource`. Set that env
+ * var in .env (loaded here by `tsx --env-file` and by prisma.config.ts's dotenv).
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -38,25 +39,28 @@ const timestamp =
   `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
 
 const webDir = join(__dirname, '..');
-const schemaPath = join(webDir, 'prisma', 'schema.prisma');
-const migrationsDir = join(webDir, '..', '..', 'supabase', 'migrations');
+const repoRoot = join(webDir, '..', '..');
+// Prisma lives in packages/db (the relocation). This script still runs from
+// apps/web (where .env is) and points the CLI at the package's schema + config.
+const dbDir = join(repoRoot, 'packages', 'db');
+const schemaPath = join(dbDir, 'prisma', 'schema.prisma');
+const configPath = join(dbDir, 'prisma.config.ts');
+const migrationsDir = join(repoRoot, 'supabase', 'migrations');
 const outFile = join(migrationsDir, `${timestamp}_${name}.sql`);
 
-const fromArgs = isInit
-  ? ['--from-empty']
-  : (() => {
-      const url = process.env.POSTGRES_URL_NON_POOLING;
-      if (!url) {
-        console.error(
-          "POSTGRES_URL_NON_POOLING is required (direct 5432 connection to the branch you're working on)."
-        );
-        console.error(
-          'Use --init for the first baseline migration (diff from empty).'
-        );
-        process.exit(1);
-      }
-      return ['--from-url', url];
-    })();
+// Prisma 7 flags: the baseline comes from prisma.config.ts (`--from-config-datasource`),
+// not `--from-url`; the target datamodel flag is `--to-schema` (was `--to-schema-datamodel`).
+if (!isInit && !process.env.POSTGRES_URL_NON_POOLING) {
+  console.error(
+    "POSTGRES_URL_NON_POOLING is required (direct 5432 connection to the branch you're working on); prisma.config.ts reads it as the diff baseline."
+  );
+  console.error(
+    'Use --init for the first baseline migration (diff from empty).'
+  );
+  process.exit(1);
+}
+
+const fromArgs = isInit ? ['--from-empty'] : ['--from-config-datasource'];
 
 const sql = execFileSync(
   'npx',
@@ -64,8 +68,10 @@ const sql = execFileSync(
     'prisma',
     'migrate',
     'diff',
+    '--config',
+    configPath,
     ...fromArgs,
-    '--to-schema-datamodel',
+    '--to-schema',
     schemaPath,
     '--script',
   ],

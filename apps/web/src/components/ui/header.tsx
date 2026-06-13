@@ -12,7 +12,7 @@ import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useContext, useEffect, useState } from 'react';
-import { auth } from '../../config';
+import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
 
 export interface NavItem {
@@ -65,7 +65,7 @@ export default function Header() {
   }, [top]);
 
   async function signOut() {
-    await auth.signOut();
+    await supabaseSignOut();
   }
 
   const getVisibleNavItems = () => {

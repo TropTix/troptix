@@ -1,7 +1,7 @@
 import React from 'react';
 import prisma from '@/server/prisma';
 import OrderTable from './_components/OrderTable';
-import { TicketTypes } from '@prisma/client';
+import { TicketTypes } from '@troptix/db';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';

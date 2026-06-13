@@ -1,11 +1,10 @@
 // app/api/checkout/initiate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies, headers } from 'next/headers'; // For reading cookies in App Router
+import { getServerUser } from '@/server/authUser';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { UserDetailsFormData } from '@/lib/schemas/checkoutSchema'; // Adjust path if needed
-import { OrderStatus, TicketFeeStructure, TicketStatus } from '@prisma/client';
-import { getFirebaseAdmin } from '@/server/lib/firebaseAdmin'; // Adjust path if needed
+import { OrderStatus, TicketFeeStructure, TicketStatus } from '@troptix/db';
 import { generateId } from '@/lib/utils'; // Adjust path if needed
 import {
   ValidatedItem,
@@ -14,7 +13,7 @@ import {
   ValidationResponseMessage,
 } from '@/types/checkout'; // Adjust path if needed
 import { calculateFees } from '@/lib/fees'; // Adjust path if needed
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@troptix/db';
 import { sendEmailConfirmationEmailToUser } from '@/server/lib/email';
 
 interface InitiateRequestData {
@@ -86,26 +85,10 @@ type ticketTypeWithPendingAndCompletedOrders = ticketTypeWithRawData & {
 export async function POST(
   req: NextRequest
 ): Promise<NextResponse<ValidationResponse | { message: string }>> {
-  let userId: string | null = null;
-
-  try {
-    const cookieStore = await cookies();
-    const tokenCookie = cookieStore.get('fb-token');
-    if (!tokenCookie?.value) {
-      userId = null;
-    } else {
-      const admin = getFirebaseAdmin();
-      const decoded = await admin.auth().verifyIdToken(tokenCookie.value);
-      userId = decoded.uid;
-    }
-  } catch (error) {
-    console.error(
-      'Error verifying Firebase token during checkout initiation:',
-      error
-    );
-
-    userId = null;
-  }
+  // Supabase-first with Firebase fallback (dual-verify — ADR 0011/0015).
+  // `uid` is the stable Users.id, validated against the DB just below.
+  const user = await getServerUser();
+  let userId: string | null = user?.uid ?? null;
 
   // --- Validate user exists if userId is provided ---
   let validUserId: string | undefined = undefined;

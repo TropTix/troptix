@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/prisma';
-import { OrderStatus, Prisma, TicketFeeStructure } from '@prisma/client';
+import { OrderStatus, Prisma, TicketFeeStructure } from '@troptix/db';
 import { calculateFees } from '@/lib/fees';
 import { CheckoutConfigResponse, CheckoutTicket } from '@/types/checkout';
 

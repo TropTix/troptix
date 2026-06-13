@@ -85,10 +85,6 @@ const fetchCheckoutConfig = async (
   eventId: string,
   promoCode?: string
 ): Promise<CheckoutConfigResponse> => {
-  // TODO: Determine if auth is needed for this endpoint
-  // const { user } = useContext(TropTixContext); // Get user/token if needed
-  // const jwtToken = user?.jwtToken; // Example token retrieval
-
   if (!eventId) {
     throw new Error('Event ID is required to fetch checkout config.');
   }

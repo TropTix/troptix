@@ -5,7 +5,7 @@ Conventions for Claude Code (and other AI agents) working in this repo.
 ## Where artifacts live
 
 - **`docs/roadmap.md`** — the living strategic roadmap. Edited in place over time; priorities reflect the current view.
-- **`docs/adr/NNNN-<slug>.md`** — Architecture Decision Records. One decision per file, append-only, numbered sequentially. Use these to capture *why* a non-trivial choice was made.
+- **`docs/adr/NNNN-<slug>.md`** — Architecture Decision Records. One decision per file, append-only, numbered sequentially. Use these to capture _why_ a non-trivial choice was made.
 - **`docs/plans/YYYY-MM-<slug>.md`** — implementation plans for substantial initiatives. Front-matter status (`proposed`, `active`, `done`, `superseded`). The plan is the spec; an umbrella GitHub Issue tracks execution.
 - **`docs/audits/YYYY-MM-DD-<slug>.md`** — dated point-in-time audits and research snapshots. Frozen on write — never edited.
 - **`docs/private/`** — gitignored. Personal/working notes that should not be committed.
@@ -28,6 +28,12 @@ Conventions for Claude Code (and other AI agents) working in this repo.
 - **Durable decisions** made along the way → add an ADR.
 - **Trivial work** (typo, one-line fix, mechanical rename) → straight to a PR. No plan doc, no ADR.
 - **Unrelated cleanup spotted while doing other work** → open an issue (or use a spawn-task chip). Don't scope-creep the current PR.
+
+## Formatting
+
+- **Prettier is the single source of truth** for code style. Config lives in `.prettierrc`; ignores in `.prettierignore`. Don't hand-tune whitespace/quotes/semicolons — let Prettier decide.
+- A **husky `pre-commit` hook** runs `lint-staged` → `prettier --write` on staged files, so every commit is auto-formatted. This applies to commits Claude makes too.
+- Before committing, run `yarn format` (write) or `yarn format:check` (verify) if you've touched many files. Don't bypass the hook with `--no-verify`.
 
 ## Naming
 
@@ -63,3 +69,17 @@ created: YYYY-MM-DD
 tracking-issue: <#N or TBD>
 ---
 ```
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live in `TropTix/troptix`'s GitHub Issues, managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage roles use their default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) — all present in GitHub. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` (created lazily) + root `docs/adr/`. See `docs/agents/domain.md`.

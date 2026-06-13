@@ -1,8 +1,21 @@
-import jwt from 'jsonwebtoken';
 import { NextRequest, NextResponse } from 'next/server';
+import { updateSession } from '@/lib/supabase/proxy';
 
-export function proxy(req: NextRequest) {
-  const token = req.cookies.get('fb-token')?.value;
+// Auth routes that establish or clear the session — they must always run, so an
+// authenticated user is never bounced off them by the "redirect away from
+// /auth/*" rule.
+const MECHANISM_ROUTES = ['/auth/callback', '/auth/signout'];
+
+/**
+ * Next 16 middleware (`proxy`). Refreshes the Supabase session every request and
+ * redirect-gates protected routes / auth pages on the validated claims.
+ *
+ * Gating is a redirect heuristic only — pages/routes still do the real check via
+ * getServerUser(). Any redirect MUST carry the refreshed cookies from
+ * updateSession, or the rotated session is lost.
+ */
+export async function proxy(req: NextRequest) {
+  const { response, claims } = await updateSession(req);
 
   const isProtected =
     req.nextUrl.pathname.startsWith('/admin') ||
@@ -10,31 +23,33 @@ export function proxy(req: NextRequest) {
     req.nextUrl.pathname.startsWith('/organizer') ||
     req.nextUrl.pathname === '/orders';
 
-  const isAuthPage = req.nextUrl.pathname.startsWith('/auth');
+  const isAuthPage =
+    req.nextUrl.pathname.startsWith('/auth') &&
+    !MECHANISM_ROUTES.some((route) => req.nextUrl.pathname.startsWith(route));
+  const isAuthenticated = Boolean(claims);
 
-  // Check if user has valid token
-  let isAuthenticated = false;
-  try {
-    const decoded = jwt.decode(token || '') as any;
-    isAuthenticated = !!decoded?.user_id;
-  } catch (error) {
-    isAuthenticated = false;
-  }
-
-  // Redirect authenticated users away from auth pages
   if (isAuthPage && isAuthenticated) {
-    const url = new URL('/', req.url);
-    return NextResponse.redirect(url);
+    return redirectPreservingCookies(new URL('/', req.url), response);
   }
 
-  // Handle protected routes (redirect unauthenticated users to sign in)
   if (isProtected && !isAuthenticated) {
-    const url = new URL('/auth/signin', req.url);
-    // url.searchParams.set('redirectedFrom', req.nextUrl.pathname);
-    return NextResponse.redirect(url);
+    return redirectPreservingCookies(
+      new URL('/auth/signin', req.url),
+      response
+    );
   }
 
-  return NextResponse.next();
+  return response;
+}
+
+/**
+ * Redirect while carrying over any cookies updateSession set on `from` — so a
+ * session refreshed during this request still persists across the redirect.
+ */
+function redirectPreservingCookies(url: URL, from: NextResponse): NextResponse {
+  const redirect = NextResponse.redirect(url);
+  from.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+  return redirect;
 }
 
 export const config = {

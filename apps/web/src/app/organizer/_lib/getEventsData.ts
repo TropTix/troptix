@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@troptix/db';
 
 import prisma from '@/server/prisma';
 

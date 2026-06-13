@@ -1,0 +1,360 @@
+datasource db {
+  provider = "postgresql"
+  // Prisma 7: connection URLs are no longer allowed in the schema.
+  //  - CLI / migrate diff: prisma.config.ts -> datasource.url (direct, 5432)
+  //  - runtime: pg driver adapter in src/server/prisma.ts (pooled URL)
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+enum Role {
+  PATRON
+  ORGANIZER
+  PROMOTER
+}
+
+model Users {
+  id                  String                @id @default(uuid())
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  email               String                @unique
+  // Supabase Auth identity (ADR 0011). The auth key; `id` stays the app PK —
+  // never assume equality (migrated users have id != authUserId). FK to
+  // auth.users(id) is hand-appended in SQL (the auth schema isn't modeled in
+  // Prisma). Nullable until the 1c backfill + orphan gate clears it.
+  authUserId          String?               @unique @db.Uuid
+  name                String?
+  firstName           String?
+  lastName            String?
+  stripeId            String?
+  role                Role                  @default(PATRON)
+  tickets             Tickets[]
+  orders              Orders[]
+  socialMediaAccounts SocialMediaAccounts[]
+  reservations        Reservation[]
+
+  telephoneNumber String?
+  billingAddress1 String?
+  billingAddress2 String?
+  billingCity     String?
+  billingCountry  String?
+  billingZip      String?
+  billingState    String?
+}
+
+enum SocialMediaAccountType {
+  UNKNOWN
+  FACEBOOK
+  INSTAGRAM
+  TIKTOK
+  TWITTER
+}
+
+model SocialMediaAccounts {
+  id                     String                 @id @default(uuid())
+  socialMediaAccountType SocialMediaAccountType @default(UNKNOWN)
+  link                   String?
+  user                   Users?                 @relation(fields: [userId], references: [id])
+  userId                 String?
+
+  @@index([userId])
+}
+
+enum TicketStatus {
+  AVAILABLE
+  NOT_AVAILABLE
+  // New canonical lifecycle (reservation rebuild, Phase A — additive).
+  // Replaces the overloaded AVAILABLE/NOT_AVAILABLE pair; the old values stay
+  // until the cleanup phase migrates remaining rows and drops them.
+  VALID
+  USED
+  CANCELLED
+  REFUNDED
+}
+
+enum TicketType {
+  FREE
+  PAID
+  COMPLEMENTARY
+}
+
+// Order-level transaction kind (roadmap 2.4). Distinct from the per-ticket
+// TicketType enum; lets free/paid/comp share one reservation→confirm path.
+enum OrderType {
+  FREE
+  PAID
+  COMPLEMENTARY
+}
+
+// Lifecycle of a checkout hold (reservation rebuild).
+enum ReservationStatus {
+  HELD
+  CONVERTED
+  EXPIRED
+  RELEASED
+}
+
+// Transactional-outbox row state — deferred side effects (e.g. confirmation
+// email) written in the confirm transaction, sent after commit / retried.
+enum OutboxStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model Tickets {
+  id          String       @id @default(uuid())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime?    @updatedAt
+  status      TicketStatus @default(NOT_AVAILABLE)
+  ticketsType TicketType?  @default(PAID)
+  fees        Float?
+  subtotal    Float?
+  total       Float?
+  firstName   String?
+  lastName    String?
+  email       String?
+
+  // Reservation rebuild (Phase A — additive)
+  checkinTimestamp DateTime? // set when scanned/checked in at the door (roadmap 2.11)
+
+  event        Events       @relation(fields: [eventId], references: [id])
+  eventId      String
+  order        Orders       @relation(fields: [orderId], references: [id])
+  orderId      String
+  ticketType   TicketTypes? @relation(fields: [ticketTypeId], references: [id])
+  ticketTypeId String?
+  user         Users?       @relation(fields: [userId], references: [id])
+  userId       String?
+
+  @@index([eventId])
+  @@index([orderId])
+  @@index([ticketTypeId])
+  @@index([userId])
+}
+
+enum OrderStatus {
+  PENDING
+  CANCELLED
+  COMPLETED
+}
+
+model Orders {
+  id               String      @id @default(uuid())
+  stripeCustomerId String?
+  stripePaymentId  String?     @unique
+  createdAt        DateTime?   @default(now())
+  updatedAt        DateTime?   @updatedAt
+  total            Float
+  subtotal         Float?
+  fees             Float?
+  name             String?
+  firstName        String?
+  lastName         String?
+  email            String?
+  cardType         String?
+  cardLast4        String?
+  telephoneNumber  String?
+  billingAddress1  String?
+  billingAddress2  String?
+  billingCity      String?
+  billingCountry   String?
+  billingZip       String?
+  billingState     String?
+  tickets          Tickets[]
+  ticketsLink      String?
+  status           OrderStatus @default(PENDING)
+
+  // Reservation rebuild (Phase A — additive). Nullable until backfilled +
+  // the cutover writes them; old Float columns retained until cleanup.
+  type          OrderType? // roadmap 2.4 — transaction kind at the order level
+  totalCents    Int?
+  subtotalCents Int?
+  feesCents     Int?
+  reservation   Reservation? // the hold this order was materialized from
+
+  user    Users?  @relation(fields: [userId], references: [id])
+  userId  String?
+  event   Events  @relation(fields: [eventId], references: [id])
+  eventId String
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model Events {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDraft   Boolean  @default(true)
+
+  // Event Details
+  imageUrl        String? @db.VarChar(2000)
+  name            String
+  description     String  @db.VarChar(4000)
+  summary         String?
+  organizer       String
+  organizerUserId String
+
+  // Date and Time Details
+  startDate DateTime
+  startTime DateTime?
+  endDate   DateTime
+  endTime   DateTime?
+
+  // Reservation rebuild (Phase A — additive). Single DateTime fields (roadmap
+  // 2.10) that fix the sale-window-ignores-time bug; backfilled from the split
+  // columns, replace them in cleanup.
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  // Location Details
+  venue       String?
+  address     String
+  country     String?
+  countryCode String?
+  latitude    Float?
+  longitude   Float?
+
+  // Ticket Details
+  tickets      Tickets[]
+  ticketTypes  TicketTypes[]
+  orders       Orders[]
+  reservations Reservation[]
+}
+
+enum TicketFeeStructure {
+  // Fees to be included in the ticket price you set. 
+  // Fees will be deducted from your sales at the time of your payout.
+  ABSORB_TICKET_FEES
+  // Attendees to pay the fees on top of the ticket price you set. 
+  // Fees will be collected off the top of your ticket sales at the time of your payout.
+  PASS_TICKET_FEES
+}
+
+model TicketTypes {
+  id         String      @id @default(uuid())
+  ticketType TicketType? @default(PAID)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  // Ticket Details
+  name               String
+  description        String
+  maxPurchasePerUser Int
+  quantity           Int
+  quantitySold       Int?   @default(0)
+
+  // Reservation rebuild (Phase A — additive). Counter inventory: availability
+  // = capacity - reserved - sold. `capacity` backfills from `quantity`,
+  // `sold` from `quantitySold`; these replace `quantity`/`quantitySold` in
+  // cleanup. reserved/sold are NOT NULL with a default (safe additive).
+  capacity Int? // immutable total (← quantity)
+  reserved Int  @default(0) // held by active, unexpired reservations
+  sold     Int  @default(0) // confirmed/paid (← quantitySold)
+
+  // Sale Date Details
+  saleStartDate DateTime
+  saleStartTime DateTime?
+  saleEndDate   DateTime
+  saleEndTime   DateTime?
+
+  // Single DateTime sale-window fields (roadmap 2.10), backfilled from the
+  // split columns; fix the sale-window-ignores-time bug. Replace them in cleanup.
+  saleStartsAt DateTime?
+  saleEndsAt   DateTime?
+
+  // Price Details
+  price         Float
+  priceCents    Int? // integer cents (roadmap 2.12), ← round(price * 100)
+  ticketingFees TicketFeeStructure @default(PASS_TICKET_FEES)
+
+  event            Events            @relation(fields: [eventId], references: [id])
+  eventId          String
+  discountCode     String?
+  tickets          Tickets[]
+  reservationItems ReservationItem[]
+
+  @@index([eventId])
+}
+
+// ---------------------------------------------------------------------------
+// Reservation rebuild (Phase A — additive). New tables; not yet written to by
+// app code until the Phase B cutover. RLS is enabled on each in the migration
+// (per the #281 convention); the app connects as a bypassrls role.
+// ---------------------------------------------------------------------------
+
+// An explicit, time-boxed hold on inventory. Replaces "a PENDING Orders row is
+// the reservation". The Order is materialized only when the hold is confirmed.
+model Reservation {
+  id                    String            @id @default(uuid())
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  status                ReservationStatus @default(HELD)
+  expiresAt             DateTime
+  stripePaymentIntentId String?           @unique
+
+  // buyer contact captured at hold time
+  email     String?
+  firstName String?
+  lastName  String?
+
+  totalCents    Int @default(0)
+  subtotalCents Int @default(0)
+  feesCents     Int @default(0)
+
+  items   ReservationItem[]
+  event   Events            @relation(fields: [eventId], references: [id])
+  eventId String
+  user    Users?            @relation(fields: [userId], references: [id])
+  userId  String?
+  // Set when the hold is converted to a paid/confirmed order.
+  order   Orders?           @relation(fields: [orderId], references: [id])
+  orderId String?           @unique
+
+  @@index([eventId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model ReservationItem {
+  id             String      @id @default(uuid())
+  reservation    Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  reservationId  String
+  ticketType     TicketTypes @relation(fields: [ticketTypeId], references: [id])
+  ticketTypeId   String
+  quantity       Int
+  unitPriceCents Int         @default(0)
+  feesCents      Int         @default(0)
+
+  @@index([reservationId])
+  @@index([ticketTypeId])
+}
+
+// Transactional outbox — side effects (e.g. confirmation email) are written in
+// the same transaction as confirm_reservation and dispatched after commit, so
+// a slow/failed email can never roll back a confirmed payment (roadmap 1.2 / 4.4).
+model OutboxMessage {
+  id          String       @id @default(uuid())
+  createdAt   DateTime     @default(now())
+  type        String
+  payload     Json
+  status      OutboxStatus @default(PENDING)
+  attempts    Int          @default(0)
+  lastError   String?
+  processedAt DateTime?
+
+  @@index([status])
+}
+
+// Idempotency ledger for Stripe webhook deliveries (Stripe is at-least-once).
+// Primary key is the Stripe event id; an INSERT that conflicts means we already
+// processed it. Belt-and-suspenders alongside the reservation-status guard.
+model ProcessedStripeEvent {
+  id          String   @id // Stripe event id (evt_…)
+  type        String
+  processedAt DateTime @default(now())
+}

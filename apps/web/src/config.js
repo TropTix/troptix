@@ -1,5 +1,6 @@
+// Firebase is kept ONLY for Storage (event image uploads). Auth moved to
+// Supabase — see ADR 0011/0015 and src/lib/supabase/*.
 import { getApps, initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -16,5 +17,4 @@ let firebaseApp =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 export const app = firebaseApp;
-export const auth = getAuth(firebaseApp);
 export const storage = getStorage(firebaseApp);

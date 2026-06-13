@@ -1,0 +1,35 @@
+{
+  "name": "@troptix/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TropTix shared database layer (Prisma 7 schema + client). Server-only; RN-safe types under ./types.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "default": "./src/types.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "postinstall": "prisma generate",
+    "generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "dotenv": "^17.2.0",
+    "prisma": "^7.8.0",
+    "typescript": "^5.2.2"
+  }
+}

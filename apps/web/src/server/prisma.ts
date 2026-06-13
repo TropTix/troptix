@@ -1,13 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-let prisma: PrismaClient;
-if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient();
-} else {
-  if (!global.prisma) {
-    global.prisma = new PrismaClient();
-  }
-  prisma = global.prisma;
-}
-
-export default prisma;
+// The Prisma client moved into @troptix/db (the packages/db relocation).
+// This thin re-export keeps existing `import prisma from '@/server/prisma'`
+// call sites working without churn.
+export { default } from '@troptix/db';

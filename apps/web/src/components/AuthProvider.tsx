@@ -1,17 +1,10 @@
 'use client';
 
-import { User, initializeUser } from '@/hooks/types/User';
+import { User } from '@/hooks/types/User';
 import { cn } from '@/lib/utils';
-import { LoadingOutlined } from '@ant-design/icons';
-import { Spin } from 'antd';
-import { onIdTokenChanged } from 'firebase/auth';
-
-import { useOrganizerStatus } from '@/hooks/useUser';
-import Cookies from 'js-cookie';
+import { createClient } from '@/lib/supabase/client';
 import { Inter } from 'next/font/google';
-import { usePathname } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '../config';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -19,99 +12,78 @@ const inter = Inter({
   display: 'swap',
 });
 
-const emptyUser: User = {
-  id: '',
-  jwtToken: '',
-};
+const emptyUser: User = { id: '' };
 
-export const TropTixContext = createContext({
+export const TropTixContext = createContext<{ user: User; loading: boolean }>({
   user: emptyUser,
   loading: true,
 });
 
+export const useAuth = () => useContext(TropTixContext);
+
+/**
+ * Client-side auth state for Client Components (header, checkout). The single
+ * source of truth is /api/user/me — the server resolves the Supabase session
+ * (getClaims) → the app `Users` row (stable id + role). We re-fetch it whenever
+ * the Supabase auth state changes (sign-in / sign-out / token refresh).
+ *
+ * Protected routes are gated server-side (proxy + getServerUser), so this never
+ * blocks rendering — it just hydrates UI that reacts to the signed-in user.
+ */
 export default function AuthProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const [user, setUser] = useState<User>();
+  const [user, setUser] = useState<User>(emptyUser);
   const [loading, setLoading] = useState(true);
 
-  // Fetch the organizer state from the database
-  const { data: isOrganizer, isLoading: isOrganizerLoading } =
-    useOrganizerStatus(user?.id);
-
   useEffect(() => {
-    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const token = await firebaseUser.getIdToken();
+    const supabase = createClient();
+    let active = true;
 
-        Cookies.set('fb-token', token, {
-          path: '/',
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-        });
-
-        let currentUser = await initializeUser(firebaseUser);
-        setUser(currentUser);
-      } else {
-        Cookies.remove('fb-token');
-        setUser(emptyUser);
+    async function loadUser() {
+      try {
+        const res = await fetch('/api/user/me', { cache: 'no-store' });
+        const json = await res.json();
+        if (active) setUser(json.user ?? emptyUser);
+      } catch (error) {
+        console.error('Failed to load user:', error);
+        if (active) setUser(emptyUser);
+      } finally {
+        if (active) setLoading(false);
       }
-      setLoading(false);
-    });
+    }
 
-    return () => unsubscribe();
+    // onAuthStateChange fires INITIAL_SESSION right after subscribing, so this
+    // loads on mount too — no separate up-front fetch needed (avoids a double
+    // /api/user/me on every page load).
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => loadUser());
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Sync the isOrganizer state with the user state
-  // TODO: I am not sure if this is the best way to do this
-  useEffect(() => {
-    if (
-      user &&
-      !isOrganizerLoading &&
-      isOrganizer !== undefined &&
-      user.isOrganizer !== isOrganizer
-    ) {
-      setUser({ ...user, isOrganizer });
-    }
-  }, [user, isOrganizer, isOrganizerLoading]);
-
-  if (loading && pathname !== '/' && pathname !== '/home') {
-    return <></>;
-  }
-
   return (
-    <TropTixContext.Provider
-      value={{
-        user: user as User,
-        loading,
-      }}
-    >
-      {loading && (pathname === '/' || pathname === '/home') ? (
-        <>
-          <Spin
-            className="flex h-screen items-center justify-center"
-            indicator={<LoadingOutlined style={{ fontSize: 84 }} spin />}
-          />
-        </>
-      ) : (
+    <TropTixContext.Provider value={{ user, loading }}>
+      <div
+        className={cn(
+          'min-h-screen font-sans antialiased mx-auto',
+          inter.variable
+        )}
+      >
         <div
-          className={cn(
-            'min-h-screen font-sans antialiased mx-auto',
-            inter.variable
-          )}
+          className={`${inter.variable} font-inter antialiased text-gray-900 tracking-tight`}
         >
-          <div
-            className={`${inter.variable} font-inter antialiased text-gray-900 tracking-tight`}
-          >
-            <div className="flex flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
-              {children}
-            </div>
+          <div className="flex flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
+            {children}
           </div>
         </div>
-      )}
+      </div>
     </TropTixContext.Provider>
   );
 }

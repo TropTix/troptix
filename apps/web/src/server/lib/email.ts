@@ -1,5 +1,5 @@
 import prisma from '@/server/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@troptix/db';
 import { createElement } from 'react';
 import { render } from '@react-email/components';
 import EmailConfirmationTemplate from '@emails/EmailConfirmation';

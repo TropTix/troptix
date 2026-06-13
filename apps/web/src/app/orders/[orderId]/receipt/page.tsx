@@ -1,4 +1,5 @@
-import { PrismaClient, OrderStatus } from '@prisma/client';
+import { OrderStatus } from '@troptix/db';
+import prisma from '@/server/prisma';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -32,8 +33,6 @@ import { Badge } from '@/components/ui/badge';
 import { getDateFormatter } from '@/lib/dateUtils'; // Assuming getTimeFormatter
 import { getFormattedCurrency } from '@/lib/utils';
 import { EnrichedOrder } from '../page';
-
-const prisma = new PrismaClient();
 
 interface AggregatedTicketRow {
   key: string;
@@ -113,11 +112,9 @@ function aggregateTicketsForReceipt(
   return Array.from(orderMap.values());
 }
 
-export default async function OrderReceiptPage(
-  props: {
-    params: Promise<{ orderId: string }>;
-  }
-) {
+export default async function OrderReceiptPage(props: {
+  params: Promise<{ orderId: string }>;
+}) {
   const params = await props.params;
   const orderId = params.orderId;
   const order = await getOrderForReceipt(orderId);

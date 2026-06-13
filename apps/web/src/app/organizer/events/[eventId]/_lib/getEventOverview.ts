@@ -1,4 +1,4 @@
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus } from '@troptix/db';
 import { notFound } from 'next/navigation';
 import prisma from '@/server/prisma';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';

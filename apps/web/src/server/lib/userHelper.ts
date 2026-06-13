@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@troptix/db';
 
 export function getPrismaUpdateSocialMediaQuery(account) {
   let socialMedia: Prisma.SocialMediaAccountsUpdateInput;

@@ -1,0 +1,34 @@
+{
+  "name": "@troptix/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TropTix shared API layer. Default entry is a type-only barrel (AppRouter type + zod contracts); ./server holds the router value, context, and services (server entry).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./server": {
+      "types": "./src/server.ts",
+      "default": "./src/server.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@troptix/db": "0.0.0",
+    "@trpc/server": "^11.17.0",
+    "short-unique-id": "^5.0.3",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "dotenv": "^17.2.0",
+    "typescript": "^5.2.2",
+    "vitest": "^4.1.8"
+  }
+}
