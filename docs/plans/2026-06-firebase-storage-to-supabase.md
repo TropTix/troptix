@@ -65,11 +65,11 @@ Auth already moved to Supabase ([ADR 0015](../adr/0015-passwordless-auth-and-tri
 
 ### PR 4 — Migrate existing objects
 
-`scripts/migrate-firebase-storage-to-supabase.ts` (run with `tsx --env-file`):
+`scripts/migrate-storage-firebase-to-supabase.ts` (`yarn migrate:storage`):
 
-- Read every `Events` row whose `imageUrl` matches `firebasestorage.googleapis.com`.
-- For each: download via **firebase-admin** (existing `FIREBASE_SERVICE_ACCOUNT_KEY`) → upload to `event-flyers/<uuidv7>.<ext>` with the **Supabase secret key** → update `Events.imageUrl` to the new path.
-- **`--dry-run` is the default** (report counts, no writes); `--commit` to apply. **Idempotent**: skip rows already holding a non-`http` path. Per-row try/catch; summary of migrated/skipped/failed.
+- Read every `Events` row whose `imageUrl` matches `firebasestorage.googleapis.com`, via the app's **Prisma client** (`@troptix/db`) — connects directly to Postgres (bypasses RLS + PostgREST grants) and needs no extra dependency.
+- For each: download via plain `fetch` (the stored Firebase download URLs are token-bearing and publicly fetchable — no firebase-admin needed) → upload to `event-flyers/<uuid>.<ext>` with the **Supabase secret key** → update `Events.imageUrl` to the new path via Prisma.
+- **Dry run is the default** (report counts, no writes); `--commit` to apply. **Idempotent**: the `contains` filter only matches rows still pointing at Firebase, so migrated rows are skipped and a second run is a no-op. Per-row try/catch; summary of migrated/failed.
 - **Gate:** dry-run, then `--commit` on staging, eyeball a few event pages, then prod. `firebasestorage.googleapis.com` stays allow-listed and `eventFlyerUrl()` passes legacy URLs through, so partial migration never breaks rendering.
 
 ### PR 5 — Decommission Firebase
@@ -80,6 +80,7 @@ Only after PR 4 is verified in prod and a query confirms **no** `Events.imageUrl
 - Remove `firebase` from `apps/web/package.json`; reinstall lockfile.
 - Remove `NEXT_PUBLIC_FIREBASE_*` and `FIREBASE_SERVICE_ACCOUNT_KEY*` from web env (Vercel + local `.env`).
 - Remove the `firebasestorage.googleapis.com` entry from `next.config.js`.
+- Delete the single-use `scripts/migrate-storage-firebase-to-supabase.ts` and its `migrate:storage` entry in `apps/web/package.json` (git history retains the audit trail).
 - **Gate:** `grep -ri firebase apps/web/src` is clean of Storage refs; typecheck + build green.
 
 ## Custom domain (follow-up, not blocking)
