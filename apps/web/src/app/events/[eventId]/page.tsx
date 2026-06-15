@@ -3,6 +3,7 @@ import EventDetail from './_components/EventDetails';
 import { Prisma } from '@troptix/db';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { eventFlyerUrl } from '@/lib/supabase/storage';
 
 const EventByIdSelect: Prisma.EventsSelect = {
   id: true,
@@ -61,6 +62,8 @@ export async function generateMetadata(props: {
 }) {
   const params = await props.params;
   const event = await getEventById(params.eventId);
+  // OG images must be absolute URLs; resolve the stored path (ADR 0016).
+  const ogImage = eventFlyerUrl(event?.imageUrl);
   return {
     title: event?.name,
     isDraft: event?.isDraft,
@@ -68,7 +71,7 @@ export async function generateMetadata(props: {
     openGraph: {
       title: event?.name,
       description: event?.description,
-      images: [event?.imageUrl],
+      images: ogImage ? [ogImage] : [],
     },
   };
 }

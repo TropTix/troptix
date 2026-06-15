@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, MapPin, DollarSign, ExternalLink } from 'lucide-react';
 import { Event } from '../page';
+import { eventFlyerUrl } from '@/lib/supabase/storage';
 
 export default function EventCard({ event }: { event: Event }) {
   const displayPrice =
@@ -19,7 +20,8 @@ export default function EventCard({ event }: { event: Event }) {
   const now = new Date();
   const isToday = eventDate.toDateString() === now.toDateString();
 
-  const displayImageUrl = event.imageUrl ?? '/placeholder-event.jpg';
+  const displayImageUrl =
+    eventFlyerUrl(event.imageUrl) ?? '/placeholder-event.jpg';
 
   const getEventStatus = () => {
     if (isToday) return { label: 'Today', variant: 'destructive' as const };

@@ -3,6 +3,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Image from 'next/image'; // For the list view cards
+import { eventFlyerUrl } from '@/lib/supabase/storage';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -126,7 +127,7 @@ export default function TicketDisplayManager({
             {ticket.event.imageUrl && (
               <div className="relative w-full h-48 flex-shrink-0 overflow-hidden">
                 <Image
-                  src={ticket.event.imageUrl}
+                  src={eventFlyerUrl(ticket.event.imageUrl)!}
                   alt={`Event: ${ticket.event.name}`}
                   layout="fill"
                   objectFit="cover"

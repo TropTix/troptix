@@ -2,6 +2,7 @@ import { OrderStatus } from '@troptix/db';
 import prisma from '@/server/prisma';
 import Link from 'next/link';
 import Image from 'next/image';
+import { eventFlyerUrl } from '@/lib/supabase/storage';
 import {
   AlertTriangle,
   TicketIcon as TicketIconLucide,
@@ -243,7 +244,9 @@ export default async function OrderReceiptPage(props: {
               </h2>
               <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 p-4 bg-slate-100 dark:bg-slate-800/50 rounded-lg border dark:border-slate-700">
                 <Image
-                  src={order.event.imageUrl || defaultEventImageUrl}
+                  src={
+                    eventFlyerUrl(order.event.imageUrl) || defaultEventImageUrl
+                  }
                   alt={order.event.name || 'Event image'}
                   width={100}
                   height={100}

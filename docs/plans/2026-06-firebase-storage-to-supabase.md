@@ -1,6 +1,6 @@
 ---
 title: Firebase Storage → Supabase Storage (event flyer images)
-status: proposed
+status: active
 created: 2026-06-13
 tracking-issue: TBD
 ---

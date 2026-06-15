@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
+import { eventFlyerUrl } from '@/lib/supabase/storage';
 import {
   ListOrdered,
   Ticket,
@@ -115,7 +116,9 @@ export default async function OrdersPage() {
                 : 'Date N/A',
               time: eventDate ? formatTime(eventDate) : 'Time N/A',
               venue: order.event?.venue || 'Venue N/A',
-              imageUrl: order.event?.imageUrl || '/placeholder-event.jpg',
+              imageUrl:
+                eventFlyerUrl(order.event?.imageUrl) ||
+                '/placeholder-event.jpg',
               ticketCount: order._count.tickets,
               createdAt: order.createdAt,
               eventDate: eventDate,
