@@ -74,9 +74,9 @@ export default function EventDetail({ event }: { event: EventById }) {
       organizer: event.organizer,
     });
   }
+  const resolvedImageUrl = eventFlyerUrl(event.imageUrl);
   const displayImageUrl =
-    eventFlyerUrl(event.imageUrl) ??
-    'https://placehold.co/400x400?text=Add+Event+Flyer';
+    resolvedImageUrl ?? 'https://placehold.co/400x400?text=Add+Event+Flyer';
 
   const displayPrice =
     event.ticketTypes && event.ticketTypes.length > 0
@@ -127,7 +127,7 @@ export default function EventDetail({ event }: { event: EventById }) {
                     objectFit: 'fill',
                   }}
                   src={
-                    eventFlyerUrl(event.imageUrl) ??
+                    resolvedImageUrl ??
                     'https://placehold.co/600x600.png?text=Add+Event+Flyer'
                   }
                   alt={event.name}

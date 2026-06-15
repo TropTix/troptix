@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { getFormattedCurrency } from '@/lib/utils';
 import Image from 'next/image';
-import { eventFlyerUrl } from '@/lib/supabase/storage';
+import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { CheckoutContainer } from './CheckoutContainer';
 import CheckoutSteps from './checkout-steps';
 import { Separator } from '@/components/ui/separator';
@@ -93,8 +93,7 @@ export default function TicketModal({
                         height={200}
                         width={200}
                         src={
-                          eventFlyerUrl(event?.imageUrl) ??
-                          'https://placehold.co/200x200?text=Event'
+                          eventFlyerUrl(event?.imageUrl) ?? DEFAULT_EVENT_IMAGE
                         }
                         alt={event?.name || 'Event Image'}
                         style={{

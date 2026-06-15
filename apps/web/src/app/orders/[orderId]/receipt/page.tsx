@@ -2,7 +2,7 @@ import { OrderStatus } from '@troptix/db';
 import prisma from '@/server/prisma';
 import Link from 'next/link';
 import Image from 'next/image';
-import { eventFlyerUrl } from '@/lib/supabase/storage';
+import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import {
   AlertTriangle,
   TicketIcon as TicketIconLucide,
@@ -192,7 +192,7 @@ export default async function OrderReceiptPage(props: {
   // Use the order's master total for the grand total to ensure accuracy, as it's the source of truth.
   const grandTotal = order.total;
 
-  const defaultEventImageUrl = '/placeholder-event.jpg'; // Path to your default event image in /public
+  const defaultEventImageUrl = DEFAULT_EVENT_IMAGE;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8 md:py-16">

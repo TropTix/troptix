@@ -31,20 +31,23 @@ export function EventImageUploader({
   currentImageUrl,
   onUploadComplete,
 }: EventImageUploaderProps) {
+  // The stored value resolved to a renderable URL — the fallback whenever there
+  // is no in-progress local selection. Derived from the prop, recomputed per render.
+  const resolvedCurrentUrl = eventFlyerUrl(currentImageUrl);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(
-    eventFlyerUrl(currentImageUrl)
+    resolvedCurrentUrl
   );
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setPreviewUrl(eventFlyerUrl(currentImageUrl));
+    setPreviewUrl(resolvedCurrentUrl);
     if (!isUploading) {
       setFile(null);
     }
-  }, [currentImageUrl, isUploading]);
+  }, [resolvedCurrentUrl, isUploading]);
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -58,11 +61,11 @@ export function EventImageUploader({
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
         setPreviewUrl((prev) =>
-          prev === objectUrl ? eventFlyerUrl(currentImageUrl) : prev
+          prev === objectUrl ? resolvedCurrentUrl : prev
         );
       }
     };
-  }, [file, currentImageUrl]);
+  }, [file, resolvedCurrentUrl]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -72,13 +75,13 @@ export function EventImageUploader({
       if (!selectedFile.type.startsWith('image/')) {
         setError('Please select an image file (e.g., JPG, PNG).');
         setFile(null);
-        setPreviewUrl(eventFlyerUrl(currentImageUrl));
+        setPreviewUrl(resolvedCurrentUrl);
         return;
       }
       if (selectedFile.size > 10 * 1024 * 1024) {
         setError('File size exceeds 10MB limit.');
         setFile(null);
-        setPreviewUrl(eventFlyerUrl(currentImageUrl));
+        setPreviewUrl(resolvedCurrentUrl);
         return;
       }
 
@@ -110,7 +113,7 @@ export function EventImageUploader({
         uploadError instanceof Error ? uploadError.message : 'Unknown error';
       console.error('Upload failed:', uploadError);
       setError(`Upload failed: ${message}`);
-      setPreviewUrl(eventFlyerUrl(currentImageUrl));
+      setPreviewUrl(resolvedCurrentUrl);
     } finally {
       setIsUploading(false);
     }

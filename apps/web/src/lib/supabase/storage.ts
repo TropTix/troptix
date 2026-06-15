@@ -11,6 +11,12 @@ import { createClient } from '@/lib/supabase/client';
 
 export const EVENT_FLYERS_BUCKET = 'event-flyers';
 
+/**
+ * Local fallback shown when an event has no flyer. Callers pair it with
+ * `eventFlyerUrl()`, e.g. `eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE`.
+ */
+export const DEFAULT_EVENT_IMAGE = '/placeholder-event.jpg';
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 /**
