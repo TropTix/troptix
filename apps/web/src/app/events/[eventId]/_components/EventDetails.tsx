@@ -125,7 +125,7 @@ export default function EventDetail({ event }: { event: EventById }) {
                     maxWidth: 350,
                     objectFit: 'fill',
                   }}
-                  src={resolvedImageUrl ?? DEFAULT_EVENT_IMAGE}
+                  src={displayImageUrl}
                   alt={event.name}
                   className="mb-8 max-h-full flex-shrink-0 self-center object-fill overflow-hidden rounded-lg mx-auto"
                 />

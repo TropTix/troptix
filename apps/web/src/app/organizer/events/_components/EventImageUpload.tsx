@@ -1,7 +1,7 @@
 // components/EventImageUploader.tsx
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import {
   uploadEventFlyer,
   deleteEventFlyer,
@@ -30,6 +30,9 @@ export function EventImageUploader({
   currentImageUrl,
   onUploadComplete,
 }: EventImageUploaderProps) {
+  // Page-unique id so the trigger <label htmlFor> stays correct even if this
+  // component is ever rendered more than once on a page.
+  const inputId = useId();
   // The stored value resolved to a renderable URL — the fallback whenever there
   // is no in-progress local selection. Derived from the prop, recomputed per render.
   const resolvedCurrentUrl = eventFlyerUrl(currentImageUrl);
@@ -152,7 +155,7 @@ export function EventImageUploader({
           — the most reliable trigger across browsers. Input is visually hidden
           (sr-only) but kept in the layout so the label can target it. */}
       <input
-        id="event-flyer-input"
+        id={inputId}
         type="file"
         ref={fileInputRef}
         onChange={handleFileSelect}
@@ -193,7 +196,7 @@ export function EventImageUploader({
               size="sm"
               className="mt-2 cursor-pointer"
             >
-              <label htmlFor="event-flyer-input">
+              <label htmlFor={inputId}>
                 <UploadCloud className="mr-2 h-4 w-4" /> Select Image
               </label>
             </Button>
@@ -214,7 +217,7 @@ export function EventImageUploader({
           size="sm"
           className="w-full cursor-pointer"
         >
-          <label htmlFor="event-flyer-input">
+          <label htmlFor={inputId}>
             <UploadCloud className="mr-2 h-4 w-4" /> Change Image
           </label>
         </Button>
