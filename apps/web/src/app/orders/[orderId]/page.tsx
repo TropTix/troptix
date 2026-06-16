@@ -8,6 +8,7 @@ import {
 } from '@troptix/db';
 import Link from 'next/link';
 import Image from 'next/image';
+import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import {
   AlertTriangle,
   Redo,
@@ -142,7 +143,7 @@ export default async function OrderDetailsPage(props: {
     );
   }
 
-  const defaultEventImageUrl = '/placeholder-event.jpg';
+  const defaultEventImageUrl = DEFAULT_EVENT_IMAGE;
 
   return (
     <div
@@ -155,7 +156,9 @@ export default async function OrderDetailsPage(props: {
           <div className="md:flex">
             <div className="md:w-2/5 relative">
               <Image
-                src={order.event.imageUrl || defaultEventImageUrl}
+                src={
+                  eventFlyerUrl(order.event.imageUrl) || defaultEventImageUrl
+                }
                 alt={order.event.name || 'Event image'}
                 width={400}
                 height={400}

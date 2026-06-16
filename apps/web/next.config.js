@@ -31,6 +31,15 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
+        // Supabase Storage public objects (event flyers). Wildcard covers the
+        // prod project ref + every preview-branch ref. See ADR 0016.
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        // Legacy: kept until the Firebase→Supabase data migration completes and
+        // no Events.imageUrl still points here. Removed in the decommission PR.
         protocol: 'https',
         hostname: 'firebasestorage.googleapis.com',
         pathname: '/**',

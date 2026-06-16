@@ -15,6 +15,7 @@
     "test:watch": "jest --watch",
     "db:new": "tsx --env-file=.env scripts/new-migration.ts",
     "db:apply": "tsx --env-file=.env scripts/apply-migration.ts",
+    "migrate:storage": "tsx --env-file=.env scripts/migrate-storage-firebase-to-supabase.ts",
     "knip": "knip"
   },
   "engines": {

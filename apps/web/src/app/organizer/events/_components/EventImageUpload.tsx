@@ -2,45 +2,52 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { storage } from '@/config';
 import {
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-  deleteObject,
-  StorageError,
-} from 'firebase/storage';
+  uploadEventFlyer,
+  deleteEventFlyer,
+  eventFlyerUrl,
+} from '@/lib/supabase/storage';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UploadCloud, X, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import {
+  UploadCloud,
+  X,
+  Image as ImageIcon,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
 import Image from 'next/image'; // Use Next.js Image for optimization
 
 interface EventImageUploaderProps {
+  // `currentImageUrl` carries the stored value, which is now a Supabase Storage
+  // PATH (ADR 0016), not a URL. `onUploadComplete` likewise emits a path (or
+  // null when cleared). Previews are resolved to URLs via eventFlyerUrl().
   currentImageUrl?: string | null;
-  onUploadComplete: (url: string | null) => void;
+  onUploadComplete: (path: string | null) => void;
 }
 
 export function EventImageUploader({
   currentImageUrl,
   onUploadComplete,
 }: EventImageUploaderProps) {
+  // The stored value resolved to a renderable URL — the fallback whenever there
+  // is no in-progress local selection. Derived from the prop, recomputed per render.
+  const resolvedCurrentUrl = eventFlyerUrl(currentImageUrl);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(
-    currentImageUrl || null
+    resolvedCurrentUrl
   );
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setPreviewUrl(currentImageUrl || null);
+    setPreviewUrl(resolvedCurrentUrl);
     if (!isUploading) {
       setFile(null);
     }
-  }, [currentImageUrl, isUploading]);
+  }, [resolvedCurrentUrl, isUploading]);
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -54,11 +61,11 @@ export function EventImageUploader({
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
         setPreviewUrl((prev) =>
-          prev === objectUrl ? currentImageUrl || null : prev
+          prev === objectUrl ? resolvedCurrentUrl : prev
         );
       }
     };
-  }, [file, currentImageUrl]);
+  }, [file, resolvedCurrentUrl]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -68,13 +75,13 @@ export function EventImageUploader({
       if (!selectedFile.type.startsWith('image/')) {
         setError('Please select an image file (e.g., JPG, PNG).');
         setFile(null);
-        setPreviewUrl(currentImageUrl || null);
+        setPreviewUrl(resolvedCurrentUrl);
         return;
       }
       if (selectedFile.size > 10 * 1024 * 1024) {
         setError('File size exceeds 10MB limit.');
         setFile(null);
-        setPreviewUrl(currentImageUrl || null);
+        setPreviewUrl(resolvedCurrentUrl);
         return;
       }
 
@@ -94,50 +101,22 @@ export function EventImageUploader({
 
     setIsUploading(true);
     setError(null);
-    setUploadProgress(0);
 
-    // --- Storage Path Strategy ---
-    const filePath = `event-images/${Date.now()}-${file.name}`;
-    // TODO: Create a structured path for the event image after the event is created
-    // const filePath = `events/${eventId}/flyer-${file.name}`; // Ensure eventId is passed as prop
-
-    const storageRef = ref(storage, filePath);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress =
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setUploadProgress(progress);
-      },
-      (uploadError) => {
-        console.error('Upload failed:', uploadError);
-        // Handle specific Firebase storage errors if needed
-        // https://firebase.google.com/docs/storage/web/handle-errors
-        setError(`Upload failed: ${uploadError.message}`);
-        setIsUploading(false);
-        setFile(null);
-        setPreviewUrl(currentImageUrl || null);
-        setUploadProgress(0);
-      },
-      async () => {
-        try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          console.log('File available at', downloadURL);
-          setPreviewUrl(downloadURL);
-          onUploadComplete(downloadURL);
-          setFile(null);
-        } catch (getUrlError: any) {
-          console.error('Failed to get download URL:', getUrlError);
-          setError(`Failed to get download URL: ${getUrlError.message}`);
-          setPreviewUrl(currentImageUrl || null);
-        } finally {
-          setIsUploading(false);
-          setUploadProgress(0);
-        }
-      }
-    );
+    try {
+      // Returns the stored bucket path (what goes into Events.imageUrl).
+      const path = await uploadEventFlyer(file);
+      setPreviewUrl(eventFlyerUrl(path));
+      onUploadComplete(path);
+      setFile(null);
+    } catch (uploadError: unknown) {
+      const message =
+        uploadError instanceof Error ? uploadError.message : 'Unknown error';
+      console.error('Upload failed:', uploadError);
+      setError(`Upload failed: ${message}`);
+      setPreviewUrl(resolvedCurrentUrl);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   useEffect(() => {
@@ -151,27 +130,18 @@ export function EventImageUploader({
     setFile(null);
     setPreviewUrl(null);
     setIsUploading(false);
-    setUploadProgress(0);
+    const previous = currentImageUrl;
     onUploadComplete(null);
 
-    if (currentImageUrl) {
+    if (previous) {
       try {
-        const imageRef = ref(storage, currentImageUrl);
-        await deleteObject(imageRef);
-        console.log('Existing image deleted from Firebase Storage.');
+        await deleteEventFlyer(previous);
+        console.log('Existing image deleted from Supabase Storage.');
       } catch (deleteError: unknown) {
-        if (
-          deleteError instanceof StorageError &&
-          deleteError.code !== 'storage/object-not-found'
-        ) {
-          console.error(
-            'Failed to delete existing image from Firebase:',
-            deleteError
-          );
-          setError(
-            'Could not remove existing image from storage, but cleared from form.'
-          );
-        }
+        console.error('Failed to delete existing image:', deleteError);
+        setError(
+          'Could not remove existing image from storage, but cleared from form.'
+        );
       }
     }
 
@@ -232,11 +202,8 @@ export function EventImageUploader({
         )}
         {isUploading && (
           <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center z-20">
-            <p className="text-white text-sm mb-2">Uploading...</p>
-            <Progress value={uploadProgress} className="w-3/4 h-2" />
-            <p className="text-white text-xs mt-1">
-              {Math.round(uploadProgress)}%
-            </p>
+            <Loader2 className="h-8 w-8 text-white animate-spin mb-2" />
+            <p className="text-white text-sm">Uploading…</p>
           </div>
         )}
       </div>
