@@ -6,6 +6,7 @@
     "dev": "next dev",
     "dev:mobile": "tsx scripts/dev-mobile.ts",
     "email": "email dev",
+    "prebuild": "yarn workspace @troptix/db generate",
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "start": "next start",
