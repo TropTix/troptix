@@ -19,7 +19,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Calendar, DollarSign, MapPin, Ticket } from 'lucide-react';
 import Image from 'next/image';
-import { eventFlyerUrl } from '@/lib/supabase/storage';
+import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -75,8 +75,7 @@ export default function EventDetail({ event }: { event: EventById }) {
     });
   }
   const resolvedImageUrl = eventFlyerUrl(event.imageUrl);
-  const displayImageUrl =
-    resolvedImageUrl ?? 'https://placehold.co/400x400?text=Add+Event+Flyer';
+  const displayImageUrl = resolvedImageUrl ?? DEFAULT_EVENT_IMAGE;
 
   const displayPrice =
     event.ticketTypes && event.ticketTypes.length > 0
@@ -126,10 +125,7 @@ export default function EventDetail({ event }: { event: EventById }) {
                     maxWidth: 350,
                     objectFit: 'fill',
                   }}
-                  src={
-                    resolvedImageUrl ??
-                    'https://placehold.co/600x600.png?text=Add+Event+Flyer'
-                  }
+                  src={resolvedImageUrl ?? DEFAULT_EVENT_IMAGE}
                   alt={event.name}
                   className="mb-8 max-h-full flex-shrink-0 self-center object-fill overflow-hidden rounded-lg mx-auto"
                 />
