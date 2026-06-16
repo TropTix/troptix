@@ -15,7 +15,7 @@ import {
   pixelBasedPreset,
 } from '@react-email/components';
 
-interface EmailTicket {
+export interface EmailTicket {
   id: string;
   total: number | null;
   subtotal: number | null;
@@ -29,7 +29,7 @@ interface EmailTicket {
   } | null;
 }
 
-interface EmailOrder {
+export interface EmailOrder {
   id: string;
   firstName: string | null;
   lastName: string | null;
@@ -52,7 +52,218 @@ interface EmailOrder {
 }
 
 export default function EmailConfirmationTemplate({
-  order = {
+  order,
+  baseUrl,
+}: {
+  order: EmailOrder;
+  // Absolute origin for in-email links, supplied by the caller so this template
+  // stays environment-agnostic.
+  baseUrl: string;
+}) {
+  const { event, tickets = [] } = order;
+  const ticketUrl = `${baseUrl}/orders/${order.id}/tickets`;
+  const greetingName = order.firstName || 'Guest';
+  const fullName =
+    [order.firstName, order.lastName].filter(Boolean).join(' ') || 'Guest';
+
+  return (
+    <Html>
+      <Head />
+      <Tailwind config={{ presets: [pixelBasedPreset] }}>
+        <Body className="bg-slate-50 ">
+          <Container className="w-full max-w-[480px] mx-auto bg-white font-sans rounded-xl">
+            <Section className="bg-indigo-500 w-full text-[1px] leading-[6px]">
+              {' '}
+            </Section>
+
+            <Section className="text-center pt-5">
+              <Link href={baseUrl}>
+                <Text className="inline-block mb-3 text-[28px] font-bold text-indigo-500 m-0">
+                  TropTix
+                </Text>
+              </Link>
+            </Section>
+
+            <Heading className="text-2xl text-center px-6 pt-4 text-slate-900">
+              {greetingName}, you&apos;re confirmed!
+            </Heading>
+
+            <Section className="p-6">
+              <Text className="text-xl font-semibold text-slate-700 mb-4">
+                {event.name}
+              </Text>
+              {event.imageUrl && (
+                <Img
+                  src={event.imageUrl}
+                  alt={event.name}
+                  className="w-full mb-6"
+                  style={{ borderRadius: '12px' }}
+                />
+              )}
+
+              <Button
+                href={ticketUrl}
+                className="block bg-indigo-500 text-white text-base font-semibold no-underline text-center py-3 px-5 rounded-md w-1/2 mx-auto"
+              >
+                View Tickets
+              </Button>
+
+              <Section className="text-sm text-slate-600 mb-6">
+                <DetailRow label="Venue" value={event.address} />
+                <DetailRow
+                  label="Date & Time"
+                  value={
+                    <>
+                      {formatDate(event.startDate, DATE_TIME)}{' '}
+                      {event.endDate
+                        ? `– ${formatDate(event.endDate, TIME)}`
+                        : ''}
+                    </>
+                  }
+                />
+                <DetailRow label="Order Number" value={order.id} />
+              </Section>
+
+              {/* TICKET DETAILS */}
+              <Section className="mt-6">
+                <Text className="text-sm font-bold text-black mb-4">
+                  TICKET DETAILS
+                </Text>
+                <table
+                  cellPadding="0"
+                  cellSpacing="0"
+                  className="w-full border-collapse"
+                  style={{ width: '100%', lineHeight: '1.6' }}
+                >
+                  <tbody>
+                    <tr>
+                      <td className="text-sm text-slate-500 pr-4 align-top">
+                        Name
+                      </td>
+                      <td className="text-sm text-black font-medium text-right">
+                        {fullName}
+                      </td>
+                    </tr>
+
+                    {groupTicketsByType(tickets).map((group, index) => (
+                      <tr key={index}>
+                        <td className="text-sm text-slate-900 font-medium pr-4 align-top pt-2">
+                          {group.ticketType?.name || 'Ticket'}
+                        </td>
+                        <td className="text-sm text-slate-900 font-medium text-right pt-2">
+                          {group.quantity} ×{' '}
+                          {priceOrFree(group.ticketType?.price)}
+                        </td>
+                      </tr>
+                    ))}
+
+                    <tr>
+                      <td className="text-sm text-slate-500 pr-4 pt-3">
+                        Total price
+                      </td>
+                      <td className="text-sm text-black font-medium text-right pt-3">
+                        {priceOrFree(order.total, 'FREE')}
+                      </td>
+                    </tr>
+
+                    {!!order.total && order.total > 0 && !!order.cardLast4 && (
+                      <tr>
+                        <td></td>
+                        <td className="text-xs text-slate-500 text-right pt-1">
+                          Paid with card ending in ****{order.cardLast4}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </Section>
+            </Section>
+
+            <Hr className="border-slate-200 my-8" />
+
+            <Text className="text-xs text-center text-slate-400 px-6 pb-6">
+              Powered by{' '}
+              <Link
+                href={baseUrl}
+                style={{ textDecoration: 'underline', color: '#6366f1' }}
+              >
+                TropTix
+              </Link>
+              .
+            </Text>
+          </Container>
+        </Body>
+      </Tailwind>
+    </Html>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  if (!value) return null;
+  return (
+    <>
+      <Text className="font-medium mt-3 mb-1 text-slate-500">{label}</Text>
+      <Text className="m-0 text-slate-900">{value}</Text>
+    </>
+  );
+}
+
+function groupTicketsByType(tickets: EmailTicket[]) {
+  const map = new Map<
+    string,
+    { ticketType: EmailTicket['ticketType']; quantity: number }
+  >();
+
+  for (const ticket of tickets) {
+    const id = ticket.ticketType?.id || 'Unknown';
+    const existing = map.get(id);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      map.set(id, { ticketType: ticket.ticketType, quantity: 1 });
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function priceOrFree(price: number | null | undefined, freeLabel = 'Free') {
+  return price && price > 0 ? `$${price.toFixed(2)}` : freeLabel;
+}
+
+const TIME_ZONE = 'America/New_York';
+
+const DATE_TIME = {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+} satisfies Intl.DateTimeFormatOptions;
+
+const TIME = {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+} satisfies Intl.DateTimeFormatOptions;
+
+function formatDate(date: Date, options: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: TIME_ZONE,
+    ...options,
+  }).format(new Date(date));
+}
+
+// Mock data for the preview server (`yarn email`); never used in production.
+EmailConfirmationTemplate.PreviewProps = {
+  order: {
     id: 'TT-2024-001234',
     firstName: 'Emmanuel',
     lastName: 'Sylvester',
@@ -111,202 +322,5 @@ export default function EmailConfirmationTemplate({
       },
     ],
   },
-}: {
-  order: EmailOrder;
-}) {
-  const { event, tickets = [] } = order;
-  const baseUrl =
-    process.env.NODE_ENV === 'development'
-      ? 'http://localhost:3000'
-      : 'https://usetroptix.com';
-  const ticketUrl = `${baseUrl}/orders/${order.id}/tickets`;
-  const ticketGroups = groupTicketsByType(tickets);
-  const fullName =
-    [order.firstName, order.lastName].filter(Boolean).join(' ') || 'Guest';
-  const totalPrice =
-    order.total && order.total > 0 ? formatCurrency(order.total) : 'FREE';
-
-  return (
-    <Html>
-      <Head />
-      <Tailwind config={{ presets: [pixelBasedPreset] }}>
-        <Body className="bg-slate-50 ">
-          <Container className="w-full max-w-[480px] mx-auto bg-white font-sans rounded-xl">
-            <Section className="bg-indigo-500 w-full text-[1px] leading-[6px]">
-              {' '}
-            </Section>
-
-            <Section className="text-center pt-5">
-              <Link href={baseUrl}>
-                <Text className="inline-block mb-3 text-[28px] font-bold text-indigo-500 m-0">
-                  TropTix
-                </Text>
-              </Link>
-            </Section>
-
-            <Heading className="text-2xl text-center px-6 pt-4 text-slate-900">
-              {order.firstName}, you&apos;re confirmed!
-            </Heading>
-
-            <Section className="p-6">
-              <Text className="text-xl font-semibold text-slate-700 mb-4">
-                {event.name}
-              </Text>
-              {event.imageUrl && (
-                <Img
-                  src={event.imageUrl}
-                  alt={event.name}
-                  className="w-full mb-6"
-                  style={{ borderRadius: '12px' }}
-                />
-              )}
-
-              <Button
-                href={ticketUrl}
-                className="block bg-indigo-500 text-white text-base font-semibold no-underline text-center py-3 px-5 rounded-md w-1/2 mx-auto"
-              >
-                View Tickets
-              </Button>
-
-              <Section className="text-sm text-slate-600 mb-6">
-                {event.address && (
-                  <>
-                    <Text className="font-medium mt-3 mb-1 text-slate-500">
-                      Venue
-                    </Text>
-                    <Text className="m-0 text-slate-900">{event.address}</Text>
-                  </>
-                )}
-                <Text className="font-medium mt-3 mb-1 text-slate-500">
-                  Date & Time
-                </Text>
-                <Text className="m-0 text-slate-900">
-                  {formatDateTime(event.startDate)}{' '}
-                  {event.endDate ? `– ${formatTime(event.endDate)}` : ''}
-                </Text>
-                <Text className="font-medium mt-3 mb-1 text-slate-500">
-                  Order Number
-                </Text>
-                <Text className="m-0 text-slate-900">{order.id}</Text>
-              </Section>
-
-              {/* TICKET DETAILS */}
-              <Section className="mt-6">
-                <Text className="text-sm font-bold text-black mb-4">
-                  TICKET DETAILS
-                </Text>
-                <table
-                  cellPadding="0"
-                  cellSpacing="0"
-                  className="w-full border-collapse"
-                  style={{ width: '100%', lineHeight: '1.6' }}
-                >
-                  <tbody>
-                    <tr>
-                      <td className="text-sm text-slate-500 pr-4 align-top">
-                        Name
-                      </td>
-                      <td className="text-sm text-black font-medium text-right">
-                        {fullName}
-                      </td>
-                    </tr>
-
-                    {ticketGroups.map((group, index) => (
-                      <tr key={index}>
-                        <td className="text-sm text-slate-900 font-medium pr-4 align-top pt-2">
-                          {group.ticketType?.name || 'Ticket'}
-                        </td>
-                        <td className="text-sm text-slate-900 font-medium text-right pt-2">
-                          {group.quantity} ×{' '}
-                          {group.ticketType?.price && group.ticketType.price > 0
-                            ? formatCurrency(group.ticketType.price)
-                            : 'Free'}
-                        </td>
-                      </tr>
-                    ))}
-
-                    <tr>
-                      <td className="text-sm text-slate-500 pr-4 pt-3">
-                        Total price
-                      </td>
-                      <td className="text-sm text-black font-medium text-right pt-3">
-                        {totalPrice}
-                      </td>
-                    </tr>
-
-                    {!!order.total && order.total > 0 && !!order.cardLast4 && (
-                      <tr>
-                        <td></td>
-                        <td className="text-xs text-slate-500 text-right pt-1">
-                          Paid with card ending in ****{order.cardLast4}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </Section>
-            </Section>
-
-            <Hr className="border-slate-200 my-8" />
-
-            <Text className="text-xs text-center text-slate-400 px-6 pb-6">
-              Powered by{' '}
-              <Link
-                href={baseUrl}
-                style={{ textDecoration: 'underline', color: '#6366f1' }}
-              >
-                TropTix
-              </Link>
-              .
-            </Text>
-          </Container>
-        </Body>
-      </Tailwind>
-    </Html>
-  );
-}
-
-// Helper Functions
-
-function groupTicketsByType(tickets: EmailTicket[]) {
-  const map = new Map<
-    string,
-    { ticketType: EmailTicket['ticketType']; quantity: number }
-  >();
-
-  for (const ticket of tickets) {
-    const id = ticket.ticketType?.id || 'Unknown';
-    if (!map.has(id)) {
-      map.set(id, { ticketType: ticket.ticketType, quantity: 1 });
-    } else {
-      map.get(id)!.quantity += 1;
-    }
-  }
-
-  return Array.from(map.values());
-}
-
-function formatCurrency(amount: number) {
-  return `$${amount.toFixed(2)}`;
-}
-
-function formatDateTime(date: Date) {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(new Date(date));
-}
-
-function formatTime(date: Date) {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(new Date(date));
-}
+  baseUrl: 'http://localhost:3000',
+} satisfies { order: EmailOrder; baseUrl: string };

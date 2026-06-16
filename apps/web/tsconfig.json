@@ -17,11 +17,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@emails/*": ["./emails/*"],
       "@troptix/db": ["../../packages/db/src/index.ts"],
       "@troptix/db/types": ["../../packages/db/src/types.ts"],
       "@troptix/api": ["../../packages/api/src/index.ts"],
-      "@troptix/api/server": ["../../packages/api/src/server.ts"]
+      "@troptix/api/server": ["../../packages/api/src/server.ts"],
+      "@troptix/transactional": ["../../packages/transactional/src/index.ts"]
     },
     "plugins": [
       {

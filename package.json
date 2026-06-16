@@ -7,7 +7,7 @@
     "test": "jest",
     "next": "yarn --cwd apps/web dev",
     "dev": "npm-run-all --parallel next",
-    "typecheck": "yarn workspace web typecheck && yarn workspace @troptix/db typecheck && yarn workspace @troptix/api typecheck",
+    "typecheck": "yarn workspace web typecheck && yarn workspace @troptix/db typecheck && yarn workspace @troptix/api typecheck && yarn workspace @troptix/transactional typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"
