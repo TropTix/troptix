@@ -15,6 +15,11 @@
  *   connects directly to Postgres as the app's DB role — bypassing RLS and the
  *   PostgREST/Data-API grants (revoked-by-default on newer projects). Reusing
  *   the app client also means zero extra dependencies for this script.
+ * - The shared client connects via POSTGRES_PRISMA_URL — the *transaction*
+ *   pooler (6543), tuned for serverless and known to drop long-lived
+ *   connections from a laptop (the connection times out). For this one-off
+ *   script we prefer POSTGRES_URL_NON_POOLING (the session pooler / direct,
+ *   5432) when it's set, which behaves like a normal Postgres connection.
  * - The storage upload uses the Supabase SECRET key (bypasses storage RLS).
  *   NEVER expose this key to the browser.
  * - Idempotent: the query only matches rows whose imageUrl still points at
@@ -25,14 +30,21 @@
  *   yarn migrate:storage            # dry run — reports what would change
  *   yarn migrate:storage --commit   # apply: upload + rewrite imageUrl
  *
- * ⚠️  The Prisma client connects via the same DB env the web app uses (loaded
- *     from .env). Point .env at the branch you intend to migrate — staging
- *     first, then prod. Required Supabase env:
+ * ⚠️  The DB connection comes from .env. Point .env at the branch you intend
+ *     to migrate — staging first, then prod. Required env:
+ *       POSTGRES_URL_NON_POOLING (preferred) or POSTGRES_PRISMA_URL,
  *       NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY
  */
 import { createClient } from '@supabase/supabase-js';
-import prisma from '@troptix/db';
 import { randomUUID } from 'node:crypto';
+
+// Prefer the session/direct connection over the transaction pooler for this
+// one-off run (see header). The shared client reads POSTGRES_PRISMA_URL at
+// import time, so this must run BEFORE `@troptix/db` is loaded — hence the
+// dynamic import in main() rather than a static top-level import.
+if (process.env.POSTGRES_URL_NON_POOLING) {
+  process.env.POSTGRES_PRISMA_URL = process.env.POSTGRES_URL_NON_POOLING;
+}
 
 const COMMIT = process.argv.includes('--commit');
 const BUCKET = 'event-flyers';
@@ -58,6 +70,10 @@ const EXT_BY_CONTENT_TYPE: Record<string, string> = {
 };
 
 async function main() {
+  // Dynamic import: the client's connection string is read at module load, so
+  // it must load AFTER the POSTGRES_PRISMA_URL preference above is applied.
+  const { default: prisma } = await import('@troptix/db');
+
   const supabase = createClient(SUPABASE_URL!, SUPABASE_SECRET_KEY!, {
     auth: { persistSession: false },
   });
@@ -116,6 +132,12 @@ async function main() {
     console.log(
       `\n${COMMIT ? 'APPLIED' : 'DRY RUN COMPLETE'} — ${migrated} ${COMMIT ? 'migrated' : 'to migrate'}, ${failed} failed, ${rows.length} total.`
     );
+
+    // Exit non-zero on any per-row failure so a partial run isn't mistaken for
+    // complete — the Firebase decommission (PR5) is gated on a clean run.
+    if (failed > 0) {
+      process.exitCode = 1;
+    }
     if (!COMMIT && rows.length > 0) {
       console.log('Re-run with --commit to apply.');
     }
