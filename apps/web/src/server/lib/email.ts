@@ -3,6 +3,7 @@ import { Prisma } from '@troptix/db';
 import { createElement } from 'react';
 import { render } from '@react-email/components';
 import EmailConfirmationTemplate from '@emails/EmailConfirmation';
+import { eventFlyerUrl } from '@/lib/supabase/storage';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -55,10 +56,17 @@ export async function sendEmailConfirmationEmailToUser(orderId: string) {
 }
 
 async function createEmailConfirmationEmailHTML(orderDetails: OrderDetails) {
+  // imageUrl now stores a Supabase bucket PATH (ADR 0016), and email clients
+  // can't resolve a relative src — resolve it to an absolute URL before render.
+  const order = {
+    ...orderDetails,
+    event: {
+      ...orderDetails.event,
+      imageUrl: eventFlyerUrl(orderDetails.event.imageUrl),
+    },
+  };
   const html = await render(
-    createElement(EmailConfirmationTemplate, {
-      order: orderDetails,
-    })
+    createElement(EmailConfirmationTemplate, { order })
   );
   return html;
 }
