@@ -1,14 +1,12 @@
-// components/EventImageUploader.tsx
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import {
   uploadEventFlyer,
   deleteEventFlyer,
   eventFlyerUrl,
 } from '@/lib/supabase/storage';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   UploadCloud,
@@ -17,12 +15,9 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
-import Image from 'next/image'; // Use Next.js Image for optimization
+import Image from 'next/image';
 
 interface EventImageUploaderProps {
-  // `currentImageUrl` carries the stored value, which is now a Supabase Storage
-  // PATH (ADR 0016), not a URL. `onUploadComplete` likewise emits a path (or
-  // null when cleared). Previews are resolved to URLs via eventFlyerUrl().
   currentImageUrl?: string | null;
   onUploadComplete: (path: string | null) => void;
 }
@@ -31,8 +26,7 @@ export function EventImageUploader({
   currentImageUrl,
   onUploadComplete,
 }: EventImageUploaderProps) {
-  // The stored value resolved to a renderable URL — the fallback whenever there
-  // is no in-progress local selection. Derived from the prop, recomputed per render.
+  const inputId = useId();
   const resolvedCurrentUrl = eventFlyerUrl(currentImageUrl);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(
@@ -56,7 +50,6 @@ export function EventImageUploader({
       setPreviewUrl(objectUrl);
     }
 
-    // Cleanup function
     return () => {
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
@@ -89,10 +82,6 @@ export function EventImageUploader({
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
   const handleUpload = async () => {
     if (!file) {
       setError('No file selected.');
@@ -103,7 +92,6 @@ export function EventImageUploader({
     setError(null);
 
     try {
-      // Returns the stored bucket path (what goes into Events.imageUrl).
       const path = await uploadEventFlyer(file);
       setPreviewUrl(eventFlyerUrl(path));
       onUploadComplete(path);
@@ -145,7 +133,6 @@ export function EventImageUploader({
       }
     }
 
-    // Reset the file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -153,12 +140,13 @@ export function EventImageUploader({
 
   return (
     <div className="space-y-4">
-      <Input
+      <input
+        id={inputId}
         type="file"
         ref={fileInputRef}
         onChange={handleFileSelect}
         accept="image/*"
-        className="hidden"
+        className="sr-only"
         disabled={isUploading}
       />
 
@@ -189,14 +177,14 @@ export function EventImageUploader({
             <ImageIcon className="mx-auto h-12 w-12 mb-2" />
             <p className="text-sm">No image selected</p>
             <Button
-              type="button"
+              asChild
               variant="outline"
               size="sm"
-              className="mt-2"
-              onClick={triggerFileInput}
-              disabled={isUploading}
+              className="mt-2 cursor-pointer"
             >
-              <UploadCloud className="mr-2 h-4 w-4" /> Select Image
+              <label htmlFor={inputId}>
+                <UploadCloud className="mr-2 h-4 w-4" /> Select Image
+              </label>
             </Button>
           </div>
         )}
@@ -210,13 +198,14 @@ export function EventImageUploader({
 
       {previewUrl && !isUploading && (
         <Button
-          type="button"
+          asChild
           variant="outline"
           size="sm"
-          onClick={triggerFileInput}
-          className="w-full"
+          className="w-full cursor-pointer"
         >
-          <UploadCloud className="mr-2 h-4 w-4" /> Change Image
+          <label htmlFor={inputId}>
+            <UploadCloud className="mr-2 h-4 w-4" /> Change Image
+          </label>
         </Button>
       )}
 
