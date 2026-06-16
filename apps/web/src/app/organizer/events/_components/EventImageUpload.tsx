@@ -8,7 +8,6 @@ import {
   eventFlyerUrl,
 } from '@/lib/supabase/storage';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   UploadCloud,
@@ -89,10 +88,6 @@ export function EventImageUploader({
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
   const handleUpload = async () => {
     if (!file) {
       setError('No file selected.');
@@ -153,12 +148,16 @@ export function EventImageUploader({
 
   return (
     <div className="space-y-4">
-      <Input
+      {/* Native <label htmlFor> opens the OS file picker without any JS .click()
+          — the most reliable trigger across browsers. Input is visually hidden
+          (sr-only) but kept in the layout so the label can target it. */}
+      <input
+        id="event-flyer-input"
         type="file"
         ref={fileInputRef}
         onChange={handleFileSelect}
         accept="image/*"
-        className="hidden"
+        className="sr-only"
         disabled={isUploading}
       />
 
@@ -189,14 +188,14 @@ export function EventImageUploader({
             <ImageIcon className="mx-auto h-12 w-12 mb-2" />
             <p className="text-sm">No image selected</p>
             <Button
-              type="button"
+              asChild
               variant="outline"
               size="sm"
-              className="mt-2"
-              onClick={triggerFileInput}
-              disabled={isUploading}
+              className="mt-2 cursor-pointer"
             >
-              <UploadCloud className="mr-2 h-4 w-4" /> Select Image
+              <label htmlFor="event-flyer-input">
+                <UploadCloud className="mr-2 h-4 w-4" /> Select Image
+              </label>
             </Button>
           </div>
         )}
@@ -210,13 +209,14 @@ export function EventImageUploader({
 
       {previewUrl && !isUploading && (
         <Button
-          type="button"
+          asChild
           variant="outline"
           size="sm"
-          onClick={triggerFileInput}
-          className="w-full"
+          className="w-full cursor-pointer"
         >
-          <UploadCloud className="mr-2 h-4 w-4" /> Change Image
+          <label htmlFor="event-flyer-input">
+            <UploadCloud className="mr-2 h-4 w-4" /> Change Image
+          </label>
         </Button>
       )}
 
