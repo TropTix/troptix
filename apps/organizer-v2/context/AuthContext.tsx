@@ -1,7 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/lib/supabase';
+import type { Session } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-interface User {
+export interface User {
   id: string;
   email: string;
   name: string;
@@ -10,43 +11,70 @@ interface User {
 interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  sendOtp: (email: string) => Promise<{ error: string | null }>;
+  verifyOtp: (email: string, code: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const STORAGE_KEY = '@troptix_organizer_user';
+function userFromSession(session: Session): User {
+  const { id, email, user_metadata } = session.user;
+  const fullName: string =
+    user_metadata?.full_name ??
+    user_metadata?.name ??
+    (email
+      ? email
+          .split('@')[0]
+          .replace(/[._-]/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase())
+      : '');
+  return { id, email: email ?? '', name: fullName };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => {
-        if (raw) setUser(JSON.parse(raw));
-      })
-      .finally(() => setIsLoading(false));
+    // Restore persisted session from AsyncStorage on mount.
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session ? userFromSession(data.session) : null);
+      setIsLoading(false);
+    });
+
+    // Stay in sync with token refreshes and sign-outs.
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session ? userFromSession(session) : null);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, _password: string) => {
-    const stubUser: User = {
-      id: 'user-001',
+  const sendOtp = async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    return { error: error?.message ?? null };
+  };
+
+  const verifyOtp = async (email: string, code: string) => {
+    const { error } = await supabase.auth.verifyOtp({
       email,
-      name: email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-    };
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(stubUser));
-    setUser(stubUser);
+      token: code,
+      type: 'email',
+    });
+    return { error: error?.message ?? null };
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-    setUser(null);
+    await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, sendOtp, verifyOtp, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -14,8 +14,17 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, fonts } from '../../constants/theme';
-import { Guest, STUB_EVENTS } from '../../data/stub';
+import { colors, fonts } from '@/constants/theme';
+import { trpc } from '@/lib/trpc';
+
+type Guest = {
+  id: string;
+  name: string;
+  ticketType: string;
+  ticketId: string;
+  checkedIn: boolean;
+  checkedInAt?: string;
+};
 
 type Tab = 'scanner' | 'guests';
 type ScanResult = {
@@ -61,20 +70,20 @@ function ScanResultBanner({ result }: { result: ScanResult }) {
           badge: result.guest?.ticketType,
         }
       : result.status === 'already_in'
-      ? {
-          bg: colors.warning,
-          icon: 'alert-circle' as const,
-          title: 'Already Checked In',
-          sub: result.guest?.name ?? '',
-          badge: result.guest?.ticketType,
-        }
-      : {
-          bg: colors.error,
-          icon: 'close-circle' as const,
-          title: 'Ticket Not Found',
-          sub: result.ticketId ?? '',
-          badge: undefined,
-        };
+        ? {
+            bg: colors.warning,
+            icon: 'alert-circle' as const,
+            title: 'Already Checked In',
+            sub: result.guest?.name ?? '',
+            badge: result.guest?.ticketType,
+          }
+        : {
+            bg: colors.error,
+            icon: 'close-circle' as const,
+            title: 'Ticket Not Found',
+            sub: result.ticketId ?? '',
+            badge: undefined,
+          };
 
   return (
     <View style={[styles.resultBanner, { backgroundColor: config.bg }]}>
@@ -94,7 +103,13 @@ function ScanResultBanner({ result }: { result: ScanResult }) {
   );
 }
 
-function ScannerTab({ guests, onCheckIn }: { guests: Guest[]; onCheckIn: (id: string) => void }) {
+function ScannerTab({
+  guests,
+  onCheckIn,
+}: {
+  guests: Guest[];
+  onCheckIn: (id: string) => void;
+}) {
   const [permission, requestPermission] = useCameraPermissions();
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const cooldown = useRef(false);
@@ -114,14 +129,17 @@ function ScannerTab({ guests, onCheckIn }: { guests: Guest[]; onCheckIn: (id: st
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         onCheckIn(guest.id);
-        setLastResult({ status: 'success', guest: { ...guest, checkedIn: true } });
+        setLastResult({
+          status: 'success',
+          guest: { ...guest, checkedIn: true },
+        });
       }
 
       setTimeout(() => {
         cooldown.current = false;
       }, 2500);
     },
-    [guests, onCheckIn],
+    [guests, onCheckIn]
   );
 
   if (!permission) return <View style={styles.flex} />;
@@ -180,14 +198,30 @@ const TICKET_COLORS: Record<string, string> = {
   RSVP: '#8B5CF6',
 };
 
-function GuestRow({ guest, onToggle }: { guest: Guest; onToggle: (id: string) => void }) {
+function GuestRow({
+  guest,
+  onToggle,
+}: {
+  guest: Guest;
+  onToggle: (id: string) => void;
+}) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.guestRow, pressed && styles.guestRowPressed]}
+      style={({ pressed }) => [
+        styles.guestRow,
+        pressed && styles.guestRowPressed,
+      ]}
       onPress={() => onToggle(guest.id)}
     >
-      <View style={[styles.guestAvatar, guest.checkedIn && styles.guestAvatarIn]}>
-        <Text style={[styles.guestAvatarText, guest.checkedIn && styles.guestAvatarTextIn]}>
+      <View
+        style={[styles.guestAvatar, guest.checkedIn && styles.guestAvatarIn]}
+      >
+        <Text
+          style={[
+            styles.guestAvatarText,
+            guest.checkedIn && styles.guestAvatarTextIn,
+          ]}
+        >
           {initials(guest.name)}
         </Text>
       </View>
@@ -198,7 +232,9 @@ function GuestRow({ guest, onToggle }: { guest: Guest; onToggle: (id: string) =>
           <View
             style={[
               styles.ticketPill,
-              { backgroundColor: `${TICKET_COLORS[guest.ticketType] ?? '#888'}18` },
+              {
+                backgroundColor: `${TICKET_COLORS[guest.ticketType] ?? '#888'}18`,
+              },
             ]}
           >
             <Text
@@ -213,7 +249,9 @@ function GuestRow({ guest, onToggle }: { guest: Guest; onToggle: (id: string) =>
         </View>
       </View>
 
-      <View style={[styles.checkCircle, guest.checkedIn && styles.checkCircleIn]}>
+      <View
+        style={[styles.checkCircle, guest.checkedIn && styles.checkCircleIn]}
+      >
         <Ionicons
           name={guest.checkedIn ? 'checkmark' : 'add'}
           size={15}
@@ -224,14 +262,20 @@ function GuestRow({ guest, onToggle }: { guest: Guest; onToggle: (id: string) =>
   );
 }
 
-function GuestListTab({ guests, onToggle }: { guests: Guest[]; onToggle: (id: string) => void }) {
+function GuestListTab({
+  guests,
+  onToggle,
+}: {
+  guests: Guest[];
+  onToggle: (id: string) => void;
+}) {
   const [query, setQuery] = useState('');
 
   const filtered = query.trim()
     ? guests.filter(
         (g) =>
           g.name.toLowerCase().includes(query.toLowerCase()) ||
-          g.ticketId.toLowerCase().includes(query.toLowerCase()),
+          g.ticketId.toLowerCase().includes(query.toLowerCase())
       )
     : guests;
 
@@ -254,7 +298,11 @@ function GuestListTab({ guests, onToggle }: { guests: Guest[]; onToggle: (id: st
           />
           {query ? (
             <Pressable onPress={() => setQuery('')}>
-              <Ionicons name="close-circle" size={15} color={colors.textMuted} />
+              <Ionicons
+                name="close-circle"
+                size={15}
+                color={colors.textMuted}
+              />
             </Pressable>
           ) : null}
         </View>
@@ -272,7 +320,9 @@ function GuestListTab({ guests, onToggle }: { guests: Guest[]; onToggle: (id: st
         ItemSeparatorComponent={() => <View style={styles.guestSep} />}
         ListEmptyComponent={
           <View style={styles.emptySearch}>
-            <Text style={styles.emptySearchText}>No guests match "{query}"</Text>
+            <Text style={styles.emptySearchText}>
+              No guests match "{query}"
+            </Text>
           </View>
         }
       />
@@ -287,13 +337,52 @@ export default function EventDetailScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('scanner');
 
-  const event = STUB_EVENTS.find((e) => e.id === id);
-  const [guests, setGuests] = useState<Guest[]>(event?.guests ?? []);
+  const [event, setEvent] = useState<any>(null);
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!event) {
+  React.useEffect(() => {
+    trpc.organizer.event
+      .query({ id })
+      .then((data) => {
+        setEvent(data);
+        setGuests(data.guests);
+        setLoading(false);
+      })
+      .catch((e) => {
+        setError(e.message ?? 'Failed to load event');
+        setLoading(false);
+      });
+  }, [id]);
+
+  const handleCheckInByScan = useCallback((guestId: string) => {
+    setGuests((prev) =>
+      prev.map((g) =>
+        g.id === guestId
+          ? { ...g, checkedIn: true, checkedInAt: new Date().toISOString() }
+          : g
+      )
+    );
+  }, []);
+
+  if (loading) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <Text style={{ color: colors.text, padding: 24 }}>Event not found.</Text>
+      <SafeAreaView style={[styles.safe, styles.center]}>
+        <Text style={{ color: colors.textMuted }}>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !event) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.center]}>
+        <Text style={{ color: colors.error, padding: 24 }}>
+          {error ?? 'Event not found.'}
+        </Text>
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={{ color: colors.accent }}>Go Back</Text>
+        </Pressable>
       </SafeAreaView>
     );
   }
@@ -305,36 +394,36 @@ export default function EventDetailScreen() {
     if (!guest) return;
 
     if (guest.checkedIn) {
-      Alert.alert('Undo Check-In', `Remove ${guest.name} from the checked-in list?`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () =>
-            setGuests((prev) =>
-              prev.map((g) =>
-                g.id === guestId ? { ...g, checkedIn: false, checkedInAt: undefined } : g,
+      Alert.alert(
+        'Undo Check-In',
+        `Remove ${guest.name} from the checked-in list?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () =>
+              setGuests((prev) =>
+                prev.map((g) =>
+                  g.id === guestId
+                    ? { ...g, checkedIn: false, checkedInAt: undefined }
+                    : g
+                )
               ),
-            ),
-        },
-      ]);
+          },
+        ]
+      );
     } else {
       Haptics.selectionAsync();
       setGuests((prev) =>
         prev.map((g) =>
-          g.id === guestId ? { ...g, checkedIn: true, checkedInAt: new Date().toISOString() } : g,
-        ),
+          g.id === guestId
+            ? { ...g, checkedIn: true, checkedInAt: new Date().toISOString() }
+            : g
+        )
       );
     }
   };
-
-  const handleCheckInByScan = useCallback((guestId: string) => {
-    setGuests((prev) =>
-      prev.map((g) =>
-        g.id === guestId ? { ...g, checkedIn: true, checkedInAt: new Date().toISOString() } : g,
-      ),
-    );
-  }, []);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -362,7 +451,9 @@ export default function EventDetailScreen() {
       {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.statCol}>
-          <Text style={[styles.statNum, { color: colors.accent }]}>{checkedIn}</Text>
+          <Text style={[styles.statNum, { color: colors.accent }]}>
+            {checkedIn}
+          </Text>
           <Text style={styles.statLabel}>Checked In</Text>
         </View>
         <View style={styles.statVDivider} />
@@ -388,7 +479,12 @@ export default function EventDetailScreen() {
             size={14}
             color={activeTab === 'scanner' ? colors.accent : colors.textMuted}
           />
-          <Text style={[styles.tabText, activeTab === 'scanner' && styles.tabTextActive]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'scanner' && styles.tabTextActive,
+            ]}
+          >
             Scan Tickets
           </Text>
         </Pressable>
@@ -401,7 +497,12 @@ export default function EventDetailScreen() {
             size={14}
             color={activeTab === 'guests' ? colors.accent : colors.textMuted}
           />
-          <Text style={[styles.tabText, activeTab === 'guests' && styles.tabTextActive]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'guests' && styles.tabTextActive,
+            ]}
+          >
             Guest List
           </Text>
         </Pressable>
@@ -427,6 +528,7 @@ const CORNER_W = 3;
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   // Header
   header: {
@@ -581,10 +683,34 @@ const styles = StyleSheet.create({
     height: CORNER,
     borderColor: colors.accent,
   },
-  cTL: { top: 0, left: 0, borderTopWidth: CORNER_W, borderLeftWidth: CORNER_W, borderTopLeftRadius: 4 },
-  cTR: { top: 0, right: 0, borderTopWidth: CORNER_W, borderRightWidth: CORNER_W, borderTopRightRadius: 4 },
-  cBL: { bottom: 0, left: 0, borderBottomWidth: CORNER_W, borderLeftWidth: CORNER_W, borderBottomLeftRadius: 4 },
-  cBR: { bottom: 0, right: 0, borderBottomWidth: CORNER_W, borderRightWidth: CORNER_W, borderBottomRightRadius: 4 },
+  cTL: {
+    top: 0,
+    left: 0,
+    borderTopWidth: CORNER_W,
+    borderLeftWidth: CORNER_W,
+    borderTopLeftRadius: 4,
+  },
+  cTR: {
+    top: 0,
+    right: 0,
+    borderTopWidth: CORNER_W,
+    borderRightWidth: CORNER_W,
+    borderTopRightRadius: 4,
+  },
+  cBL: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: CORNER_W,
+    borderLeftWidth: CORNER_W,
+    borderBottomLeftRadius: 4,
+  },
+  cBR: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: CORNER_W,
+    borderRightWidth: CORNER_W,
+    borderBottomRightRadius: 4,
+  },
 
   // Scan result
   resultBanner: {
@@ -600,7 +726,11 @@ const styles = StyleSheet.create({
   },
   resultBody: { flex: 1, gap: 1 },
   resultTitle: { fontFamily: fonts.semiBold, fontSize: 15, color: '#fff' },
-  resultSub: { fontFamily: fonts.regular, fontSize: 13, color: 'rgba(255,255,255,0.8)' },
+  resultSub: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+  },
   resultBadge: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 6,

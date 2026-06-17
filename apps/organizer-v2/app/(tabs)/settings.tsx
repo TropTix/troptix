@@ -1,9 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Alert,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, fonts } from '../../constants/theme';
-import { useAuth } from '../../context/AuthContext';
+import { colors, fonts } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
+import { trpc } from '@/lib/trpc';
 
 function SettingsRow({
   icon,
@@ -20,13 +29,22 @@ function SettingsRow({
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && onPress && styles.rowPressed]}
+      style={({ pressed }) => [
+        styles.row,
+        pressed && onPress && styles.rowPressed,
+      ]}
       onPress={onPress}
       disabled={!onPress}
     >
-      <Text style={[styles.rowLabel, destructive && styles.rowLabelDestructive]}>{label}</Text>
+      <Text
+        style={[styles.rowLabel, destructive && styles.rowLabelDestructive]}
+      >
+        {label}
+      </Text>
       {value ? (
-        <Text style={styles.rowValue} numberOfLines={1}>{value}</Text>
+        <Text style={styles.rowValue} numberOfLines={1}>
+          {value}
+        </Text>
       ) : null}
       {onPress && !destructive ? (
         <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
@@ -35,8 +53,33 @@ function SettingsRow({
   );
 }
 
+type Profile = {
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+};
+
 export default function SettingsScreen() {
   const { user, logout } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      const data = await trpc.user.profile.query();
+      setProfile({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProfile().finally(() => setLoading(false));
+  }, [fetchProfile]);
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -45,12 +88,22 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const initials = user?.name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() ?? '?';
+  const displayFirstName =
+    profile?.firstName ?? user?.name?.split(' ')[0] ?? '';
+  const displayLastName =
+    profile?.lastName ?? user?.name?.split(' ').slice(1).join(' ') ?? '';
+  const fullName =
+    [displayFirstName, displayLastName].filter(Boolean).join(' ') ||
+    'Unknown User';
+  const displayEmail = profile?.email ?? user?.email ?? '';
+
+  const initials =
+    [displayFirstName, displayLastName]
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || '?';
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -59,27 +112,48 @@ export default function SettingsScreen() {
           <Text style={styles.headerTitle}>Settings</Text>
         </View>
 
-        <View style={styles.profile}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-          <Text style={styles.profileName}>{user?.name}</Text>
-          <Text style={styles.profileEmail}>{user?.email}</Text>
-        </View>
+        {loading ? (
+          <ActivityIndicator
+            style={{ paddingVertical: 40 }}
+            color={colors.accent}
+          />
+        ) : (
+          <>
+            <View style={styles.profile}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+              <Text style={styles.profileName}>{fullName}</Text>
+              <Text style={styles.profileEmail}>{displayEmail}</Text>
+            </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.card}>
-            <SettingsRow icon="person-outline" label="Name" value={user?.name} />
-            <View style={styles.divider} />
-            <SettingsRow icon="mail-outline" label="Email" value={user?.email} />
-          </View>
-        </View>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Account</Text>
+              <View style={styles.card}>
+                <SettingsRow
+                  icon="person-outline"
+                  label="Name"
+                  value={fullName}
+                />
+                <View style={styles.divider} />
+                <SettingsRow
+                  icon="mail-outline"
+                  label="Email"
+                  value={displayEmail}
+                />
+              </View>
+            </View>
+          </>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App</Text>
           <View style={styles.card}>
-            <SettingsRow icon="code-slash-outline" label="Version" value="1.0.0" />
+            <SettingsRow
+              icon="code-slash-outline"
+              label="Version"
+              value="1.0.0"
+            />
           </View>
         </View>
 

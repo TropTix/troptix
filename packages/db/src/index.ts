@@ -50,8 +50,12 @@ const createPrismaClient = () =>
   new PrismaClient({
     adapter: new PrismaPg({
       connectionString: connectionString(),
-      // node-pg has no default connection timeout; Prisma v6 used 5s.
-      connectionTimeoutMillis: 5000,
+      // Supabase pgbouncer drops idle server-side connections after ~30s. Close
+      // pool connections after 20s of idleness so the pool never hands out a
+      // dead socket, which would surface as "Connection terminated unexpectedly".
+      idleTimeoutMillis: 20000,
+      // Give Supabase free-tier enough time to wake a cold pooler connection.
+      connectionTimeoutMillis: 15000,
       // SSL is governed here (the Rust engine ignored cert validation pre-v7);
       // see connectionString() for why sslmode is stripped from the URL.
       ssl: { rejectUnauthorized: false },

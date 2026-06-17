@@ -1,20 +1,44 @@
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { appRouter, createContext } from '@troptix/api/server';
+import type { Actor } from '@troptix/api/server';
+import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
 
 /**
- * tRPC HTTP endpoint (App Router). Additive — exposes the @troptix/api router
- * at /api/trpc. Nothing calls it yet: the web client migrates onto it in the
- * Stage 3 checkout redesign, and the Expo app consumes it later. The actor is
- * anonymous until Supabase Auth lands (Stage 1c); the only wired procedures
- * (checkout reads) are public.
+ * Resolve the request actor from the Authorization header (Bearer token from
+ * mobile/API clients) or from the session cookie (web clients). Returns
+ * anonymous when no valid session is found.
+ *
+ * Uses getUserFromIdTokenCookie — the same auth path the REST organizer routes
+ * use — so the token verification is consistent and already proven to work.
  */
-function handler(req: Request) {
+async function resolveActor(req: Request): Promise<Actor> {
+  try {
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : undefined;
+
+    const user = await getUserFromIdTokenCookie(token);
+    if (!user) return { kind: 'anonymous' };
+
+    return {
+      kind: 'user',
+      userId: user.uid,
+      role: user.role ?? 'PATRON',
+    };
+  } catch {
+    return { kind: 'anonymous' };
+  }
+}
+
+async function handler(req: Request) {
+  const actor = await resolveActor(req);
   return fetchRequestHandler({
     endpoint: '/api/trpc',
     req,
     router: appRouter,
-    createContext: () => createContext({ prisma }),
+    createContext: () => createContext({ prisma, actor }),
   });
 }
 
