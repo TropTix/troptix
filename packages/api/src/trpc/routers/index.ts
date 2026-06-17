@@ -1,13 +1,16 @@
 import { createCallerFactory, router } from '../trpc';
 import { checkoutRouter } from './checkout';
+import { organizerRouter } from './organizer';
+import { userRouter } from './user';
 
 /**
- * The application router. New domains (events, organizer) mount here as their
- * services land. `confirm`/`expire` are intentionally NOT procedures — the
- * webhook and cron drive them directly (ADR 0007 / the service-layer plan).
+ * The application router. `confirm`/`expire` are intentionally NOT procedures
+ * — the webhook and cron drive them directly (ADR 0007 / the service-layer plan).
  */
 export const appRouter = router({
   checkout: checkoutRouter,
+  organizer: organizerRouter,
+  user: userRouter,
 });
 
 /** The router *type* — the only thing clients (web/RN) import, via `@troptix/api`. */

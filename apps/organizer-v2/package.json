@@ -1,6 +1,6 @@
 {
   "name": "troptix-organizer-v2",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
@@ -12,6 +12,8 @@
     "@expo-google-fonts/inter": "^0.3.0",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "2.1.2",
+    "@supabase/supabase-js": "^2.108.1",
+    "@trpc/client": "^11.17.0",
     "expo": "~53.0.20",
     "expo-asset": "~11.1.4",
     "expo-camera": "~16.1.11",
