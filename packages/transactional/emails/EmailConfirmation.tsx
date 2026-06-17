@@ -13,7 +13,7 @@ import {
   Link,
   Tailwind,
   pixelBasedPreset,
-} from '@react-email/components';
+} from 'react-email';
 
 export interface EmailTicket {
   id: string;

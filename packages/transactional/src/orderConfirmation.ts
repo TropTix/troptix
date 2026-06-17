@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { render } from '@react-email/components';
+import { render } from 'react-email';
 import EmailConfirmationTemplate, {
   type EmailOrder,
 } from '../emails/EmailConfirmation';
