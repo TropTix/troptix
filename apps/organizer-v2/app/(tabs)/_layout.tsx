@@ -25,11 +25,13 @@ export default function TabLayout() {
         options={{
           title: 'Events',
           tabBarLabel: ({ focused, color }) => (
-            <Text style={{
-              fontFamily: focused ? fonts.bold : fonts.medium,
-              fontSize: 12,
-              color: color,
-            }}>
+            <Text
+              style={{
+                fontFamily: focused ? fonts.bold : fonts.medium,
+                fontSize: 12,
+                color: color,
+              }}
+            >
               Events
             </Text>
           ),
@@ -43,11 +45,13 @@ export default function TabLayout() {
         options={{
           title: 'Settings',
           tabBarLabel: ({ focused, color }) => (
-            <Text style={{
-              fontFamily: focused ? fonts.bold : fonts.medium,
-              fontSize: 12,
-              color: color,
-            }}>
+            <Text
+              style={{
+                fontFamily: focused ? fonts.bold : fonts.medium,
+                fontSize: 12,
+                color: color,
+              }}
+            >
               Settings
             </Text>
           ),

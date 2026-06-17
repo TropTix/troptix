@@ -35,8 +35,24 @@ export const STUB_EVENTS: Event[] = [
     accentColor: '#F59E0B',
     ticketsSold: 1240,
     guests: [
-      { id: 'g01', name: 'Jordan Williams', email: 'jordan@example.com', ticketType: 'VIP', ticketId: 'TRP-EVT001-G01', checkedIn: true, checkedInAt: '2026-07-15T18:12:00' },
-      { id: 'g02', name: 'Aaliyah Moss', email: 'aaliyah@example.com', ticketType: 'General Admission', ticketId: 'TRP-EVT001-G02', checkedIn: true, checkedInAt: '2026-07-15T18:20:00' },
+      {
+        id: 'g01',
+        name: 'Jordan Williams',
+        email: 'jordan@example.com',
+        ticketType: 'VIP',
+        ticketId: 'TRP-EVT001-G01',
+        checkedIn: true,
+        checkedInAt: '2026-07-15T18:12:00',
+      },
+      {
+        id: 'g02',
+        name: 'Aaliyah Moss',
+        email: 'aaliyah@example.com',
+        ticketType: 'General Admission',
+        ticketId: 'TRP-EVT001-G02',
+        checkedIn: true,
+        checkedInAt: '2026-07-15T18:20:00',
+      },
     ],
   },
   {
@@ -62,7 +78,14 @@ export const STUB_EVENTS: Event[] = [
     accentColor: '#10B981',
     ticketsSold: 420,
     guests: [
-      { id: 'g11', name: 'Kofi Asante', email: 'kofi@example.com', ticketType: 'VIP', ticketId: 'TRP-EVT002-G01', checkedIn: false },
+      {
+        id: 'g11',
+        name: 'Kofi Asante',
+        email: 'kofi@example.com',
+        ticketType: 'VIP',
+        ticketId: 'TRP-EVT002-G01',
+        checkedIn: false,
+      },
     ],
   },
   {
