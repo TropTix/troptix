@@ -21,6 +21,17 @@ reservation core that fixes them is merged and tested but **nothing live calls
 it**. This plan wires it in without widening the atomic surface beyond what must
 ship together.
 
+> **Status update (rebased onto main, 2026-06-17).** Since this plan was
+> written, main advanced ~11 commits with three intersections: (a) **tRPC actor
+> threading already landed** (`resolveActor` in the `/api/trpc` handler →
+> `createContext`), so gap #3 and most of 3b are **done** — 3b shrinks to the
+> `@trpc/tanstack-react-query` client + checkout components (the `PaymentGateway`
+> context field + Stripe impl landed in **3a, #328**, now rebased on main).
+> (b) **`@troptix/transactional`** (#337) provides typed `buildOrderConfirmation`
+> rendering — the 3c outbox drain renders through it (see open decision 3).
+> (c) **Firebase is fully gone** (storage → Supabase Storage, #330). **3a is
+> built, tested, rebased** (#328).
+
 ## Where the seam is today (verified 2026-06-12)
 
 **Built, tested, inert in `@troptix/api`:**
@@ -214,9 +225,10 @@ Pre-land everything inert; keep the atomic PR as small as the contract allows.
    shows sold-out) — confirm.
 2. ~~TTL/countdown UI~~ — **decided** (see Client flow structure): quiet pill,
    tone shift at 2:00, expiry = one-tap re-reserve overlay.
-3. **Outbox drain transport**: reuse the existing SendGrid sender as-is
-   (proposed) vs fold into the Resend migration — proposed: keep SendGrid here,
-   email-provider consolidation is a separate concern.
+3. ~~Outbox drain transport~~ — **updated for main's drift**: the drain renders
+   the confirmation via `@troptix/transactional` `buildOrderConfirmation` (#337,
+   typed React Email) and sends through the existing transport (`server/lib/
+email.ts`). Email-provider consolidation (SendGrid → Resend) stays separate.
 4. **Organizer Expo app**: untouched (being rebuilt separately); its REST reads
    keep working through 3d. Confirm nothing in 3c's deletions is mobile-called
    (the legacy checkout routes are web-only — verified; the mobile app hits
