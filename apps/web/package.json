@@ -14,7 +14,6 @@
     "test:watch": "jest --watch",
     "db:new": "tsx --env-file=.env scripts/new-migration.ts",
     "db:apply": "tsx --env-file=.env scripts/apply-migration.ts",
-    "migrate:storage": "tsx --env-file=.env scripts/migrate-storage-firebase-to-supabase.ts",
     "knip": "knip"
   },
   "engines": {
@@ -61,7 +60,6 @@
     "date-fns-tz": "^3.2.0",
     "embla-carousel-react": "^8.6.0",
     "eslint": "^9",
-    "firebase": "^11.10.0",
     "flags": "^3.1.1",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.503.0",
