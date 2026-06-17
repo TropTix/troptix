@@ -18,10 +18,13 @@ export interface Context {
 
 /**
  * Build the per-request context. The DB client is injected so the services stay
- * framework-agnostic. Session → `actor` resolution is added with Supabase Auth
- * (Stage 1c); for now the actor is always anonymous, which is fine because the
- * only wired procedures (checkout reads) are actor-agnostic.
+ * framework-agnostic. The caller resolves the actor from the request (Bearer
+ * token or session cookie) and passes it in; procedures never do auth
+ * themselves, they gate on ctx.actor.kind.
  */
-export function createContext(opts: { prisma: PrismaClient }): Context {
-  return { prisma: opts.prisma, actor: { kind: 'anonymous' } };
+export function createContext(opts: {
+  prisma: PrismaClient;
+  actor?: Actor;
+}): Context {
+  return { prisma: opts.prisma, actor: opts.actor ?? { kind: 'anonymous' } };
 }

@@ -144,11 +144,15 @@ export default async function EventOverviewPage(props: {
               </div>
             </div>
 
-            <Link href={`/events/${eventId}`} passHref legacyBehavior>
-              <a target="_blank" rel="noopener noreferrer">
-                <Button variant="outline">View Event Page</Button>
-              </a>
-            </Link>
+            <Button variant="outline" asChild>
+              <Link
+                href={`/events/${eventId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View Event Page
+              </Link>
+            </Button>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5">
@@ -373,18 +377,12 @@ export default async function EventOverviewPage(props: {
                   <Filter className="h-4 w-4" />
                   <span className="sr-only">Filter orders</span>
                 </Button> */}
-                <Link
-                  href={`/organizer/events/${eventId}/orders`}
-                  passHref
-                  legacyBehavior
-                >
-                  <Button variant="outline" size="sm" asChild>
-                    <a>
-                      View All Orders
-                      <ArrowUpRight className="ml-2 h-4 w-4" />
-                    </a>
-                  </Button>
-                </Link>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/organizer/events/${eventId}/orders`}>
+                    View All Orders
+                    <ArrowUpRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
             </div>
           </CardHeader>
