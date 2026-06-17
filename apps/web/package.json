@@ -15,6 +15,7 @@
     "db:new": "tsx --env-file=.env scripts/new-migration.ts",
     "db:apply": "tsx --env-file=.env scripts/apply-migration.ts",
     "migrate:storage": "tsx --env-file=.env scripts/migrate-storage-firebase-to-supabase.ts",
+    "check:images": "tsx --env-file=.env scripts/check-event-images.ts",
     "knip": "knip"
   },
   "engines": {
