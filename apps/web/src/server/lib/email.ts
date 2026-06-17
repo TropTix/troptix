@@ -1,8 +1,7 @@
 import prisma from '@/server/prisma';
 import { Prisma } from '@troptix/db';
-import { createElement } from 'react';
-import { render } from '@react-email/components';
-import EmailConfirmationTemplate from '@emails/EmailConfirmation';
+import { buildOrderConfirmation } from '@troptix/transactional';
+import { getAppBaseUrl } from '@/lib/appUrl';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
 import { Resend } from 'resend';
 
@@ -14,25 +13,21 @@ async function sendEmail(
   html: string,
   orderId: string
 ) {
-  try {
-    const { data, error } = await resend.emails.send(
-      {
-        from: 'TropTix <info@usetroptix.com>',
-        to,
-        subject,
-        html,
-      },
-      { idempotencyKey: `confirmation-${orderId}` }
-    );
-    console.log('Email sent successfully:', data);
-    if (error) {
-      console.error('Error sending email:', error);
-    }
-    return data;
-  } catch (error) {
-    console.error('Error sending email:', error);
-    return error;
+  const { data, error } = await resend.emails.send(
+    {
+      from: 'TropTix <info@usetroptix.com>',
+      to,
+      subject,
+      html,
+    },
+    { idempotencyKey: `confirmation-${orderId}` }
+  );
+  // Resend reports failures via `error`, not by throwing.
+  if (error) {
+    throw new Error(`Resend failed to send email: ${error.message}`);
   }
+  console.log('Email sent successfully:', data);
+  return data;
 }
 
 // Only passing the orderID since this will eventually be called from a seperate email worker and we only will be passing the orderID
@@ -42,20 +37,11 @@ export async function sendEmailConfirmationEmailToUser(orderId: string) {
     console.error('Order not found');
     return;
   }
-  const html = await createEmailConfirmationEmailHTML(orderDetails);
   if (!orderDetails.email) {
     console.error('Order email not found');
     return;
   }
-  await sendEmail(
-    orderDetails.email,
-    `Order Confirmation for ${orderDetails.event.name}`,
-    html,
-    orderId
-  );
-}
 
-async function createEmailConfirmationEmailHTML(orderDetails: OrderDetails) {
   // imageUrl now stores a Supabase bucket PATH (ADR 0016), and email clients
   // can't resolve a relative src — resolve it to an absolute URL before render.
   const order = {
@@ -65,10 +51,17 @@ async function createEmailConfirmationEmailHTML(orderDetails: OrderDetails) {
       imageUrl: eventFlyerUrl(orderDetails.event.imageUrl),
     },
   };
-  const html = await render(
-    createElement(EmailConfirmationTemplate, { order })
-  );
-  return html;
+  const { subject, html } = await buildOrderConfirmation(order, {
+    baseUrl: getAppBaseUrl(),
+  });
+
+  // A failed confirmation email must never break the order — the Stripe webhook
+  // re-throws, and Stripe would retry and re-process an already-complete order.
+  try {
+    await sendEmail(orderDetails.email, subject, html, orderId);
+  } catch (error) {
+    console.error('Failed to send order confirmation email:', error);
+  }
 }
 
 async function getOrderDetails(orderId: string) {
@@ -118,7 +111,3 @@ const OrderDetailsSelect = {
     },
   },
 } satisfies Prisma.OrdersSelect;
-
-type OrderDetails = Prisma.OrdersGetPayload<{
-  select: typeof OrderDetailsSelect;
-}>;

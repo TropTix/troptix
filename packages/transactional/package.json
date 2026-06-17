@@ -1,0 +1,34 @@
+{
+  "name": "@troptix/transactional",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TropTix transactional email layer. React Email templates + render helpers (template -> HTML string). Transport-agnostic: callers own data fetching and the Resend client.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "email": "email dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-email/components": "0.3.1"
+  },
+  "peerDependencies": {
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@react-email/preview-server": "4.1.3",
+    "@types/react": "19.2.7",
+    "react": "19.2.1",
+    "react-dom": "19.2.1",
+    "react-email": "4.1.3",
+    "typescript": "^5.2.2"
+  }
+}

@@ -61,6 +61,7 @@ const nextConfig = {
     // transpile them. See docs/adr/0009-shared-package-topology.md.
     '@troptix/db',
     '@troptix/api',
+    '@troptix/transactional',
     // antd & deps
     '@ant-design',
     '@rc-component',
