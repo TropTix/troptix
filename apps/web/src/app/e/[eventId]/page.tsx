@@ -1,6 +1,10 @@
 import { cache } from 'react';
 import prisma from '@/server/prisma';
-import { getEventDetail, NotFoundError } from '@troptix/api/server';
+import {
+  getEventDetail,
+  getCheckoutConfig,
+  NotFoundError,
+} from '@troptix/api/server';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
@@ -63,5 +67,8 @@ export default async function EventDetailPage({
     notFound();
   }
 
-  return <EventPageClean event={event} />;
+  // Public tier list for the selection sheet (reused from the checkout service).
+  const { tickets } = await getCheckoutConfig(prisma, { eventId });
+
+  return <EventPageClean event={event} tickets={tickets} />;
 }

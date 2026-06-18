@@ -8,7 +8,10 @@ import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency, cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Banner } from '@/components/ui/banner';
-import type { EventDetail } from '@troptix/api';
+import type { EventDetail, CheckoutTicket } from '@troptix/api';
+import TicketSelectionSheet, {
+  type TicketSelection,
+} from './TicketSelectionSheet';
 
 // Event page — Luma-light direction. Two-column on desktop (sticky poster aside
 // + main column), stacked on mobile, with a subtle flyer-tinted backdrop, glass
@@ -55,10 +58,25 @@ function MetaRow({
   );
 }
 
-export default function EventPageClean({ event }: { event: EventDetail }) {
+export default function EventPageClean({
+  event,
+  tickets,
+}: {
+  event: EventDetail;
+  tickets: CheckoutTicket[];
+}) {
   // Representative "r, g, b" sampled from the flyer for a light backdrop glow.
   const [accent, setAccent] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
+
+  const isFree = event.fromPriceCents === 0;
+
+  // Commit seam → next slice wires this to createReservation + the reservation
+  // route. For now it just closes the sheet.
+  function onCommit(_selection: TicketSelection) {
+    setSheetOpen(false);
+  }
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
@@ -280,13 +298,23 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
           </div>
           <button
             type="button"
+            onClick={() => setSheetOpen(true)}
             className="flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            {event.fromPriceCents === 0 ? 'RSVP' : 'Get Tickets'}
+            {isFree ? 'RSVP' : 'Get Tickets'}
             <ArrowRight className="h-5 w-5" />
           </button>
         </div>
       </div>
+
+      <TicketSelectionSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        eventName={event.name}
+        tickets={tickets}
+        isFree={isFree}
+        onCommit={onCommit}
+      />
     </>
   );
 }
