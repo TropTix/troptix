@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { MapPin, Share2, Check } from 'lucide-react';
+import { MapPin, Share2, Check, ArrowRight } from 'lucide-react';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency, cn } from '@/lib/utils';
@@ -36,12 +36,9 @@ const STYLES: Record<
     meta: string;
     metaSub: string;
     tile: string;
-    card: string;
-    cardHeader: string;
-    cardPrice: string;
     iconBtn: string;
     cta: string;
-    pill: string;
+    bar: string;
     divider: string;
   }
 > = {
@@ -55,13 +52,10 @@ const STYLES: Record<
     meta: 'text-slate-900',
     metaSub: 'text-slate-500',
     tile: 'border border-slate-200 bg-white text-slate-700',
-    card: 'border border-slate-200 bg-white shadow-sm',
-    cardHeader: 'border-slate-200 bg-slate-50 text-slate-500',
-    cardPrice: 'text-slate-500',
     iconBtn:
       'border border-slate-200 bg-white/80 text-slate-700 hover:bg-white',
     cta: 'bg-indigo-500 text-white hover:bg-indigo-600',
-    pill: 'bg-indigo-500 text-white shadow-xl shadow-indigo-500/30',
+    bar: 'border-slate-200 bg-white/95',
     divider: 'border-slate-200',
   },
   hybrid: {
@@ -74,13 +68,10 @@ const STYLES: Record<
     meta: 'text-slate-900',
     metaSub: 'text-slate-600',
     tile: 'border border-white/60 bg-white/70 text-slate-700 backdrop-blur',
-    card: 'border border-white/60 bg-white/70 shadow-lg backdrop-blur-xl',
-    cardHeader: 'border-white/50 bg-white/40 text-slate-600',
-    cardPrice: 'text-slate-600',
     iconBtn:
       'border border-white/60 bg-white/60 text-slate-800 backdrop-blur hover:bg-white/80',
     cta: 'bg-indigo-500 text-white hover:bg-indigo-600',
-    pill: 'bg-indigo-500 text-white shadow-xl shadow-indigo-900/30',
+    bar: 'border-slate-200 bg-white/95',
     divider: 'border-slate-900/10',
   },
   dark: {
@@ -93,13 +84,10 @@ const STYLES: Record<
     meta: 'text-white',
     metaSub: 'text-white/60',
     tile: 'border border-white/15 bg-white/10 text-white backdrop-blur',
-    card: 'border border-white/10 bg-white/10 shadow-2xl backdrop-blur-xl',
-    cardHeader: 'border-white/10 bg-white/5 text-white/60',
-    cardPrice: 'text-white/70',
     iconBtn:
       'border border-white/15 bg-white/10 text-white backdrop-blur hover:bg-white/20',
     cta: 'bg-indigo-500 text-white hover:bg-indigo-400',
-    pill: 'bg-indigo-500 text-white shadow-xl shadow-black/50',
+    bar: 'border-white/10 bg-neutral-900/95',
     divider: 'border-white/10',
   },
 };
@@ -108,12 +96,6 @@ function priceLabelFor(fromPriceCents: number | null): string {
   if (fromPriceCents == null) return 'No tickets available';
   if (fromPriceCents === 0) return 'Free';
   return `From ${getFormattedCurrency(fromPriceCents / 100)} USD`;
-}
-
-function ctaLabelFor(fromPriceCents: number | null): string {
-  if (fromPriceCents === 0) return 'Get Tickets';
-  if (fromPriceCents == null) return 'Get Tickets';
-  return `Get tickets from ${getFormattedCurrency(fromPriceCents / 100)}`;
 }
 
 export default function EventPageClean({ event }: { event: EventDetail }) {
@@ -304,37 +286,6 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                 </div>
               </div>
 
-              {/* Registration card — the checkout seam (stubbed in Phase 1) */}
-              <div
-                className={cn(
-                  'mt-8 overflow-hidden rounded-2xl transition-shadow',
-                  s.card
-                )}
-              >
-                <div
-                  className={cn(
-                    'border-b px-5 py-3 text-sm font-semibold',
-                    s.cardHeader
-                  )}
-                >
-                  Registration
-                </div>
-                <div className="p-5">
-                  <p className={cn('text-sm font-semibold', s.cardPrice)}>
-                    {priceLabel}
-                  </p>
-                  <button
-                    type="button"
-                    className={cn(
-                      'mt-4 w-full rounded-xl px-6 py-3 font-semibold transition-colors',
-                      s.cta
-                    )}
-                  >
-                    Get Tickets
-                  </button>
-                </div>
-              </div>
-
               {event.description && (
                 <section className="mt-10">
                   <h2
@@ -378,17 +329,37 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         </div>
       </main>
 
-      {/* Floating CTA pill (Posh-style) — the checkout seam, stubbed for now. */}
-      <button
-        type="button"
+      {/* Sticky "Get Tickets" bar (original design) — solid surface so the
+          text stays readable over the ambient backdrop. The checkout seam is
+          stubbed in Phase 1. */}
+      <div
         className={cn(
-          'fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full px-8 py-4 text-base font-bold transition-transform duration-300 hover:scale-[1.03]',
-          s.pill,
-          mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+          'fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-xl transition-transform duration-300',
+          s.bar,
+          mounted ? 'translate-y-0' : 'translate-y-full'
         )}
       >
-        {ctaLabelFor(event.fromPriceCents)}
-      </button>
+        <div className="mx-auto flex max-w-3xl items-center gap-4 px-5 py-3.5">
+          <div className="min-w-0 flex-1">
+            <div className={cn('text-lg font-extrabold', s.meta)}>
+              {priceLabel}
+            </div>
+            <div className={cn('text-xs', s.metaSub)}>
+              fees calculated at checkout
+            </div>
+          </div>
+          <button
+            type="button"
+            className={cn(
+              'flex h-12 shrink-0 items-center gap-2 rounded-2xl px-6 font-bold transition-colors',
+              s.cta
+            )}
+          >
+            {event.fromPriceCents === 0 ? 'RSVP' : 'Get Tickets'}
+            <ArrowRight className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
     </>
   );
 }
