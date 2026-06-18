@@ -27,9 +27,63 @@ const SECTION_LABEL =
 export default function EventPageClean({ event }: { event: EventDetail }) {
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Representative "r, g, b" sampled from the flyer for a light backdrop glow.
+  const [accent, setAccent] = useState<string | null>(null);
   useEffect(() => setMounted(true), []);
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
+
+  // Sample a representative colour from the flyer: a saturation-weighted average
+  // so a vibrant subject wins over a dark/neutral background. Falls back
+  // silently (accent stays null → blurred-flyer backdrop) if the canvas is
+  // tainted by CORS.
+  useEffect(() => {
+    let cancelled = false;
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const size = 24;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, size, size);
+        const { data } = ctx.getImageData(0, 0, size, size);
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let wSum = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const R = data[i];
+          const G = data[i + 1];
+          const B = data[i + 2];
+          const max = Math.max(R, G, B);
+          const min = Math.min(R, G, B);
+          const sat = max === 0 ? 0 : (max - min) / max;
+          const w = sat * sat + 0.05; // bias toward colourful pixels
+          r += R * w;
+          g += G * w;
+          b += B * w;
+          wSum += w;
+        }
+        if (!cancelled && wSum > 0) {
+          setAccent(
+            `${Math.round(r / wSum)}, ${Math.round(g / wSum)}, ${Math.round(
+              b / wSum
+            )}`
+          );
+        }
+      } catch {
+        /* tainted canvas (CORS) — keep the blurred-flyer fallback */
+      }
+    };
+    img.src = imageUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl]);
   const start = new Date(event.startDate);
   const end = new Date(event.endDate);
   const badgeMonth = start
@@ -63,17 +117,27 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         />
       )}
 
-      {/* Subtle flyer-tinted backdrop — a faint colour glow over a light base,
-          fading to solid so the page stays clean and readable. */}
+      {/* Subtle flyer-tinted backdrop — a light glow of the colour sampled from
+          the flyer (blurred flyer as fallback), fading to solid so the page
+          stays clean and readable. */}
       <div className="fixed inset-0 -z-10 bg-background">
-        <div
-          className="absolute inset-0 scale-110 bg-cover bg-center opacity-20"
-          style={{
-            backgroundImage: `url("${imageUrl}")`,
-            filter: 'blur(64px)',
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/90 to-background" />
+        {accent ? (
+          <div
+            className="absolute inset-0 transition-opacity duration-700"
+            style={{
+              background: `radial-gradient(90% 55% at 50% -5%, rgba(${accent}, 0.35), rgba(${accent}, 0) 70%)`,
+            }}
+          />
+        ) : (
+          <div
+            className="absolute inset-0 scale-110 bg-cover bg-center opacity-20"
+            style={{
+              backgroundImage: `url("${imageUrl}")`,
+              filter: 'blur(64px)',
+            }}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/70 to-background" />
       </div>
 
       <main
