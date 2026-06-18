@@ -31,8 +31,10 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         />
       )}
       <main className="min-h-screen bg-background text-foreground">
-        <div className="mx-auto w-full max-w-[620px] px-5 pb-24 pt-6">
-          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[22px] shadow-lg">
+        {/* Full-bleed on mobile; centered 620px column on desktop (handoff). */}
+        <div className="mx-auto w-full px-5 pb-24 pt-6 md:max-w-[620px] md:px-7">
+          {/* Portrait poster on mobile, landscape on desktop (handoff). */}
+          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[22px] shadow-lg md:aspect-[3/2]">
             <Image
               src={imageUrl}
               alt={event.name}
