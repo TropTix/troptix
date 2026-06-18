@@ -1,19 +1,12 @@
 /**
- * Read-side event service for the public event page — the canonical public read.
- * Built first-principles on the reservation-era model and independent of the
- * read-side checkout services (which are slated for rework): it fetches the
- * event AND its public tiers in a single query and shapes both here.
+ * Canonical public read for the event page: fetches the event and its public
+ * tiers in one query and shapes both here, independent of the read-side checkout
+ * services (slated for rework).
  *
- * Prisma is injected (framework-agnostic, unit-testable with a fake). The read
- * is keyed off `eventId`, so — like the other public reads — it carries no
- * authorization (ADR 0013); the page applies its own draft-visibility guard
- * using the returned `isDraft` / `organizerUserId`.
- *
- * The browser never receives raw ticket rows or discount codes: only public
- * (non-code-gated) tiers are returned, shaped to `EventTicket` (price/fees in
- * cents + a `maxAllowedToAdd` clamp). New columns (`priceCents`/`capacity`/
- * `saleStartsAt`/`saleEndsAt`) fall back to their legacy sources until the
- * Stage-3 backfill.
+ * Prisma is injected (unit-testable). No authorization (ADR 0013) — keyed by
+ * `eventId`; the page does its own draft guard via `isDraft`/`organizerUserId`.
+ * Only public (non-gated) tiers are returned, with no discount codes; new
+ * columns fall back to legacy sources until the Stage-3 backfill.
  */
 import type { PrismaClient } from '@troptix/db';
 import type {
@@ -107,7 +100,6 @@ export async function getEventDetail(
         maxAllowedToAdd,
       };
     })
-    // Available first, then by ascending price.
     .sort((a, b) => {
       const aOut = a.maxAllowedToAdd > 0 ? 0 : 1;
       const bOut = b.maxAllowedToAdd > 0 ? 0 : 1;

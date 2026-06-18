@@ -6,14 +6,8 @@ import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
 import EventPageClean from './_components/EventPageClean';
 
-// New event page (Clean direction) on a parallel `/e/[eventId]` route while
-// legacy `/events/[eventId]` stays live. See
+// Parallel `/e/[eventId]` route (legacy `/events/[eventId]` stays live). See
 // docs/plans/2026-06-event-page-redesign.md.
-//
-// Data comes from the `@troptix/api` service layer (called directly — this is a
-// server component, so no tRPC round-trip). The service returns a client-safe
-// DTO with a server-computed "From $X"; no ticket rows or discount codes reach
-// the browser.
 
 // Deduped per request so generateMetadata + the page share one DB read.
 const loadEvent = cache((eventId: string) =>

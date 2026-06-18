@@ -12,11 +12,8 @@ import {
 import { getFormattedCurrency, cn } from '@/lib/utils';
 import type { EventTicket } from '@troptix/api';
 
-// Ticket-selection sheet (Stage 3, slice 1): a bottom sheet (shadcn Sheet),
-// width-constrained so it reads as a centered card on desktop. Lists the public
-// tiers with steppers and a running total. "Continue" is the commit seam —
-// wiring it to createReservation + the reservation route is the next slice.
-// See docs/plans/2026-06-event-page-redesign.md / PRD #348.
+// Ticket-selection sheet. "Continue" is the commit seam — wiring it to
+// createReservation is the next slice. See PRD #348.
 
 export type TicketSelection = Record<string, number>;
 
@@ -98,8 +95,6 @@ export default function TicketSelectionSheet({
         side="bottom"
         className="flex max-h-[85vh] flex-col gap-0 rounded-t-2xl border-border p-0"
       >
-        {/* Width-constrained so it's a full-width sheet on mobile and a centered
-            card on desktop. */}
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden">
           <SheetHeader className="space-y-0.5 border-b border-border px-5 py-4 text-left">
             <SheetTitle className="text-lg font-extrabold tracking-tight">

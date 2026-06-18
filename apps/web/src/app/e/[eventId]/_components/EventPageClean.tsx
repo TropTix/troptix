@@ -13,11 +13,7 @@ import TicketSelectionSheet, {
   type TicketSelection,
 } from './TicketSelectionSheet';
 
-// Event page — Luma-light direction. Two-column on desktop (sticky poster aside
-// + main column), stacked on mobile, with a subtle flyer-tinted backdrop, glass
-// tiles, share button, and the original sticky Get-Tickets bar. Content is
-// limited to what the schema backs. Map + the checkout seam land in Phase 2.
-// See docs/plans/2026-06-event-page-redesign.md.
+// Public event page (Luma-light). See docs/plans/2026-06-event-page-redesign.md.
 
 function priceLabelFor(fromPriceCents: number | null): string {
   if (fromPriceCents == null) return 'No tickets available';
@@ -59,25 +55,22 @@ function MetaRow({
 }
 
 export default function EventPageClean({ event }: { event: EventDetail }) {
-  // Representative "r, g, b" sampled from the flyer for a light backdrop glow.
+  // "r, g, b" sampled from the flyer for the backdrop glow.
   const [accent, setAccent] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
 
   const isFree = event.fromPriceCents === 0;
 
-  // Commit seam → next slice wires this to createReservation + the reservation
-  // route. For now it just closes the sheet.
+  // Commit seam: next slice wires this to createReservation.
   function onCommit(_selection: TicketSelection) {
     setSheetOpen(false);
   }
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
-  // Sample a representative colour from the flyer: a saturation-weighted average
-  // so a vibrant subject wins over a dark/neutral background. Falls back
-  // silently (accent stays null → blurred-flyer backdrop) if the canvas is
-  // tainted by CORS.
+  // Saturation-weighted average so a vibrant subject wins over a dark
+  // background; falls back to the blurred flyer if the canvas is CORS-tainted.
   useEffect(() => {
     let cancelled = false;
     const img = new window.Image();
@@ -154,9 +147,6 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         />
       )}
 
-      {/* Subtle flyer-tinted backdrop — a light glow of the colour sampled from
-          the flyer (blurred flyer as fallback), fading to solid so the page
-          stays clean and readable. */}
       <div className="fixed inset-0 -z-10 bg-background">
         {accent ? (
           <div
@@ -180,7 +170,6 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
       <main className="min-h-screen animate-in pb-32 text-foreground duration-700 fade-in">
         <div className="mx-auto w-full max-w-5xl px-5 py-10 md:px-8 md:py-14">
           <div className="md:grid md:grid-cols-[minmax(0,380px)_1fr] md:items-start md:gap-12">
-            {/* Left aside — sticky on desktop */}
             <aside className="md:sticky md:top-20">
               <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-xl transition-transform duration-300 hover:-translate-y-1">
                 <Image
@@ -199,7 +188,6 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
               </div>
             </aside>
 
-            {/* Right main column */}
             <div className="mt-8 min-w-0 md:mt-0">
               <div className="flex items-start justify-between gap-4">
                 <h1 className="text-3xl font-extrabold tracking-tight md:text-5xl">
@@ -273,15 +261,13 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                 <SectionHeader>Location</SectionHeader>
                 <p className="mt-4 font-semibold">{event.venue ?? 'Venue'}</p>
                 <p className="text-sm text-muted-foreground">{event.address}</p>
-                {/* Map lands in Phase 2 (Google Maps + lat/lng). */}
+                {/* TODO: venue map (Phase 2) */}
               </section>
             </div>
           </div>
         </div>
       </main>
 
-      {/* Sticky Get-Tickets bar (original design) — solid surface for contrast.
-          The checkout seam is stubbed in Phase 1. */}
       <div className="fixed inset-x-0 bottom-0 z-40 animate-in border-t border-border bg-background/95 backdrop-blur-xl duration-300 slide-in-from-bottom">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-5 py-3.5">
           <div className="min-w-0 flex-1">

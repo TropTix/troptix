@@ -1,13 +1,11 @@
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Mirrors the Luma-light layout: sticky poster aside + main column on desktop,
-// stacked on mobile. Keep in sync with EventPageClean.
+// Keep in sync with EventPageClean's layout.
 export default function EventDetailPageLoading() {
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto w-full max-w-5xl px-5 py-10 md:px-8 md:py-14">
         <div className="md:grid md:grid-cols-[minmax(0,380px)_1fr] md:items-start md:gap-12">
-          {/* Left aside — poster + organizer */}
           <aside>
             <Skeleton className="aspect-square w-full rounded-2xl" />
             <div className="mt-5 border-t border-border pt-5">
@@ -16,7 +14,6 @@ export default function EventDetailPageLoading() {
             </div>
           </aside>
 
-          {/* Right main column */}
           <div className="mt-8 md:mt-0">
             <Skeleton className="h-10 w-3/4 md:h-12" />
             <Skeleton className="mt-3 h-6 w-1/2" />
