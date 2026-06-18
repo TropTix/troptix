@@ -3,18 +3,19 @@
 import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 import { getFormattedCurrency, cn } from '@/lib/utils';
 import type { EventTicket } from '@troptix/api';
 
-// Ticket-selection sheet (Stage 3, slice 1): bottom sheet on mobile / centered
-// modal on desktop. Lists the public tiers from getCheckoutConfig with steppers
-// and a running total. "Continue" is the commit seam — wiring it to
-// createReservation + the reservation route is the next slice.
+// Ticket-selection sheet (Stage 3, slice 1): a bottom sheet (shadcn Sheet),
+// width-constrained so it reads as a centered card on desktop. Lists the public
+// tiers with steppers and a running total. "Continue" is the commit seam —
+// wiring it to createReservation + the reservation route is the next slice.
 // See docs/plans/2026-06-event-page-redesign.md / PRD #348.
 
 export type TicketSelection = Record<string, number>;
@@ -92,115 +93,117 @@ export default function TicketSelectionSheet({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          // Bottom sheet on mobile, centered modal on desktop.
-          'bottom-0 left-0 right-0 top-auto max-w-full translate-x-0 translate-y-0 gap-0 rounded-t-2xl border-x-0 border-b-0 p-0',
-          'sm:bottom-auto sm:left-[50%] sm:right-auto sm:top-[50%] sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border',
-          'flex max-h-[85vh] flex-col'
-        )}
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        className="flex max-h-[85vh] flex-col gap-0 rounded-t-2xl border-border p-0"
       >
-        <DialogHeader className="space-y-0.5 border-b border-border px-5 py-4 text-left">
-          <DialogTitle className="text-lg font-extrabold tracking-tight">
-            {isFree ? 'Reserve your spot' : 'Choose tickets'}
-          </DialogTitle>
-          <p className="truncate text-sm text-muted-foreground">{eventName}</p>
-        </DialogHeader>
+        {/* Width-constrained so it's a full-width sheet on mobile and a centered
+            card on desktop. */}
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden">
+          <SheetHeader className="space-y-0.5 border-b border-border px-5 py-4 text-left">
+            <SheetTitle className="text-lg font-extrabold tracking-tight">
+              {isFree ? 'Reserve your spot' : 'Choose tickets'}
+            </SheetTitle>
+            <SheetDescription className="truncate">
+              {eventName}
+            </SheetDescription>
+          </SheetHeader>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
-          {tickets.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No tickets are currently available.
-            </p>
-          )}
-          {tickets.map((t) => {
-            const q = sel[t.id] ?? 0;
-            const unavailable = t.maxAllowedToAdd === 0;
-            return (
-              <div
-                key={t.id}
-                className={cn(
-                  'rounded-xl border p-4 transition-colors',
-                  q > 0 ? 'border-primary bg-primary/5' : 'border-border',
-                  unavailable && 'opacity-60'
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-semibold">{t.name}</div>
-                    {t.description && (
-                      <div className="mt-0.5 text-sm text-muted-foreground">
-                        {t.description}
-                      </div>
-                    )}
-                    <div className="mt-1.5 text-sm">
-                      <span className="font-bold">
-                        {t.priceCents === 0 ? 'Free' : money(t.priceCents)}
-                      </span>
-                      {t.feesCents > 0 && (
-                        <span className="text-muted-foreground">
-                          {' '}
-                          + {money(t.feesCents)} fees
+          <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+            {tickets.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No tickets are currently available.
+              </p>
+            )}
+            {tickets.map((t) => {
+              const q = sel[t.id] ?? 0;
+              const unavailable = t.maxAllowedToAdd === 0;
+              return (
+                <div
+                  key={t.id}
+                  className={cn(
+                    'rounded-xl border p-4 transition-colors',
+                    q > 0 ? 'border-primary bg-primary/5' : 'border-border',
+                    unavailable && 'opacity-60'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold">{t.name}</div>
+                      {t.description && (
+                        <div className="mt-0.5 text-sm text-muted-foreground">
+                          {t.description}
+                        </div>
+                      )}
+                      <div className="mt-1.5 text-sm">
+                        <span className="font-bold">
+                          {t.priceCents === 0 ? 'Free' : money(t.priceCents)}
                         </span>
+                        {t.feesCents > 0 && (
+                          <span className="text-muted-foreground">
+                            {' '}
+                            + {money(t.feesCents)} fees
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="shrink-0 pt-0.5">
+                      {unavailable ? (
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          Unavailable
+                        </span>
+                      ) : (
+                        <Stepper
+                          value={q}
+                          max={t.maxAllowedToAdd}
+                          onChange={(delta) =>
+                            adjust(t.id, delta, t.maxAllowedToAdd)
+                          }
+                        />
                       )}
                     </div>
                   </div>
-                  <div className="shrink-0 pt-0.5">
-                    {unavailable ? (
-                      <span className="text-xs font-semibold text-muted-foreground">
-                        Unavailable
-                      </span>
-                    ) : (
-                      <Stepper
-                        value={q}
-                        max={t.maxAllowedToAdd}
-                        onChange={(delta) =>
-                          adjust(t.id, delta, t.maxAllowedToAdd)
-                        }
-                      />
-                    )}
-                  </div>
+                </div>
+              );
+            })}
+            <p className="pt-1 text-xs text-muted-foreground">
+              Prices include fees. Tickets are held for 10 minutes once you
+              continue.
+            </p>
+          </div>
+
+          <div className="border-t border-border px-5 py-4">
+            <div className="mb-3 flex items-baseline justify-between">
+              <div>
+                <div className="text-sm font-semibold">Total</div>
+                <div className="text-xs text-muted-foreground">
+                  {qty > 0
+                    ? `${qty} ${qty === 1 ? 'ticket' : 'tickets'} · incl. ${money(
+                        feesCents
+                      )} fees`
+                    : 'incl. fees'}
                 </div>
               </div>
-            );
-          })}
-          <p className="pt-1 text-xs text-muted-foreground">
-            Prices include fees. Tickets are held for 10 minutes once you
-            continue.
-          </p>
-        </div>
-
-        <div className="border-t border-border px-5 py-4">
-          <div className="mb-3 flex items-baseline justify-between">
-            <div>
-              <div className="text-sm font-semibold">Total</div>
-              <div className="text-xs text-muted-foreground">
-                {qty > 0
-                  ? `${qty} ${qty === 1 ? 'ticket' : 'tickets'} · incl. ${money(
-                      feesCents
-                    )} fees`
-                  : 'incl. fees'}
+              <div className="text-xl font-extrabold tabular-nums">
+                {money(totalCents)}
               </div>
             </div>
-            <div className="text-xl font-extrabold tabular-nums">
-              {money(totalCents)}
-            </div>
+            <button
+              type="button"
+              disabled={qty === 0}
+              onClick={() => onCommit(sel)}
+              className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
+            >
+              {qty === 0
+                ? 'Select tickets to continue'
+                : isFree
+                  ? 'Complete RSVP'
+                  : 'Continue'}
+            </button>
           </div>
-          <button
-            type="button"
-            disabled={qty === 0}
-            onClick={() => onCommit(sel)}
-            className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-          >
-            {qty === 0
-              ? 'Select tickets to continue'
-              : isFree
-                ? 'Complete RSVP'
-                : 'Continue'}
-          </button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
