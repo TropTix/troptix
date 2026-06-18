@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import { MapPin, Share2, Check, ArrowRight } from 'lucide-react';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency, cn } from '@/lib/utils';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Banner } from '@/components/ui/banner';
 import type { EventDetail } from '@troptix/api';
 
@@ -24,12 +25,40 @@ function priceLabelFor(fromPriceCents: number | null): string {
 const SECTION_LABEL =
   'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
+const META_TILE = 'h-14 w-14 shrink-0 rounded-xl border border-border bg-card';
+
+function SectionHeader({ children }: { children: ReactNode }) {
+  return (
+    <h2 className={cn('border-b border-border pb-2', SECTION_LABEL)}>
+      {children}
+    </h2>
+  );
+}
+
+function MetaRow({
+  leading,
+  title,
+  subtitle,
+}: {
+  leading: ReactNode;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="flex items-center gap-4">
+      {leading}
+      <div className="min-w-0">
+        <div className="font-semibold">{title}</div>
+        <div className="text-sm text-muted-foreground">{subtitle}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function EventPageClean({ event }: { event: EventDetail }) {
-  const [mounted, setMounted] = useState(false);
-  const [copied, setCopied] = useState(false);
   // Representative "r, g, b" sampled from the flyer for a light backdrop glow.
   const [accent, setAccent] = useState<string | null>(null);
-  useEffect(() => setMounted(true), []);
+  const { copyToClipboard, isCopied } = useCopyToClipboard();
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
@@ -69,11 +98,8 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
           wSum += w;
         }
         if (!cancelled && wSum > 0) {
-          setAccent(
-            `${Math.round(r / wSum)}, ${Math.round(g / wSum)}, ${Math.round(
-              b / wSum
-            )}`
-          );
+          const round = (n: number) => Math.round(n / wSum);
+          setAccent(`${round(r)}, ${round(g)}, ${round(b)}`);
         }
       } catch {
         /* tainted canvas (CORS) — keep the blurred-flyer fallback */
@@ -84,6 +110,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
       cancelled = true;
     };
   }, [imageUrl]);
+
   const start = new Date(event.startDate);
   const end = new Date(event.endDate);
   const badgeMonth = start
@@ -94,17 +121,15 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
 
   async function onShare() {
     const url = typeof window !== 'undefined' ? window.location.href : '';
-    try {
-      if (navigator.share) {
+    if (navigator.share) {
+      try {
         await navigator.share({ title: event.name, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1600);
+      } catch {
+        /* user dismissed the share sheet — no-op */
       }
-    } catch {
-      /* user dismissed the share sheet — no-op */
+      return;
     }
+    void copyToClipboard(url);
   }
 
   return (
@@ -140,12 +165,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/70 to-background" />
       </div>
 
-      <main
-        className={cn(
-          'min-h-screen pb-32 text-foreground transition-opacity duration-700',
-          mounted ? 'opacity-100' : 'opacity-0'
-        )}
-      >
+      <main className="min-h-screen animate-in pb-32 text-foreground duration-700 fade-in">
         <div className="mx-auto w-full max-w-5xl px-5 py-10 md:px-8 md:py-14">
           <div className="md:grid md:grid-cols-[minmax(0,380px)_1fr] md:items-start md:gap-12">
             {/* Left aside — sticky on desktop */}
@@ -179,7 +199,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                   aria-label="Share event"
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-muted"
                 >
-                  {copied ? (
+                  {isCopied ? (
                     <Check className="h-5 w-5" />
                   ) : (
                     <Share2 className="h-5 w-5" />
@@ -193,47 +213,44 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
               )}
 
               <div className="mt-6 space-y-3">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-card">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {badgeMonth}
+                <MetaRow
+                  leading={
+                    <div
+                      className={cn(
+                        'flex flex-col items-center justify-center',
+                        META_TILE
+                      )}
+                    >
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {badgeMonth}
+                      </span>
+                      <span className="text-lg font-bold leading-none">
+                        {badgeDay}
+                      </span>
+                    </div>
+                  }
+                  title={getDateRangeFormatter(start, end)}
+                  subtitle={getTimeRangeFormatter(start, end)}
+                />
+                <MetaRow
+                  leading={
+                    <span
+                      className={cn(
+                        'grid place-items-center text-muted-foreground',
+                        META_TILE
+                      )}
+                    >
+                      <MapPin className="h-6 w-6" />
                     </span>
-                    <span className="text-lg font-bold leading-none">
-                      {badgeDay}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-semibold">
-                      {getDateRangeFormatter(start, end)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {getTimeRangeFormatter(start, end)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground">
-                    <MapPin className="h-6 w-6" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="font-semibold">
-                      {event.venue ?? event.address}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {event.address}
-                    </div>
-                  </div>
-                </div>
+                  }
+                  title={event.venue ?? event.address}
+                  subtitle={event.address}
+                />
               </div>
 
               {event.description && (
                 <section className="mt-10">
-                  <h2
-                    className={cn('border-b border-border pb-2', SECTION_LABEL)}
-                  >
-                    About Event
-                  </h2>
+                  <SectionHeader>About Event</SectionHeader>
                   <p className="mt-4 whitespace-pre-wrap leading-relaxed text-muted-foreground">
                     {event.description}
                   </p>
@@ -241,11 +258,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
               )}
 
               <section className="mt-10">
-                <h2
-                  className={cn('border-b border-border pb-2', SECTION_LABEL)}
-                >
-                  Location
-                </h2>
+                <SectionHeader>Location</SectionHeader>
                 <p className="mt-4 font-semibold">{event.venue ?? 'Venue'}</p>
                 <p className="text-sm text-muted-foreground">{event.address}</p>
                 {/* Map lands in Phase 2 (Google Maps + lat/lng). */}
@@ -257,12 +270,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
 
       {/* Sticky Get-Tickets bar (original design) — solid surface for contrast.
           The checkout seam is stubbed in Phase 1. */}
-      <div
-        className={cn(
-          'fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-xl transition-transform duration-300',
-          mounted ? 'translate-y-0' : 'translate-y-full'
-        )}
-      >
+      <div className="fixed inset-x-0 bottom-0 z-40 animate-in border-t border-border bg-background/95 backdrop-blur-xl duration-300 slide-in-from-bottom">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-5 py-3.5">
           <div className="min-w-0 flex-1">
             <div className="text-lg font-extrabold">{priceLabel}</div>

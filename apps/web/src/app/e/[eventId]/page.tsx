@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import prisma from '@/server/prisma';
 import { getEventDetail, NotFoundError } from '@troptix/api/server';
 import { notFound } from 'next/navigation';
@@ -14,12 +15,17 @@ import EventPageClean from './_components/EventPageClean';
 // DTO with a server-computed "From $X"; no ticket rows or discount codes reach
 // the browser.
 
+// Deduped per request so generateMetadata + the page share one DB read.
+const loadEvent = cache((eventId: string) =>
+  getEventDetail(prisma, { eventId })
+);
+
 export async function generateMetadata(props: {
   params: Promise<{ eventId: string }>;
 }) {
   const { eventId } = await props.params;
   try {
-    const event = await getEventDetail(prisma, { eventId });
+    const event = await loadEvent(eventId);
     // OG images must be absolute URLs; resolve the stored path (ADR 0016).
     const ogImage = eventFlyerUrl(event.imageUrl);
     return {
@@ -47,7 +53,7 @@ export default async function EventDetailPage({
 
   let event;
   try {
-    event = await getEventDetail(prisma, { eventId });
+    event = await loadEvent(eventId);
   } catch (err) {
     if (err instanceof NotFoundError) notFound();
     throw err;
