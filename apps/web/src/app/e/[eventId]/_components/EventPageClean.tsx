@@ -8,7 +8,7 @@ import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency, cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Banner } from '@/components/ui/banner';
-import type { EventDetail, CheckoutTicket } from '@troptix/api';
+import type { EventDetail } from '@troptix/api';
 import TicketSelectionSheet, {
   type TicketSelection,
 } from './TicketSelectionSheet';
@@ -58,13 +58,7 @@ function MetaRow({
   );
 }
 
-export default function EventPageClean({
-  event,
-  tickets,
-}: {
-  event: EventDetail;
-  tickets: CheckoutTicket[];
-}) {
+export default function EventPageClean({ event }: { event: EventDetail }) {
   // Representative "r, g, b" sampled from the flyer for a light backdrop glow.
   const [accent, setAccent] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -311,7 +305,7 @@ export default function EventPageClean({
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         eventName={event.name}
-        tickets={tickets}
+        tickets={event.tickets}
         isFree={isFree}
         onCommit={onCommit}
       />

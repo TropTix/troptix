@@ -10,6 +10,22 @@ export const eventDetailInputSchema = z.object({
 });
 export type EventDetailInput = z.infer<typeof eventDetailInputSchema>;
 
+// A public ticket tier, shaped for the event page's selection sheet. No
+// discount codes or raw inventory counts — `maxAllowedToAdd` (0 when sold out /
+// off-sale / draft) is all the client needs.
+export const eventTicketSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  /** Integer cents (priceCents, legacy price*100 fallback). */
+  priceCents: z.number().int(),
+  /** Per-ticket fee in integer cents (0 when the organizer absorbs fees). */
+  feesCents: z.number().int(),
+  /** Quantity the buyer may add now — clamped to availability, max-per-user, sale window, draft. */
+  maxAllowedToAdd: z.number().int(),
+});
+export type EventTicket = z.infer<typeof eventTicketSchema>;
+
 export const eventDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -27,7 +43,9 @@ export const eventDetailSchema = z.object({
   address: z.string(),
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
-  /** Cheapest public (non-code-gated) tier, integer cents. Null = none on sale. */
+  /** Cheapest public tier, integer cents. Null = no public tiers. */
   fromPriceCents: z.number().int().nullable(),
+  /** Public (non-code-gated) tiers, available first then by price. */
+  tickets: z.array(eventTicketSchema),
 });
 export type EventDetail = z.infer<typeof eventDetailSchema>;

@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { getFormattedCurrency, cn } from '@/lib/utils';
-import type { CheckoutTicket } from '@troptix/api';
+import type { EventTicket } from '@troptix/api';
 
 // Ticket-selection sheet (Stage 3, slice 1): bottom sheet on mobile / centered
 // modal on desktop. Lists the public tiers from getCheckoutConfig with steppers
@@ -68,7 +68,7 @@ export default function TicketSelectionSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   eventName: string;
-  tickets: CheckoutTicket[];
+  tickets: EventTicket[];
   isFree: boolean;
   onCommit: (selection: TicketSelection) => void;
 }) {
