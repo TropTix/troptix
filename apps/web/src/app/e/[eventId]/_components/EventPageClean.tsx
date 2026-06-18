@@ -6,33 +6,19 @@ import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency } from '@/lib/utils';
 import { Banner } from '@/components/ui/banner';
-import { EventById } from '../page';
+import type { EventDetail } from '@troptix/api';
 
 // Phase 1 scaffold: confirms the `/e/[eventId]` route + data layer is wired
-// (event meta, organizer, description, and the "From $X" price derived from the
-// fetched tiers). Phase 2 replaces this body with the Clean handoff visuals
-// (inset poster hero, summary/meta rows, sticky buy bar). See
+// (event meta, organizer, description, and the server-computed "From $X").
+// Phase 2 replaces this body with the Clean handoff visuals (inset poster hero,
+// summary/meta rows, sticky buy bar). See
 // docs/plans/2026-06-event-page-redesign.md.
 
-// "From $X" uses the cheapest non-gated tier (discount-code tiers are hidden
-// until unlocked, matching the legacy page).
-function fromPrice(event: EventById): number | null {
-  const visible = event.ticketTypes.filter(
-    (t) => t.discountCode == null || t.discountCode === ''
-  );
-  if (visible.length === 0) return null;
-  return visible.reduce(
-    (min, t) => (t.price < min ? t.price : min),
-    visible[0].price
-  );
-}
-
-export default function EventPageClean({ event }: { event: EventById }) {
+export default function EventPageClean({ event }: { event: EventDetail }) {
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
-  const min = fromPrice(event);
   const priceLabel =
-    min != null
-      ? `From ${getFormattedCurrency(min)} USD`
+    event.fromPriceCents != null
+      ? `From ${getFormattedCurrency(event.fromPriceCents / 100)} USD`
       : 'No tickets available';
 
   return (
