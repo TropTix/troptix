@@ -25,7 +25,9 @@ function GlobalLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div>
-      {chrome && <UnifiedHeader />}
+      {/* Header shows everywhere except the immersive event page; the rest of
+          the chrome (top offset + footer) stays as it was for organizer pages. */}
+      {!isImmersive && <UnifiedHeader />}
       <div className={`flex-grow border-x ${chrome ? 'mt-16' : ''}`}>
         {children}
       </div>
