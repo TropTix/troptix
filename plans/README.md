@@ -6,39 +6,46 @@ Note on conventions: this `plans/` directory is the **advisor/executor workspace
 
 ## Held plans (security)
 
-Plans **002, 003, 004, 005, and 012** are security-hardening plans that are deliberately **not committed** while this repository is public — they document fixes that haven't landed yet. They exist locally in this directory (covered by `plans/.gitignore`) and are tracked out-of-band. After each fix merges, commit the plan file as documentation and open its tracking issue then.
+Plans **003, 004, 005, and 012** are security-hardening plans whose detailed plan files stay **uncommitted** (`plans/.gitignore`) while the underlying fix is still live in production. The fix code is reviewed in a public PR where applicable; the full plan doc is committed as documentation once that PR merges. Plan **002 has merged** (#344) and its plan file is now committed.
 
 ## Execution order & status
 
-| Plan                                        | Title                                                                         | Priority | Effort | Depends on                    | Issue                                                 | Status            |
-| ------------------------------------------- | ----------------------------------------------------------------------------- | -------- | ------ | ----------------------------- | ----------------------------------------------------- | ----------------- |
-| [001](001-verification-baseline.md)         | Verification baseline: CI gates, working root scripts, tests green by default | P1       | M      | —                             | [#310](https://github.com/TropTix/troptix/issues/310) | TODO              |
-| 002                                         | Security hardening (plan held locally until the fix lands)                    | P1       | M      | operator gate in local plan   | held                                                  | TODO (local-only) |
-| 003                                         | Security hardening (plan held locally until the fix lands)                    | P1       | S      | —                             | held                                                  | TODO (local-only) |
-| 004                                         | Security hardening (plan held locally until the fix lands)                    | P1       | S      | operator action in local plan | held                                                  | TODO (local-only) |
-| 005                                         | Security hardening (plan held locally until the fix lands)                    | P1       | S      | 001 (recommended)             | held                                                  | TODO (local-only) |
-| [006](006-remove-dead-dependencies.md)      | Remove 7 dead dependencies (2 on vulnerable lines, all unused)                | P2       | S      | 001                           | [#311](https://github.com/TropTix/troptix/issues/311) | TODO              |
-| [007](007-fix-eslint-errors-gate-lint.md)   | Fix 5 ESLint errors; gate lint in CI                                          | P2       | S–M    | 001                           | [#312](https://github.com/TropTix/troptix/issues/312) | TODO              |
-| [008](008-orders-composite-index.md)        | Add Orders(eventId, status) composite index                                   | P2       | S      | —                             | [#313](https://github.com/TropTix/troptix/issues/313) | TODO              |
-| [009](009-onboarding-readme-env-example.md) | Real README + .env.example files                                              | P2       | S      | 001                           | [#314](https://github.com/TropTix/troptix/issues/314) | TODO              |
-| [010](010-monorepo-hygiene-organizer.md)    | Organizer app into the monorepo (rename + single lockfile)                    | P2       | M      | —                             | [#315](https://github.com/TropTix/troptix/issues/315) | TODO              |
-| [011](011-firebase-storage-to-supabase.md)  | Event images → Supabase Storage; remove Firebase SDK                          | P2       | M      | —                             | [#316](https://github.com/TropTix/troptix/issues/316) | TODO              |
-| 012                                         | Security hardening (plan held locally until the fix lands)                    | P2       | M      | 008 (migration ordering)      | held                                                  | TODO (local-only) |
-| [013](013-code-split-recharts.md)           | Code-split the recharts dashboards                                            | P3       | S–M    | —                             | [#317](https://github.com/TropTix/troptix/issues/317) | TODO              |
-| [014](014-auth-seam-tests.md)               | Unit-test the authorization seam                                              | P2       | M      | 001; coordinates with 003     | [#318](https://github.com/TropTix/troptix/issues/318) | TODO              |
-| [015](015-spike-organizer-financials.md)    | SPIKE: organizer financials/payout dashboard proposal                         | P3       | M      | —                             | [#319](https://github.com/TropTix/troptix/issues/319) | TODO              |
-| [016](016-spike-refund-void.md)             | SPIKE: ticket void & refund path proposal                                     | P3       | M      | review with 015               | [#320](https://github.com/TropTix/troptix/issues/320) | TODO              |
+| Plan                                                  | Title                                                                         | Priority | Effort | Depends on                | Issue / PR                                            | Status                                          |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------- | -------- | ------ | ------------------------- | ----------------------------------------------------- | ----------------------------------------------- |
+| [001](001-verification-baseline.md)                   | Verification baseline: CI gates, working root scripts, tests green by default | P1       | M      | —                         | [#310](https://github.com/TropTix/troptix/issues/310) | TODO                                            |
+| [002](002-retire-legacy-unauthenticated-endpoints.md) | Retire unauthenticated legacy user/payment endpoints                          | P1       | M      | —                         | [#344](https://github.com/TropTix/troptix/pull/344)   | DONE (merged)                                   |
+| 003                                                   | Security hardening — plan file held; fix in review                            | P1       | S      | —                         | [#345](https://github.com/TropTix/troptix/pull/345)   | IN PROGRESS (PR open)                           |
+| 004                                                   | Security hardening — plan file held                                           | P1       | S      | —                         | —                                                     | DEFERRED (maintainer; cutover supersedes)       |
+| 005                                                   | Security hardening — plan file held; fix in review                            | P1       | S      | —                         | [#347](https://github.com/TropTix/troptix/pull/347)   | IN PROGRESS (PR open)                           |
+| [006](006-remove-dead-dependencies.md)                | Remove dead dependencies                                                      | P2       | S      | —                         | [#311](https://github.com/TropTix/troptix/issues/311) | REJECTED (shipped upstream #336/#339; see note) |
+| [007](007-fix-eslint-errors-gate-lint.md)             | Fix 5 ESLint errors; gate lint in CI                                          | P2       | S–M    | 001                       | [#312](https://github.com/TropTix/troptix/issues/312) | TODO                                            |
+| [008](008-orders-composite-index.md)                  | Add Orders(eventId, status) composite index                                   | P2       | S      | —                         | [#313](https://github.com/TropTix/troptix/issues/313) | TODO                                            |
+| [009](009-onboarding-readme-env-example.md)           | Real README + .env.example files                                              | P2       | S      | 001                       | [#314](https://github.com/TropTix/troptix/issues/314) | TODO                                            |
+| [010](010-monorepo-hygiene-organizer.md)              | Organizer app into the monorepo (rename + single lockfile)                    | P2       | M      | —                         | [#315](https://github.com/TropTix/troptix/issues/315) | TODO                                            |
+| [011](011-firebase-storage-to-supabase.md)            | Event images → Supabase Storage; remove Firebase SDK                          | P2       | M      | —                         | [#316](https://github.com/TropTix/troptix/issues/316) | REJECTED (shipped upstream #330/#343)           |
+| 012                                                   | Security hardening — plan file held                                           | P2       | M      | 008 (migration ordering)  | —                                                     | TODO (not started; needs DB env)                |
+| [013](013-code-split-recharts.md)                     | Code-split the recharts dashboards                                            | P3       | S–M    | —                         | [#317](https://github.com/TropTix/troptix/issues/317) | TODO                                            |
+| [014](014-auth-seam-tests.md)                         | Unit-test the authorization seam                                              | P2       | M      | 001; coordinates with 003 | [#318](https://github.com/TropTix/troptix/issues/318) | TODO                                            |
+| [015](015-spike-organizer-financials.md)              | SPIKE: organizer financials/payout dashboard proposal                         | P3       | M      | —                         | [#319](https://github.com/TropTix/troptix/issues/319) | TODO                                            |
+| [016](016-spike-refund-void.md)                       | SPIKE: ticket void & refund path proposal                                     | P3       | M      | review with 015           | [#320](https://github.com/TropTix/troptix/issues/320) | TODO                                            |
 
-Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
+Status values: TODO | IN PROGRESS | DONE | DEFERRED (parked by maintainer; revivable) | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
 ## Dependency notes
 
-- **001 first.** It creates the CI workflow that 006/007/009/014 reference and makes every other plan's "done" trustworthy. The held security plans (002–005) are independent fixes that can land in parallel with it.
-- **002 and 004 each have an operator gate/action** documented in their local plan files — neither can be executed blind.
-- **003 and 014 touch the same file** (an export in `accessControl.ts`): whichever runs second should notice the export already exists.
+- **001 next.** It creates the CI workflow that 007/009/014 reference and makes every other plan's "done" trustworthy.
+- **003 and 014 touch the same file** (an export in `accessControl.ts`): 003 already exported `canAccessEvent`, so 014 should reuse it.
 - **008 before 012** only because both generate Prisma→SQL migrations; serializing keeps `prisma migrate diff` output clean.
-- **015/016 deliver proposals into `docs/plans/`** per repo convention; the builds they propose depend on the checkout-reservation cutover (an existing, separately-tracked initiative) and on each other's money-semantics decisions (review them together).
-- The route code touched by local plans 004/005 is **deleted by the checkout cutover** — they are deliberate interim insurance; if the cutover lands first, mark them REJECTED with that rationale.
+- **004 deferred (2026-06-17):** the cron-auth fix is reviewed on `advisor/004-cron-auth` but parked — the Stage-3 checkout cutover (#326/#328) will replace this cron route with the reservation `expire()` path, so the guard should be folded into the new route rather than landed on the doomed one. Revive by reopening the PR if the cutover slips.
+- **005** (webhook guards) is interim insurance on a path the checkout cutover deletes; merge before the cutover lands or its value is lost.
+- **015/016 deliver proposals into `docs/plans/`** per repo convention; the builds they propose depend on the checkout-reservation cutover and on each other's money-semantics decisions (review them together).
+
+## Reconciled against upstream (2026-06-17)
+
+Work that landed on `main` independently while these plans were open:
+
+- **006 (dead deps) — REJECTED, shipped upstream.** #336 + #339 removed 6 of the 7 dead deps. **Remnant:** `@sendgrid/mail` + the dead `apps/web/src/server/lib/emailHelper.ts` still present on main (the live email path is Resend via `email.ts`; #337 extracted transactional email). Worth a tiny follow-up cleanup, not a full plan. Issue #311 to close.
+- **011 (Firebase → Supabase storage) — REJECTED, shipped upstream.** #330 + #343 migrated event-image storage and removed `config.js`, `src/firebase/`, and the `firebase` dependency entirely. Issue #316 to close.
 
 ## Findings considered and rejected
 
