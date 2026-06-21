@@ -19,14 +19,17 @@ const queryClient = new QueryClient();
 function GlobalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isOrganizer = pathname?.startsWith('/organizer');
+  // The new event page owns the full screen (immersive hero, in-page back/share).
+  const isImmersive = pathname?.startsWith('/e/');
+  const chrome = !isOrganizer && !isImmersive;
 
   return (
     <div>
-      <UnifiedHeader />
-      <div className={`flex-grow border-x ${!isOrganizer ? 'mt-16' : ''}`}>
+      {chrome && <UnifiedHeader />}
+      <div className={`flex-grow border-x ${chrome ? 'mt-16' : ''}`}>
         {children}
       </div>
-      {isOrganizer ? null : <Footer />}
+      {chrome ? <Footer /> : null}
     </div>
   );
 }
