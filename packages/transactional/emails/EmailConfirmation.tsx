@@ -13,7 +13,8 @@ import {
   Link,
   Tailwind,
   pixelBasedPreset,
-} from '@react-email/components';
+} from 'react-email';
+import { buildCalendarLinks } from '../src/calendar';
 
 export interface EmailTicket {
   id: string;
@@ -62,6 +63,7 @@ export default function EmailConfirmationTemplate({
 }) {
   const { event, tickets = [] } = order;
   const ticketUrl = `${baseUrl}/orders/${order.id}/tickets`;
+  const calendar = buildCalendarLinks(order, ticketUrl);
   const greetingName = order.firstName || 'Guest';
   const fullName =
     [order.firstName, order.lastName].filter(Boolean).join(' ') || 'Guest';
@@ -122,6 +124,24 @@ export default function EmailConfirmationTemplate({
                   }
                 />
                 <DetailRow label="Order Number" value={order.id} />
+                <Text className="font-medium mt-3 mb-1 text-slate-500">
+                  Add to calendar
+                </Text>
+                <Text className="m-0">
+                  <Link
+                    href={calendar.google}
+                    style={{ textDecoration: 'underline', color: '#6366f1' }}
+                  >
+                    Google
+                  </Link>
+                  <span className="text-slate-300"> &nbsp;·&nbsp; </span>
+                  <Link
+                    href={calendar.outlook}
+                    style={{ textDecoration: 'underline', color: '#6366f1' }}
+                  >
+                    Outlook
+                  </Link>
+                </Text>
               </Section>
 
               {/* TICKET DETAILS */}

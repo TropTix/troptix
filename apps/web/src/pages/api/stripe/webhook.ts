@@ -7,6 +7,7 @@ import {
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { buffer } from 'micro';
+import { OrderStatus } from '@troptix/db';
 
 import { sendEmailConfirmationEmailToUser } from '@/server/lib/email';
 
@@ -55,9 +56,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         console.log(`[Payment] Success - PaymentIntent: ${paymentIntent.id}`);
 
-        const paymentMethod = await stripe.paymentMethods.retrieve(
-          paymentIntent.payment_method as string
-        );
+        const paymentMethod =
+          typeof paymentIntent.payment_method === 'string'
+            ? await stripe.paymentMethods.retrieve(paymentIntent.payment_method)
+            : null;
 
         await updateOrderAfterPaymentSucceeds(paymentIntent.id, paymentMethod);
         return res.status(200).json({
@@ -85,9 +87,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 async function updateOrderAfterPaymentSucceeds(
   paymentIntentId: string,
-  paymentMethod: Stripe.PaymentMethod
+  paymentMethod: Stripe.PaymentMethod | null
 ): Promise<void> {
   try {
+    // Step 1: Idempotency guard — no-op if already completed
+    const existing = await prisma.orders.findUnique({
+      where: { stripePaymentId: paymentIntentId },
+      select: { id: true, status: true },
+    });
+    if (!existing) {
+      console.error(
+        `[Order] Order not found for PaymentIntent: ${paymentIntentId}`
+      );
+      throw new Error('Order not found');
+    }
+    if (existing.status === OrderStatus.COMPLETED) {
+      console.log(
+        `[Order] ${existing.id} already completed — duplicate webhook delivery, skipping`
+      );
+      return;
+    }
+
     await prisma.orders.update({
       where: {
         stripePaymentId: paymentIntentId,
@@ -122,7 +142,13 @@ async function updateOrderAfterPaymentSucceeds(
     const orderMap = new Map();
     order.tickets.forEach((ticket) => {
       const ticketId = ticket?.ticketType?.id;
-      if (ticketId && orderMap.has(ticketId)) {
+      if (!ticketId) {
+        console.error(
+          `[Order] ticket ${ticket.id} has no ticketType — skipping quantity update`
+        );
+        return;
+      }
+      if (orderMap.has(ticketId)) {
         const existingOrder = orderMap.get(ticketId);
         orderMap.set(ticketId, {
           ...existingOrder,
