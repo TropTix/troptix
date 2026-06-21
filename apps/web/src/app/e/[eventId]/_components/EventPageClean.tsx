@@ -84,7 +84,9 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
 
   // Saturation-weighted average so a vibrant subject wins over a dark
   // background; falls back to null (no halo) if the canvas is CORS-tainted.
+  // The halo is desktop-only, so skip the extra image fetch on mobile.
   useEffect(() => {
+    if (!window.matchMedia('(min-width: 768px)').matches) return;
     let cancelled = false;
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
@@ -234,7 +236,6 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                     fill
                     sizes="380px"
                     className="object-cover"
-                    priority
                   />
                 </div>
               </div>
