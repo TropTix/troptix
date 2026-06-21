@@ -1,9 +1,13 @@
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { canAccessEvent } from '@/server/accessControl';
 import prisma from '@/server/prisma';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest, props: { params: Promise<{ eventId: string }> }) {
+export async function GET(
+  request: NextRequest,
+  props: { params: Promise<{ eventId: string }> }
+) {
   const params = await props.params;
   const headersList = await headers();
   const authorization = headersList.get('authorization');
@@ -32,6 +36,15 @@ export async function GET(request: NextRequest, props: { params: Promise<{ event
       { error: 'Event ID is required' },
       { status: 400 }
     );
+  }
+
+  const hasAccess = await canAccessEvent(
+    organizerId.uid,
+    organizerId.email,
+    eventId
+  );
+  if (!hasAccess) {
+    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
   try {
