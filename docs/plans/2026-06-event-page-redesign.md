@@ -19,7 +19,7 @@ was reviewed in [PR #350](https://github.com/TropTix/troptix/pull/350).
 
 **Design source of truth:** `event-checkout-flow/project/design_handoff_event_checkout/`
 (README spec + `event/*.jsx`) for the Clean direction, **plus** later mobile/desktop direction
-calls captured below (Luma-light, mobile-immersive hero + desktop two-column).
+calls captured below (clean light direction, mobile-immersive hero + desktop two-column).
 
 ## Status / progress (PR #351)
 
@@ -32,7 +32,7 @@ untouched, so it's safe to merge as WIP):
   tests.
 - **Route** — `app/e/[eventId]/{page,loading,not-found}.tsx`: draft guard, `generateMetadata`/OG,
   `cache()`-deduped read.
-- **Page UI** (`EventPageClean.tsx`) — Luma-light; **mobile immersive hero** (full-bleed poster,
+- **Page UI** (`EventPageClean.tsx`) — clean light; **mobile immersive hero** (full-bleed poster,
   floating back/share, date chip, scrim) + **desktop two-column** (sticky poster aside with a
   flyer-sampled colour halo); title / tagline / date+location meta / About / Location / Hosted-by;
   sticky **Get Tickets / RSVP** bar.
@@ -65,7 +65,7 @@ are to be **amended to match**:
    tiers (`maxAllowedToAdd === 0`) just disable in the sheet ("Unavailable").
 4. **Layout: mobile immersive hero + desktop two-column** (explicit direction call). Mobile is
    the priority; desktop two-column stays.
-5. **Visual direction: Luma-light** (chosen after exploring Light/Hybrid/Dark). Clean white
+5. **Visual direction: clean light** (chosen after exploring light / hybrid / dark). Clean white
    surface; colour comes from the poster — a subtle flyer-**sampled** halo behind the desktop
    poster (not a page-wide wash). Light-only per [ADR 0002](../adr/0002-light-only-no-dark-toggle.md),
    indigo per [ADR 0003](../adr/0003-indigo-canonical-brand.md).
@@ -133,7 +133,7 @@ latter to keep existing links / email UTM / SEO. Cleanup deletes `EventDetails.t
 ## Remaining slices
 
 1. ✅ Route + `getEventDetail` data layer.
-2. ✅ Page UI (mobile hero + desktop two-column, Luma-light) + selection sheet (stubbed commit).
+2. ✅ Page UI (mobile hero + desktop two-column, clean light) + selection sheet (stubbed commit).
 3. **Free RSVP end-to-end** — `createReservation` (free) → `completeFree` → confirmation
    (needs the tRPC React client + first new procedures; no Stripe).
 4. **Paid checkout** — `createReservation` + PaymentIntent + reservation route + Payment Element.
