@@ -1,8 +1,16 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { MapPin, Share2, Check, ArrowRight } from 'lucide-react';
+import {
+  ArrowLeft,
+  Share2,
+  Check,
+  Calendar,
+  MapPin,
+  ArrowRight,
+} from 'lucide-react';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency, cn } from '@/lib/utils';
@@ -13,7 +21,8 @@ import TicketSelectionSheet, {
   type TicketSelection,
 } from './TicketSelectionSheet';
 
-// Public event page (Luma-light). See docs/plans/2026-06-event-page-redesign.md.
+// Public event page (Luma-light). Immersive poster hero on mobile, two-column
+// on desktop. See docs/plans/2026-06-event-page-redesign.md.
 
 function priceLabelFor(fromPriceCents: number | null): string {
   if (fromPriceCents == null) return 'No tickets available';
@@ -24,7 +33,11 @@ function priceLabelFor(fromPriceCents: number | null): string {
 const SECTION_LABEL =
   'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
-const META_TILE = 'h-14 w-14 shrink-0 rounded-xl border border-border bg-card';
+const META_TILE =
+  'grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground';
+
+const ROUND_BTN =
+  'grid h-10 w-10 place-items-center rounded-full text-foreground transition-colors';
 
 function SectionHeader({ children }: { children: ReactNode }) {
   return (
@@ -35,17 +48,17 @@ function SectionHeader({ children }: { children: ReactNode }) {
 }
 
 function MetaRow({
-  leading,
+  icon,
   title,
   subtitle,
 }: {
-  leading: ReactNode;
+  icon: ReactNode;
   title: string;
   subtitle: string;
 }) {
   return (
     <div className="flex items-center gap-4">
-      {leading}
+      <span className={META_TILE}>{icon}</span>
       <div className="min-w-0">
         <div className="font-semibold">{title}</div>
         <div className="text-sm text-muted-foreground">{subtitle}</div>
@@ -55,7 +68,7 @@ function MetaRow({
 }
 
 export default function EventPageClean({ event }: { event: EventDetail }) {
-  // "r, g, b" sampled from the flyer for the backdrop glow.
+  const router = useRouter();
   const [accent, setAccent] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
@@ -70,7 +83,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
   // Saturation-weighted average so a vibrant subject wins over a dark
-  // background; falls back to the blurred flyer if the canvas is CORS-tainted.
+  // background; falls back to null (no halo) if the canvas is CORS-tainted.
   useEffect(() => {
     let cancelled = false;
     const img = new window.Image();
@@ -96,7 +109,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
           const max = Math.max(R, G, B);
           const min = Math.min(R, G, B);
           const sat = max === 0 ? 0 : (max - min) / max;
-          const w = sat * sat + 0.05; // bias toward colourful pixels
+          const w = sat * sat + 0.05;
           r += R * w;
           g += G * w;
           b += B * w;
@@ -107,7 +120,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
           setAccent(`${round(r)}, ${round(g)}, ${round(b)}`);
         }
       } catch {
-        /* tainted canvas (CORS) — keep the blurred-flyer fallback */
+        /* tainted canvas (CORS) — no halo */
       }
     };
     img.src = imageUrl;
@@ -118,10 +131,13 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
 
   const start = new Date(event.startDate);
   const end = new Date(event.endDate);
-  const badgeMonth = start
-    .toLocaleString('en-US', { month: 'short' })
-    .toUpperCase();
-  const badgeDay = start.getDate();
+  const heroChip = `${start.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })} · ${start.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`;
   const priceLabel = priceLabelFor(event.fromPriceCents);
 
   async function onShare() {
@@ -137,6 +153,12 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
     void copyToClipboard(url);
   }
 
+  const shareIcon = isCopied ? (
+    <Check className="h-5 w-5" />
+  ) : (
+    <Share2 className="h-5 w-5" />
+  );
+
   return (
     <>
       {event.isDraft && (
@@ -147,63 +169,89 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         />
       )}
 
-      <div className="fixed inset-0 -z-10 bg-background">
-        {accent ? (
-          <div
-            className="absolute inset-0 transition-opacity duration-700"
-            style={{
-              background: `radial-gradient(90% 55% at 50% -5%, rgba(${accent}, 0.35), rgba(${accent}, 0) 70%)`,
-            }}
-          />
-        ) : (
-          <div
-            className="absolute inset-0 scale-110 bg-cover bg-center opacity-20"
-            style={{
-              backgroundImage: `url("${imageUrl}")`,
-              filter: 'blur(64px)',
-            }}
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/70 to-background" />
-      </div>
+      <main className="min-h-screen bg-background pb-32 text-foreground">
+        {/* Mobile: immersive poster hero with floating controls + date chip. */}
+        <div className="relative md:hidden">
+          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-b-3xl">
+            <Image
+              src={imageUrl}
+              alt={event.name}
+              fill
+              sizes="100vw"
+              className="object-cover"
+              priority
+            />
+            <span className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              {heroChip}
+            </span>
+          </div>
+          <div className="absolute inset-x-4 top-4 flex items-center justify-between">
+            <button
+              type="button"
+              aria-label="Back"
+              onClick={() => router.back()}
+              className={cn(ROUND_BTN, 'bg-white/85 shadow backdrop-blur')}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Share event"
+              onClick={onShare}
+              className={cn(ROUND_BTN, 'bg-white/85 shadow backdrop-blur')}
+            >
+              {shareIcon}
+            </button>
+          </div>
+        </div>
 
-      <main className="min-h-screen animate-in pb-32 text-foreground duration-700 fade-in">
-        <div className="mx-auto w-full max-w-5xl px-5 py-10 md:px-8 md:py-14">
+        <div className="mx-auto w-full max-w-5xl px-5 py-6 md:px-8 md:py-14">
           <div className="md:grid md:grid-cols-[minmax(0,380px)_1fr] md:items-start md:gap-12">
-            <aside className="md:sticky md:top-20">
-              <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-xl transition-transform duration-300 hover:-translate-y-1">
-                <Image
-                  src={imageUrl}
-                  alt={event.name}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 380px"
-                  className="object-cover"
-                  priority
-                />
+            {/* Desktop: poster aside with a soft flyer-coloured halo. */}
+            <aside className="hidden md:block md:sticky md:top-20">
+              <div className="relative">
+                {accent && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute -inset-4 rounded-[2rem] opacity-70 blur-3xl"
+                    style={{
+                      background: `radial-gradient(circle, rgba(${accent}, 0.4), transparent 70%)`,
+                    }}
+                  />
+                )}
+                <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-xl">
+                  <Image
+                    src={imageUrl}
+                    alt={event.name}
+                    fill
+                    sizes="380px"
+                    className="object-cover"
+                    priority
+                  />
+                </div>
               </div>
-
               <div className="mt-5 border-t border-border pt-5">
                 <p className={SECTION_LABEL}>Presented by</p>
                 <p className="mt-1 font-semibold">{event.organizer}</p>
               </div>
             </aside>
 
-            <div className="mt-8 min-w-0 md:mt-0">
+            <div className="min-w-0">
               <div className="flex items-start justify-between gap-4">
                 <h1 className="text-3xl font-extrabold tracking-tight md:text-5xl">
                   {event.name}
                 </h1>
                 <button
                   type="button"
-                  onClick={onShare}
                   aria-label="Share event"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-muted"
-                >
-                  {isCopied ? (
-                    <Check className="h-5 w-5" />
-                  ) : (
-                    <Share2 className="h-5 w-5" />
+                  onClick={onShare}
+                  className={cn(
+                    ROUND_BTN,
+                    'hidden shrink-0 border border-border bg-card hover:bg-muted md:grid'
                   )}
+                >
+                  {shareIcon}
                 </button>
               </div>
               {event.summary && (
@@ -214,35 +262,12 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
 
               <div className="mt-6 space-y-3">
                 <MetaRow
-                  leading={
-                    <div
-                      className={cn(
-                        'flex flex-col items-center justify-center',
-                        META_TILE
-                      )}
-                    >
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {badgeMonth}
-                      </span>
-                      <span className="text-lg font-bold leading-none">
-                        {badgeDay}
-                      </span>
-                    </div>
-                  }
+                  icon={<Calendar className="h-6 w-6" />}
                   title={getDateRangeFormatter(start, end)}
                   subtitle={getTimeRangeFormatter(start, end)}
                 />
                 <MetaRow
-                  leading={
-                    <span
-                      className={cn(
-                        'grid place-items-center text-muted-foreground',
-                        META_TILE
-                      )}
-                    >
-                      <MapPin className="h-6 w-6" />
-                    </span>
-                  }
+                  icon={<MapPin className="h-6 w-6" />}
                   title={event.venue ?? event.address}
                   subtitle={event.address}
                 />
@@ -262,6 +287,12 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                 <p className="mt-4 font-semibold">{event.venue ?? 'Venue'}</p>
                 <p className="text-sm text-muted-foreground">{event.address}</p>
                 {/* TODO: venue map (Phase 2) */}
+              </section>
+
+              {/* Organizer shows in the aside on desktop; surface it here on mobile. */}
+              <section className="mt-10 md:hidden">
+                <SectionHeader>Hosted by</SectionHeader>
+                <p className="mt-3 font-semibold">{event.organizer}</p>
               </section>
             </div>
           </div>

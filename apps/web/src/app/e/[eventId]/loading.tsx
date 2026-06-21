@@ -4,9 +4,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function EventDetailPageLoading() {
   return (
     <main className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-5xl px-5 py-10 md:px-8 md:py-14">
+      {/* Mobile hero */}
+      <Skeleton className="aspect-[4/5] w-full rounded-b-3xl md:hidden" />
+
+      <div className="mx-auto w-full max-w-5xl px-5 py-6 md:px-8 md:py-14">
         <div className="md:grid md:grid-cols-[minmax(0,380px)_1fr] md:items-start md:gap-12">
-          <aside>
+          <aside className="hidden md:block">
             <Skeleton className="aspect-square w-full rounded-2xl" />
             <div className="mt-5 border-t border-border pt-5">
               <Skeleton className="h-4 w-24" />
@@ -14,7 +17,7 @@ export default function EventDetailPageLoading() {
             </div>
           </aside>
 
-          <div className="mt-8 md:mt-0">
+          <div className="mt-6 md:mt-0">
             <Skeleton className="h-10 w-3/4 md:h-12" />
             <Skeleton className="mt-3 h-6 w-1/2" />
             <div className="mt-6 space-y-3">
