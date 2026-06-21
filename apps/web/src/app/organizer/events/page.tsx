@@ -10,6 +10,7 @@ import {
   Settings,
 } from 'lucide-react';
 import Image from 'next/image';
+import { eventFlyerUrl } from '@/lib/supabase/storage';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { EventCardData, getAllOrganizerEvents } from '../_lib/getEventsData'; // Adjust import path
@@ -97,7 +98,7 @@ export default async function AllEventsListPage() {
                         <div className="relative w-full flex-shrink-0 aspect-video">
                           {event.imageUrl ? (
                             <Image
-                              src={event.imageUrl}
+                              src={eventFlyerUrl(event.imageUrl)!}
                               alt={`${event.name} Flyer`}
                               layout="fill"
                               objectFit="cover"

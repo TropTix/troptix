@@ -47,6 +47,7 @@ import {
 import { CopyButton } from '@/components/ui/copy-button';
 import { Progress } from '@/components/ui/progress';
 import { hasPlatformAccess } from '@/server/accessControl';
+import { absoluteUrl } from '@/lib/appUrl';
 
 function getEventStatusDisplay(eventData: EventOverview) {
   const { event, timing } = eventData;
@@ -97,7 +98,7 @@ export default async function EventOverviewPage(props: {
     return <p>Error loading event data.</p>;
   }
 
-  const eventUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/events/${eventId}`;
+  const eventUrl = absoluteUrl(`/events/${eventId}`);
   const statusDisplay = getEventStatusDisplay(eventData);
   const isPlatformOwner = hasPlatformAccess(user.email);
 

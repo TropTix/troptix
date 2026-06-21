@@ -25,7 +25,10 @@ export const eventFormSchema = z
     latitude: z.number().nullable().optional(),
     longitude: z.number().nullable().optional(),
     tickets: z.array(ticketTypeSchema).optional(),
-    imageUrl: z.string().url().or(z.literal('')).nullable().optional(),
+    // Holds a Supabase Storage object PATH, not a URL (ADR 0016), so this is a
+    // plain string — not `.url()`, which would reject the path. Empty string
+    // means "no image". Render via eventFlyerUrl().
+    imageUrl: z.string().nullable().optional(),
   })
   .refine(
     (data) => {
