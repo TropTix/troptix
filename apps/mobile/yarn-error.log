@@ -1,0 +1,68 @@
+Arguments: 
+  /Users/gaurnett/.nvm/versions/node/v24.16.0/bin/node /usr/local/Cellar/yarn/1.22.19/libexec/bin/yarn.js add expo@latest
+
+PATH: 
+  /Users/gaurnett/.nvm/versions/node/v24.16.0/bin:/Users/gaurnett/.antigravity-ide/antigravity-ide/bin:/Users/gaurnett/.antigravity/antigravity/bin:/opt/homebrew/bin:/Library/Frameworks/Python.framework/Versions/3.10/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Library/TeX/texbin:/Applications/VMware Fusion.app/Contents/Public:/usr/local/share/dotnet:~/.dotnet/tools:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/Users/gaurnett/.nvm/versions/node/v24.16.0/bin:/Users/gaurnett/.antigravity-ide/antigravity-ide/bin:/Users/gaurnett/.antigravity/antigravity/bin:/opt/homebrew/bin:/Library/Frameworks/Python.framework/Versions/3.10/bin
+
+Yarn version: 
+  1.22.19
+
+Node version: 
+  24.16.0
+
+Platform: 
+  darwin arm64
+
+Trace: 
+  Error: ENOENT: no such file or directory, scandir '/Users/gaurnett/Programming/TechBrewery/troptix/node_modules/@ampproject'
+
+npm manifest: 
+  {
+    "name": "troptix-organizer-v2",
+    "main": "index.js",
+    "version": "1.0.0",
+    "scripts": {
+      "start": "expo start",
+      "android": "expo start --android",
+      "ios": "expo start --ios",
+      "web": "expo start --web"
+    },
+    "dependencies": {
+      "@expo-google-fonts/inter": "^0.3.0",
+      "@expo/vector-icons": "^14.1.0",
+      "@react-native-async-storage/async-storage": "2.1.2",
+      "@supabase/supabase-js": "^2.108.1",
+      "@trpc/client": "^11.17.0",
+      "expo": "~53.0.20",
+      "expo-asset": "~11.1.4",
+      "expo-camera": "~16.1.11",
+      "expo-constants": "~17.1.7",
+      "expo-font": "~13.3.2",
+      "expo-haptics": "~14.1.4",
+      "expo-linking": "~7.1.7",
+      "expo-router": "~5.1.4",
+      "expo-splash-screen": "~0.30.10",
+      "expo-status-bar": "~2.2.3",
+      "expo-system-ui": "~5.0.10",
+      "react": "19.0.0",
+      "react-dom": "19.0.0",
+      "react-native": "0.79.5",
+      "react-native-gesture-handler": "~2.24.0",
+      "react-native-reanimated": "~3.17.4",
+      "react-native-safe-area-context": "5.4.0",
+      "react-native-screens": "~4.11.1",
+      "react-native-web": "~0.20.0"
+    },
+    "devDependencies": {
+      "@babel/core": "^7.25.2",
+      "@types/react": "~19.0.10",
+      "typescript": "~5.8.3"
+    },
+    "private": true
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  
