@@ -345,21 +345,36 @@ export default function EventDetailScreen() {
   const [event, setEvent] = useState<any>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showRefreshToast, setShowRefreshToast] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    trpc.organizer.event
-      .query({ id })
-      .then((data) => {
-        setEvent(data);
-        setGuests(data.guests);
-        setLoading(false);
-      })
-      .catch((e) => {
-        setError(e.message ?? 'Failed to load event');
-        setLoading(false);
-      });
+  const fetchEventData = useCallback(async () => {
+    try {
+      const data = await trpc.organizer.event.query({ id });
+      setEvent(data);
+      setGuests(data.guests);
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to load event');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  React.useEffect(() => {
+    fetchEventData();
+  }, [fetchEventData]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchEventData();
+    setRefreshing(false);
+
+    setShowRefreshToast(true);
+    setTimeout(() => {
+      setShowRefreshToast(false);
+    }, 2500);
+  };
 
   const handleCheckInByScan = useCallback(
     (guestId: string) => {
@@ -449,6 +464,13 @@ export default function EventDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {showRefreshToast && (
+        <View style={styles.refreshToast}>
+          <Ionicons name="checkmark-circle" size={16} color="#fff" />
+          <Text style={styles.refreshToastText}>Data refreshed</Text>
+        </View>
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
@@ -457,7 +479,17 @@ export default function EventDetailScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {event.name}
         </Text>
-        <View style={{ width: 36 }} />
+        <Pressable
+          style={styles.backBtn}
+          onPress={handleRefresh}
+          disabled={refreshing}
+        >
+          <Ionicons
+            name="refresh"
+            size={20}
+            color={refreshing ? colors.textMuted : colors.text}
+          />
+        </Pressable>
       </View>
 
       {/* Event info */}
@@ -815,6 +847,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: Platform.OS === 'ios' ? 9 : 5,
     gap: 6,
+  },
+  scanBannerCloseText: {
+    color: '#fff',
+    fontFamily: fonts.medium,
+    fontSize: 13,
+  },
+  refreshToast: {
+    position: 'absolute',
+    top: 60,
+    alignSelf: 'center',
+    backgroundColor: colors.success,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  refreshToastText: {
+    color: '#fff',
+    fontFamily: fonts.medium,
+    fontSize: 14,
   },
   searchInput: {
     flex: 1,

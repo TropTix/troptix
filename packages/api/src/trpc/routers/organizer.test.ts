@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
-import { createCaller } from './index';
+import { describe, expect, it } from 'vitest';
 import { createContext } from '../context';
+import { createCaller } from './index';
 
 type MockPrismaOptions = {
   userEmail?: string;
@@ -28,7 +28,7 @@ function caller(prisma: PrismaClient) {
   // Use a mocked context holding an actor
   return createCaller({
     ...createContext({ prisma }),
-    actor: { kind: 'user', userId: 'org-1' },
+    actor: { kind: 'user', userId: 'org-1', role: 'ORGANIZER' },
   });
 }
 

@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
-import { checkInTicket } from './organizer';
+import { describe, expect, it } from 'vitest';
 import type { Actor } from '../trpc/context';
+import { checkInTicket } from './organizer';
 
 type MockPrismaOptions = {
   userEmail?: string;
@@ -20,7 +20,7 @@ function fakePrisma(opts: MockPrismaOptions): PrismaClient {
   } as unknown as PrismaClient;
 }
 
-const mockActor: Actor = { kind: 'user', userId: 'org-1' };
+const mockActor: Actor = { kind: 'user', userId: 'org-1', role: 'ORGANIZER' };
 
 describe('checkInTicket', () => {
   it('throws NOT_FOUND if ticket does not exist', async () => {
