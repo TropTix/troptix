@@ -45,8 +45,15 @@ function fakePrisma(opts: {
   } as unknown as PrismaClient;
 }
 
+/** Gateway that must not be reached by the read procedures under test. */
+const unusedGateway = {
+  createPaymentIntent: async () => {
+    throw new Error('paymentGateway should not be called by this procedure');
+  },
+};
+
 function caller(prisma: PrismaClient) {
-  return createCaller(createContext({ prisma }));
+  return createCaller(createContext({ prisma, paymentGateway: unusedGateway }));
 }
 
 describe('appRouter.checkout (via createCaller)', () => {

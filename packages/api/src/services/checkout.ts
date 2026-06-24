@@ -27,8 +27,9 @@ import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
 
 // Exactly the columns the mapper needs — shared by both queries so they read
-// the same data. New reservation-rebuild columns first, legacy fallbacks next.
-const TICKET_TYPE_SELECT = {
+// the same data (also reused by `initiateCheckout`, which adds `discountCode`).
+// New reservation-rebuild columns first, legacy fallbacks next.
+export const TICKET_TYPE_SELECT = {
   id: true,
   name: true,
   description: true,

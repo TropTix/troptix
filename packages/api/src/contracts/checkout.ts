@@ -16,7 +16,11 @@
  * unchanged for the un-wired legacy routes until the Stage 3 cutover retires it.
  */
 import { z } from 'zod';
-import type { TicketFeeStructure, TicketType } from '@troptix/db/types';
+import type {
+  ReservationStatus,
+  TicketFeeStructure,
+  TicketType,
+} from '@troptix/db/types';
 
 // --- Prisma enums mirrored as zod string enums --------------------------------
 // We can't import the enum *values* from `@troptix/db` (runtime entry) without
@@ -137,6 +141,60 @@ export type CheckoutConfigInput = z.infer<typeof checkoutConfigInputSchema>;
 // Frozen here so the Stage 3 initiate rewrite (PR 2c) has the target shape;
 // the service is built in a later PR. Cents + reservation-id, not the legacy
 // dollar/orderId shape.
+
+export const initiateCheckoutItemSchema = z.object({
+  ticketTypeId: z.string().min(1),
+  quantity: z.number().int().min(1).max(50),
+});
+export type InitiateCheckoutItem = z.infer<typeof initiateCheckoutItemSchema>;
+
+/**
+ * Input for the initiate mutation — the buyer's cart at commit time. `code` is
+ * the unlock code when the cart contains a password-gated ticket; the signed-in
+ * user id is NOT wire input (the server takes it from the actor — ADR 0013).
+ */
+export const initiateCheckoutInputSchema = z.object({
+  eventId: z.string().min(1),
+  items: z.array(initiateCheckoutItemSchema).min(1).max(20),
+  contact: z.object({
+    email: z.string().email(),
+    firstName: z.string().min(1),
+    lastName: z.string().min(1),
+  }),
+  code: z.string().min(1).optional(),
+});
+export type InitiateCheckoutInput = z.infer<typeof initiateCheckoutInputSchema>;
+
+// --- Reservation status (post-payment polling) ---------------------------------
+
+export const reservationStatusSchema = z.enum([
+  'HELD',
+  'CONVERTED',
+  'EXPIRED',
+  'RELEASED',
+]);
+const _reservationStatusParity: AssertEqual<
+  z.infer<typeof reservationStatusSchema>,
+  ReservationStatus
+> = true;
+
+export const reservationStatusResponseSchema = z.object({
+  reservationId: z.string(),
+  status: reservationStatusSchema,
+  /** Set once the webhook (or a synchronous free confirm) materializes the order. */
+  orderId: z.string().nullable(),
+  expiresAt: z.string().datetime(),
+});
+export type ReservationStatusResponse = z.infer<
+  typeof reservationStatusResponseSchema
+>;
+
+export const reservationStatusInputSchema = z.object({
+  reservationId: z.string().min(1),
+});
+export type ReservationStatusInput = z.infer<
+  typeof reservationStatusInputSchema
+>;
 
 export const validatedItemSchema = z.object({
   ticketTypeId: z.string(),
