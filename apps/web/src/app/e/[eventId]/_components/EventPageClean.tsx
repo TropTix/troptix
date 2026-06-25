@@ -17,9 +17,7 @@ import { getFormattedCurrency, cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Banner } from '@/components/ui/banner';
 import type { EventDetail } from '@troptix/api';
-import TicketSelectionSheet, {
-  type TicketSelection,
-} from './TicketSelectionSheet';
+import CheckoutSheet from './CheckoutSheet';
 
 // Public event page (Luma-light). Immersive poster hero on mobile, two-column
 // on desktop. See docs/plans/2026-06-event-page-redesign.md.
@@ -74,11 +72,6 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
   const { copyToClipboard, isCopied } = useCopyToClipboard();
 
   const isFree = event.fromPriceCents === 0;
-
-  // Commit seam: next slice wires this to createReservation.
-  function onCommit(_selection: TicketSelection) {
-    setSheetOpen(false);
-  }
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
@@ -328,13 +321,10 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         </div>
       </div>
 
-      <TicketSelectionSheet
+      <CheckoutSheet
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        eventName={event.name}
-        tickets={event.tickets}
-        isFree={isFree}
-        onCommit={onCommit}
+        event={event}
       />
     </>
   );

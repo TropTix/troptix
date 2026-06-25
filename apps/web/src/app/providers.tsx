@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { httpBatchLink } from '@trpc/client';
+import { trpc } from '@/lib/trpc';
 import { ErrorBoundary } from 'react-error-boundary';
 import { usePathname, useRouter } from 'next/navigation';
 import { ConfigProvider } from 'antd';
@@ -53,6 +55,9 @@ function PostHogProvider({ children }: { children: React.ReactNode }) {
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const [trpcClient] = useState(() =>
+    trpc.createClient({ links: [httpBatchLink({ url: '/api/trpc' })] })
+  );
 
   return (
     <ConfigProvider
@@ -70,13 +75,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       >
         <PostHogProvider>
           <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              {/* Honor the OS "Reduce Motion" setting app-wide: disables
-                  transform/layout animations while keeping opacity fades. */}
-              <MotionConfig reducedMotion="user">
-                <GlobalLayout>{children}</GlobalLayout>
-              </MotionConfig>
-            </AuthProvider>
+            <trpc.Provider client={trpcClient} queryClient={queryClient}>
+              <AuthProvider>
+                {/* Honor the OS "Reduce Motion" setting app-wide: disables
+                    transform/layout animations while keeping opacity fades. */}
+                <MotionConfig reducedMotion="user">
+                  <GlobalLayout>{children}</GlobalLayout>
+                </MotionConfig>
+              </AuthProvider>
+            </trpc.Provider>
           </QueryClientProvider>
         </PostHogProvider>
       </ErrorBoundary>
