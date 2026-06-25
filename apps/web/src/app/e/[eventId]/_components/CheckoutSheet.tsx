@@ -112,7 +112,7 @@ export default function CheckoutSheet({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="bottom"
-        className="flex max-h-[85vh] flex-col gap-0 rounded-t-2xl border-border p-0"
+        className="flex h-[100dvh] w-full flex-col gap-0 border-0 p-0"
       >
         <SheetTitle className="sr-only">{STEP_TITLE[step]}</SheetTitle>
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden">
