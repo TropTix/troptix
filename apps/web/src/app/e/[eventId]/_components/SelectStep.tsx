@@ -17,18 +17,22 @@ function Stepper({
 }) {
   return (
     <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
-      <button
-        type="button"
-        aria-label="Remove one"
-        disabled={value === 0}
-        onClick={() => onChange(-1)}
-        className="grid h-8 w-8 place-items-center rounded-full text-foreground transition-colors hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent"
-      >
-        <Minus className="h-4 w-4" />
-      </button>
-      <span className="w-6 text-center text-sm font-bold tabular-nums">
-        {value}
-      </span>
+      {/* Minus + count are hidden until the first ticket is added, then slide in. */}
+      {value > 0 && (
+        <div className="flex items-center gap-1 duration-200 animate-in fade-in slide-in-from-right-2">
+          <button
+            type="button"
+            aria-label="Remove one"
+            onClick={() => onChange(-1)}
+            className="grid h-8 w-8 place-items-center rounded-full text-foreground transition-colors hover:bg-muted"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <span className="w-6 text-center text-sm font-bold tabular-nums">
+            {value}
+          </span>
+        </div>
+      )}
       <button
         type="button"
         aria-label="Add one"
