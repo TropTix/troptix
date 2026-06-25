@@ -8,7 +8,9 @@
 
 export {
   reserve,
+  createReservation,
   confirm,
+  completeFree,
   release,
   expire,
   type ReserveInput,

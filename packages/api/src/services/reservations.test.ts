@@ -11,11 +11,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import prisma, {
   OrderStatus,
+  OrderType,
   ReservationStatus,
   TicketStatus,
 } from '@troptix/db';
 import { generateId } from './_shared/ids';
-import { confirm, expire, release, reserve } from './reservations';
+import {
+  completeFree,
+  confirm,
+  createReservation,
+  expire,
+  release,
+  reserve,
+} from './reservations';
 
 const TEST_EVENT_ID = `test-evt-${generateId()}`;
 const createdOrderIds: string[] = [];
@@ -259,5 +267,116 @@ describe('expire', () => {
       (await prisma.reservation.findUnique({ where: { id: r.reservationId } }))
         ?.status
     ).toBe(ReservationStatus.EXPIRED);
+  });
+});
+
+describe('createReservation — server pricing authority', () => {
+  it('derives fees from the tier and holds inventory', async () => {
+    const tt = await makeTicketType(5, 5000); // PASS_TICKET_FEES by default
+    const res = await createReservation(
+      prisma,
+      {
+        eventId: TEST_EVENT_ID,
+        items: [{ ticketTypeId: tt.id, quantity: 2 }],
+        contact: {
+          firstName: 'Bud',
+          lastName: 'Buyer',
+          email: 'bud@example.com',
+        },
+      },
+      null
+    );
+
+    expect(res.wasAdjusted).toBe(false);
+    expect(res.totalCents).toBe(2 * (5000 + 450)); // fee = round(5000*.08 + 50)
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(2);
+  });
+
+  it('clamps to availability and flags wasAdjusted', async () => {
+    const tt = await makeTicketType(1, 5000);
+    const res = await createReservation(
+      prisma,
+      {
+        eventId: TEST_EVENT_ID,
+        items: [{ ticketTypeId: tt.id, quantity: 3 }],
+        contact: { firstName: 'A', lastName: 'B', email: 'a@b.com' },
+      },
+      null
+    );
+
+    expect(res.items[0].granted).toBe(1);
+    expect(res.wasAdjusted).toBe(true);
+  });
+});
+
+describe('completeFree', () => {
+  it('materializes a free order + tickets, idempotently', async () => {
+    const tt = await makeTicketType(5, 0); // free tier
+    const res = await createReservation(
+      prisma,
+      {
+        eventId: TEST_EVENT_ID,
+        items: [{ ticketTypeId: tt.id, quantity: 2 }],
+        contact: {
+          firstName: 'Free',
+          lastName: 'Guest',
+          email: 'free@example.com',
+        },
+      },
+      null
+    );
+    expect(res.totalCents).toBe(0);
+
+    const done = await completeFree(prisma, {
+      reservationId: res.reservationId,
+    });
+    createdOrderIds.push(done.orderId);
+    expect(done.email).toBe('free@example.com');
+    expect(done.tickets).toHaveLength(2);
+
+    const ttAfter = await prisma.ticketTypes.findUnique({
+      where: { id: tt.id },
+    });
+    expect(ttAfter?.sold).toBe(2);
+    expect(ttAfter?.reserved).toBe(0);
+
+    const order = await prisma.orders.findUnique({
+      where: { id: done.orderId },
+      include: { tickets: true },
+    });
+    expect(order?.type).toBe(OrderType.FREE);
+    expect(order?.status).toBe(OrderStatus.COMPLETED);
+    expect(order?.tickets).toHaveLength(2);
+    expect(order?.tickets.every((t) => t.status === TicketStatus.VALID)).toBe(
+      true
+    );
+
+    // idempotent: a second call returns the same order, no double-sell
+    const again = await completeFree(prisma, {
+      reservationId: res.reservationId,
+    });
+    expect(again.orderId).toBe(done.orderId);
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.sold
+    ).toBe(2);
+  });
+
+  it('rejects a paid reservation', async () => {
+    const tt = await makeTicketType(5, 5000);
+    const res = await createReservation(
+      prisma,
+      {
+        eventId: TEST_EVENT_ID,
+        items: [{ ticketTypeId: tt.id, quantity: 1 }],
+        contact: { firstName: 'P', lastName: 'Q', email: 'p@q.com' },
+      },
+      null
+    );
+
+    await expect(
+      completeFree(prisma, { reservationId: res.reservationId })
+    ).rejects.toThrow();
   });
 });
