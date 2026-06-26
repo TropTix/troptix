@@ -34,10 +34,10 @@ export default function CheckoutSheet({
   const [step, setStep] = useState<Step>('select');
   const [selection, setSelection] = useState<Record<string, number>>({});
   const [localError, setLocalError] = useState<string | null>(null);
-  const isFree = event.fromPriceCents === 0;
 
   const createReservation = trpc.checkout.createReservation.useMutation();
   const completeFree = trpc.checkout.completeFree.useMutation();
+  const releaseReservation = trpc.checkout.release.useMutation();
 
   function handleOpenChange(next: boolean) {
     onOpenChange(next);
@@ -72,6 +72,9 @@ export default function CheckoutSheet({
     (sum, t) => sum + selection[t.id] * (t.priceCents + t.feesCents),
     0
   );
+  // Free vs paid is a property of the selection, not the event — an event can
+  // have both free and paid tiers.
+  const isFree = totalCents === 0;
 
   async function handleContact(contact: ReservationContact) {
     setLocalError(null);
@@ -79,6 +82,7 @@ export default function CheckoutSheet({
       setStep('comingSoon');
       return;
     }
+    let heldReservationId: string | undefined;
     try {
       const reservation = await createReservation.mutateAsync({
         eventId: event.id,
@@ -88,6 +92,7 @@ export default function CheckoutSheet({
         })),
         contact,
       });
+      heldReservationId = reservation.reservationId;
       if (reservation.items.every((g) => g.granted === 0)) {
         setLocalError('Sorry — these tickets just sold out.');
         return;
@@ -97,7 +102,12 @@ export default function CheckoutSheet({
       });
       setStep('success');
     } catch {
-      // tRPC errors surface via the mutation errors below.
+      // tRPC errors surface via the mutation errors below. Hand the hold back
+      // so a failed commit doesn't leak inventory (no-op server-side if it
+      // actually converted).
+      if (heldReservationId) {
+        releaseReservation.mutate({ reservationId: heldReservationId });
+      }
     }
   }
 
@@ -113,61 +123,67 @@ export default function CheckoutSheet({
       <SheetContent
         side="bottom"
         className="flex h-[100dvh] w-full flex-col gap-0 border-0 p-0"
+        // Full-screen: nothing to tap "outside". Prevent dismissal on
+        // outside/focus interactions so browser autofill suggestions (which
+        // pop up outside the dialog) don't close the sheet.
+        onInteractOutside={(e) => e.preventDefault()}
       >
         <SheetTitle className="sr-only">{STEP_TITLE[step]}</SheetTitle>
-        <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden">
-          {step === 'select' && (
-            <SelectStep
-              tickets={event.tickets}
-              selection={selection}
-              onAdjust={adjust}
-              qty={qty}
-              totalCents={totalCents}
-              feesCents={feesCents}
-              isFree={isFree}
-              eventName={event.name}
-              onContinue={() => setStep('contact')}
-            />
-          )}
-          {step === 'contact' && (
-            <ContactStep
-              defaultValues={{
-                firstName: user?.firstName ?? '',
-                lastName: user?.lastName ?? '',
-                email: user?.email ?? '',
-              }}
-              isFree={isFree}
-              submitting={submitting}
-              error={submitError}
-              eventName={event.name}
-              onBack={() => setStep('select')}
-              onSubmit={handleContact}
-            />
-          )}
-          {step === 'comingSoon' && (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-              <p className="text-lg font-bold">Card checkout is coming soon</p>
-              <p className="text-sm text-muted-foreground">
-                Paid tickets aren&rsquo;t available on this page yet.
-              </p>
-              <button
-                type="button"
-                onClick={() => setStep('contact')}
-                className="mt-2 text-sm font-semibold text-primary"
-              >
-                Back
-              </button>
-            </div>
-          )}
-          {step === 'success' && completeFree.data && (
-            <SuccessTicket
-              event={event}
-              email={completeFree.data.email}
-              tickets={completeFree.data.tickets}
-              onDone={() => handleOpenChange(false)}
-            />
-          )}
-        </div>
+        {step === 'success' && completeFree.data ? (
+          <SuccessTicket
+            event={event}
+            orderId={completeFree.data.orderId}
+            tickets={completeFree.data.tickets}
+          />
+        ) : (
+          <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden">
+            {step === 'select' && (
+              <SelectStep
+                tickets={event.tickets}
+                selection={selection}
+                onAdjust={adjust}
+                qty={qty}
+                totalCents={totalCents}
+                feesCents={feesCents}
+                isFree={isFree}
+                eventName={event.name}
+                onContinue={() => setStep('contact')}
+              />
+            )}
+            {step === 'contact' && (
+              <ContactStep
+                defaultValues={{
+                  firstName: user?.firstName ?? '',
+                  lastName: user?.lastName ?? '',
+                  email: user?.email ?? '',
+                }}
+                isFree={isFree}
+                submitting={submitting}
+                error={submitError}
+                eventName={event.name}
+                onBack={() => setStep('select')}
+                onSubmit={handleContact}
+              />
+            )}
+            {step === 'comingSoon' && (
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+                <p className="text-lg font-bold">
+                  Card checkout is coming soon
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Paid tickets aren&rsquo;t available on this page yet.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setStep('contact')}
+                  className="mt-2 text-sm font-semibold text-primary"
+                >
+                  Back
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );

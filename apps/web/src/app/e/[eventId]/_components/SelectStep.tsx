@@ -16,32 +16,36 @@ function Stepper({
   onChange: (delta: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
-      {/* Minus + count are hidden until the first ticket is added, then slide in. */}
-      {value > 0 && (
-        <div className="flex items-center gap-1 duration-200 animate-in fade-in slide-in-from-right-2">
-          <button
-            type="button"
-            aria-label="Remove one"
-            onClick={() => onChange(-1)}
-            className="grid h-8 w-8 place-items-center rounded-full text-foreground transition-colors hover:bg-muted"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <span className="w-6 text-center text-sm font-bold tabular-nums">
-            {value}
-          </span>
-        </div>
-      )}
-      <button
-        type="button"
-        aria-label="Add one"
-        disabled={value >= max}
-        onClick={() => onChange(1)}
-        className="grid h-8 w-8 place-items-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
-      >
-        <Plus className="h-4 w-4" />
-      </button>
+    // Fixed-width slot, right-aligned: the pill grows leftward into reserved
+    // space, so opening it never reflows the ticket's title/price.
+    <div className="flex w-24 justify-end">
+      <div className="flex items-center gap-0.5 rounded-full border border-border bg-card p-0.5">
+        {/* Minus + count are hidden until the first ticket is added, then slide in. */}
+        {value > 0 && (
+          <div className="flex items-center gap-0.5 duration-500 ease-[cubic-bezier(.34,1.56,.64,1)] animate-in fade-in slide-in-from-right-4">
+            <button
+              type="button"
+              aria-label="Remove one"
+              onClick={() => onChange(-1)}
+              className="grid h-7 w-7 place-items-center rounded-full text-foreground transition-colors hover:bg-muted"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="flex w-6 items-center justify-center text-sm font-bold leading-none tabular-nums">
+              {value}
+            </span>
+          </div>
+        )}
+        <button
+          type="button"
+          aria-label="Add one"
+          disabled={value >= max}
+          onClick={() => onChange(1)}
+          className="grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
