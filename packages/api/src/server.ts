@@ -8,7 +8,9 @@
 
 export {
   reserve,
+  createReservation,
   confirm,
+  completeFree,
   release,
   expire,
   type ReserveInput,
@@ -20,6 +22,7 @@ export {
 } from './services/reservations';
 
 export { getCheckoutConfig, applyCode } from './services/checkout';
+export { getEventDetail } from './services/events';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
 export { NotFoundError } from './services/_shared/errors';
 

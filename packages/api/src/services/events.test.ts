@@ -1,0 +1,148 @@
+/**
+ * Unit tests for the public event-page read. Pure over an injected `prisma`
+ * (a hand-rolled fake returning canned rows) — no Postgres (ADR 0010). Asserts
+ * the tier shaping (price/fees, priceCents-with-legacy-fallback, maxAllowedToAdd
+ * clamp), the "From $X" derivation, the empty case, and not-found.
+ */
+import { describe, expect, it } from 'vitest';
+import type { PrismaClient } from '@troptix/db';
+import { getEventDetail } from './events';
+import { NotFoundError } from './_shared/errors';
+
+const PAST = new Date(Date.now() - 86_400_000);
+const FUTURE = new Date(Date.now() + 86_400_000);
+
+type TierRow = {
+  id: string;
+  name: string;
+  description: string;
+  priceCents: number | null;
+  price: number;
+  ticketingFees: 'PASS_TICKET_FEES' | 'ABSORB_TICKET_FEES';
+  capacity: number | null;
+  quantity: number;
+  reserved: number;
+  sold: number;
+  maxPurchasePerUser: number;
+  saleStartsAt: Date | null;
+  saleStartDate: Date;
+  saleEndsAt: Date | null;
+  saleEndDate: Date;
+};
+
+function tier(overrides: Partial<TierRow> = {}): TierRow {
+  return {
+    id: 'tt-1',
+    name: 'General Admission',
+    description: 'GA',
+    priceCents: 2500,
+    price: 25,
+    ticketingFees: 'ABSORB_TICKET_FEES',
+    capacity: 100,
+    quantity: 100,
+    reserved: 0,
+    sold: 0,
+    maxPurchasePerUser: 10,
+    saleStartsAt: null,
+    saleStartDate: PAST,
+    saleEndsAt: null,
+    saleEndDate: FUTURE,
+    ...overrides,
+  };
+}
+
+function fakeEvent(overrides: { ticketTypes?: TierRow[] } = {}) {
+  return {
+    id: 'ev-1',
+    name: 'Rum Punch Brunch',
+    description: 'Bottomless rum punch',
+    summary: 'Island brunch',
+    imageUrl: 'flyer.jpg',
+    isDraft: false,
+    organizer: 'Island Brunch Co.',
+    organizerUserId: 'user-1',
+    startDate: new Date('2026-07-01T18:00:00.000Z'),
+    endDate: new Date('2026-07-01T22:00:00.000Z'),
+    venue: "Omar's Kitchen",
+    address: '171 Ludlow St, New York, NY',
+    latitude: 40.72,
+    longitude: -73.98,
+    ticketTypes: overrides.ticketTypes ?? [],
+  };
+}
+
+function fakePrisma(event: ReturnType<typeof fakeEvent> | null): PrismaClient {
+  return {
+    events: { findUnique: async () => event },
+  } as unknown as PrismaClient;
+}
+
+describe('getEventDetail', () => {
+  it('derives fromPriceCents from the cheapest tier (priceCents)', async () => {
+    const prisma = fakePrisma(
+      fakeEvent({
+        ticketTypes: [
+          tier({ id: 'a', priceCents: 6000, price: 60 }),
+          tier({ id: 'b', priceCents: 2500, price: 25 }),
+          tier({ id: 'c', priceCents: 4000, price: 40 }),
+        ],
+      })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.fromPriceCents).toBe(2500);
+    expect(result.tickets).toHaveLength(3);
+    // Sorted by ascending price (all available).
+    expect(result.tickets.map((t) => t.priceCents)).toEqual([2500, 4000, 6000]);
+  });
+
+  it('falls back to legacy price*100 when priceCents is null (pre-backfill)', async () => {
+    const prisma = fakePrisma(
+      fakeEvent({
+        ticketTypes: [
+          tier({ id: 'a', priceCents: null, price: 25 }),
+          tier({ id: 'b', priceCents: null, price: 40 }),
+        ],
+      })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.fromPriceCents).toBe(2500);
+  });
+
+  it('returns empty tickets and null fromPriceCents when there are no public tiers', async () => {
+    const prisma = fakePrisma(fakeEvent({ ticketTypes: [] }));
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.tickets).toEqual([]);
+    expect(result.fromPriceCents).toBeNull();
+  });
+
+  it('clamps maxAllowedToAdd to availability and sorts sold-out tiers last', async () => {
+    const prisma = fakePrisma(
+      fakeEvent({
+        ticketTypes: [
+          tier({ id: 'soldout', priceCents: 1000, capacity: 5, sold: 5 }),
+          tier({ id: 'open', priceCents: 5000, capacity: 5, sold: 2 }),
+        ],
+      })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    const byId = Object.fromEntries(result.tickets.map((t) => [t.id, t]));
+    expect(byId.soldout.maxAllowedToAdd).toBe(0);
+    expect(byId.open.maxAllowedToAdd).toBe(3); // min(availability 3, max-per-user 10)
+    // Available tier comes first despite being pricier.
+    expect(result.tickets[0].id).toBe('open');
+  });
+
+  it('serializes dates to ISO strings', async () => {
+    const prisma = fakePrisma(fakeEvent());
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.startDate).toBe('2026-07-01T18:00:00.000Z');
+    expect(result.endDate).toBe('2026-07-01T22:00:00.000Z');
+  });
+
+  it('throws NotFoundError when the event does not exist', async () => {
+    const prisma = fakePrisma(null);
+    await expect(
+      getEventDetail(prisma, { eventId: 'missing' })
+    ).rejects.toThrow(NotFoundError);
+  });
+});

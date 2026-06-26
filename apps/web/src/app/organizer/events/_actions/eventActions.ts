@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { generateId } from '@/lib/utils';
+import { reservationColumns } from '@/lib/reservationColumns';
 import { eventFormSchema, EventFormValues } from '@/lib/schemas/eventSchema';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
@@ -77,6 +78,8 @@ export async function createEvent(
                 saleEndDate: ticket.saleEndDate,
                 ticketingFees: ticket.ticketingFees,
                 ticketType: ticketTypeEnum,
+                // Reservation-era columns the new checkout reads.
+                ...reservationColumns(ticket),
               },
             });
           })

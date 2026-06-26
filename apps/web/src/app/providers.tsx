@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { httpBatchLink } from '@trpc/client';
+import { trpc } from '@/lib/trpc';
 import { usePathname } from 'next/navigation';
 import { ConfigProvider } from 'antd';
 import { MotionConfig } from 'motion/react';
@@ -17,14 +19,19 @@ const queryClient = new QueryClient();
 function GlobalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isOrganizer = pathname?.startsWith('/organizer');
+  // The new event page owns the full screen (immersive hero, in-page back/share).
+  const isImmersive = pathname?.startsWith('/e/');
+  const chrome = !isOrganizer && !isImmersive;
 
   return (
     <div>
-      <UnifiedHeader />
-      <div className={`flex-grow border-x ${!isOrganizer ? 'mt-16' : ''}`}>
+      {/* Header shows everywhere except the immersive event page; the rest of
+          the chrome (top offset + footer) stays as it was for organizer pages. */}
+      {!isImmersive && <UnifiedHeader />}
+      <div className={`flex-grow border-x ${chrome ? 'mt-16' : ''}`}>
         {children}
       </div>
-      {isOrganizer ? null : <Footer />}
+      {chrome ? <Footer /> : null}
     </div>
   );
 }
@@ -45,6 +52,10 @@ function PostHogProvider({ children }: { children: React.ReactNode }) {
 }
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  const [trpcClient] = useState(() =>
+    trpc.createClient({ links: [httpBatchLink({ url: '/api/trpc' })] })
+  );
+
   return (
     <ConfigProvider
       theme={{
@@ -55,13 +66,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     >
       <PostHogProvider>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            {/* Honor the OS "Reduce Motion" setting app-wide: disables
-                transform/layout animations while keeping opacity fades. */}
-            <MotionConfig reducedMotion="user">
-              <GlobalLayout>{children}</GlobalLayout>
-            </MotionConfig>
-          </AuthProvider>
+          <trpc.Provider client={trpcClient} queryClient={queryClient}>
+            <AuthProvider>
+              {/* Honor the OS "Reduce Motion" setting app-wide: disables
+                  transform/layout animations while keeping opacity fades. */}
+              <MotionConfig reducedMotion="user">
+                <GlobalLayout>{children}</GlobalLayout>
+              </MotionConfig>
+            </AuthProvider>
+          </trpc.Provider>
         </QueryClientProvider>
       </PostHogProvider>
     </ConfigProvider>

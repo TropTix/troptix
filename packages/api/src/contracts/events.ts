@@ -1,0 +1,51 @@
+import { z } from 'zod';
+
+// --- EventDetail --------------------------------------------------------------
+// The public event-page DTO: event meta + a server-computed "From $X" price.
+// Client-safe by construction — no ticket rows, no discount codes, no gated-tier
+// data ever reaches the browser; the cheapest public price is pre-derived here.
+
+export const eventDetailInputSchema = z.object({
+  eventId: z.string().min(1),
+});
+export type EventDetailInput = z.infer<typeof eventDetailInputSchema>;
+
+// A public ticket tier, shaped for the event page's selection sheet. No
+// discount codes or raw inventory counts — `maxAllowedToAdd` (0 when sold out /
+// off-sale / draft) is all the client needs.
+export const eventTicketSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  /** Integer cents (priceCents, legacy price*100 fallback). */
+  priceCents: z.number().int(),
+  /** Per-ticket fee in integer cents (0 when the organizer absorbs fees). */
+  feesCents: z.number().int(),
+  /** Quantity the buyer may add now — clamped to availability, max-per-user, sale window, draft. */
+  maxAllowedToAdd: z.number().int(),
+});
+export type EventTicket = z.infer<typeof eventTicketSchema>;
+
+export const eventDetailSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  summary: z.string().nullable(),
+  /** Stored flyer path (resolved to an absolute URL by the web layer). */
+  imageUrl: z.string().nullable(),
+  isDraft: z.boolean(),
+  organizer: z.string(),
+  /** The owning user — used by the page's draft-visibility guard. */
+  organizerUserId: z.string(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  venue: z.string().nullable(),
+  address: z.string(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  /** Cheapest public tier, integer cents. Null = no public tiers. */
+  fromPriceCents: z.number().int().nullable(),
+  /** Public (non-code-gated) tiers, available first then by price. */
+  tickets: z.array(eventTicketSchema),
+});
+export type EventDetail = z.infer<typeof eventDetailSchema>;

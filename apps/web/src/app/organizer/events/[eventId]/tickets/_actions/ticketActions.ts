@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { generateId } from '@/lib/utils';
+import { reservationColumns } from '@/lib/reservationColumns';
 import {
   TicketTypeFormValues,
   ticketTypeSchema,
@@ -59,6 +60,8 @@ export async function createTicketType(
         ticketingFees: data.ticketingFees,
         ticketType: ticketTypeEnum,
         discountCode: data.discountCode || null,
+        // Reservation-era columns the new checkout reads.
+        ...reservationColumns(data),
       },
     });
     console.log('Ticket type created:', data);
@@ -110,6 +113,8 @@ export async function updateTicketType(
         ticketingFees: data.ticketingFees,
         ticketType: ticketTypeEnum,
         discountCode: data.discountCode || null,
+        // Keep the reservation-era columns in sync (see create).
+        ...reservationColumns(data),
       },
       select: { eventId: true },
     });
