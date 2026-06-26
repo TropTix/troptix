@@ -113,9 +113,6 @@ async function updateOrderAfterPaymentSucceeds(
         stripePaymentId: paymentIntentId,
       },
       data: updateSuccessfulOrder(paymentMethod),
-      include: {
-        tickets: true,
-      },
     });
 
     const order = await prisma.orders.findUnique({
