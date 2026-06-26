@@ -275,9 +275,9 @@ export interface ConfirmResult {
 
 /**
  * Materialize a paid (or free) order from a held reservation, atomically:
- * move `reserved → sold`, create the Order + one Ticket per unit (VALID), mark
- * the reservation CONVERTED, and enqueue the confirmation email in the outbox
- * (sent after commit — never inside this transaction).
+ * move `reserved → sold`, create the Order + one Ticket per unit (VALID), and
+ * mark the reservation CONVERTED. The confirmation email is sent by the caller
+ * after commit (never inside this transaction).
  *
  * Idempotent: Stripe delivers webhooks at-least-once, so a second call for an
  * already-CONVERTED reservation is a no-op returning the existing order id.
@@ -367,14 +367,6 @@ async function materializeOrder(
   await tx.reservation.update({
     where: { id: reservation.id },
     data: { status: ReservationStatus.CONVERTED, orderId },
-  });
-
-  await tx.outboxMessage.create({
-    data: {
-      id: generateId(),
-      type: 'order_confirmation',
-      payload: { orderId },
-    },
   });
 
   return orderId;

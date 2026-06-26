@@ -97,10 +97,17 @@ export default function CheckoutSheet({
         setLocalError('Sorry — these tickets just sold out.');
         return;
       }
-      await completeFree.mutateAsync({
+      const order = await completeFree.mutateAsync({
         reservationId: reservation.reservationId,
       });
       setStep('success');
+      // Send the confirmation email. Fire-and-forget — delivery is idempotent
+      // server-side and the success screen shouldn't block on it.
+      void fetch('/api/checkout/confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.orderId }),
+      }).catch(() => {});
     } catch {
       // tRPC errors surface via the mutation errors below. Hand the hold back
       // so a failed commit doesn't leak inventory (no-op server-side if it

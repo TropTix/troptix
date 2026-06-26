@@ -26,7 +26,6 @@ import {
 } from './reservations';
 
 const TEST_EVENT_ID = `test-evt-${generateId()}`;
-const createdOrderIds: string[] = [];
 
 beforeAll(async () => {
   await prisma.events.create({
@@ -46,15 +45,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // FK-safe teardown, scoped to the test event.
-  if (createdOrderIds.length > 0) {
-    await prisma.outboxMessage.deleteMany({
-      where: {
-        OR: createdOrderIds.map((id) => ({
-          payload: { path: ['orderId'], equals: id },
-        })),
-      },
-    });
-  }
   await prisma.tickets.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.orders.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.reservation.deleteMany({ where: { eventId: TEST_EVENT_ID } }); // items cascade
@@ -173,7 +163,6 @@ describe('confirm — atomic + idempotent', () => {
       cardType: 'visa',
       cardLast4: '4242',
     });
-    createdOrderIds.push(first.orderId);
     expect(first.alreadyProcessed).toBe(false);
 
     const second = await confirm(prisma, { paymentIntentId });
@@ -332,7 +321,6 @@ describe('completeFree', () => {
     const done = await completeFree(prisma, {
       reservationId: res.reservationId,
     });
-    createdOrderIds.push(done.orderId);
     expect(done.tickets).toHaveLength(2);
 
     const ttAfter = await prisma.ticketTypes.findUnique({
