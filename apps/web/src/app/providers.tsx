@@ -2,15 +2,13 @@
 
 import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ErrorBoundary } from 'react-error-boundary';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { ConfigProvider } from 'antd';
 import { MotionConfig } from 'motion/react';
 import posthog from 'posthog-js';
 import { PostHogProvider as PHProvider } from 'posthog-js/react';
 
 import AuthProvider from '@/components/AuthProvider';
-import { ErrorFallback } from '@/components/utils/ErrorFallback';
 import UnifiedHeader from '@/components/ui/unified-header';
 import Footer from '@/components/ui/footer';
 
@@ -47,8 +45,6 @@ function PostHogProvider({ children }: { children: React.ReactNode }) {
 }
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-
   return (
     <ConfigProvider
       theme={{
@@ -57,24 +53,17 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      <ErrorBoundary
-        FallbackComponent={ErrorFallback}
-        onReset={() => {
-          router.push('/');
-        }}
-      >
-        <PostHogProvider>
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              {/* Honor the OS "Reduce Motion" setting app-wide: disables
-                  transform/layout animations while keeping opacity fades. */}
-              <MotionConfig reducedMotion="user">
-                <GlobalLayout>{children}</GlobalLayout>
-              </MotionConfig>
-            </AuthProvider>
-          </QueryClientProvider>
-        </PostHogProvider>
-      </ErrorBoundary>
+      <PostHogProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            {/* Honor the OS "Reduce Motion" setting app-wide: disables
+                transform/layout animations while keeping opacity fades. */}
+            <MotionConfig reducedMotion="user">
+              <GlobalLayout>{children}</GlobalLayout>
+            </MotionConfig>
+          </AuthProvider>
+        </QueryClientProvider>
+      </PostHogProvider>
     </ConfigProvider>
   );
 }
