@@ -1,22 +1,16 @@
-import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { extractOrganizer } from '@/server/organizerAuth';
 import prisma from '@/server/prisma';
 import { TicketStatus } from '@troptix/db';
-import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function PUT(request: NextRequest) {
   // 1. Authenticate the user
-  const headersList = await headers();
-  const authorization = headersList.get('authorization');
-  const token = authorization?.split(' ')[1];
+  const auth = await extractOrganizer();
 
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const organizerId = await getUserFromIdTokenCookie(token);
-  if (!organizerId) {
-    return NextResponse.json({ error: 'Invalid token' }, { status: 403 });
+  if (!auth.ok) {
+    return auth.failure === 'missing-token'
+      ? NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      : NextResponse.json({ error: 'Invalid token' }, { status: 403 });
   }
 
   // 2. Get and validate the request body

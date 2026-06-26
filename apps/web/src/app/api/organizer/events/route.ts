@@ -1,32 +1,29 @@
 import { isPlatformOwner } from '@/server/accessControl';
-import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { extractOrganizer } from '@/server/organizerAuth';
 import prisma from '@/server/prisma';
-import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
-  const headersList = await headers();
-  const authorization = headersList.get('authorization');
+  const auth = await extractOrganizer();
 
-  if (!authorization || !authorization.startsWith('Bearer ')) {
-    return NextResponse.json(
-      { error: 'Authorization header is missing or invalid' },
-      { status: 401 }
-    );
+  if (!auth.ok) {
+    return auth.failure === 'missing-token'
+      ? NextResponse.json(
+          { error: 'Authorization header is missing or invalid' },
+          { status: 401 }
+        )
+      : NextResponse.json(
+          { error: 'Invalid token or user not found' },
+          { status: 403 }
+        );
   }
 
-  const token = authorization.split(' ')[1];
-  const organizerId = await getUserFromIdTokenCookie(token);
-
-  if (!organizerId) {
-    return NextResponse.json(
-      { error: 'Invalid token or user not found' },
-      { status: 403 }
-    );
-  }
+  const organizerId = auth.user;
 
   try {
-    const whereClause = isPlatformOwner(organizerId.email) ? {} : { organizerUserId: organizerId.uid };
+    const whereClause = isPlatformOwner(organizerId.email)
+      ? {}
+      : { organizerUserId: organizerId.uid };
 
     const events = await prisma.events.findMany({
       select: {
