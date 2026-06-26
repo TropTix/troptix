@@ -1,6 +1,9 @@
 import prisma from '@/server/prisma';
 import { Prisma } from '@troptix/db';
-import { buildOrderConfirmation } from '@troptix/transactional';
+import {
+  buildOrderConfirmation,
+  type EmailAttachment,
+} from '@troptix/transactional';
 import { getAppBaseUrl } from '@/lib/appUrl';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
 import { Resend } from 'resend';
@@ -11,7 +14,8 @@ async function sendEmail(
   to: string,
   subject: string,
   html: string,
-  orderId: string
+  orderId: string,
+  attachments: EmailAttachment[] = []
 ) {
   const { data, error } = await resend.emails.send(
     {
@@ -19,6 +23,11 @@ async function sendEmail(
       to,
       subject,
       html,
+      attachments: attachments.map((attachment) => ({
+        filename: attachment.filename,
+        content: Buffer.from(attachment.content, 'utf-8'),
+        contentType: attachment.contentType,
+      })),
     },
     { idempotencyKey: `confirmation-${orderId}` }
   );
@@ -51,14 +60,14 @@ export async function sendEmailConfirmationEmailToUser(orderId: string) {
       imageUrl: eventFlyerUrl(orderDetails.event.imageUrl),
     },
   };
-  const { subject, html } = await buildOrderConfirmation(order, {
+  const { subject, html, attachments } = await buildOrderConfirmation(order, {
     baseUrl: getAppBaseUrl(),
   });
 
   // A failed confirmation email must never break the order — the Stripe webhook
   // re-throws, and Stripe would retry and re-process an already-complete order.
   try {
-    await sendEmail(orderDetails.email, subject, html, orderId);
+    await sendEmail(orderDetails.email, subject, html, orderId, attachments);
   } catch (error) {
     console.error('Failed to send order confirmation email:', error);
   }

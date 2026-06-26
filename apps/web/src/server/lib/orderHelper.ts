@@ -1,13 +1,16 @@
 import { OrderStatus, Prisma, TicketStatus, TicketType } from '@troptix/db';
 import { buffer } from 'micro';
+import Stripe from 'stripe';
 
-export function updateSuccessfulOrder(paymentMethod) {
+export function updateSuccessfulOrder(
+  paymentMethod: Stripe.PaymentMethod | null
+) {
   let orderUpdate: Prisma.OrdersUpdateInput;
 
   orderUpdate = {
     status: OrderStatus.COMPLETED,
-    cardType: paymentMethod.card.brand,
-    cardLast4: paymentMethod.card.last4,
+    cardType: paymentMethod?.card?.brand ?? null,
+    cardLast4: paymentMethod?.card?.last4 ?? null,
     tickets: {
       updateMany: {
         where: {
