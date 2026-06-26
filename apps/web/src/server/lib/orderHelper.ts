@@ -1,5 +1,4 @@
 import { OrderStatus, Prisma, TicketStatus, TicketType } from '@troptix/db';
-import { buffer } from 'micro';
 import Stripe from 'stripe';
 
 export function updateSuccessfulOrder(
