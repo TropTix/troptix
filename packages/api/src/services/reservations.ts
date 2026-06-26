@@ -464,20 +464,13 @@ export async function completeFree(
     return materializeOrder(tx, reservation);
   });
 
-  const [tickets, order] = await Promise.all([
-    prisma.tickets.findMany({
-      where: { orderId },
-      select: { id: true, ticketType: { select: { name: true } } },
-    }),
-    prisma.orders.findUnique({
-      where: { id: orderId },
-      select: { email: true },
-    }),
-  ]);
+  const tickets = await prisma.tickets.findMany({
+    where: { orderId },
+    select: { id: true, ticketType: { select: { name: true } } },
+  });
 
   return {
     orderId,
-    email: order?.email ?? null,
     tickets: tickets.map((t) => ({
       id: t.id,
       ticketTypeName: t.ticketType?.name ?? null,

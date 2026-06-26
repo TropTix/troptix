@@ -333,7 +333,6 @@ describe('completeFree', () => {
       reservationId: res.reservationId,
     });
     createdOrderIds.push(done.orderId);
-    expect(done.email).toBe('free@example.com');
     expect(done.tickets).toHaveLength(2);
 
     const ttAfter = await prisma.ticketTypes.findUnique({

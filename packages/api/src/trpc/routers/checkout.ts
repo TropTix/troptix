@@ -6,9 +6,14 @@ import {
 import {
   createReservationInputSchema,
   completeFreeInputSchema,
+  releaseInputSchema,
 } from '../../contracts/reservations';
 import { applyCode, getCheckoutConfig } from '../../services/checkout';
-import { createReservation, completeFree } from '../../services/reservations';
+import {
+  createReservation,
+  completeFree,
+  release,
+} from '../../services/reservations';
 
 /**
  * Checkout procedures — thin pass-throughs to the services. Reads are public
@@ -38,4 +43,10 @@ export const checkoutRouter = router({
   completeFree: publicProcedure
     .input(completeFreeInputSchema)
     .mutation(({ ctx, input }) => completeFree(ctx.prisma, input)),
+
+  // Hand a held reservation's inventory back (e.g. the buyer abandons or the
+  // commit fails after the hold was taken).
+  release: publicProcedure
+    .input(releaseInputSchema)
+    .mutation(({ ctx, input }) => release(ctx.prisma, input.reservationId)),
 });

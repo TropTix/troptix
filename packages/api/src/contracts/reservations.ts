@@ -50,9 +50,13 @@ export const completeFreeInputSchema = z.object({
 });
 export type CompleteFreeInput = z.infer<typeof completeFreeInputSchema>;
 
+export const releaseInputSchema = z.object({
+  reservationId: z.string().min(1),
+});
+export type ReleaseInput = z.infer<typeof releaseInputSchema>;
+
 export const completeFreeResponseSchema = z.object({
   orderId: z.string(),
-  email: z.string().nullable(),
   tickets: z.array(
     z.object({ id: z.string(), ticketTypeName: z.string().nullable() })
   ),
