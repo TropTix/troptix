@@ -1,4 +1,4 @@
-'use client'; // Error components must be Client Components
+'use client';
 
 import { useEffect } from 'react';
 import posthog from 'posthog-js';
@@ -10,17 +10,17 @@ interface ErrorProps {
   reset: () => void;
 }
 
-/** Segment-scoped error boundary for the organizer dashboard. */
+/**
+ * Root error boundary for the App Router. Catches render errors thrown by any
+ * page below the root layout and renders inside it, so the header and footer
+ * stay in place. Errors in the root layout / providers themselves fall through
+ * to `app/global-error.tsx`.
+ */
 export default function Error({ error, reset }: ErrorProps) {
   useEffect(() => {
     posthog.captureException(error);
     console.error(error);
   }, [error]);
 
-  return (
-    <ErrorDisplay
-      message="Something went wrong in the organizer section."
-      onReset={reset}
-    />
-  );
+  return <ErrorDisplay onReset={reset} />;
 }
