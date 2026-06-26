@@ -36,13 +36,27 @@ untouched, so it's safe to merge as WIP):
   floating back/share, date chip, scrim) + **desktop two-column** (sticky poster aside with a
   flyer-sampled colour halo); title / tagline / date+location meta / About / Location / Hosted-by;
   sticky **Get Tickets / RSVP** bar.
-- **Selection sheet** (`TicketSelectionSheet.tsx`) — shadcn `Sheet` (bottom), steppers, running
-  total, free/paid CTA. **Stops at a stubbed commit** (the seam).
 - **Immersive shell** — the global header/footer are hidden on `/e/` routes (the page owns the
   screen; in-page back/share replace the app nav).
+- **Checkout flow (Free RSVP, end to end)** — `CheckoutSheet` (full-screen, shadcn `Sheet`)
+  orchestrates **select → contact → confirmation**: `SelectStep` (steppers collapse to a `+`,
+  running total), `ContactStep` (react-hook-form + `zodResolver`, prefilled from `useAuth`),
+  `SuccessTicket` (the **shareable confirmation** — poster card + Share, with the private QR pass
+  behind "View ticket & QR" → links to `/orders/[orderId]/tickets`). Free events reserve +
+  confirm here; paid stops at a "coming soon" note (Stripe is the next slice).
+- **Reservation backend** — `createReservation` (server-side pricing authority: derives
+  price/fees, clamps, reserves), `completeFree` (free-path materialize by reservationId; `confirm`
+  refactored to share `materializeOrder`), and `release`; all as public `checkout.*` tRPC
+  procedures. Stood up the **tRPC React client** (`lib/trpc.ts` + provider). Fake-prisma unit
+  tests + integration tests.
+- **Organizer dual-write** — ticket create/update now populate the reservation-era columns
+  (`capacity`/`priceCents`/`saleStartsAt`/`saleEndsAt`) via a shared `reservationColumns` helper,
+  so new/edited events work with `reserve()`. Existing events need a one-time backfill (run
+  manually via SQL; not in the repo).
 
-**Not yet built:** the commit wiring (`createReservation` → reservation/payment), the venue map,
-and the carried-over UTM/email tracking — see [Open follow-ups](#open-follow-ups).
+**Not yet built:** paid checkout (Stripe Payment Element), the URL-addressable reservation route +
+countdown, webhook fulfillment, and the carried-over UTM/email tracking — see
+[Open follow-ups](#open-follow-ups).
 
 ## Relationship to PRD #348
 
@@ -97,29 +111,39 @@ fallbacks (`price`, `quantity`, split sale dates) until the Stage-3 backfill.
 
 Under `apps/web/src/app/e/[eventId]/` and `packages/api`:
 
-| File                                   | Role                                                                                                                                             |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `page.tsx`                             | server component: `cache()`-deduped `getEventDetail`, draft guard, metadata                                                                      |
-| `_components/EventPageClean.tsx`       | the page UI — mobile hero + desktop two-column, share, accent halo, sticky bar, sheet wiring (Phase-1 scaffold; Hero/BuyBar extraction deferred) |
-| `_components/TicketSelectionSheet.tsx` | shadcn `Sheet` selection: steppers, total, commit seam                                                                                           |
-| `loading.tsx` / `not-found.tsx`        | skeleton mirroring the layout / 404                                                                                                              |
-| `packages/api/src/services/events.ts`  | `getEventDetail` (+ unit tests)                                                                                                                  |
-| `packages/api/src/contracts/events.ts` | `EventDetail` / `EventTicket` zod contracts                                                                                                      |
-| `apps/web/src/app/providers.tsx`       | hide header/footer on `/e/` (immersive) — header otherwise unchanged                                                                             |
+| File                                                  | Role                                                                                                            |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `page.tsx`                                            | server component: `cache()`-deduped `getEventDetail`, draft guard, metadata                                     |
+| `_components/EventPageClean.tsx`                      | the page UI — mobile hero + desktop two-column, share, accent halo, sticky bar                                  |
+| `_components/CheckoutSheet.tsx`                       | checkout orchestrator: step machine (select/contact/comingSoon/success), the tRPC mutations, release-on-failure |
+| `_components/SelectStep.tsx`                          | tier list + collapsible steppers + running total                                                                |
+| `_components/ContactStep.tsx`                         | react-hook-form + `zodResolver` over the shared contact schema; `useAuth` prefill                               |
+| `_components/SuccessTicket.tsx`                       | shareable confirmation (poster card + Share) + private QR pass overlay                                          |
+| `loading.tsx` / `not-found.tsx`                       | skeleton mirroring the layout / 404                                                                             |
+| `apps/web/src/lib/trpc.ts` + `providers.tsx`          | tRPC React client + provider (reuses the app QueryClient); `/e/` immersive header/footer hiding                 |
+| `apps/web/src/lib/reservationColumns.ts`              | maps legacy ticket fields → reservation-era columns (organizer create/update)                                   |
+| `packages/api/src/services/events.ts`                 | `getEventDetail` (+ unit tests)                                                                                 |
+| `packages/api/src/services/reservations.ts`           | `createReservation` / `completeFree` / `release` (+ `materializeOrder` shared with `confirm`)                   |
+| `packages/api/src/contracts/{events,reservations}.ts` | `EventDetail`/`EventTicket` + reservation/commit zod contracts                                                  |
+| `packages/api/src/trpc/routers/checkout.ts`           | `createReservation` / `completeFree` / `release` public procedures                                              |
 
-Reuses: shadcn `Sheet`/`Banner`/`Skeleton`, `useCopyToClipboard`, `eventFlyerUrl`,
-`getFormattedCurrency`, the date formatters.
+Reuses: shadcn `Sheet`/`Banner`/`Skeleton`/`Form`/`Input`, `useCopyToClipboard`, `qrcode.react`,
+`eventFlyerUrl`, `getFormattedCurrency`, the date formatters, `calculateFeesCents`, the reservation
+primitives (`reserve`/`confirm`/`release`).
 
 ## The flow / seam
 
 ```
 /e/[eventId]  (immersive page)
-  buy bar "Get Tickets" / "RSVP"  → open TicketSelectionSheet (tiers + steppers + total)
-     "Continue" / "Complete RSVP" → onCommit(selection)   ← SEAM (stubbed today)
-        next slices: createReservation → reservation route → payment / RSVP confirm
+  buy bar "Get Tickets" / "RSVP"  → open CheckoutSheet
+     select tiers → contact (prefilled if logged in) → commit:
+        free  → createReservation → completeFree → shareable confirmation (QR behind "View ticket")
+        paid  → "coming soon"  ← SEAM (createReservation + PaymentIntent + Payment Element next)
 ```
 
-`onCommit` is the single integration point with the rest of Stage 3.
+Free is wired end to end; the paid branch is the remaining seam into Stage 3. Free-vs-paid is
+decided by the **selected total**, not the event's cheapest tier (mixed free+paid events). If a
+commit fails after the hold, the client `release()`s it so inventory isn't leaked.
 
 ## Rollout (parallel route → coordinated cutover)
 
@@ -133,9 +157,9 @@ latter to keep existing links / email UTM / SEO. Cleanup deletes `EventDetails.t
 ## Remaining slices
 
 1. ✅ Route + `getEventDetail` data layer.
-2. ✅ Page UI (mobile hero + desktop two-column, clean light) + selection sheet (stubbed commit).
-3. **Free RSVP end-to-end** — `createReservation` (free) → `completeFree` → confirmation
-   (needs the tRPC React client + first new procedures; no Stripe).
+2. ✅ Page UI (mobile hero + desktop two-column, clean light) + selection sheet.
+3. ✅ **Free RSVP end-to-end** — tRPC client + `createReservation`/`completeFree`/`release`,
+   checkout flow (select → contact → shareable confirmation), organizer capacity dual-write.
 4. **Paid checkout** — `createReservation` + PaymentIntent + reservation route + Payment Element.
 5. **Fulfillment** — webhook → `confirm()`, confirmation/poll.
 6. **Coordinated cutover + cleanup.**
@@ -150,6 +174,17 @@ From the `/code-review` pass and prior decisions (deferred, not blocking the WIP
   landings (the hero back button no-ops without history).
 - **"Get Tickets" with no tiers** — CTA is clickable and opens an empty sheet when an event has
   no public tickets.
+- **`createReservation` doesn't re-check sale window / draft** — `reserve()` only clamps
+  inventory; a crafted request could hold an off-sale or draft tier. Validate in the service.
+- **`wasAdjusted` is silent** — a partial grant proceeds without telling the buyer their quantity
+  was reduced (the "we reduced your order" confirm).
+- **Backfill existing events** — the reservation-era columns are only written for new/edited
+  ticket types; existing rows need the one-time backfill (`capacity = quantity`, etc.). Run via
+  SQL editor (kept out of the repo) or fold into the Stage-3 M4 migration.
+- **Apple Wallet pass** + the **story-image share** (1080×1920 card) — the confirmation's
+  share uses the native Web Share API with the event link for now; both are bigger features.
+- **Guest access to `/orders/[orderId]/tickets`** — confirm the order/tickets page allows
+  possession-based (guest) access, else guests can't open "View all tickets".
 - **Venue map** (Phase 2) and **persisted sheet selection** on reopen.
 - **`/e/` chrome-hide is a prefix match** — revisit (route groups) if a `/e/[id]/sub` route ever
   needs the header.
