@@ -16,15 +16,19 @@ import {
   Calendar,
   Home,
   LogOut,
+  Menu,
   PlusCircle,
   Shield,
   Ticket,
 } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useContext, useEffect, useState } from 'react';
 import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
+
+type NavLinkItem = { label: string; href: string; icon: LucideIcon };
 
 // Helper to check if the user is a platform owner
 // This is also checked on the backed
@@ -57,12 +61,18 @@ export default function UnifiedHeader() {
   const { user } = useContext(TropTixContext);
   const pathname = usePathname();
 
-  // Effect to handle scroll-based styling
+  // Scroll-based styling, throttled to one state update per frame.
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      setHasScrolled(window.scrollY > 10);
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        setHasScrolled(window.scrollY > 10);
+        ticking = false;
+      });
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Check on mount
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -75,8 +85,16 @@ export default function UnifiedHeader() {
   const isOrganizerRoute = pathname?.startsWith('/organizer');
   const userIsPlatformOwner = isPlatformOwner(user?.email);
 
+  // Active when the path matches exactly or sits under the link (e.g. an event
+  // detail page under /events). The home link only lights up on an exact match.
+  const isActive = (href: string): boolean => {
+    if (!pathname) return false;
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
   // Organizer-specific navigation, shown contextually
-  const organizerNavItems = [
+  const organizerNavItems: NavLinkItem[] = [
     { label: 'Dashboard', href: '/organizer', icon: Home },
     { label: 'My Events', href: '/organizer/events', icon: Calendar },
   ];
@@ -89,14 +107,83 @@ export default function UnifiedHeader() {
     });
   }
 
+  const patronNavItems: NavLinkItem[] = [
+    { label: 'Explore Events', href: '/events', icon: Calendar },
+    ...(user?.id
+      ? [{ label: 'Tickets', href: '/orders', icon: Ticket } as NavLinkItem]
+      : []),
+  ];
+
+  const navItems = isOrganizerRoute ? organizerNavItems : patronNavItems;
+
   const handleSignOut = async () => {
     await supabaseSignOut();
   };
 
+  // Inline links for the desktop bar — active route gets an underline + brand color.
+  const NavLink = ({ label, href, icon: Icon }: NavLinkItem) => (
+    <Link
+      href={href}
+      aria-current={isActive(href) ? 'page' : undefined}
+      className={cn(
+        'flex items-center gap-2 border-b-2 py-1 text-sm font-medium transition-colors',
+        isActive(href)
+          ? 'border-primary text-primary'
+          : 'border-transparent text-muted-foreground hover:text-primary'
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </Link>
+  );
+
+  // Mobile nav lives in a labelled menu so icon-only triggers stay accessible.
+  const MobileMenu = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {navItems.map((item) => (
+          <DropdownMenuItem asChild key={item.href}>
+            <Link
+              href={item.href}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+            >
+              <item.icon className="mr-2 h-4 w-4" />
+              {item.label}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        {!isOrganizerRoute && (
+          <DropdownMenuItem asChild>
+            <Link href="/organizer/events/new">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create Event
+            </Link>
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  // Account menu — identity + account-level shortcuts. Navigation lives in the
+  // bar (desktop) and the mobile menu, so it's intentionally not duplicated here.
   const UserMenu = () => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+        <Button
+          variant="ghost"
+          className="relative h-10 w-10 rounded-full"
+          aria-label="Open account menu"
+        >
           <Avatar className="h-10 w-10">
             <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
           </Avatar>
@@ -112,35 +199,18 @@ export default function UnifiedHeader() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {!isOrganizerRoute && (
-          <DropdownMenuItem asChild>
-            <Link href="/orders">
-              <Ticket className="mr-2 h-4 w-4" />
-              Tickets
-            </Link>
-          </DropdownMenuItem>
-        )}
-        {!isOrganizerRoute && (
-          <DropdownMenuItem asChild>
-            <Link href="/organizer">
-              <Home className="mr-2 h-4 w-4" />
-              Organizer Dashboard
-            </Link>
-          </DropdownMenuItem>
-        )}
-
-        <DropdownMenuItem asChild>
-          <Link href="/organizer/events/new">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Create Event
-          </Link>
-        </DropdownMenuItem>
-
-        {isOrganizerRoute && (
+        {isOrganizerRoute ? (
           <DropdownMenuItem asChild>
             <Link href="/">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Home
+            </Link>
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem asChild>
+            <Link href="/organizer">
+              <Home className="mr-2 h-4 w-4" />
+              Organizer Dashboard
             </Link>
           </DropdownMenuItem>
         )}
@@ -173,67 +243,45 @@ export default function UnifiedHeader() {
       <div className="container flex items-center justify-between h-16">
         <Link
           href={isOrganizerRoute && user?.isOrganizer ? '/organizer' : '/'}
-          className="flex flex-col items-center text-2xl font-bold text-primary leading-none"
+          className="flex flex-col text-2xl font-bold text-primary leading-none"
         >
-          <span className="block text-center">TropTix</span>
+          <span>TropTix</span>
           {isOrganizerRoute && (
-            <span className="text-xs text-muted-foreground leading-tight text-center">
+            <span className="text-xs text-muted-foreground leading-tight">
               Organizer
             </span>
           )}
         </Link>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <nav className="flex items-center gap-0.5 sm:gap-1">
-            {isOrganizerRoute ? (
-              organizerNavItems.map((item) => (
-                <Button
-                  variant={pathname === item.href ? 'secondary' : 'ghost'}
-                  className="p-2 md:px-3 md:py-1.5"
-                  asChild
-                  key={item.href}
-                >
-                  <Link href={item.href}>
-                    <item.icon className="h-5 w-5 md:h-4 md:w-4" />
-                    <span className="hidden md:inline ml-2 text-sm font-medium">
-                      {item.label}
-                    </span>
-                  </Link>
-                </Button>
-              ))
-            ) : (
-              <>
-                <Button variant="ghost" className="p-2 " asChild>
-                  <Link href="/events">
-                    <Calendar className="h-5 w-5" />
-                    <span className="hidden md:inline ml-2">
-                      Explore Events
-                    </span>
-                  </Link>
-                </Button>
-                {user && (
-                  <Button variant="ghost" className="p-2 " asChild>
-                    <Link href="/orders">
-                      <Ticket className="h-5 w-5" />
-                      <span className="hidden md:inline ml-2">Tickets</span>
-                    </Link>
-                  </Button>
-                )}
-              </>
-            )}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <nav className="hidden md:flex items-center gap-5">
+            {navItems.map((item) => (
+              <NavLink key={item.href} {...item} />
+            ))}
           </nav>
+
+          {!isOrganizerRoute && (
+            <Button
+              variant="outline"
+              className="hidden md:inline-flex border-primary/30 text-primary hover:bg-primary/5"
+              asChild
+            >
+              <Link href="/organizer/events/new">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create Event
+              </Link>
+            </Button>
+          )}
 
           {user?.id ? (
             <UserMenu />
           ) : (
-            <>
-              <Button variant="default" className="rounded-full" asChild>
-                <Link href="/auth/signin">
-                  <span className=" ml-0 w-full">Sign In</span>
-                </Link>
-              </Button>
-            </>
+            <Button variant="default" className="rounded-full" asChild>
+              <Link href="/auth/signin">Sign In</Link>
+            </Button>
           )}
+
+          <MobileMenu />
         </div>
       </div>
     </header>
