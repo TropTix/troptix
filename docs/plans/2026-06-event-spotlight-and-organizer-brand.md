@@ -2,7 +2,7 @@
 title: Event Spotlight & Organization Brand
 status: proposed
 created: 2026-06-30
-tracking-issue: TBD
+tracking-issue: 'TropTix/troptix#385'
 ---
 
 # Event Spotlight & Organization Brand
