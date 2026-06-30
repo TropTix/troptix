@@ -165,8 +165,10 @@ export async function updateEvent(
 
     revalidatePath('/organizer/events');
     revalidatePath(`/organizer/events/${eventId}`);
-    // TODO: revalidating the public event page if it exists, e.g.:
-    // revalidatePath(/events/${eventId})
+    // Public listing is ISR-cached (revalidate = 86400) — bust it on edit so
+    // organizer changes aren't stale for up to 24h.
+    revalidatePath('/events');
+    revalidatePath(`/events/${eventId}`);
 
     return { success: true, eventId: eventId };
   } catch (error) {
