@@ -159,8 +159,10 @@ export default function EventForm({
 
     let country = '';
     let countryCode = '';
-    let lat = 0;
-    let lng = 0;
+    // Null (not 0) when geometry is missing — 0,0 is the Gulf-of-Guinea "null
+    // island" that the map guard would otherwise center on.
+    let lat: number | null = null;
+    let lng: number | null = null;
 
     place.address_components?.forEach((component) => {
       if (component.types.includes('country')) {
@@ -184,7 +186,7 @@ export default function EventForm({
     form.setValue('countryCode', countryCode || undefined, {
       shouldDirty: true,
     });
-    form.setValue('latitude', lat, { shouldDirty: true }); // lat/lng can be null
+    form.setValue('latitude', lat, { shouldDirty: true }); // null when no geometry
     form.setValue('longitude', lng, { shouldDirty: true });
 
     if (place.name && place.name !== formattedAddress.split(',')[0]) {
