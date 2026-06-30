@@ -18,6 +18,7 @@ import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Banner } from '@/components/ui/banner';
 import type { EventDetail } from '@troptix/api';
 import CheckoutSheet from './CheckoutSheet';
+import VenueMap from './VenueMap';
 
 // Public event page (Luma-light). Immersive poster hero on mobile, two-column
 // on desktop. See docs/plans/2026-06-event-page-redesign.md.
@@ -287,7 +288,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                 <SectionHeader>Location</SectionHeader>
                 <p className="mt-4 font-semibold">{event.venue ?? 'Venue'}</p>
                 <p className="text-sm text-muted-foreground">{event.address}</p>
-                {/* TODO: venue map (Phase 2) */}
+                <VenueMap event={event} />
               </section>
 
               {/* Organizer shows in the aside on desktop; surface it here on mobile. */}
