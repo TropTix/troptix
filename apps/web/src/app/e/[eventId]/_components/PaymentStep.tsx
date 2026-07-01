@@ -62,10 +62,12 @@ function PaymentInner({
   const secondsLeft = useCountdown(softDeadline);
   const expired = secondsLeft <= 0;
 
-  // Once the hold lapses, kick the parent to the "start over" step.
+  // Once the hold lapses, kick the parent to the "start over" step — but never
+  // while a confirm() is in flight, or we'd tear down the UI mid-charge. If that
+  // confirm then fails, `submitting` clears and this re-runs to expire.
   useEffect(() => {
-    if (expired) onExpired();
-  }, [expired, onExpired]);
+    if (expired && !submitting) onExpired();
+  }, [expired, submitting, onExpired]);
 
   if (checkoutState.type === 'loading') {
     return (

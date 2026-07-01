@@ -80,23 +80,24 @@ export async function sendEmailConfirmationEmailToUser(orderId: string) {
  * webhook never double-sends. Never throws (fired from the webhook).
  */
 export async function sendRefundNoticeEmail(reservationId: string) {
-  const reservation = await prisma.reservation.findUnique({
-    where: { id: reservationId },
-    select: {
-      email: true,
-      firstName: true,
-      totalCents: true,
-      event: { select: { name: true } },
-    },
-  });
-  if (!reservation?.email) {
-    console.error(`[Refund] No email for reservation ${reservationId}`);
-    return;
-  }
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: {
+        email: true,
+        firstName: true,
+        totalCents: true,
+        event: { select: { name: true } },
+      },
+    });
+    if (!reservation?.email) {
+      console.error(`[Refund] No email for reservation ${reservationId}`);
+      return;
+    }
 
-  const eventName = reservation.event?.name ?? 'the event';
-  const amount = `$${(reservation.totalCents / 100).toFixed(2)}`;
-  const html = `
+    const eventName = reservation.event?.name ?? 'the event';
+    const amount = `$${(reservation.totalCents / 100).toFixed(2)}`;
+    const html = `
     <p>Hi ${reservation.firstName ?? 'there'},</p>
     <p>Unfortunately, tickets to <strong>${eventName}</strong> sold out while
     your payment was processing, so we&rsquo;ve refunded your ${amount} in full.</p>
@@ -104,7 +105,6 @@ export async function sendRefundNoticeEmail(reservationId: string) {
     charged for any tickets.</p>
     <p>— TropTix</p>`;
 
-  try {
     const { error } = await resend.emails.send(
       {
         from: 'TropTix <info@usetroptix.com>',

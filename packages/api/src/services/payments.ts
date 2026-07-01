@@ -76,6 +76,7 @@ export async function beginPayment(
   const extendedExpiresAt = new Date(Date.now() + HOLD_TTL_MINUTES * 60_000);
 
   // Reuse an existing open Session (refresh / resume / racing call).
+  let staleSessionId: string | null = null;
   if (reservation.stripeCheckoutSessionId) {
     const existing = await stripe.checkout.sessions.retrieve(
       reservation.stripeCheckoutSessionId
@@ -91,6 +92,10 @@ export async function beginPayment(
         totalCents: reservation.totalCents,
       };
     }
+    // Non-open (expired / complete): we must mint a fresh Session. Remember the
+    // dead id so the create below uses a distinct idempotency key — the fixed
+    // `checkout-<id>` key would make Stripe replay this dead Session instead.
+    staleSessionId = reservation.stripeCheckoutSessionId;
   }
 
   const tiers = await prisma.ticketTypes.findMany({
@@ -134,7 +139,13 @@ export async function beginPayment(
       expires_at: Math.floor(Date.now() / 1000) + 2 * 60 * 60,
       ...(reservation.email ? { customer_email: reservation.email } : {}),
     },
-    { idempotencyKey: `checkout-${reservation.id}` }
+    {
+      // Distinct-per-dead-session key on retry (stable for the same dead
+      // Session, so concurrent retries still dedupe); the fixed key otherwise.
+      idempotencyKey: staleSessionId
+        ? `checkout-${reservation.id}-retry-${staleSessionId}`
+        : `checkout-${reservation.id}`,
+    }
   );
 
   if (!session.client_secret) {

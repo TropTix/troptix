@@ -419,6 +419,31 @@ describe('beginPayment — session creation + reuse', () => {
     });
     expect(res?.expiresAt.getTime()).toBe(returned);
   });
+
+  it('mints a fresh Session with a distinct key when the stored one is non-open', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+    // A previous Session exists but has expired/completed at Stripe.
+    const deadSessionId = `cs_dead_${generateId()}`;
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { stripeCheckoutSessionId: deadSessionId },
+    });
+
+    const fake = fakeStripe({ id: deadSessionId, status: 'expired' });
+    await beginPayment(prisma, fake.stripe, {
+      reservationId,
+      baseUrl: 'https://example.test',
+    });
+
+    // It retrieved the dead session, then created a NEW one with a retry key —
+    // not the fixed `checkout-<id>` key that would replay the dead session.
+    expect(fake.calls.retrieve).toContain(deadSessionId);
+    expect(fake.calls.create).toHaveLength(1);
+    expect((fake.calls.create[0].opts as any).idempotencyKey).toBe(
+      `checkout-${reservationId}-retry-${deadSessionId}`
+    );
+  });
 });
 
 describe('getCheckoutState', () => {

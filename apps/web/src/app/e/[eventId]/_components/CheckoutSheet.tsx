@@ -66,6 +66,9 @@ export default function CheckoutSheet({
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  // Authoritative charge from the server (beginPayment). The selection-derived
+  // total is 0 on a resumed load, so the Payment step must use this instead.
+  const [paymentTotalCents, setPaymentTotalCents] = useState(0);
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const [slowFinalize, setSlowFinalize] = useState(false);
   // Guards the one-shot "resume found an unpaid hold → reopen payment" branch.
@@ -107,6 +110,16 @@ export default function CheckoutSheet({
       }).catch(() => {});
     } else if (state.kind === 'refunded') {
       setStep('refunded');
+      // The webhook normally sends this, but the sync-fulfillment poll can be
+      // what performs the refund (webhook slow/down) — nudge it here too
+      // (idempotent: Resend dedupes on refund-<reservationId>).
+      if (reservationId) {
+        void fetch('/api/checkout/refund-notice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reservationId }),
+        }).catch(() => {});
+      }
     } else if (state.kind === 'expired') {
       setStep('expired');
     } else if (
@@ -123,6 +136,7 @@ export default function CheckoutSheet({
         .then((payment) => {
           setClientSecret(payment.clientSecret);
           setExpiresAt(payment.expiresAt);
+          setPaymentTotalCents(payment.totalCents);
           setStep('payment');
         })
         .catch(() => setStep('expired'));
@@ -146,6 +160,7 @@ export default function CheckoutSheet({
     setReservationId(null);
     setClientSecret(null);
     setExpiresAt(null);
+    setPaymentTotalCents(0);
     setSuccessData(null);
     setSlowFinalize(false);
     resumeReopenRef.current = false;
@@ -228,6 +243,7 @@ export default function CheckoutSheet({
       });
       setClientSecret(payment.clientSecret);
       setExpiresAt(payment.expiresAt);
+      setPaymentTotalCents(payment.totalCents);
       setStep('payment');
     } catch {
       // Errors surface via the mutation error banners below. Hand back the hold
@@ -302,7 +318,7 @@ export default function CheckoutSheet({
             {step === 'payment' && clientSecret && expiresAt && (
               <PaymentStep
                 clientSecret={clientSecret}
-                totalCents={totalCents}
+                totalCents={paymentTotalCents}
                 expiresAt={expiresAt}
                 onExpired={() => setStep('expired')}
                 onBack={() => setStep('contact')}
