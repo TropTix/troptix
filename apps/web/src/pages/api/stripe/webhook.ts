@@ -96,10 +96,14 @@ async function updateOrderAfterPaymentSucceeds(
       select: { id: true, status: true },
     });
     if (!existing) {
-      console.error(
-        `[Order] Order not found for PaymentIntent: ${paymentIntentId}`
+      // No legacy order for this PaymentIntent. Since the new `/e/` reservation
+      // flow (ADR 0018) also emits `payment_intent.succeeded` for its Checkout
+      // Session payments — fulfilled by the separate reservation webhook — this
+      // endpoint must tolerate PIs it doesn't own: log and ack (no 500/retry).
+      console.warn(
+        `[Order] No legacy order for PaymentIntent ${paymentIntentId} — likely a new-flow (Checkout Session) payment; ignoring.`
       );
-      throw new Error('Order not found');
+      return;
     }
     if (existing.status === OrderStatus.COMPLETED) {
       console.log(
