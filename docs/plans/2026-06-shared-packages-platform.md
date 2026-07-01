@@ -1,6 +1,6 @@
 ---
 title: Shared DB+API Packages, Prisma 7, Supabase Auth & Checkout Service Extraction
-status: proposed
+status: active
 created: 2026-06-07
 tracking-issue: TBD
 ---

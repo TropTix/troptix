@@ -1,11 +1,32 @@
 ---
 title: Checkout Redesign — Reservation-Aware Client + Server Cutover (Stage 3)
-status: proposed
+status: active
 created: 2026-06-17
-tracking-issue: TBD
+tracking-issue: '#327'
 ---
 
 # Checkout Redesign — Reservation-Aware Client + Server Cutover
+
+> **Amendment — 2026-07-01 (paid checkout on `/e/`).** Phase 1 (event page + free RSVP)
+> is live. Paid checkout is now being built on `/e/` with these decisions
+> ([ADR 0018](../adr/0018-paid-checkout-on-checkout-sessions.md)):
+>
+> - **Stripe Checkout Sessions API, `ui_mode: 'elements'`** (Stripe's recommended custom
+>   integration) instead of raw PaymentIntents. A dedicated `beginPayment` service creates
+>   one Session per reservation; the reservation service stays Stripe-free.
+> - **Payment surface stays in the `CheckoutSheet`**, not a separate route. A
+>   `?reservation=<id>` query param on the event URL is the durable key: one
+>   `getCheckoutState` call on load maps to the sheet step, and it is the Session
+>   `return_url`. (Supersedes the "URL-addressable checkout route" described below.)
+> - **Cards + wallets only** (`payment_method_types: ['card']`) — no `processing` states.
+> - **Hybrid fulfillment** ([Stripe fulfillment guide](https://docs.stripe.com/checkout/fulfillment)):
+>   `checkout.session.completed` webhook is canonical; `getCheckoutState` also retrieves the
+>   Session and calls the same idempotent `confirm()` when `payment_status !== 'unpaid'`.
+> - **Auto-refund on the expiry race**: `confirm()` re-acquires all-or-nothing after a paid
+>   hold expired, else refunds the whole PaymentIntent and marks the reservation `REFUNDED`.
+> - **Simplicity cuts**: no client-side auto-reacquire (countdown zero → start over);
+>   `expire()` cron unchanged; `/e/` charges the new flat fee (divergence accepted until
+>   cutover). The legacy `/events/` flow and its Pages Router webhook are untouched here.
 
 The user-facing rebuild of checkout: a new, high-converting, testable flow built on the
 **already-shipped reservation core**, plus the deferred server cutover that wires the live
