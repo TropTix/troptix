@@ -188,6 +188,40 @@ describe('settle — HELD path (fulfillment)', () => {
     expect(res?.status).toBe(ReservationStatus.CONVERTED);
     expect(res?.stripePaymentIntentId).toBe(pi);
   });
+
+  it('materializes exactly one order under concurrent settles (webhook + poll)', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 2);
+    const pi = `pi_test_${generateId()}`;
+
+    // The webhook and the sync-fulfillment poll can fire at the same instant.
+    const [a, b] = await Promise.all([
+      settle(prisma, { reservationId, paymentIntentId: pi }),
+      settle(prisma, { reservationId, paymentIntentId: pi }),
+    ]);
+
+    expect(a.kind).toBe('converted');
+    expect(b.kind).toBe('converted');
+    if (a.kind !== 'converted' || b.kind !== 'converted') {
+      throw new Error('unreachable');
+    }
+    // Same order; exactly one of the two did the real work.
+    expect(a.orderId).toBe(b.orderId);
+    expect([a.alreadyProcessed, b.alreadyProcessed].sort()).toEqual([
+      false,
+      true,
+    ]);
+
+    const orders = await prisma.orders.findMany({
+      where: { eventId: TEST_EVENT_ID, stripePaymentId: pi },
+    });
+    expect(orders).toHaveLength(1);
+
+    // No oversell / double count.
+    const after = await prisma.ticketTypes.findUnique({ where: { id: tt.id } });
+    expect(after?.sold).toBe(2);
+    expect(after?.reserved).toBe(0);
+  });
 });
 
 describe('settle — expiry race', () => {

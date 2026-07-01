@@ -475,6 +475,12 @@ export async function settle(
   };
   try {
     return await prisma.$transaction(async (tx) => {
+      // Serialize concurrent settles of the same reservation (the webhook and
+      // the sync-fulfillment poll can race). Without this row lock, both could
+      // read HELD under READ COMMITTED and both materialize — a double order /
+      // oversell. FOR UPDATE makes the loser block, then re-read CONVERTED.
+      await tx.$queryRaw`SELECT id FROM "Reservation" WHERE id = ${input.reservationId} FOR UPDATE`;
+
       const reservation = await tx.reservation.findUnique({
         where: { id: input.reservationId },
         include: { items: true },
