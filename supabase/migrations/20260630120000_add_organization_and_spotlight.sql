@@ -1,11 +1,5 @@
--- AlterEnum
-ALTER TYPE "SocialMediaAccountType" ADD VALUE 'LINKEDIN';
-
 -- AlterTable
 ALTER TABLE "Events" ADD COLUMN "organizationId" TEXT;
-
--- AlterTable
-ALTER TABLE "SocialMediaAccounts" ADD COLUMN "organizationId" TEXT;
 
 -- CreateTable
 CREATE TABLE "Organization" (
@@ -17,6 +11,9 @@ CREATE TABLE "Organization" (
     "logoUrl" VARCHAR(2000),
     "bio" TEXT,
     "website" TEXT,
+    "instagram" TEXT,
+    "twitter" TEXT,
+    "linkedin" TEXT,
     "ownerUserId" TEXT NOT NULL,
     "verified" BOOLEAN NOT NULL DEFAULT false,
 
@@ -49,12 +46,6 @@ CREATE INDEX "Spotlight_eventId_idx" ON "Spotlight"("eventId");
 
 -- CreateIndex
 CREATE INDEX "Events_organizationId_idx" ON "Events"("organizationId");
-
--- CreateIndex
-CREATE INDEX "SocialMediaAccounts_organizationId_idx" ON "SocialMediaAccounts"("organizationId");
-
--- AddForeignKey
-ALTER TABLE "SocialMediaAccounts" ADD CONSTRAINT "SocialMediaAccounts_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Events" ADD CONSTRAINT "Events_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE SET NULL ON UPDATE CASCADE;
