@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE "Events" ADD COLUMN "organizationId" TEXT;
+ALTER TABLE "Events" ADD COLUMN     "organizationId" TEXT;
 
 -- CreateTable
 CREATE TABLE "Organization" (
@@ -48,10 +48,11 @@ CREATE INDEX "Spotlight_eventId_idx" ON "Spotlight"("eventId");
 CREATE INDEX "Events_organizationId_idx" ON "Events"("organizationId");
 
 -- AddForeignKey
-ALTER TABLE "Events" ADD CONSTRAINT "Events_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "Organization" ADD CONSTRAINT "Organization_ownerUserId_fkey" FOREIGN KEY ("ownerUserId") REFERENCES "Users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Spotlight" ADD CONSTRAINT "Spotlight_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "Events"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Events" ADD CONSTRAINT "Events_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
