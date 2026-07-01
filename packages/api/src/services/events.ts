@@ -17,6 +17,7 @@ import type {
   EventTicket,
 } from '../contracts/events';
 import { calculateFeesCents } from './_shared/fees';
+import { toEventSummary } from './_shared/eventSummary';
 import { NotFoundError } from './_shared/errors';
 
 /**
@@ -56,22 +57,7 @@ export async function listPublicEvents(
     },
   });
 
-  return events.map((event) => {
-    const cheapest = event.ticketTypes[0];
-    const fromPriceCents = cheapest
-      ? (cheapest.priceCents ?? Math.round(cheapest.price * 100))
-      : null;
-
-    return {
-      id: event.id,
-      name: event.name,
-      imageUrl: event.imageUrl,
-      startDate: event.startDate.toISOString(),
-      endDate: event.endDate.toISOString(),
-      venue: event.venue,
-      fromPriceCents,
-    };
-  });
+  return events.map(toEventSummary);
 }
 
 export async function getEventDetail(

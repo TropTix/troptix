@@ -9,7 +9,9 @@ import type { PrismaClient } from '@troptix/db';
 import {
   ensureOrganizationForUser,
   backfillOrganizations,
+  getOrganizationBySlug,
 } from './organizations';
+import { NotFoundError } from './_shared/errors';
 
 type OrgRow = {
   id: string;
@@ -198,5 +200,79 @@ describe('backfillOrganizations', () => {
     await backfillOrganizations(prisma);
     const second = await backfillOrganizations(prisma);
     expect(second).toEqual({ organizationsEnsured: 0, eventsLinked: 0 });
+  });
+});
+
+describe('getOrganizationBySlug', () => {
+  const DAY = 86_400_000;
+  function ev(
+    id: string,
+    startDays: number,
+    endDays: number,
+    tier?: { priceCents: number | null; price: number }
+  ) {
+    return {
+      id,
+      name: id,
+      imageUrl: null,
+      startDate: new Date(Date.now() + startDays * DAY),
+      endDate: new Date(Date.now() + endDays * DAY),
+      venue: 'The Deck',
+      ticketTypes: tier ? [tier] : [],
+    };
+  }
+
+  const fakePrisma = (events: unknown[] | null) =>
+    ({
+      organization: {
+        findUnique: async ({ where }: any) =>
+          events === null || where.slug !== 'island-vibes'
+            ? null
+            : {
+                slug: 'island-vibes',
+                displayName: 'Island Vibes',
+                logoUrl: null,
+                bio: 'Soca everywhere',
+                website: null,
+                instagram: 'islandvibes',
+                twitter: null,
+                linkedin: null,
+                verified: true,
+                events,
+              },
+      },
+    }) as unknown as PrismaClient;
+
+  it('throws NotFoundError when the slug does not exist', async () => {
+    await expect(
+      getOrganizationBySlug(fakePrisma(null), { slug: 'nope' })
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('splits events into upcoming (soonest first) and past (most-recent first)', async () => {
+    // provided startDate-asc, as the query returns them
+    const prisma = fakePrisma([
+      ev('past-old', -10, -9),
+      ev('past-recent', -3, -2),
+      ev('up-soon', 2, 3, { priceCents: 2500, price: 25 }),
+      ev('up-later', 8, 9),
+    ]);
+    const result = await getOrganizationBySlug(prisma, {
+      slug: 'island-vibes',
+    });
+
+    expect(result.displayName).toBe('Island Vibes');
+    expect(result.verified).toBe(true);
+    expect(result.instagram).toBe('islandvibes');
+    expect(result.upcomingEvents.map((e) => e.id)).toEqual([
+      'up-soon',
+      'up-later',
+    ]);
+    expect(result.pastEvents.map((e) => e.id)).toEqual([
+      'past-recent',
+      'past-old',
+    ]);
+    expect(result.upcomingEvents[0].fromPriceCents).toBe(2500);
+    expect(result.upcomingEvents[1].fromPriceCents).toBeNull();
   });
 });

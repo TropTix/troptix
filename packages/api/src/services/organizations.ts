@@ -8,7 +8,14 @@
  * docs/plans/2026-06-event-spotlight-and-organizer-brand.md (2, 2b).
  */
 import type { PrismaClient } from '@troptix/db';
+import type { EventSummary } from '../contracts/events';
+import type {
+  OrganizationDetail,
+  OrganizationDetailInput,
+} from '../contracts/organizations';
 import { generateUniqueSlug } from './_shared/slug';
+import { toEventSummary } from './_shared/eventSummary';
+import { NotFoundError } from './_shared/errors';
 
 type OrganizationRow = Awaited<
   ReturnType<PrismaClient['organization']['create']>
@@ -101,4 +108,79 @@ export async function backfillOrganizations(
   }
 
   return { organizationsEnsured, eventsLinked };
+}
+
+/**
+ * The public organization page read (/o/[slug]): brand header + the org's
+ * published events, split into upcoming (soonest first) and past (most-recent
+ * first). No authorization (ADR 0013) — always public; drafts are never included.
+ */
+export async function getOrganizationBySlug(
+  prisma: PrismaClient,
+  input: OrganizationDetailInput
+): Promise<OrganizationDetail> {
+  const org = await prisma.organization.findUnique({
+    where: { slug: input.slug },
+    select: {
+      slug: true,
+      displayName: true,
+      logoUrl: true,
+      bio: true,
+      website: true,
+      instagram: true,
+      twitter: true,
+      linkedin: true,
+      verified: true,
+      events: {
+        where: { isDraft: false },
+        orderBy: { startDate: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          imageUrl: true,
+          startDate: true,
+          endDate: true,
+          venue: true,
+          ticketTypes: {
+            where: {
+              OR: [
+                { discountCode: { equals: null } },
+                { discountCode: { equals: '' } },
+              ],
+            },
+            select: { priceCents: true, price: true },
+            orderBy: { price: 'asc' },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  if (!org) {
+    throw new NotFoundError(`Organization not found: ${input.slug}`);
+  }
+
+  const now = Date.now();
+  const upcomingEvents: EventSummary[] = [];
+  const pastEvents: EventSummary[] = [];
+  for (const event of org.events) {
+    const bucket = event.endDate.getTime() > now ? upcomingEvents : pastEvents;
+    bucket.push(toEventSummary(event));
+  }
+  pastEvents.reverse(); // fetched startDate asc → most-recent past first
+
+  return {
+    slug: org.slug,
+    displayName: org.displayName,
+    logoUrl: org.logoUrl,
+    bio: org.bio,
+    website: org.website,
+    instagram: org.instagram,
+    twitter: org.twitter,
+    linkedin: org.linkedin,
+    verified: org.verified,
+    upcomingEvents,
+    pastEvents,
+  };
 }
