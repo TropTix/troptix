@@ -16,20 +16,10 @@ type OrganizationRow = Awaited<
 
 const FALLBACK_NAME = 'Organizer';
 
-/**
- * A unique slug for a new Organization. Loads existing slugs into a set and
- * defers to the pure `generateUniqueSlug`. Full-table read is fine at v1 scale
- * (few organizations); revisit if the table grows large.
- */
-async function nextOrganizationSlug(
-  prisma: PrismaClient,
-  displayName: string
-): Promise<string> {
-  const existing = await prisma.organization.findMany({
-    select: { slug: true },
-  });
-  const taken = new Set(existing.map((o) => o.slug));
-  return generateUniqueSlug(displayName || FALLBACK_NAME, (s) => taken.has(s));
+/** Every existing slug, as a set — the input to `generateUniqueSlug`. */
+async function loadTakenSlugs(prisma: PrismaClient): Promise<Set<string>> {
+  const rows = await prisma.organization.findMany({ select: { slug: true } });
+  return new Set(rows.map((o) => o.slug));
 }
 
 /**
@@ -37,10 +27,15 @@ async function nextOrganizationSlug(
  * existing org if the user already owns one (v1 exposes exactly one). Called on
  * first event save so ownership can be dual-written (`organizerUserId` ==
  * `ownerUserId`).
+ *
+ * Pass `takenSlugs` when creating many orgs in a loop (the backfill) to avoid a
+ * per-call full-table slug read; the new slug is added to it so later calls stay
+ * unique. The DB `slug` unique constraint is the real concurrency backstop.
  */
 export async function ensureOrganizationForUser(
   prisma: PrismaClient,
-  { ownerUserId, displayName }: { ownerUserId: string; displayName: string }
+  { ownerUserId, displayName }: { ownerUserId: string; displayName: string },
+  takenSlugs?: Set<string>
 ): Promise<OrganizationRow> {
   const existing = await prisma.organization.findFirst({
     where: { ownerUserId },
@@ -48,10 +43,14 @@ export async function ensureOrganizationForUser(
   });
   if (existing) return existing;
 
-  const slug = await nextOrganizationSlug(prisma, displayName);
-  return prisma.organization.create({
-    data: { ownerUserId, displayName: displayName || FALLBACK_NAME, slug },
+  const taken = takenSlugs ?? (await loadTakenSlugs(prisma));
+  const name = displayName || FALLBACK_NAME;
+  const slug = generateUniqueSlug(name, (s) => taken.has(s));
+  const org = await prisma.organization.create({
+    data: { ownerUserId, displayName: name, slug },
   });
+  taken.add(slug);
+  return org;
 }
 
 /**
@@ -77,15 +76,20 @@ export async function backfillOrganizations(
     }
   }
 
+  // One slug read for the whole backfill; ensureOrganizationForUser adds each
+  // created slug to the set, keeping later iterations unique without re-reading.
+  const takenSlugs = await loadTakenSlugs(prisma);
+
   let organizationsEnsured = 0;
   let eventsLinked = 0;
   // Array.from(...) so the for-of is over an array (apps/web compiles at es5,
   // where iterating a Map directly needs --downlevelIteration).
   for (const [ownerUserId, displayName] of Array.from(nameByUser.entries())) {
-    const org = await ensureOrganizationForUser(prisma, {
-      ownerUserId,
-      displayName,
-    });
+    const org = await ensureOrganizationForUser(
+      prisma,
+      { ownerUserId, displayName },
+      takenSlugs
+    );
     const { count } = await prisma.events.updateMany({
       where: { organizerUserId: ownerUserId, organizationId: null },
       data: { organizationId: org.id },
