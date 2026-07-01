@@ -23,6 +23,10 @@ export {
 
 export { getCheckoutConfig, applyCode } from './services/checkout';
 export { getEventDetail } from './services/events';
+export {
+  ensureOrganizationForUser,
+  backfillOrganizations,
+} from './services/organizations';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
 export { NotFoundError } from './services/_shared/errors';
 

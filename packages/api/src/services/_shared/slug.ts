@@ -51,7 +51,9 @@ export function slugify(input: string): string {
   return trimHyphens(
     input
       .normalize('NFKD')
-      .replace(/\p{Diacritic}/gu, '')
+      // Combining diacritical marks (U+0300–U+036F); a plain BMP range so this
+      // needs no `u` flag / property escape (apps/web compiles at target es5).
+      .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
   );
