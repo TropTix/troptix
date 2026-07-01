@@ -6,11 +6,12 @@ import { stripe } from '@/server/lib/stripe';
 /**
  * Expire reservation holds past their TTL (ADR 0018). Cancel-then-release: the
  * sweep expires each hold's Checkout Session before handing inventory back, so a
- * payment can never land after release. Schedule via Vercel Cron.
+ * payment can never land after release. Scheduled via Supabase cron (pg_cron +
+ * pg_net) — see docs/runbooks/expire-reservations-cron.md.
  *
- * Auth: requires `Authorization: Bearer $CRON_SECRET` (Vercel Cron sends this).
- * Fails closed if CRON_SECRET is unset — a money-adjacent endpoint must not be
- * open (issue #358).
+ * Auth: requires `Authorization: Bearer $CRON_SECRET` (the cron job sends this
+ * header). Fails closed if CRON_SECRET is unset — a money-adjacent endpoint must
+ * not be open (issue #358).
  */
 export const runtime = 'nodejs';
 

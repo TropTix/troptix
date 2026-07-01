@@ -71,7 +71,9 @@ Installed SDKs: `stripe@22` (server, API version `2026-06-24.dahlia`),
 
 ### Cancel-then-release (makes the refund state structurally impossible)
 
-The expiry sweep (`sweepExpiredHolds`, run by the `/api/cron/expire-reservations` cron)
+The expiry sweep (`sweepExpiredHolds`, run by the `/api/cron/expire-reservations` cron —
+scheduled via Supabase `pg_cron` + `pg_net`, see
+[the runbook](../runbooks/expire-reservations-cron.md))
 **cancels the payment before releasing inventory** — Stripe's own recommended mechanism
 ([Manage limited inventory](https://docs.stripe.com/payments/checkout/managing-limited-inventory)).
 For a hold that reached payment (has a `stripeCheckoutSessionId`), it calls
