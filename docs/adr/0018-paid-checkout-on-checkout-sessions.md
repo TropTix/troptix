@@ -54,13 +54,31 @@ Installed SDKs: `stripe@22` (server, API version `2026-06-24.dahlia`),
   idempotent `confirm()` when `payment_status !== 'unpaid'`. Both converge on one
   transaction guarded by reservation status. Fulfillment (order + tickets) happens only
   once.
-- **Auto-refund on the expiry race.** If payment lands after the 10-minute hold expired,
+- **Hold window skew, refreshed at payment.** The server holds for 12 minutes
+  (`HOLD_TTL_MINUTES`); the client counts down to a deadline 2 minutes earlier (10 min),
+  so a payment submitted right at the buyer's zero still has runway to settle and have
+  its webhook delivered before the server releases the hold. `beginPayment` also
+  refreshes `expiresAt` to a fresh full window, so a buyer who browsed a while still gets
+  the whole payment window without long browsing holds starving inventory.
+- **Auto-refund on the expiry race.** If payment still lands after the hold released,
   `confirm()` atomically re-acquires the exact quantities; if any line cannot be
   re-acquired, it refunds the whole PaymentIntent (idempotency key
   `refund-<reservationId>`), marks the reservation `REFUNDED`, and the buyer is told
-  clearly. No partial fulfillment, no oversell, no held money.
+  clearly. No partial fulfillment, no oversell, no held money. The skew + refresh make
+  this rare; it is the backstop, not a hot path.
 - **The legacy `/events/` flow and its Pages Router webhook are untouched** by this
   change; the maintenance-window cutover remains a separate later initiative.
+
+### Not done (offered): making the refund state impossible
+
+The refund race could be eliminated structurally by having the release path **cancel the
+payment** rather than just tolerate it: on expiry, call `stripe.checkout.sessions.expire`
+(or cancel the PaymentIntent) _before_ releasing inventory. If the expire succeeds the
+Session can never be paid → safe to release; if it fails because it was already paid →
+keep/convert. Because Stripe's expire/cancel is atomic, there is no read-then-race gap.
+Deferred because it re-couples the (currently Stripe-free) `expire()` cron to Stripe — but
+only for holds that actually reached payment (`stripeCheckoutSessionId` set), so the cost
+is bounded. Revisit if refunds ever need to be driven to exactly zero.
 
 ## Consequences
 

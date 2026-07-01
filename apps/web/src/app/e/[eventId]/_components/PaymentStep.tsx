@@ -16,6 +16,11 @@ const stripePromise = loadStripe(stripeKey ?? '');
 
 const money = (cents: number) => getFormattedCurrency(cents / 100);
 
+// The server holds 2 min past the buyer's countdown (ADR 0018): showing a
+// deadline earlier than the true `expiresAt` gives a payment submitted right at
+// zero time to settle + have its webhook delivered before the hold releases.
+const CLIENT_HOLD_BUFFER_MS = 2 * 60_000;
+
 /** Whole seconds left until `expiresAt`, clamped at 0. */
 function useCountdown(expiresAt: string): number {
   const [secondsLeft, setSecondsLeft] = useState(() =>
@@ -50,7 +55,11 @@ function PaymentInner({
   const checkoutState = useCheckoutElements();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const secondsLeft = useCountdown(expiresAt);
+  // Count down to the soft (client) deadline, ahead of the server's hold.
+  const softDeadline = new Date(
+    new Date(expiresAt).getTime() - CLIENT_HOLD_BUFFER_MS
+  ).toISOString();
+  const secondsLeft = useCountdown(softDeadline);
   const expired = secondsLeft <= 0;
 
   // Once the hold lapses, kick the parent to the "start over" step.

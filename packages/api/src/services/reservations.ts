@@ -30,7 +30,14 @@ import { generateId } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
 
-const DEFAULT_TTL_MINUTES = 10;
+/**
+ * Server-side hold lifetime. The client shows a shorter deadline (10 min) than
+ * this so payments submitted right at the buyer's countdown still have a buffer
+ * to settle + have their webhook delivered before the server releases the hold —
+ * shrinking the paid-after-expiry refund race (ADR 0018).
+ */
+export const HOLD_TTL_MINUTES = 12;
+const DEFAULT_TTL_MINUTES = HOLD_TTL_MINUTES;
 
 export interface ReserveItemInput {
   ticketTypeId: string;

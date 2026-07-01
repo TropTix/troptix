@@ -357,6 +357,31 @@ describe('beginPayment — session creation + reuse', () => {
     expect(fake.calls.create).toHaveLength(1);
     expect(fake.calls.retrieve.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('refreshes the hold window at payment time', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+    // Simulate a buyer who browsed a while: only ~2 min left on the hold.
+    const nearly = new Date(Date.now() + 2 * 60_000);
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { expiresAt: nearly },
+    });
+
+    const fake = fakeStripe();
+    const result = await beginPayment(prisma, fake.stripe, {
+      reservationId,
+      baseUrl: 'https://example.test',
+    });
+
+    // The returned + persisted deadline is pushed well past the near-expiry one.
+    const returned = new Date(result.expiresAt).getTime();
+    expect(returned).toBeGreaterThan(nearly.getTime() + 5 * 60_000);
+    const res = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+    });
+    expect(res?.expiresAt.getTime()).toBe(returned);
+  });
 });
 
 describe('getCheckoutState', () => {

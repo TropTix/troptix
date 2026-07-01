@@ -10,7 +10,7 @@
 import { ReservationStatus } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
-import { settle } from './reservations';
+import { HOLD_TTL_MINUTES, settle } from './reservations';
 import { NotFoundError } from './_shared/errors';
 import type {
   BeginPaymentResponse,
@@ -70,15 +70,24 @@ export async function beginPayment(
     );
   }
 
+  // Committing to pay refreshes the hold window (ADR 0018): a fresh full TTL
+  // from now, so a buyer who browsed a while still gets the whole payment window
+  // — and the server deadline stays ahead of the client countdown.
+  const extendedExpiresAt = new Date(Date.now() + HOLD_TTL_MINUTES * 60_000);
+
   // Reuse an existing open Session (refresh / resume / racing call).
   if (reservation.stripeCheckoutSessionId) {
     const existing = await stripe.checkout.sessions.retrieve(
       reservation.stripeCheckoutSessionId
     );
     if (existing.status === 'open' && existing.client_secret) {
+      await prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { expiresAt: extendedExpiresAt },
+      });
       return {
         clientSecret: existing.client_secret,
-        expiresAt: reservation.expiresAt.toISOString(),
+        expiresAt: extendedExpiresAt.toISOString(),
         totalCents: reservation.totalCents,
       };
     }
@@ -131,12 +140,15 @@ export async function beginPayment(
 
   await prisma.reservation.update({
     where: { id: reservation.id },
-    data: { stripeCheckoutSessionId: session.id },
+    data: {
+      stripeCheckoutSessionId: session.id,
+      expiresAt: extendedExpiresAt,
+    },
   });
 
   return {
     clientSecret: session.client_secret,
-    expiresAt: reservation.expiresAt.toISOString(),
+    expiresAt: extendedExpiresAt.toISOString(),
     totalCents: reservation.totalCents,
   };
 }
