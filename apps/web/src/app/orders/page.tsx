@@ -139,7 +139,7 @@ export default async function OrdersPage() {
               access.
             </p>
             <Button asChild size="lg" className="w-full sm:w-auto">
-              <Link href="/events">
+              <Link href="/discover">
                 Discover Events
                 <ExternalLink className="w-4 h-4 ml-2" />
               </Link>

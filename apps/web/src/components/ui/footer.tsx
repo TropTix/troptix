@@ -46,7 +46,7 @@ export default function Footer() {
               <ul className="text-sm">
                 <li className="mb-2">
                   <Link
-                    href="/events"
+                    href="/discover"
                     className="text-gray-600 hover:text-gray-900 transition duration-150 ease-in-out"
                   >
                     Explore Events

@@ -41,7 +41,7 @@ export default function NotFound() {
             </Link>
           </Button>
           <Button asChild className="w-full sm:w-auto">
-            <Link href="/events">
+            <Link href="/discover">
               <Search className="mr-2 h-4 w-4" />
               Browse Events
             </Link>

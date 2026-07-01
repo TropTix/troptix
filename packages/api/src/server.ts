@@ -22,7 +22,7 @@ export {
 } from './services/reservations';
 
 export { getCheckoutConfig, applyCode } from './services/checkout';
-export { getEventDetail } from './services/events';
+export { getEventDetail, listPublicEvents } from './services/events';
 export {
   ensureOrganizationForUser,
   backfillOrganizations,
