@@ -73,6 +73,55 @@ export async function sendEmailConfirmationEmailToUser(orderId: string) {
   }
 }
 
+/**
+ * Notify a buyer that their payment was auto-refunded because the tickets sold
+ * out while it was processing (the expiry race, ADR 0018). Minimal inline HTML —
+ * there's no order to render. Deduped by `refund-<reservationId>` so a retried
+ * webhook never double-sends. Never throws (fired from the webhook).
+ */
+export async function sendRefundNoticeEmail(reservationId: string) {
+  const reservation = await prisma.reservation.findUnique({
+    where: { id: reservationId },
+    select: {
+      email: true,
+      firstName: true,
+      totalCents: true,
+      event: { select: { name: true } },
+    },
+  });
+  if (!reservation?.email) {
+    console.error(`[Refund] No email for reservation ${reservationId}`);
+    return;
+  }
+
+  const eventName = reservation.event?.name ?? 'the event';
+  const amount = `$${(reservation.totalCents / 100).toFixed(2)}`;
+  const html = `
+    <p>Hi ${reservation.firstName ?? 'there'},</p>
+    <p>Unfortunately, tickets to <strong>${eventName}</strong> sold out while
+    your payment was processing, so we&rsquo;ve refunded your ${amount} in full.</p>
+    <p>The refund may take a few days to appear on your statement. You were not
+    charged for any tickets.</p>
+    <p>— TropTix</p>`;
+
+  try {
+    const { error } = await resend.emails.send(
+      {
+        from: 'TropTix <info@usetroptix.com>',
+        to: reservation.email,
+        subject: `Your ${eventName} payment was refunded`,
+        html,
+      },
+      { idempotencyKey: `refund-${reservationId}` }
+    );
+    if (error) {
+      console.error('[Refund] Resend failed to send refund notice:', error);
+    }
+  } catch (error) {
+    console.error('[Refund] Failed to send refund notice email:', error);
+  }
+}
+
 async function getOrderDetails(orderId: string) {
   return await prisma.orders.findUnique({
     where: {

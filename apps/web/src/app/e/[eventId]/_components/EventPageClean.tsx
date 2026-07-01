@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
   ArrowLeft,
@@ -68,9 +68,17 @@ function MetaRow({
 
 export default function EventPageClean({ event }: { event: EventDetail }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resumeReservationId = searchParams.get('reservation');
   const [accent, setAccent] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
+
+  // Resume an in-flight checkout after the Stripe redirect / a refresh
+  // (?reservation=…): open the sheet so it can finalize (ADR 0018).
+  useEffect(() => {
+    if (resumeReservationId) setSheetOpen(true);
+  }, [resumeReservationId]);
 
   const isFree = event.fromPriceCents === 0;
 
@@ -326,6 +334,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         event={event}
+        resumeReservationId={resumeReservationId}
       />
     </>
   );

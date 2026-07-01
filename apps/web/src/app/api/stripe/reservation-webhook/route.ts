@@ -3,7 +3,10 @@ import type Stripe from 'stripe';
 import { confirmPaid } from '@troptix/api/server';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
-import { sendEmailConfirmationEmailToUser } from '@/server/lib/email';
+import {
+  sendEmailConfirmationEmailToUser,
+  sendRefundNoticeEmail,
+} from '@/server/lib/email';
 
 /**
  * Reservation checkout webhook (ADR 0018) — the canonical fulfiller for the new
@@ -108,6 +111,9 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
             emailErr
           );
         }
+      } else if (state.kind === 'refunded') {
+        // Lost the expiry race — tell the buyer their payment was refunded.
+        await sendRefundNoticeEmail(reservationId);
       }
       return;
     }
