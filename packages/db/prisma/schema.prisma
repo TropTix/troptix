@@ -95,6 +95,9 @@ enum ReservationStatus {
   CONVERTED
   EXPIRED
   RELEASED
+  // Paid after the hold expired and the tickets could not be re-acquired: the
+  // PaymentIntent was auto-refunded (ADR 0018). Terminal, like CONVERTED.
+  REFUNDED
 }
 
 // Transactional-outbox row state — deferred side effects (e.g. confirmation
@@ -296,6 +299,11 @@ model Reservation {
   status                ReservationStatus @default(HELD)
   expiresAt             DateTime
   stripePaymentIntentId String?           @unique
+  // Checkout Sessions API (ADR 0018): the Session drives the paid flow; its
+  // PaymentIntent id is backfilled into `stripePaymentIntentId` at confirm time
+  // for refund traceability. `stripeRefundId` is set on the expiry-race refund.
+  stripeCheckoutSessionId String?         @unique
+  stripeRefundId          String?
 
   // buyer contact captured at hold time
   email     String?

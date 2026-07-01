@@ -70,6 +70,36 @@ export interface ReserveResult {
 }
 
 /**
+ * Atomically hold `requested` units of one ticket type, returning the granted
+ * count (clamped to live availability). One race-safe statement: the `FOR
+ * UPDATE` in the CTE serializes concurrent buyers of the same ticket type, so
+ * the last ticket can never be granted twice; `GREATEST/LEAST` keep the grant
+ * within `[0, capacity - reserved - sold]` (a NULL capacity pre-cutover yields
+ * availability 0, so it simply can't oversell). Shared by the initial hold
+ * (`reserve`) and the paid-after-expiry re-acquire (`settle`).
+ */
+async function holdInventoryInTx(
+  tx: Prisma.TransactionClient,
+  ticketTypeId: string,
+  requested: number
+): Promise<number> {
+  const rows = await tx.$queryRaw<Array<{ granted: number }>>(Prisma.sql`
+    WITH locked AS (
+      SELECT id, GREATEST("capacity" - "reserved" - "sold", 0) AS avail
+      FROM "TicketTypes"
+      WHERE id = ${ticketTypeId}
+      FOR UPDATE
+    )
+    UPDATE "TicketTypes" t
+    SET "reserved" = t."reserved" + LEAST(${requested}::int, locked.avail)
+    FROM locked
+    WHERE t.id = locked.id
+    RETURNING LEAST(${requested}::int, locked.avail)::int AS granted
+  `);
+  return rows[0]?.granted ?? 0;
+}
+
+/**
  * Atomically hold inventory for a set of ticket types.
  *
  * Per item, one race-safe statement clamps the grant to availability
@@ -100,24 +130,7 @@ export async function reserve(
       let granted = 0;
 
       if (requested > 0) {
-        // Lock the ticket-type row, clamp the grant to current availability,
-        // and increment reserved — all in one statement. GREATEST/LEAST keep
-        // the grant within [0, available]; a NULL capacity (pre-cutover) yields
-        // availability 0, so it simply can't oversell.
-        const rows = await tx.$queryRaw<Array<{ granted: number }>>(Prisma.sql`
-          WITH locked AS (
-            SELECT id, GREATEST("capacity" - "reserved" - "sold", 0) AS avail
-            FROM "TicketTypes"
-            WHERE id = ${item.ticketTypeId}
-            FOR UPDATE
-          )
-          UPDATE "TicketTypes" t
-          SET "reserved" = t."reserved" + LEAST(${requested}::int, locked.avail)
-          FROM locked
-          WHERE t.id = locked.id
-          RETURNING LEAST(${requested}::int, locked.avail)::int AS granted
-        `);
-        granted = rows[0]?.granted ?? 0;
+        granted = await holdInventoryInTx(tx, item.ticketTypeId, requested);
       }
 
       if (granted > 0) {
@@ -366,7 +379,15 @@ async function materializeOrder(
 
   await tx.reservation.update({
     where: { id: reservation.id },
-    data: { status: ReservationStatus.CONVERTED, orderId },
+    data: {
+      status: ReservationStatus.CONVERTED,
+      orderId,
+      // Backfill the PaymentIntent id for refund traceability (paid path); the
+      // paid flow keys off the Checkout Session, so this is set here at confirm.
+      ...(opts.paymentIntentId
+        ? { stripePaymentIntentId: opts.paymentIntentId }
+        : {}),
+    },
   });
 
   return orderId;
@@ -410,6 +431,107 @@ export async function confirm(
     });
     return { orderId, alreadyProcessed: false };
   });
+}
+
+export interface SettleInput {
+  reservationId: string;
+  paymentIntentId: string;
+  cardType?: string | null;
+  cardLast4?: string | null;
+}
+
+export type SettleResult =
+  | { kind: 'converted'; orderId: string; alreadyProcessed: boolean }
+  /** Paid after the hold expired and the tickets could not be re-acquired. */
+  | { kind: 'needs_refund' }
+  /** Already auto-refunded on a prior attempt (idempotent). */
+  | { kind: 'already_refunded' };
+
+/** Thrown inside `settle`'s transaction to roll back a partial re-acquire. */
+class NeedsRefundError extends Error {}
+
+/**
+ * Settle a paid reservation whose payment has succeeded — the Stripe-free core
+ * of the paid path, shared by the webhook and the confirmation poll (ADR 0018).
+ * The Stripe orchestration (session retrieval, `refunds.create`) lives in
+ * `services/payments.ts`; this only touches the database and is fully testable
+ * against Postgres alone.
+ *
+ * - HELD → materialize the order (move `reserved → sold`, create Order +
+ *   VALID tickets, mark CONVERTED).
+ * - CONVERTED / REFUNDED → idempotent no-op (duplicate webhook / poll race).
+ * - EXPIRED or RELEASED → the hold was already released. Re-acquire the exact
+ *   quantities atomically; if all are re-granted, materialize as normal, else
+ *   roll back and return `needs_refund` so the caller refunds the whole charge.
+ */
+export async function settle(
+  prisma: PrismaClient,
+  input: SettleInput
+): Promise<SettleResult> {
+  const opts = {
+    paymentIntentId: input.paymentIntentId,
+    cardType: input.cardType,
+    cardLast4: input.cardLast4,
+  };
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const reservation = await tx.reservation.findUnique({
+        where: { id: input.reservationId },
+        include: { items: true },
+      });
+
+      if (!reservation) {
+        throw new NotFoundError(
+          `Reservation ${input.reservationId} not found.`
+        );
+      }
+
+      if (reservation.status === ReservationStatus.CONVERTED) {
+        if (!reservation.orderId) {
+          throw new Error(
+            `Reservation ${reservation.id} is CONVERTED but has no orderId`
+          );
+        }
+        return {
+          kind: 'converted' as const,
+          orderId: reservation.orderId,
+          alreadyProcessed: true,
+        };
+      }
+
+      if (reservation.status === ReservationStatus.REFUNDED) {
+        return { kind: 'already_refunded' as const };
+      }
+
+      if (reservation.status !== ReservationStatus.HELD) {
+        // EXPIRED / RELEASED — the hold was handed back. Try to re-acquire the
+        // exact quantities; any shortfall rolls back the whole re-acquire (the
+        // throw aborts the transaction) and signals a refund.
+        for (const item of reservation.items) {
+          const granted = await holdInventoryInTx(
+            tx,
+            item.ticketTypeId,
+            item.quantity
+          );
+          if (granted < item.quantity) {
+            throw new NeedsRefundError();
+          }
+        }
+      }
+
+      const orderId = await materializeOrder(tx, reservation, opts);
+      return {
+        kind: 'converted' as const,
+        orderId,
+        alreadyProcessed: false,
+      };
+    });
+  } catch (err) {
+    if (err instanceof NeedsRefundError) {
+      return { kind: 'needs_refund' };
+    }
+    throw err;
+  }
 }
 
 /**

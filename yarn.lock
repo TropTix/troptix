@@ -5259,17 +5259,29 @@
   dependencies:
     qrcode.react "*"
 
-"@types/react-dom@19.2.3", "@types/react-dom@^18.0.0":
+"@types/react-dom@19.2.3":
   version "19.2.3"
   resolved "https://registry.yarnpkg.com/@types/react-dom/-/react-dom-19.2.3.tgz#c1e305d15a52a3e508d54dca770d202cb63abf2c"
   integrity sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==
 
-"@types/react@19.2.7", "@types/react@~19.0.10":
+"@types/react-dom@^18.0.0":
+  version "18.3.7"
+  resolved "https://registry.yarnpkg.com/@types/react-dom/-/react-dom-18.3.7.tgz#b89ddf2cd83b4feafcc4e2ea41afdfb95a0d194f"
+  integrity sha512-MEe3UeoENYVFXzoXEWsvcpg6ZvlrFNlOQ7EOsvhI3CfAXwzPfO8Qwuxd40nepsYKqyyVQnTdEfv68q91yLcKrQ==
+
+"@types/react@19.2.7":
   version "19.2.7"
   resolved "https://registry.yarnpkg.com/@types/react/-/react-19.2.7.tgz#84e62c0f23e8e4e5ac2cadcea1ffeacccae7f62f"
   integrity sha512-MWtvHrGZLFttgeEj28VXHxpmwYbor/ATPYbBfSFZEIRK0ecCFLl2Qo55z52Hss+UV9CRN7trSeq1zbgx7YDWWg==
   dependencies:
     csstype "^3.2.2"
+
+"@types/react@~19.0.10":
+  version "19.0.14"
+  resolved "https://registry.yarnpkg.com/@types/react/-/react-19.0.14.tgz#f2f62035290afd755095cb6644e10b599db72f4e"
+  integrity sha512-ixLZ7zG7j1fM0DijL9hDArwhwcCb4vqmePgwtV0GfnkHRSCUEv4LvzarcTdhoqgyMznUx/EhoTUv31CKZzkQlw==
+  dependencies:
+    csstype "^3.0.2"
 
 "@types/responselike@^1.0.0":
   version "1.0.3"
@@ -14968,7 +14980,7 @@ strip-json-comments@^3.1.1:
   resolved "https://registry.yarnpkg.com/strip-json-comments/-/strip-json-comments-3.1.1.tgz#31f1281b3832630434831c310c01cccda8cbe006"
   integrity sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==
 
-stripe@^22.3.0:
+stripe@22.3.0, stripe@^22.3.0:
   version "22.3.0"
   resolved "https://registry.yarnpkg.com/stripe/-/stripe-22.3.0.tgz#ecb75bf75f2d5c0466b0b6b4280066ee0f354c09"
   integrity sha512-ypO6xjVrMWs9SmIMeHr8naCx3dAQ0clxMdUTxn7Ejd7hmY9meBGfE+N4pVHkf9sUNebAHp6uJo6mV3GxDIc2cA==

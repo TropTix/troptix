@@ -10,6 +10,7 @@ export {
   reserve,
   createReservation,
   confirm,
+  settle,
   completeFree,
   release,
   expire,
@@ -19,7 +20,15 @@ export {
   type ReserveGrantedItem,
   type ConfirmInput,
   type ConfirmResult,
+  type SettleInput,
+  type SettleResult,
 } from './services/reservations';
+
+export {
+  beginPayment,
+  confirmPaid,
+  getCheckoutState,
+} from './services/payments';
 
 export { getCheckoutConfig, applyCode } from './services/checkout';
 export { getEventDetail } from './services/events';
