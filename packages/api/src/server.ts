@@ -14,6 +14,7 @@ export {
   completeFree,
   release,
   expire,
+  expireHold,
   type ReserveInput,
   type ReserveResult,
   type ReserveItemInput,
@@ -28,6 +29,8 @@ export {
   beginPayment,
   confirmPaid,
   getCheckoutState,
+  sweepExpiredHolds,
+  type SweepResult,
 } from './services/payments';
 
 export { getCheckoutConfig, applyCode } from './services/checkout';

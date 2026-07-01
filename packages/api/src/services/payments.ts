@@ -10,7 +10,7 @@
 import { ReservationStatus } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
-import { HOLD_TTL_MINUTES, settle } from './reservations';
+import { HOLD_TTL_MINUTES, expireHold, settle } from './reservations';
 import { NotFoundError } from './_shared/errors';
 import type {
   BeginPaymentResponse,
@@ -127,6 +127,11 @@ export async function beginPayment(
       payment_method_types: ['card'],
       return_url: `${input.baseUrl}/e/${reservation.eventId}?reservation=${reservation.id}`,
       metadata: { reservationId: reservation.id, eventId: reservation.eventId },
+      // Backstop cap on a lingering session (Stripe default is 24h; min 30 min).
+      // The sweep expires it far sooner (at the 12-min hold); this only bounds
+      // sessions the sweep never reaches (e.g. cron down). 2h clears our longest
+      // realistic hold-refresh, avoiding a resume onto an auto-expired session.
+      expires_at: Math.floor(Date.now() / 1000) + 2 * 60 * 60,
       ...(reservation.email ? { customer_email: reservation.email } : {}),
     },
     { idempotencyKey: `checkout-${reservation.id}` }
@@ -270,4 +275,57 @@ export async function getCheckoutState(
     };
   }
   return { kind: 'expired' };
+}
+
+export interface SweepResult {
+  /** Holds released back to inventory. */
+  released: number;
+  /** Holds kept because their Session couldn't be expired (paid / transient). */
+  keptLive: number;
+}
+
+/**
+ * Expire holds past their TTL — cancel-then-release, so overselling with a live
+ * payment is structurally impossible (ADR 0018). For a hold that reached payment
+ * (has a Session), expire the Session **before** releasing inventory:
+ *
+ * - Stripe only expires an OPEN Session, atomically. If expire succeeds, that
+ *   Session can never be paid → releasing the tickets is safe.
+ * - If expire throws (already paid, or transient), we DON'T release — the hold
+ *   stays put and the webhook / sync poll converts it (or the next sweep retries).
+ *   Either way there is never "inventory released + a still-payable Session".
+ *
+ * Pure browsing abandons (no Session) release directly, with no Stripe call — so
+ * the Stripe coupling is bounded to holds that actually armed for payment. This
+ * supersedes the Stripe-free `expire()` for the live app; that primitive stays
+ * for callers with no Session and for tests.
+ */
+export async function sweepExpiredHolds(
+  prisma: PrismaClient,
+  stripe: Stripe,
+  now: Date = new Date()
+): Promise<SweepResult> {
+  const expired = await prisma.reservation.findMany({
+    where: { status: ReservationStatus.HELD, expiresAt: { lt: now } },
+    select: { id: true, stripeCheckoutSessionId: true },
+  });
+
+  let released = 0;
+  let keptLive = 0;
+  for (const reservation of expired) {
+    if (reservation.stripeCheckoutSessionId) {
+      try {
+        await stripe.checkout.sessions.expire(
+          reservation.stripeCheckoutSessionId
+        );
+      } catch {
+        // Already paid/complete (can't expire) or a transient error — keep the
+        // hold; conversion or a later sweep resolves it. Never release here.
+        keptLive++;
+        continue;
+      }
+    }
+    if (await expireHold(prisma, reservation.id)) released++;
+  }
+  return { released, keptLive };
 }

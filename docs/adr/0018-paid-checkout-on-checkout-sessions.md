@@ -69,16 +69,31 @@ Installed SDKs: `stripe@22` (server, API version `2026-06-24.dahlia`),
 - **The legacy `/events/` flow and its Pages Router webhook are untouched** by this
   change; the maintenance-window cutover remains a separate later initiative.
 
-### Not done (offered): making the refund state impossible
+### Cancel-then-release (makes the refund state structurally impossible)
 
-The refund race could be eliminated structurally by having the release path **cancel the
-payment** rather than just tolerate it: on expiry, call `stripe.checkout.sessions.expire`
-(or cancel the PaymentIntent) _before_ releasing inventory. If the expire succeeds the
-Session can never be paid → safe to release; if it fails because it was already paid →
-keep/convert. Because Stripe's expire/cancel is atomic, there is no read-then-race gap.
-Deferred because it re-couples the (currently Stripe-free) `expire()` cron to Stripe — but
-only for holds that actually reached payment (`stripeCheckoutSessionId` set), so the cost
-is bounded. Revisit if refunds ever need to be driven to exactly zero.
+The expiry sweep (`sweepExpiredHolds`, run by the `/api/cron/expire-reservations` cron)
+**cancels the payment before releasing inventory** — Stripe's own recommended mechanism
+([Manage limited inventory](https://docs.stripe.com/payments/checkout/managing-limited-inventory)).
+For a hold that reached payment (has a `stripeCheckoutSessionId`), it calls
+`stripe.checkout.sessions.expire` _first_:
+
+- Stripe only expires an OPEN Session, atomically. If expire **succeeds**, that Session can
+  never be paid → releasing the tickets is safe, and no later payment can land.
+- If expire **throws** (already paid, or transient), the hold is **not** released — the
+  webhook / sync poll converts it, or the next sweep retries. There is never "inventory
+  released + a still-payable Session".
+
+So a reservation only reaches `EXPIRED` after its Session was provably killed, which makes
+the paid-after-expiry `needs_refund` branch unreachable via the normal path. The auto-refund
+stays as **defense-in-depth** (e.g. a payment landing on a `RELEASED` hold), not an expected
+outcome. Session-less browsing abandons still release with **no** Stripe call, so the sweep's
+Stripe coupling is bounded to holds that actually armed for payment. Sessions also carry
+`expires_at` (2 h) as a backstop cap for any Session the sweep never reaches.
+
+Note the floor this works around: Stripe's `expires_at` **minimum is 30 minutes**, longer
+than a ticket hold needs — which is exactly why inventory truth lives in our own counters
+with a shorter TTL, and the sweep drives Session expiry manually (the manual `expire`
+endpoint is not subject to the 30-minute floor).
 
 ## Consequences
 

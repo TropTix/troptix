@@ -10,7 +10,12 @@ import type Stripe from 'stripe';
 import prisma, { ReservationStatus } from '@troptix/db';
 import { generateId } from './_shared/ids';
 import { reserve, settle } from './reservations';
-import { beginPayment, confirmPaid, getCheckoutState } from './payments';
+import {
+  beginPayment,
+  confirmPaid,
+  getCheckoutState,
+  sweepExpiredHolds,
+} from './payments';
 
 const TEST_EVENT_ID = `test-pay-${generateId()}`;
 
@@ -106,11 +111,15 @@ interface FakeSessionState {
 }
 
 /** Minimal fake Stripe; records calls and returns a controllable session. */
-function fakeStripe(session?: Partial<FakeSessionState>) {
+function fakeStripe(
+  session?: Partial<FakeSessionState>,
+  opts?: { expireThrows?: boolean }
+) {
   const calls = {
     create: [] as Array<{ params: unknown; opts: unknown }>,
     retrieve: [] as string[],
     refund: [] as Array<{ params: unknown; opts: unknown }>,
+    expire: [] as string[],
   };
   let current: FakeSessionState = {
     id: `cs_test_${generateId()}`,
@@ -131,6 +140,12 @@ function fakeStripe(session?: Partial<FakeSessionState>) {
           calls.retrieve.push(id);
           return current;
         },
+        expire: async (id: string) => {
+          calls.expire.push(id);
+          // Stripe only expires an OPEN session; a paid one throws.
+          if (opts?.expireThrows) throw new Error('Session already completed');
+          return current;
+        },
       },
     },
     refunds: {
@@ -147,6 +162,28 @@ function fakeStripe(session?: Partial<FakeSessionState>) {
       current = { ...current, ...next };
     },
   };
+}
+
+/** Create an already-expired (past-TTL) HELD reservation, optionally with a Session id. */
+async function expiredHold(
+  ticketTypeId: string,
+  qty: number,
+  sessionId?: string
+) {
+  const r = await reserve(prisma, {
+    eventId: TEST_EVENT_ID,
+    items: [
+      { ticketTypeId, quantity: qty, unitPriceCents: 1000, feesCents: 0 },
+    ],
+    ttlMinutes: -1, // already past TTL
+  });
+  if (sessionId) {
+    await prisma.reservation.update({
+      where: { id: r.reservationId },
+      data: { stripeCheckoutSessionId: sessionId },
+    });
+  }
+  return r.reservationId;
 }
 
 describe('settle — HELD path (fulfillment)', () => {
@@ -434,5 +471,72 @@ describe('getCheckoutState', () => {
       reservationId,
     });
     expect(state.kind).toBe('expired');
+  });
+});
+
+describe('sweepExpiredHolds — cancel-then-release', () => {
+  it('expires the Session before releasing inventory', async () => {
+    const tt = await makeTicketType(3);
+    const sessionId = `cs_test_${generateId()}`;
+    const reservationId = await expiredHold(tt.id, 3, sessionId);
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(3);
+
+    const fake = fakeStripe();
+    const result = await sweepExpiredHolds(prisma, fake.stripe, new Date());
+
+    expect(fake.calls.expire).toContain(sessionId);
+    expect(result.released).toBeGreaterThanOrEqual(1);
+
+    const res = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+    });
+    expect(res?.status).toBe(ReservationStatus.EXPIRED);
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(0);
+  });
+
+  it('keeps the hold when the Session cannot be expired (already paid)', async () => {
+    const tt = await makeTicketType(3);
+    const sessionId = `cs_test_${generateId()}`;
+    const reservationId = await expiredHold(tt.id, 3, sessionId);
+
+    // Session expire throws → the payment won; must NOT release inventory.
+    const fake = fakeStripe(undefined, { expireThrows: true });
+    const result = await sweepExpiredHolds(prisma, fake.stripe, new Date());
+
+    expect(fake.calls.expire).toContain(sessionId);
+    expect(result.keptLive).toBeGreaterThanOrEqual(1);
+
+    const res = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+    });
+    expect(res?.status).toBe(ReservationStatus.HELD);
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(3);
+
+    // Terminalize so this still-HELD, past-TTL row doesn't leak into later sweeps.
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { status: ReservationStatus.EXPIRED },
+    });
+  });
+
+  it('releases a Session-less hold with no Stripe call', async () => {
+    const tt = await makeTicketType(2);
+    const reservationId = await expiredHold(tt.id, 2);
+
+    const fake = fakeStripe();
+    await sweepExpiredHolds(prisma, fake.stripe, new Date());
+
+    const res = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+    });
+    expect(res?.status).toBe(ReservationStatus.EXPIRED);
+    // No session on this hold → it was not passed to sessions.expire.
+    expect(fake.calls.expire).not.toContain(reservationId);
   });
 });

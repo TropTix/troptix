@@ -118,6 +118,11 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
       return;
     }
 
+    case 'checkout.session.expired':
+      // The sweep expires Sessions itself and releases inventory in the same
+      // pass (cancel-then-release), so this is just an acknowledgement.
+      return;
+
     case 'checkout.session.async_payment_succeeded':
     case 'checkout.session.async_payment_failed': {
       // v1 is cards-only, so delayed-settlement events shouldn't fire. Log if

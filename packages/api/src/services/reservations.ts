@@ -646,6 +646,20 @@ export async function release(
 }
 
 /**
+ * Release one HELD reservation's inventory and mark it EXPIRED. The Stripe-free
+ * primitive behind the expiry sweep (payments.sweepExpiredHolds). Idempotent —
+ * returns false if it wasn't HELD.
+ */
+export async function expireHold(
+  prisma: PrismaClient,
+  reservationId: string
+): Promise<boolean> {
+  return prisma.$transaction((tx) =>
+    releaseHeldInTx(tx, reservationId, ReservationStatus.EXPIRED)
+  );
+}
+
+/**
  * Release inventory held by all HELD reservations past their TTL. Called by the
  * cron. Idempotent and concurrency-safe (each release re-checks status in its
  * own transaction). Returns the number of reservations expired.
