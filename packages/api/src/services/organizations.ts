@@ -44,7 +44,9 @@ export async function ensureOrganizationForUser(
   if (existing) return existing;
 
   const taken = takenSlugs ?? (await loadTakenSlugs(prisma));
-  const name = displayName || FALLBACK_NAME;
+  // trim() so a padded name is cleaned and a whitespace-only one falls back
+  // (a bare `|| FALLBACK_NAME` treats "   " as a valid display name).
+  const name = displayName.trim() || FALLBACK_NAME;
   const slug = generateUniqueSlug(name, (s) => taken.has(s));
   const org = await prisma.organization.create({
     data: { ownerUserId, displayName: name, slug },

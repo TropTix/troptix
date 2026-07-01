@@ -127,6 +127,25 @@ describe('ensureOrganizationForUser', () => {
     expect(org.displayName).toBe('Organizer');
     expect(org.slug).toBe('organizer-2'); // "organizer" is reserved
   });
+
+  it('falls back when the name is only whitespace', async () => {
+    const { prisma } = makeFakePrisma();
+    const org = await ensureOrganizationForUser(prisma, {
+      ownerUserId: 'u1',
+      displayName: '   ',
+    });
+    expect(org.displayName).toBe('Organizer');
+  });
+
+  it('trims a padded display name', async () => {
+    const { prisma } = makeFakePrisma();
+    const org = await ensureOrganizationForUser(prisma, {
+      ownerUserId: 'u1',
+      displayName: '  Island Vibes  ',
+    });
+    expect(org.displayName).toBe('Island Vibes');
+    expect(org.slug).toBe('island-vibes');
+  });
 });
 
 describe('backfillOrganizations', () => {
