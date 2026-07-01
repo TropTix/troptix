@@ -75,6 +75,15 @@ export async function getEventDetail(
       isDraft: true,
       organizer: true,
       organizerUserId: true,
+      // The hosting Organization (brand) for the "Hosted by" link → /o/[slug].
+      organization: {
+        select: {
+          slug: true,
+          displayName: true,
+          logoUrl: true,
+          verified: true,
+        },
+      },
       startDate: true,
       endDate: true,
       venue: true,
@@ -161,6 +170,14 @@ export async function getEventDetail(
     isDraft: event.isDraft,
     organizer: event.organizer,
     organizerUserId: event.organizerUserId,
+    hostedBy: event.organization
+      ? {
+          slug: event.organization.slug,
+          displayName: event.organization.displayName,
+          logoUrl: event.organization.logoUrl,
+          verified: event.organization.verified,
+        }
+      : null,
     startDate: event.startDate.toISOString(),
     endDate: event.endDate.toISOString(),
     venue: event.venue,

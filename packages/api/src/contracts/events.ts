@@ -55,6 +55,16 @@ export const eventDetailSchema = z.object({
   organizer: z.string(),
   /** The owning user — used by the page's draft-visibility guard. */
   organizerUserId: z.string(),
+  /** The hosting Organization (brand) for the "Hosted by" link → /o/[slug]. */
+  hostedBy: z
+    .object({
+      slug: z.string(),
+      displayName: z.string(),
+      /** Stored logo path (resolved to a URL by the web layer). */
+      logoUrl: z.string().nullable(),
+      verified: z.boolean(),
+    })
+    .nullable(),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   venue: z.string().nullable(),

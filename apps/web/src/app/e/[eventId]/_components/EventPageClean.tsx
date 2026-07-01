@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import {
   ArrowLeft,
@@ -10,6 +11,7 @@ import {
   Calendar,
   MapPin,
   ArrowRight,
+  BadgeCheck,
 } from 'lucide-react';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
@@ -63,6 +65,35 @@ function MetaRow({
         <div className="text-sm text-muted-foreground">{subtitle}</div>
       </div>
     </div>
+  );
+}
+
+// The "Hosted by" / "Presented by" line: links to the organization page when
+// the event has a linked brand, else the legacy organizer name (pre-backfill).
+function HostedBy({
+  event,
+  className,
+}: {
+  event: EventDetail;
+  className?: string;
+}) {
+  if (!event.hostedBy) {
+    return <p className={cn('font-semibold', className)}>{event.organizer}</p>;
+  }
+  const { slug, displayName, verified } = event.hostedBy;
+  return (
+    <Link
+      href={`/o/${slug}`}
+      className={cn(
+        'inline-flex items-center gap-1.5 font-semibold transition-colors hover:text-primary',
+        className
+      )}
+    >
+      {displayName}
+      {verified && (
+        <BadgeCheck className="h-4 w-4 text-primary" aria-label="Verified" />
+      )}
+    </Link>
   );
 }
 
@@ -235,7 +266,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
               </div>
               <div className="mt-5 border-t border-border pt-5">
                 <p className={SECTION_LABEL}>Presented by</p>
-                <p className="mt-1 font-semibold">{event.organizer}</p>
+                <HostedBy event={event} className="mt-1" />
               </div>
             </aside>
 
@@ -294,7 +325,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
               {/* Organizer shows in the aside on desktop; surface it here on mobile. */}
               <section className="mt-10 md:hidden">
                 <SectionHeader>Hosted by</SectionHeader>
-                <p className="mt-3 font-semibold">{event.organizer}</p>
+                <HostedBy event={event} className="mt-3" />
               </section>
             </div>
           </div>

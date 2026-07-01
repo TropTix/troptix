@@ -51,7 +51,16 @@ function tier(overrides: Partial<TierRow> = {}): TierRow {
   };
 }
 
-function fakeEvent(overrides: { ticketTypes?: TierRow[] } = {}) {
+type OrgRel = {
+  slug: string;
+  displayName: string;
+  logoUrl: string | null;
+  verified: boolean;
+} | null;
+
+function fakeEvent(
+  overrides: { ticketTypes?: TierRow[]; organization?: OrgRel } = {}
+) {
   return {
     id: 'ev-1',
     name: 'Rum Punch Brunch',
@@ -61,6 +70,7 @@ function fakeEvent(overrides: { ticketTypes?: TierRow[] } = {}) {
     isDraft: false,
     organizer: 'Island Brunch Co.',
     organizerUserId: 'user-1',
+    organization: overrides.organization ?? null,
     startDate: new Date('2026-07-01T18:00:00.000Z'),
     endDate: new Date('2026-07-01T22:00:00.000Z'),
     venue: "Omar's Kitchen",
@@ -222,5 +232,33 @@ describe('listPublicEvents', () => {
   it('returns an empty list when there are no events', async () => {
     const prisma = fakeListPrisma([]);
     expect(await listPublicEvents(prisma)).toEqual([]);
+  });
+});
+
+describe('getEventDetail — hostedBy', () => {
+  it('maps the hosting organization when present', async () => {
+    const prisma = fakePrisma(
+      fakeEvent({
+        organization: {
+          slug: 'island-brunch',
+          displayName: 'Island Brunch Co.',
+          logoUrl: null,
+          verified: true,
+        },
+      })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.hostedBy).toEqual({
+      slug: 'island-brunch',
+      displayName: 'Island Brunch Co.',
+      logoUrl: null,
+      verified: true,
+    });
+  });
+
+  it('is null when the event has no organization (pre-backfill)', async () => {
+    const prisma = fakePrisma(fakeEvent());
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.hostedBy).toBeNull();
   });
 });
