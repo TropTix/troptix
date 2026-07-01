@@ -35,6 +35,7 @@ model Users {
   orders              Orders[]
   socialMediaAccounts SocialMediaAccounts[]
   reservations        Reservation[]
+  organizations       Organization[]
 
   telephoneNumber String?
   billingAddress1 String?
@@ -61,6 +62,55 @@ model SocialMediaAccounts {
   userId                 String?
 
   @@index([userId])
+}
+
+// The organizer's brand: a real, linkable entity that powers "Hosted by" and a
+// public page at /o/[slug]. A user may OWN many (one-to-many via ownerUserId),
+// but v1 exposes exactly one — "model for multi, expose one". Events carry
+// `organizationId`, but ownership/auth still keys on `Events.organizerUserId`
+// (dual-written == ownerUserId). See docs/plans/2026-06-event-spotlight-and-organizer-brand.md.
+//
+// Socials are a fixed, small set → plain columns, not the SocialMediaAccounts
+// join table (custom links are out of scope; the table's dormant + dual-FK).
+// `instagram`/`twitter` store usernames; `linkedin`/`website` store full URLs.
+model Organization {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  slug        String   @unique
+  displayName String
+  logoUrl     String?  @db.VarChar(2000)
+  bio         String?
+  website     String?
+  instagram   String?
+  twitter     String?
+  linkedin    String?
+  ownerUserId String
+  verified    Boolean  @default(false)
+
+  owner  Users    @relation(fields: [ownerUserId], references: [id])
+  events Events[]
+
+  @@index([ownerUserId])
+}
+
+// A per-event spotlight card (DJ, artist, speaker, sponsor, collaborator): just
+// a title + optional external link / image / description that renders as a card
+// linking out. Generic — no role/type/category. Flat, ordered by `order`.
+model Spotlight {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  eventId     String
+  title       String
+  link        String?
+  imageUrl    String?  @db.VarChar(2000)
+  description String?  @db.VarChar(350)
+  order       Int      @default(0)
+
+  event Events @relation(fields: [eventId], references: [id])
+
+  @@index([eventId])
 }
 
 enum TicketStatus {
@@ -198,6 +248,9 @@ model Events {
   summary         String?
   organizer       String
   organizerUserId String
+  // The owning Organization (brand). Nullable + backfilled; ownership/auth still
+  // keys on organizerUserId (dual-written == organization.ownerUserId).
+  organizationId  String?
 
   // Date and Time Details
   startDate DateTime
@@ -224,6 +277,11 @@ model Events {
   ticketTypes  TicketTypes[]
   orders       Orders[]
   reservations Reservation[]
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  spotlight    Spotlight[]
+
+  @@index([organizationId])
 }
 
 enum TicketFeeStructure {

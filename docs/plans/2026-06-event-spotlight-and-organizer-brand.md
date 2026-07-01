@@ -72,8 +72,9 @@ a real entity; everyone else is a link-out spotlight item.
    **Twitter** (username), **LinkedIn** (URL), **Website** (URL), and an **editable Organization
    Profile URL** (the `slug`, shown with the base prefix, e.g. `…/o/eman-events`). IG/Twitter store
    a username (URL built on render); LinkedIn/Website store a full URL. This makes the **slug
-   user-editable** (vanity), so editing needs a uniqueness check. Requires adding **`LINKEDIN`** to
-   `SocialMediaAccountType`.
+   user-editable** (vanity), so editing needs a uniqueness check. Socials are **plain columns on
+   `Organization`** (`instagram`/`twitter`/`linkedin` + the existing `website`), not the
+   `SocialMediaAccounts` join table — the set is fixed/small and custom links are out of scope.
    3b. **Slug rules.** Base path `/o/[slug]`. Format: lowercase `a–z`/`0–9`/hyphens, **3–32 chars**, no
    leading/trailing/double hyphen (slugify on input). **Globally unique, case-insensitive**, with a
    live available/taken check. Small **reserved list** (`new`, `edit`, `settings`, `admin`, `api`,
@@ -108,11 +109,13 @@ model Organization {
   displayName String
   logoUrl     String?  @db.VarChar(2000)        // Supabase path (ADR 0016)
   bio         String?
-  website     String?
+  website     String?                           // full URL
+  instagram   String?                           // username (URL built on render)
+  twitter     String?                           // username
+  linkedin    String?                           // full URL
   ownerUserId String                            // always set — single owner in v1
   verified    Boolean  @default(false)
   owner       Users    @relation(fields: [ownerUserId], references: [id])
-  socials     SocialMediaAccounts[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   @@index([ownerUserId])
@@ -135,9 +138,10 @@ model Spotlight {
 
 `Events` gains a nullable `organizationId` FK → `Organization` (populated on create + backfill;
 `organizerUserId` stays the ownership/auth key, dual-written to the org's owner).
-`SocialMediaAccounts` gains a nullable `organizationId` alongside its existing `userId`, and
-`SocialMediaAccountType` gains **`LINKEDIN`** (IG/Twitter store usernames; LinkedIn stores a URL;
-Website is the `Organization.website` column, not a social row).
+Socials are **plain columns on `Organization`** (`instagram`/`twitter` usernames, `linkedin`/`website`
+URLs), **not** the `SocialMediaAccounts` join table — the set is fixed and small, custom links are
+out of scope, and that table is dormant with an ambiguous dual-FK. Promoting to a table later (if
+open-ended links return) is a trivial migration.
 `Events.organizer` / `organizerUserId` are untouched (the latter still drives ownership/auth;
 the Organization is matched to it by `ownerUserId` for display).
 
@@ -172,7 +176,7 @@ Light-only, indigo, shadcn + tokens + lucide. Sections render only when populate
 ## Phases
 
 - **Phase 0 — Schema + backfill (invisible).** `Organization`, `Spotlight`,
-  `SocialMediaAccounts.organizationId`; slug generator; backfill one Organization per
+  socials as columns on `Organization`; slug generator; backfill one Organization per
   `organizerUserId` from the `organizer` string.
 - **Phase 1 — Organization brand display.** "Hosted by" links to the org page (**F1**);
   Organization page (**F5**). Pure win from backfilled data.
