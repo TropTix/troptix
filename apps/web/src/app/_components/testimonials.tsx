@@ -187,7 +187,7 @@ export default function SocialProof() {
                     asChild
                     className="px-8 py-3"
                   >
-                    <Link href="/events">Browse Events</Link>
+                    <Link href="/discover">Browse Events</Link>
                   </Button>
                 </motion.div>
               </div>

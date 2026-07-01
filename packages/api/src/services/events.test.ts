@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
-import { getEventDetail } from './events';
+import { getEventDetail, listPublicEvents } from './events';
 import { NotFoundError } from './_shared/errors';
 
 const PAST = new Date(Date.now() - 86_400_000);
@@ -144,5 +144,83 @@ describe('getEventDetail', () => {
     await expect(
       getEventDetail(prisma, { eventId: 'missing' })
     ).rejects.toThrow(NotFoundError);
+  });
+});
+
+type SummaryTier = { priceCents: number | null; price: number };
+
+type SummaryRow = {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  startDate: Date;
+  endDate: Date;
+  venue: string | null;
+  ticketTypes: SummaryTier[];
+};
+
+function summaryRow(overrides: Partial<SummaryRow> = {}): SummaryRow {
+  return {
+    id: 'ev-1',
+    name: 'Rum Punch Brunch',
+    imageUrl: 'flyer.jpg',
+    startDate: new Date('2026-07-01T18:00:00.000Z'),
+    endDate: new Date('2026-07-01T22:00:00.000Z'),
+    venue: "Omar's Kitchen",
+    ticketTypes: [{ priceCents: 2500, price: 25 }],
+    ...overrides,
+  };
+}
+
+function fakeListPrisma(rows: SummaryRow[]): PrismaClient {
+  return {
+    events: { findMany: async () => rows },
+  } as unknown as PrismaClient;
+}
+
+describe('listPublicEvents', () => {
+  it('maps rows to card DTOs with ISO dates and cheapest price', async () => {
+    const prisma = fakeListPrisma([
+      summaryRow({ id: 'a', ticketTypes: [{ priceCents: 2500, price: 25 }] }),
+      summaryRow({
+        id: 'b',
+        venue: null,
+        imageUrl: null,
+        ticketTypes: [{ priceCents: 8000, price: 80 }],
+      }),
+    ]);
+    const result = await listPublicEvents(prisma);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      id: 'a',
+      fromPriceCents: 2500,
+      startDate: '2026-07-01T18:00:00.000Z',
+      endDate: '2026-07-01T22:00:00.000Z',
+    });
+    expect(result[1]).toMatchObject({
+      id: 'b',
+      venue: null,
+      imageUrl: null,
+      fromPriceCents: 8000,
+    });
+  });
+
+  it('falls back to legacy price*100 when priceCents is null (pre-backfill)', async () => {
+    const prisma = fakeListPrisma([
+      summaryRow({ ticketTypes: [{ priceCents: null, price: 40 }] }),
+    ]);
+    const result = await listPublicEvents(prisma);
+    expect(result[0].fromPriceCents).toBe(4000);
+  });
+
+  it('returns null fromPriceCents when an event has no public tiers', async () => {
+    const prisma = fakeListPrisma([summaryRow({ ticketTypes: [] })]);
+    const result = await listPublicEvents(prisma);
+    expect(result[0].fromPriceCents).toBeNull();
+  });
+
+  it('returns an empty list when there are no events', async () => {
+    const prisma = fakeListPrisma([]);
+    expect(await listPublicEvents(prisma)).toEqual([]);
   });
 });

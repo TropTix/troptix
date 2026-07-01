@@ -9,13 +9,70 @@
  * columns fall back to legacy sources until the Stage-3 backfill.
  */
 import type { PrismaClient } from '@troptix/db';
+import { Prisma } from '@troptix/db';
 import type {
   EventDetail,
   EventDetailInput,
+  EventSummary,
   EventTicket,
 } from '../contracts/events';
 import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
+
+/**
+ * Public discovery listing: upcoming, non-draft events shaped for the cards on
+ * `/discover`. Soonest-first. The cheapest public price is pre-derived here
+ * (`fromPriceCents`) so no tier rows or discount codes reach the browser. New
+ * `priceCents` column falls back to legacy `price * 100` until the backfill.
+ */
+export async function listPublicEvents(
+  prisma: PrismaClient
+): Promise<EventSummary[]> {
+  const events = await prisma.events.findMany({
+    where: {
+      isDraft: false,
+      endDate: { gt: new Date() },
+    },
+    orderBy: { startDate: Prisma.SortOrder.asc },
+    select: {
+      id: true,
+      name: true,
+      imageUrl: true,
+      startDate: true,
+      endDate: true,
+      venue: true,
+      // Cheapest public tier only (a null/empty discount code means public).
+      ticketTypes: {
+        where: {
+          OR: [
+            { discountCode: { equals: null } },
+            { discountCode: { equals: '' } },
+          ],
+        },
+        select: { priceCents: true, price: true },
+        orderBy: { price: Prisma.SortOrder.asc },
+        take: 1,
+      },
+    },
+  });
+
+  return events.map((event) => {
+    const cheapest = event.ticketTypes[0];
+    const fromPriceCents = cheapest
+      ? (cheapest.priceCents ?? Math.round(cheapest.price * 100))
+      : null;
+
+    return {
+      id: event.id,
+      name: event.name,
+      imageUrl: event.imageUrl,
+      startDate: event.startDate.toISOString(),
+      endDate: event.endDate.toISOString(),
+      venue: event.venue,
+      fromPriceCents,
+    };
+  });
+}
 
 export async function getEventDetail(
   prisma: PrismaClient,

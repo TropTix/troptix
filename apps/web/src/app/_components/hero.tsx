@@ -100,12 +100,9 @@ function HeroCopy() {
         transition={{ duration: 0.7, delay: 0.1 }}
         className="mt-4 sm:mt-5 text-[clamp(2.625rem,11vw,3.25rem)] leading-[1.05] sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight text-slate-900 text-balance"
       >
-        Your next{' '}
-        <br className="sm:hidden" />
-        <AccentWord>unforgettable</AccentWord>{' '}
-        <br className="sm:hidden" />
-        experience{' '}
-        <br className="sm:hidden" />
+        Your next <br className="sm:hidden" />
+        <AccentWord>unforgettable</AccentWord> <br className="sm:hidden" />
+        experience <br className="sm:hidden" />
         starts here.
       </motion.h1>
 
@@ -131,7 +128,7 @@ function HeroCopy() {
             size="lg"
             className="h-12 w-full sm:w-auto px-7 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_10px_28px_-12px_hsl(var(--primary)/0.45)]"
           >
-            <Link href="/events" className="inline-flex items-center gap-2">
+            <Link href="/discover" className="inline-flex items-center gap-2">
               Explore Events
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
@@ -462,7 +459,11 @@ function MiniQR() {
  * straight to the final confirmed+QR state with no animation.
  * Decorative illustration only (the parent FloatingObject is aria-hidden).
  */
-function TicketConfirmedChip({ reduceMotion = false }: { reduceMotion?: boolean }) {
+function TicketConfirmedChip({
+  reduceMotion = false,
+}: {
+  reduceMotion?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
   // 0 = button, 1 = tapped, 2 = confirmed, 3 = QR revealed
@@ -537,7 +538,12 @@ function TicketConfirmedChip({ reduceMotion = false }: { reduceMotion?: boolean 
           >
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  aria-hidden
+                >
                   <motion.path
                     d="M5 13l4 4L19 7"
                     stroke="#059669"

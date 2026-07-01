@@ -11,7 +11,7 @@ export default function EventNotFound() {
         classes="mb-6 text-gray-600"
       />
       <Button asChild>
-        <Link href="/events">Back to All Events</Link>
+        <Link href="/discover">Back to All Events</Link>
       </Button>
     </div>
   );
