@@ -1,25 +1,33 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { Toaster as SonnerToaster } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+
 export default function Toaster() {
   const isMobile = useIsMobile();
-  const position = isMobile ? 'top-center' : 'bottom-right';
 
   return (
     <SonnerToaster
-      position={position}
+      position={isMobile ? 'top-center' : 'bottom-right'}
+      closeButton
+      style={
+        {
+          '--normal-bg': 'hsl(var(--background))',
+          '--normal-text': 'hsl(var(--foreground))',
+          '--normal-border': 'hsl(var(--border))',
+        } as CSSProperties
+      }
       toastOptions={{
         style: {
-          borderRadius: 'border-radius-lg',
+          borderRadius: 'var(--radius)',
         },
-
         classNames: {
-          success: '!bg-green-100 !text-green-700',
-          error: '!bg-red-100 !text-red-700',
-          warning: '!bg-yellow-100 !text-yellow-700',
-          info: '!bg-blue-100 !text-blue-700',
-          loading: '!bg-sky-100 !text-sky-700',
+          description: '!text-muted-foreground',
+          success: '[&_[data-icon]]:!text-success',
+          error: '[&_[data-icon]]:!text-destructive',
+          warning: '[&_[data-icon]]:!text-warning',
+          info: '[&_[data-icon]]:!text-primary',
         },
       }}
     />

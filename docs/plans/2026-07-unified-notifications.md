@@ -1,8 +1,8 @@
 ---
 title: Unified Notifications — notify catalog, Toaster restyle, Alert consolidation
-status: proposed
+status: active
 created: 2026-07-02
-tracking-issue: TBD
+tracking-issue: '#414'
 ---
 
 # Unified Notifications
