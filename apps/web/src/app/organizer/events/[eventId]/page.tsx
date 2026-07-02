@@ -98,7 +98,7 @@ export default async function EventOverviewPage(props: {
     return <p>Error loading event data.</p>;
   }
 
-  const eventUrl = absoluteUrl(`/events/${eventId}`);
+  const eventUrl = absoluteUrl(`/e/${eventId}`);
   const statusDisplay = getEventStatusDisplay(eventData);
   const isPlatformOwner = hasPlatformAccess(user.email);
 
@@ -146,7 +146,7 @@ export default async function EventOverviewPage(props: {
 
             <Button variant="outline" asChild>
               <Link
-                href={`/events/${eventId}`}
+                href={`/e/${eventId}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
