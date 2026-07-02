@@ -26,6 +26,24 @@ export const eventTicketSchema = z.object({
 });
 export type EventTicket = z.infer<typeof eventTicketSchema>;
 
+// --- EventSummary -------------------------------------------------------------
+// The discovery-listing DTO: just what an event card renders. The cheapest
+// public price is pre-derived server-side (`fromPriceCents`); no tier rows or
+// discount codes reach the browser.
+
+export const eventSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Stored flyer path (resolved to an absolute URL by the web layer). */
+  imageUrl: z.string().nullable(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  venue: z.string().nullable(),
+  /** Cheapest public tier, integer cents. Null = free / no public tiers. */
+  fromPriceCents: z.number().int().nullable(),
+});
+export type EventSummary = z.infer<typeof eventSummarySchema>;
+
 export const eventDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
