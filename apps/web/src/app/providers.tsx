@@ -19,19 +19,20 @@ const queryClient = new QueryClient();
 function GlobalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isOrganizer = pathname?.startsWith('/organizer');
-  // The new event page owns the full screen (immersive hero, in-page back/share).
-  const isImmersive = pathname?.startsWith('/e/');
-  const chrome = !isOrganizer && !isImmersive;
+  const isEventPage = pathname?.startsWith('/e/');
+  // Standard pages (and the event page) sit below the fixed header; organizer
+  // pages manage their own top spacing.
+  const offsetContent = !isOrganizer;
+  // The event page has its own sticky checkout bar, so it skips the footer.
+  const showFooter = !isOrganizer && !isEventPage;
 
   return (
     <div>
-      {/* Header shows everywhere except the immersive event page; the rest of
-          the chrome (top offset + footer) stays as it was for organizer pages. */}
-      {!isImmersive && <UnifiedHeader />}
-      <div className={`flex-grow border-x ${chrome ? 'mt-16' : ''}`}>
+      <UnifiedHeader />
+      <div className={`flex-grow border-x ${offsetContent ? 'mt-16' : ''}`}>
         {children}
       </div>
-      {chrome ? <Footer /> : null}
+      {showFooter ? <Footer /> : null}
     </div>
   );
 }
