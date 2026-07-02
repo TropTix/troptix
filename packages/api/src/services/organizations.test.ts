@@ -10,6 +10,7 @@ import {
   ensureOrganizationForUser,
   backfillOrganizations,
   getOrganizationBySlug,
+  updateOrganizationProfile,
 } from './organizations';
 import { NotFoundError } from './_shared/errors';
 
@@ -274,5 +275,116 @@ describe('getOrganizationBySlug', () => {
     ]);
     expect(result.upcomingEvents[0].fromPriceCents).toBe(2500);
     expect(result.upcomingEvents[1].fromPriceCents).toBeNull();
+  });
+});
+
+describe('updateOrganizationProfile', () => {
+  type Org = {
+    id: string;
+    ownerUserId: string;
+    slug: string;
+    displayName: string;
+    createdAt: number;
+    bio?: string | null;
+    website?: string | null;
+    instagram?: string | null;
+    twitter?: string | null;
+    linkedin?: string | null;
+  };
+
+  function makeFake(seed: Org[]) {
+    const orgs = seed.map((o) => ({ ...o }));
+    const prisma = {
+      organization: {
+        findFirst: async ({ where }: any) =>
+          orgs
+            .filter((o) => o.ownerUserId === where.ownerUserId)
+            .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
+        findUnique: async ({ where }: any) =>
+          orgs.find((o) => o.slug === where.slug) ?? null,
+        update: async ({ where, data }: any) => {
+          const o = orgs.find((x) => x.id === where.id)!;
+          Object.assign(o, data);
+          return o;
+        },
+      },
+    } as unknown as PrismaClient;
+    return { prisma, orgs };
+  }
+
+  const base = {
+    ownerUserId: 'u1',
+    displayName: 'Island Vibes',
+    slug: 'island-vibes',
+    bio: null,
+    website: null,
+    instagram: null,
+    twitter: null,
+    linkedin: null,
+  };
+
+  const seed = (): Org[] => [
+    {
+      id: 'a',
+      ownerUserId: 'u1',
+      slug: 'island-vibes',
+      displayName: 'Island Vibes',
+      createdAt: 0,
+    },
+    {
+      id: 'b',
+      ownerUserId: 'u2',
+      slug: 'sunset',
+      displayName: 'Sunset',
+      createdAt: 1,
+    },
+  ];
+
+  it('updates fields and blanks to null', async () => {
+    const { prisma, orgs } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      displayName: 'Island Vibes Collective',
+      bio: '  Soca everywhere  ',
+      instagram: '   ',
+    });
+    expect(result).toEqual({ ok: true, slug: 'island-vibes' });
+    const a = orgs.find((o) => o.id === 'a')!;
+    expect(a.displayName).toBe('Island Vibes Collective');
+    expect(a.bio).toBe('Soca everywhere');
+    expect(a.instagram).toBeNull();
+  });
+
+  it('allows keeping the current slug (no false "taken")', async () => {
+    const { prisma } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, base);
+    expect(result).toEqual({ ok: true, slug: 'island-vibes' });
+  });
+
+  it('rejects a slug taken by another org', async () => {
+    const { prisma } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      slug: 'sunset',
+    });
+    expect(result).toEqual({ ok: false, reason: 'slug_taken' });
+  });
+
+  it('rejects an invalid slug', async () => {
+    const { prisma } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      slug: 'ab',
+    });
+    expect(result).toEqual({ ok: false, reason: 'slug_invalid' });
+  });
+
+  it('returns not_found when the user has no org', async () => {
+    const { prisma } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      ownerUserId: 'nobody',
+    });
+    expect(result).toEqual({ ok: false, reason: 'not_found' });
   });
 });

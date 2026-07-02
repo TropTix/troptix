@@ -13,7 +13,7 @@ import type {
   OrganizationDetail,
   OrganizationDetailInput,
 } from '../contracts/organizations';
-import { generateUniqueSlug } from './_shared/slug';
+import { generateUniqueSlug, isValidSlug } from './_shared/slug';
 import { toEventSummary } from './_shared/eventSummary';
 import { NotFoundError } from './_shared/errors';
 
@@ -108,6 +108,69 @@ export async function backfillOrganizations(
   }
 
   return { organizationsEnsured, eventsLinked };
+}
+
+export type UpdateOrganizationProfileInput = {
+  ownerUserId: string;
+  displayName: string;
+  slug: string;
+  bio: string | null;
+  website: string | null;
+  instagram: string | null;
+  twitter: string | null;
+  linkedin: string | null;
+};
+
+export type UpdateOrganizationProfileResult =
+  | { ok: true; slug: string }
+  | { ok: false; reason: 'not_found' | 'slug_invalid' | 'slug_taken' };
+
+const blankToNull = (value: string | null): string | null => {
+  const trimmed = value?.trim() ?? '';
+  return trimmed === '' ? null : trimmed;
+};
+
+/**
+ * Update the caller's Organization brand (the Profile Info editor, F6). Slug is
+ * only re-validated when it changes: format/reserved via `isValidSlug`, then a
+ * uniqueness check excluding the org itself. Returns a discriminated result for
+ * the expected slug failures (the caller maps them to form errors); the DB
+ * `slug` unique index is the final backstop. `ownerUserId` scopes the write.
+ */
+export async function updateOrganizationProfile(
+  prisma: PrismaClient,
+  input: UpdateOrganizationProfileInput
+): Promise<UpdateOrganizationProfileResult> {
+  const org = await prisma.organization.findFirst({
+    where: { ownerUserId: input.ownerUserId },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (!org) return { ok: false, reason: 'not_found' };
+
+  const nextSlug = input.slug.trim().toLowerCase();
+  if (nextSlug !== org.slug) {
+    if (!isValidSlug(nextSlug)) return { ok: false, reason: 'slug_invalid' };
+    const taken = await prisma.organization.findUnique({
+      where: { slug: nextSlug },
+    });
+    if (taken && taken.id !== org.id)
+      return { ok: false, reason: 'slug_taken' };
+  }
+
+  await prisma.organization.update({
+    where: { id: org.id },
+    data: {
+      displayName: input.displayName.trim() || org.displayName,
+      slug: nextSlug,
+      bio: blankToNull(input.bio),
+      website: blankToNull(input.website),
+      instagram: blankToNull(input.instagram),
+      twitter: blankToNull(input.twitter),
+      linkedin: blankToNull(input.linkedin),
+    },
+  });
+
+  return { ok: true, slug: nextSlug };
 }
 
 /**
