@@ -280,6 +280,15 @@ export default function CheckoutSheet({
     resetState();
   }
 
+  // Back from the Payment step: a reservation already exists, so re-entering
+  // Contact would re-run createReservation (a duplicate hold in the normal flow,
+  // or an empty-items validation error on a resumed load where `selection` is
+  // gone). Instead release the hold and start fresh at ticket selection.
+  function backFromPayment() {
+    if (reservationId) releaseReservation.mutate({ reservationId });
+    startOver();
+  }
+
   const submitError =
     localError ??
     createReservation.error?.message ??
@@ -345,7 +354,7 @@ export default function CheckoutSheet({
                   summary={paymentSummary}
                   expiresAt={expiresAt}
                   onExpired={() => setStep('expired')}
-                  onBack={() => setStep('contact')}
+                  onBack={backFromPayment}
                 />
               )}
             {step === 'finalizing' && (
