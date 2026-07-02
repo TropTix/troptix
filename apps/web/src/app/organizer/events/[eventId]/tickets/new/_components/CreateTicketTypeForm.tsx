@@ -32,7 +32,7 @@ import {
 } from '@/lib/schemas/ticketSchema';
 import { formatCurrency, combineDateTime, formatTime } from '@/lib/dateUtils';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
-import { FeeConfig, getFeeBreakdown } from '@/lib/fees';
+import { calculateFeesCents, FeeConfig } from '@troptix/api';
 const today = new Date();
 today.setHours(0, 0, 0, 0);
 const tomorrow = new Date(today);
@@ -95,8 +95,7 @@ export function CreateTicketTypeForm({
   const currentPrice = Number(watchedPrice) || 0;
 
   if (currentPrice > 0) {
-    // TODO: Should we use the total fee (including tax) or the base fee (excluding tax)?
-    const { baseFee } = getFeeBreakdown(currentPrice);
+    const baseFee = calculateFeesCents(Math.round(currentPrice * 100)) / 100;
 
     if (watchedTicketingFees === 'PASS_TICKET_FEES') {
       calculatedBuyerPrice = currentPrice + baseFee;
@@ -436,7 +435,7 @@ export function CreateTicketTypeForm({
             </div>
             <p className="text-xs text-muted-foreground pt-1">
               *Based on an estimated {FeeConfig.PERCENTAGE * 100}% +{' '}
-              {formatCurrency(FeeConfig.FIXED)} fee.
+              {formatCurrency(FeeConfig.FIXED_CENTS / 100)} fee.
             </p>
           </div>
         )}
