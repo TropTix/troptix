@@ -304,7 +304,7 @@ export default function CheckoutSheet({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="bottom"
-        className="flex h-[100dvh] w-full flex-col gap-0 border-0 p-0"
+        className="flex h-[100dvh] w-full flex-col gap-0 border-0 p-0 sm:inset-0 sm:m-auto sm:h-[85vh] sm:max-w-md sm:overflow-hidden sm:rounded-2xl sm:border sm:border-border"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <SheetTitle className="sr-only">{STEP_TITLE[step]}</SheetTitle>
