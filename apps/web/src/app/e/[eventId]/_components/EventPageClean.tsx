@@ -81,6 +81,10 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
   }, [resumeReservationId]);
 
   const isFree = event.fromPriceCents === 0;
+  // "RSVP" copy is only right when there's nothing to pay for. An event can mix
+  // free and paid tiers (fromPriceCents === 0 yet paid tickets exist), so gate
+  // the reservation wording on whether any paid ticket is on sale.
+  const hasPaidTickets = event.tickets.some((t) => t.priceCents > 0);
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
@@ -270,6 +274,14 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                 </p>
               )}
 
+              {/* Host up top on mobile; desktop surfaces it in the poster aside. */}
+              <p className="mt-3 text-sm text-muted-foreground md:hidden">
+                Hosted by{' '}
+                <span className="font-semibold text-foreground">
+                  {event.organizer}
+                </span>
+              </p>
+
               <div className="mt-6 space-y-3">
                 <MetaRow
                   icon={<Calendar className="h-6 w-6" />}
@@ -298,12 +310,6 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                 <p className="text-sm text-muted-foreground">{event.address}</p>
                 <VenueMap event={event} />
               </section>
-
-              {/* Organizer shows in the aside on desktop; surface it here on mobile. */}
-              <section className="mt-10 md:hidden">
-                <SectionHeader>Hosted by</SectionHeader>
-                <p className="mt-3 font-semibold">{event.organizer}</p>
-              </section>
             </div>
           </div>
         </div>
@@ -324,7 +330,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
             onClick={() => setSheetOpen(true)}
             className="flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            {isFree ? 'RSVP' : 'Get Tickets'}
+            {hasPaidTickets ? 'Get Tickets' : 'RSVP'}
             <ArrowRight className="h-5 w-5" />
           </button>
         </div>

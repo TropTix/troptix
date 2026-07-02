@@ -173,7 +173,9 @@ function PaymentInner({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-5 py-4">
-      <div className="mb-3 flex items-center justify-between text-sm">
+      {/* pr-8 keeps the countdown clear of the sheet's absolute close (✕)
+          button pinned at right-4 — otherwise they overlap on mobile. */}
+      <div className="mb-3 flex items-center justify-between pr-8 text-sm">
         <button
           type="button"
           onClick={onBack}
