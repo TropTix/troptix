@@ -80,6 +80,16 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
     if (resumeReservationId) setSheetOpen(true);
   }, [resumeReservationId]);
 
+  // router.back() is a no-op when there's no in-app history (opened straight
+  // from a shared link), so fall back to Discover in that case.
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/discover');
+    }
+  };
+
   const isFree = event.fromPriceCents === 0;
   // "RSVP" copy is only right when there's nothing to pay for. An event can mix
   // free and paid tiers (fromPriceCents === 0 yet paid tickets exist), so gate
@@ -194,7 +204,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
               <button
                 type="button"
                 aria-label="Back"
-                onClick={() => router.back()}
+                onClick={handleBack}
                 className={cn(
                   ROUND_BTN,
                   'bg-white/90 text-slate-900 shadow-md backdrop-blur'
