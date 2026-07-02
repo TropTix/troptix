@@ -30,18 +30,41 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { initials } from '@/lib/utils';
 
 const PROFILE_URL_BASE = 'troptix.com/o/';
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
+const SOCIAL_FIELDS: {
+  name: 'instagram' | 'twitter' | 'linkedin' | 'website';
+  label: string;
+  icon: typeof Globe;
+  placeholder: string;
+}[] = [
+  {
+    name: 'instagram',
+    label: 'Instagram',
+    icon: Instagram,
+    placeholder: 'Instagram username',
+  },
+  {
+    name: 'twitter',
+    label: 'Twitter',
+    icon: Twitter,
+    placeholder: 'Twitter username',
+  },
+  {
+    name: 'linkedin',
+    label: 'LinkedIn',
+    icon: Linkedin,
+    placeholder: 'LinkedIn URL',
+  },
+  {
+    name: 'website',
+    label: 'Website',
+    icon: Globe,
+    placeholder: 'Website URL',
+  },
+];
 
 export default function OrganizationProfileForm({
   initial,
@@ -138,89 +161,29 @@ export default function OrganizationProfileForm({
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="instagram"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Instagram</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Instagram className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Instagram username"
-                      className="pl-9"
-                      {...field}
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="twitter"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Twitter</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Twitter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Twitter username"
-                      className="pl-9"
-                      {...field}
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="linkedin"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>LinkedIn</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Linkedin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="LinkedIn URL"
-                      className="pl-9"
-                      {...field}
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="website"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Website</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Website URL"
-                      className="pl-9"
-                      {...field}
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {SOCIAL_FIELDS.map(({ name, label, icon: Icon, placeholder }) => (
+            <FormField
+              key={name}
+              control={form.control}
+              name={name}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{label}</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder={placeholder}
+                        className="pl-9"
+                        {...field}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ))}
 
           <FormField
             control={form.control}

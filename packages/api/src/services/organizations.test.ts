@@ -387,4 +387,26 @@ describe('updateOrganizationProfile', () => {
     });
     expect(result).toEqual({ ok: false, reason: 'not_found' });
   });
+
+  it('maps a slug unique-constraint violation (race) to slug_taken', async () => {
+    const prisma = {
+      organization: {
+        findFirst: async () => ({
+          id: 'a',
+          ownerUserId: 'u1',
+          slug: 'island-vibes',
+          displayName: 'Island Vibes',
+        }),
+        findUnique: async () => null, // check passes…
+        update: async () => {
+          throw { code: 'P2002' }; // …but another write claimed the slug first
+        },
+      },
+    } as unknown as PrismaClient;
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      slug: 'new-slug',
+    });
+    expect(result).toEqual({ ok: false, reason: 'slug_taken' });
+  });
 });

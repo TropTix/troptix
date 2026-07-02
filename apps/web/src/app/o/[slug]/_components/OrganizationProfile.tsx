@@ -2,20 +2,11 @@ import type { ReactNode } from 'react';
 import { BadgeCheck, Globe, Instagram, Linkedin, Twitter } from 'lucide-react';
 import type { EventSummary, OrganizationDetail } from '@troptix/api';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import EventCard from '@/app/discover/_components/EventCard';
+import { initials } from '@/lib/utils';
+import EventCard from '@/components/EventCard';
 
 // Public organization page (/o/[slug], surface F5): brand header + the org's
 // upcoming/past events. Always public; drafts never reach here (service-side).
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
 
 const withScheme = (url: string) =>
   /^https?:\/\//i.test(url) ? url : `https://${url}`;

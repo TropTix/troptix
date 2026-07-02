@@ -15,6 +15,19 @@ export function getFormattedCurrency(price) {
   return formatter.format(price);
 }
 
+/** Up to two uppercase initials from a name, or '?' when there are none. */
+export function initials(name: string): string {
+  const result = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  return result || '?';
+}
+
 export function generateId() {
   const uid = new ShortUniqueId({
     dictionary: 'alphanum_upper',

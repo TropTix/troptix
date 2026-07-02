@@ -157,18 +157,27 @@ export async function updateOrganizationProfile(
       return { ok: false, reason: 'slug_taken' };
   }
 
-  await prisma.organization.update({
-    where: { id: org.id },
-    data: {
-      displayName: input.displayName.trim() || org.displayName,
-      slug: nextSlug,
-      bio: blankToNull(input.bio),
-      website: blankToNull(input.website),
-      instagram: blankToNull(input.instagram),
-      twitter: blankToNull(input.twitter),
-      linkedin: blankToNull(input.linkedin),
-    },
-  });
+  try {
+    await prisma.organization.update({
+      where: { id: org.id },
+      data: {
+        displayName: input.displayName.trim() || org.displayName,
+        slug: nextSlug,
+        bio: blankToNull(input.bio),
+        website: blankToNull(input.website),
+        instagram: blankToNull(input.instagram),
+        twitter: blankToNull(input.twitter),
+        linkedin: blankToNull(input.linkedin),
+      },
+    });
+  } catch (err) {
+    // Lost a race for the slug between the check above and this write — the DB
+    // unique index is the real arbiter; map it back to the discriminated result.
+    if ((err as { code?: string }).code === 'P2002') {
+      return { ok: false, reason: 'slug_taken' };
+    }
+    throw err;
+  }
 
   return { ok: true, slug: nextSlug };
 }
