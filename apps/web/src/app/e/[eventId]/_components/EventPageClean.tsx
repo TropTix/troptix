@@ -69,7 +69,7 @@ function MetaRow({
 export default function EventPageClean({ event }: { event: EventDetail }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const resumeReservationId = searchParams.get('reservation');
+  const resumeReservationId = searchParams?.get('reservation') ?? null;
   const [accent, setAccent] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
