@@ -375,6 +375,12 @@ describe('beginPayment — session creation + reuse', () => {
     });
     expect(first.clientSecret).toBeTruthy();
     expect(first.totalCents).toBe(2 * 1500 + 2 * 300);
+    // Order summary (payment-screen), server-sourced from the reservation tiers.
+    expect(first.subtotalCents).toBe(2 * 1500);
+    expect(first.feesCents).toBe(2 * 300);
+    expect(first.items).toEqual([
+      { name: 'GA', quantity: 2, unitPriceCents: 1500, feesCents: 300 },
+    ]);
     expect(fake.calls.create).toHaveLength(1);
     // Line items: a tier line + a single service-fee line.
     expect((fake.calls.create[0].params as any).line_items).toHaveLength(2);

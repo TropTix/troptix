@@ -8,12 +8,26 @@ export const beginPaymentInputSchema = z.object({
 });
 export type BeginPaymentInput = z.infer<typeof beginPaymentInputSchema>;
 
+/** One order-summary line for the payment screen (server-authoritative). */
+export const paymentSummaryItemSchema = z.object({
+  name: z.string(),
+  quantity: z.number().int(),
+  unitPriceCents: z.number().int(),
+  feesCents: z.number().int(),
+});
+export type PaymentSummaryItem = z.infer<typeof paymentSummaryItemSchema>;
+
 export const beginPaymentResponseSchema = z.object({
   /** Checkout Session client secret for `CheckoutElementsProvider`. */
   clientSecret: z.string(),
   /** ISO-8601 — the hold's TTL (drives the countdown). */
   expiresAt: z.string().datetime(),
   totalCents: z.number().int(),
+  subtotalCents: z.number().int(),
+  feesCents: z.number().int(),
+  /** What the buyer is paying for — from the reservation, so it survives a
+   * resumed/refreshed payment screen where the client selection is gone. */
+  items: z.array(paymentSummaryItemSchema),
 });
 export type BeginPaymentResponse = z.infer<typeof beginPaymentResponseSchema>;
 

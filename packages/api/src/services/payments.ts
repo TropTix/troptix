@@ -70,6 +70,25 @@ export async function beginPayment(
     );
   }
 
+  // Order summary for the payment screen, built from the reservation's tiers so
+  // it survives a resumed/refreshed payment step (where the client cart is gone).
+  const tiers = await prisma.ticketTypes.findMany({
+    where: { id: { in: reservation.items.map((i) => i.ticketTypeId) } },
+    select: { id: true, name: true },
+  });
+  const nameById = new Map(tiers.map((t) => [t.id, t.name]));
+  const summary = {
+    totalCents: reservation.totalCents,
+    subtotalCents: reservation.subtotalCents,
+    feesCents: reservation.feesCents,
+    items: reservation.items.map((item) => ({
+      name: nameById.get(item.ticketTypeId) ?? 'Ticket',
+      quantity: item.quantity,
+      unitPriceCents: item.unitPriceCents,
+      feesCents: item.feesCents,
+    })),
+  };
+
   // Committing to pay refreshes the hold window (ADR 0018): a fresh full TTL
   // from now, so a buyer who browsed a while still gets the whole payment window
   // — and the server deadline stays ahead of the client countdown.
@@ -89,7 +108,7 @@ export async function beginPayment(
       return {
         clientSecret: existing.client_secret,
         expiresAt: extendedExpiresAt.toISOString(),
-        totalCents: reservation.totalCents,
+        ...summary,
       };
     }
     // Non-open (expired / complete): we must mint a fresh Session. Remember the
@@ -97,12 +116,6 @@ export async function beginPayment(
     // `checkout-<id>` key would make Stripe replay this dead Session instead.
     staleSessionId = reservation.stripeCheckoutSessionId;
   }
-
-  const tiers = await prisma.ticketTypes.findMany({
-    where: { id: { in: reservation.items.map((i) => i.ticketTypeId) } },
-    select: { id: true, name: true },
-  });
-  const nameById = new Map(tiers.map((t) => [t.id, t.name]));
 
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
     reservation.items.map((item) => ({
@@ -165,7 +178,7 @@ export async function beginPayment(
   return {
     clientSecret: session.client_secret,
     expiresAt: extendedExpiresAt.toISOString(),
-    totalCents: reservation.totalCents,
+    ...summary,
   };
 }
 

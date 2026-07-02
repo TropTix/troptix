@@ -9,12 +9,71 @@ import {
 } from '@stripe/react-stripe-js/checkout';
 import { Spinner } from '@/components/ui/spinner';
 import { getFormattedCurrency } from '@/lib/utils';
+import type { EventDetail } from '@troptix/api';
 
 // One Stripe.js instance for the module (loadStripe is memoized upstream too).
 const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 const stripePromise = loadStripe(stripeKey ?? '');
 
 const money = (cents: number) => getFormattedCurrency(cents / 100);
+
+type PaymentSummary = {
+  items: {
+    name: string;
+    quantity: number;
+    unitPriceCents: number;
+    feesCents: number;
+  }[];
+  subtotalCents: number;
+  feesCents: number;
+  totalCents: number;
+};
+
+/** Order summary shown above the card field, so the buyer can see what they're
+ * paying for. Server-sourced (survives a resumed/refreshed payment step). */
+function OrderSummary({
+  event,
+  summary,
+}: {
+  event: EventDetail;
+  summary: PaymentSummary;
+}) {
+  const start = new Date(event.startDate);
+  const dateLine = `${start.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })} · ${start.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`;
+  return (
+    <div className="mb-4 rounded-xl border bg-muted/30 p-4">
+      <p className="font-bold leading-tight">{event.name}</p>
+      <p className="text-sm text-muted-foreground">{dateLine}</p>
+      <div className="mt-3 space-y-1 text-sm">
+        {summary.items.map((item, i) => (
+          <div key={`${item.name}-${i}`} className="flex justify-between">
+            <span>
+              {item.quantity} × {item.name}
+            </span>
+            <span>{money(item.quantity * item.unitPriceCents)}</span>
+          </div>
+        ))}
+        {summary.feesCents > 0 && (
+          <div className="flex justify-between text-muted-foreground">
+            <span>Service fees</span>
+            <span>{money(summary.feesCents)}</span>
+          </div>
+        )}
+        <div className="mt-1 flex justify-between border-t pt-2 font-semibold">
+          <span>Total</span>
+          <span>{money(summary.totalCents)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // The server holds 2 min past the buyer's countdown (ADR 0018): showing a
 // deadline earlier than the true `expiresAt` gives a payment submitted right at
@@ -42,12 +101,14 @@ function useCountdown(expiresAt: string): number {
 }
 
 function PaymentInner({
-  totalCents,
+  event,
+  summary,
   expiresAt,
   onExpired,
   onBack,
 }: {
-  totalCents: number;
+  event: EventDetail;
+  summary: PaymentSummary;
   expiresAt: string;
   onExpired: () => void;
   onBack: () => void;
@@ -131,6 +192,8 @@ function PaymentInner({
         </span>
       </div>
 
+      <OrderSummary event={event} summary={summary} />
+
       <PaymentElement />
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -145,7 +208,7 @@ function PaymentInner({
           ? 'Hold expired'
           : submitting
             ? 'Processing…'
-            : `Pay ${money(totalCents)}`}
+            : `Pay ${money(summary.totalCents)}`}
       </button>
     </div>
   );
@@ -158,13 +221,15 @@ function PaymentInner({
  */
 export default function PaymentStep({
   clientSecret,
-  totalCents,
+  event,
+  summary,
   expiresAt,
   onExpired,
   onBack,
 }: {
   clientSecret: string;
-  totalCents: number;
+  event: EventDetail;
+  summary: PaymentSummary;
   expiresAt: string;
   onExpired: () => void;
   onBack: () => void;
@@ -172,7 +237,8 @@ export default function PaymentStep({
   return (
     <CheckoutElementsProvider stripe={stripePromise} options={{ clientSecret }}>
       <PaymentInner
-        totalCents={totalCents}
+        event={event}
+        summary={summary}
         expiresAt={expiresAt}
         onExpired={onExpired}
         onBack={onBack}

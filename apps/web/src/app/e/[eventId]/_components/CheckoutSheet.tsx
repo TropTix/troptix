@@ -66,9 +66,19 @@ export default function CheckoutSheet({
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  // Authoritative charge from the server (beginPayment). The selection-derived
-  // total is 0 on a resumed load, so the Payment step must use this instead.
-  const [paymentTotalCents, setPaymentTotalCents] = useState(0);
+  // Authoritative order summary from the server (beginPayment). The selection-
+  // derived total/items are gone on a resumed load, so the Payment step uses this.
+  const [paymentSummary, setPaymentSummary] = useState<{
+    items: {
+      name: string;
+      quantity: number;
+      unitPriceCents: number;
+      feesCents: number;
+    }[];
+    subtotalCents: number;
+    feesCents: number;
+    totalCents: number;
+  } | null>(null);
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const [slowFinalize, setSlowFinalize] = useState(false);
   // Guards the one-shot "resume found an unpaid hold → reopen payment" branch.
@@ -136,7 +146,12 @@ export default function CheckoutSheet({
         .then((payment) => {
           setClientSecret(payment.clientSecret);
           setExpiresAt(payment.expiresAt);
-          setPaymentTotalCents(payment.totalCents);
+          setPaymentSummary({
+            items: payment.items,
+            subtotalCents: payment.subtotalCents,
+            feesCents: payment.feesCents,
+            totalCents: payment.totalCents,
+          });
           setStep('payment');
         })
         .catch(() => setStep('expired'));
@@ -160,7 +175,7 @@ export default function CheckoutSheet({
     setReservationId(null);
     setClientSecret(null);
     setExpiresAt(null);
-    setPaymentTotalCents(0);
+    setPaymentSummary(null);
     setSuccessData(null);
     setSlowFinalize(false);
     resumeReopenRef.current = false;
@@ -243,7 +258,12 @@ export default function CheckoutSheet({
       });
       setClientSecret(payment.clientSecret);
       setExpiresAt(payment.expiresAt);
-      setPaymentTotalCents(payment.totalCents);
+      setPaymentSummary({
+        items: payment.items,
+        subtotalCents: payment.subtotalCents,
+        feesCents: payment.feesCents,
+        totalCents: payment.totalCents,
+      });
       setStep('payment');
     } catch {
       // Errors surface via the mutation error banners below. Hand back the hold
@@ -315,15 +335,19 @@ export default function CheckoutSheet({
                 onSubmit={handleContact}
               />
             )}
-            {step === 'payment' && clientSecret && expiresAt && (
-              <PaymentStep
-                clientSecret={clientSecret}
-                totalCents={paymentTotalCents}
-                expiresAt={expiresAt}
-                onExpired={() => setStep('expired')}
-                onBack={() => setStep('contact')}
-              />
-            )}
+            {step === 'payment' &&
+              clientSecret &&
+              expiresAt &&
+              paymentSummary && (
+                <PaymentStep
+                  clientSecret={clientSecret}
+                  event={event}
+                  summary={paymentSummary}
+                  expiresAt={expiresAt}
+                  onExpired={() => setStep('expired')}
+                  onBack={() => setStep('contact')}
+                />
+              )}
             {step === 'finalizing' && (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
                 <Spinner text="Finalizing your tickets…" />
