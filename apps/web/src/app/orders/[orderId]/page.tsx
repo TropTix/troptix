@@ -209,7 +209,7 @@ export default async function OrderDetailsPage(props: {
                 variant="outline"
                 className="w-full sm:w-auto mt-2 mb-4 border-primary/50 hover:border-primary text-primary hover:bg-primary/5 group"
               >
-                <Link href={`/events/${order.event.id}`}>
+                <Link href={`/e/${order.event.id}`}>
                   {' '}
                   {isPastEvent ? 'View Past Event Details' : 'View Event'}
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
