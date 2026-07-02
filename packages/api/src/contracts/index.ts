@@ -4,4 +4,5 @@
 export * from './checkout';
 export * from './events';
 export * from './organizations';
+export * from './payments';
 export * from './reservations';

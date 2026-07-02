@@ -27,7 +27,7 @@ function Stepper({
               type="button"
               aria-label="Remove one"
               onClick={() => onChange(-1)}
-              className="grid h-7 w-7 place-items-center rounded-full text-foreground transition-colors hover:bg-muted"
+              className="grid h-7 w-7 place-items-center rounded-full bg-muted/70 text-foreground transition-colors hover:bg-muted"
             >
               <Minus className="h-4 w-4" />
             </button>
@@ -75,7 +75,7 @@ export default function SelectStep({
     <>
       <div className="space-y-0.5 border-b border-border px-5 py-4">
         <h2 className="text-lg font-extrabold tracking-tight">
-          {isFree ? 'Reserve your spot' : 'Choose tickets'}
+          Choose tickets
         </h2>
         <p className="truncate text-sm text-muted-foreground">{eventName}</p>
       </div>

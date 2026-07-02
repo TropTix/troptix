@@ -46,7 +46,7 @@ export default function EventCard({ event }: { event: Event }) {
   };
 
   const status = getEventStatus();
-  const eventUrl = `/events/${event.id}`;
+  const eventUrl = `/e/${event.id}`;
 
   return (
     <Card className="group hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-[1.02] overflow-hidden">
