@@ -18,5 +18,9 @@ export default defineConfig({
     // Integration tests hit a real DB; the default 5s is too tight.
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // All files share ONE Postgres, and some (expire / sweepExpiredHolds) scan
+    // the whole Reservation table — running files in parallel workers would let
+    // them mutate each other's rows. Run them serially instead.
+    fileParallelism: false,
   },
 });

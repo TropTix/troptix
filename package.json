@@ -38,5 +38,8 @@
     "prettier": "^3.2.4",
     "ts-node": "^10.9.1"
   },
+  "resolutions": {
+    "stripe": "22.3.0"
+  },
   "private": true
 }

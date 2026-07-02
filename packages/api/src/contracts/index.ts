@@ -3,4 +3,5 @@
 // type-only default entry (src/index.ts).
 export * from './checkout';
 export * from './events';
+export * from './payments';
 export * from './reservations';
