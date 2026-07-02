@@ -10,6 +10,17 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+/**
+ * Hybrid fulfillment sends the same email from two places (the Stripe webhook
+ * and the client success/poll), so two requests can hit Resend with the same
+ * idempotency key concurrently. Resend 409s the loser with
+ * `concurrent_idempotent_requests` while the winner sends it — benign, not a
+ * failure (Resend docs: "safe to retry later"). Treat it as success.
+ */
+function isConcurrentIdempotencyConflict(error: { name?: string } | null) {
+  return error?.name === 'concurrent_idempotent_requests';
+}
+
 async function sendEmail(
   to: string,
   subject: string,
@@ -33,6 +44,12 @@ async function sendEmail(
   );
   // Resend reports failures via `error`, not by throwing.
   if (error) {
+    if (isConcurrentIdempotencyConflict(error)) {
+      console.log(
+        `Confirmation email for ${orderId} already in progress (idempotent) — skipping duplicate.`
+      );
+      return null;
+    }
     throw new Error(`Resend failed to send email: ${error.message}`);
   }
   console.log('Email sent successfully:', data);
@@ -114,7 +131,7 @@ export async function sendRefundNoticeEmail(reservationId: string) {
       },
       { idempotencyKey: `refund-${reservationId}` }
     );
-    if (error) {
+    if (error && !isConcurrentIdempotencyConflict(error)) {
       console.error('[Refund] Resend failed to send refund notice:', error);
     }
   } catch (error) {
