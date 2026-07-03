@@ -21,13 +21,20 @@ async function orderCheckoutState(
   prisma: PrismaClient,
   orderId: string
 ): Promise<CheckoutState> {
-  const tickets = await prisma.tickets.findMany({
-    where: { orderId },
-    select: { id: true, ticketType: { select: { name: true } } },
-  });
+  const [order, tickets] = await Promise.all([
+    prisma.orders.findUnique({
+      where: { id: orderId },
+      select: { accessToken: true },
+    }),
+    prisma.tickets.findMany({
+      where: { orderId },
+      select: { id: true, ticketType: { select: { name: true } } },
+    }),
+  ]);
   return {
     kind: 'order',
     orderId,
+    accessToken: order?.accessToken ?? null,
     tickets: tickets.map((t) => ({
       id: t.id,
       ticketTypeName: t.ticketType?.name ?? null,

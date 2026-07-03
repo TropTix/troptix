@@ -43,6 +43,17 @@ async function fetchUserOrders(): Promise<UserOrder[]> {
     return [];
   }
 
+  // Opportunistic claim: stamp this user onto any orders they bought as a guest
+  // (matched by email, userId still null). Durable link beyond the email string.
+  try {
+    await prisma.orders.updateMany({
+      where: { email: user.email, userId: null },
+      data: { userId: user.uid },
+    });
+  } catch (error) {
+    console.error('Failed to backfill order ownership:', error);
+  }
+
   try {
     const userOrders = await prisma.orders.findMany({
       where: {
@@ -82,8 +93,44 @@ async function fetchUserOrders(): Promise<UserOrder[]> {
   }
 }
 
+function toCardProps(order: UserOrder) {
+  const eventDate = order.event?.startDate
+    ? new Date(order.event.startDate)
+    : null;
+  const now = new Date();
+  const isPastEvent = eventDate ? eventDate < now : false;
+  const isToday = eventDate
+    ? eventDate.toDateString() === now.toDateString()
+    : false;
+
+  return {
+    id: order.id,
+    name: order.event?.name || 'Event Name N/A',
+    date: eventDate ? getDateFormatter(eventDate, 'MMM dd, yyyy') : 'Date N/A',
+    time: eventDate ? formatTime(eventDate) : 'Time N/A',
+    venue: order.event?.venue || 'Venue N/A',
+    imageUrl: eventFlyerUrl(order.event?.imageUrl) || DEFAULT_EVENT_IMAGE,
+    ticketCount: order._count.tickets,
+    createdAt: order.createdAt,
+    eventDate,
+    isPastEvent,
+    isToday,
+  };
+}
+
 export default async function OrdersPage() {
   const orders = await fetchUserOrders();
+  const now = new Date().getTime();
+  const startMs = (o: UserOrder) =>
+    o.event?.startDate ? new Date(o.event.startDate).getTime() : 0;
+
+  // Upcoming leads (soonest first — the ticket you're about to use); past trails.
+  const upcoming = orders
+    .filter((o) => startMs(o) >= now)
+    .sort((a, b) => startMs(a) - startMs(b));
+  const past = orders
+    .filter((o) => startMs(o) < now)
+    .sort((a, b) => startMs(b) - startMs(a));
 
   return (
     <div className="container mt-16 w-full md:mt-20 min-h-screen px-4 py-8">
@@ -97,35 +144,31 @@ export default async function OrdersPage() {
       </div>
 
       {orders.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">
-          {orders.map((order) => {
-            const eventDate = order.event?.startDate
-              ? new Date(order.event.startDate)
-              : null;
-            const now = new Date();
-            const isPastEvent = eventDate ? eventDate < now : false;
-            const isToday = eventDate
-              ? eventDate.toDateString() === now.toDateString()
-              : false;
-
-            const cardOrderProps = {
-              id: order.id,
-              name: order.event?.name || 'Event Name N/A',
-              date: eventDate
-                ? getDateFormatter(eventDate, 'MMM dd, yyyy')
-                : 'Date N/A',
-              time: eventDate ? formatTime(eventDate) : 'Time N/A',
-              venue: order.event?.venue || 'Venue N/A',
-              imageUrl:
-                eventFlyerUrl(order.event?.imageUrl) || DEFAULT_EVENT_IMAGE,
-              ticketCount: order._count.tickets,
-              createdAt: order.createdAt,
-              eventDate: eventDate,
-              isPastEvent,
-              isToday,
-            };
-            return <OrderCard key={order.id} order={cardOrderProps} />;
-          })}
+        <div className="max-w-7xl mx-auto space-y-12">
+          {upcoming.length > 0 && (
+            <section>
+              <h2 className="mb-5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Upcoming
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {upcoming.map((order) => (
+                  <OrderCard key={order.id} order={toCardProps(order)} />
+                ))}
+              </div>
+            </section>
+          )}
+          {past.length > 0 && (
+            <section>
+              <h2 className="mb-5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Past
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {past.map((order) => (
+                  <OrderCard key={order.id} order={toCardProps(order)} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       ) : (
         <Card className="max-w-md mx-auto text-center">

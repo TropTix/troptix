@@ -5,6 +5,7 @@ import {
   Events as PrismaEvent,
   TicketTypes as PrismaTicketType,
   OrderStatus,
+  OrderType,
 } from '@troptix/db';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -44,6 +45,7 @@ import { Badge } from '@/components/ui/badge';
 
 import { getDateFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency } from '@/lib/utils';
+import { resolveOrderAccess } from '@/server/orderAccess';
 import TicketListInteractive from './_components/TicketList';
 
 export interface EnrichedTicket extends PrismaTicket {
@@ -76,9 +78,35 @@ async function getOrder(orderId: string): Promise<EnrichedOrder | null> {
 
 export default async function OrderDetailsPage(props: {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
   const params = await props.params;
+  const { t } = await props.searchParams;
   const orderId = params.orderId;
+
+  const access = await resolveOrderAccess(orderId, t);
+  if (access.accessMode === 'denied') {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-semibold">
+          {access.orderExists
+            ? 'Sign in to view this order'
+            : 'Order not found'}
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          {access.orderExists
+            ? 'Open the link from your confirmation email, or sign in with the email you used to buy.'
+            : 'We couldn’t find this order. Double-check the link in your confirmation email.'}
+        </p>
+        {access.orderExists && (
+          <Button asChild className="mt-6">
+            <Link href="/auth/signin">Sign in</Link>
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   const order = await getOrder(orderId);
   const now = new Date();
   const isPastEvent = order ? new Date(order.event.endDate) < now : false;
@@ -144,6 +172,11 @@ export default async function OrderDetailsPage(props: {
   }
 
   const defaultEventImageUrl = DEFAULT_EVENT_IMAGE;
+  const isFree =
+    order.type === OrderType.FREE || (order.totalCents ?? order.total) === 0;
+  const totalDisplay = getFormattedCurrency(
+    (order.totalCents ?? Math.round(order.total * 100)) / 100
+  );
 
   return (
     <div
@@ -247,10 +280,25 @@ export default async function OrderDetailsPage(props: {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total:</span>
-                  <span className="font-bold text-md sm:text-lg">
-                    {getFormattedCurrency(order.total)}
-                  </span>
+                  {isFree ? (
+                    <Badge className="bg-primary/10 text-primary border-primary/20">
+                      Free
+                    </Badge>
+                  ) : (
+                    <span className="font-bold text-md sm:text-lg">
+                      {totalDisplay}
+                    </span>
+                  )}
                 </div>
+                {!isFree && order.cardLast4 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Paid with:</span>
+                    <span className="font-medium">
+                      {order.cardType ? `${order.cardType} ` : ''}••••{' '}
+                      {order.cardLast4}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center pt-1">
                   <span className="text-muted-foreground">Status:</span>
                   <Badge
@@ -266,17 +314,21 @@ export default async function OrderDetailsPage(props: {
                   </Badge>
                 </div>
               </CardContent>
-              <CardFooter>
-                <Button
-                  asChild
-                  className="w-full bg-secondary hover:bg-secondary/80 text-secondary-foreground"
-                  size="sm"
-                >
-                  <Link href={`/orders/${order.id}/receipt`}>
-                    <FileText className="mr-2 h-4 w-4" /> View Full Receipt
-                  </Link>
-                </Button>
-              </CardFooter>
+              {!isFree && (
+                <CardFooter>
+                  <Button
+                    asChild
+                    className="w-full bg-secondary hover:bg-secondary/80 text-secondary-foreground"
+                    size="sm"
+                  >
+                    <Link
+                      href={`/orders/${order.id}/receipt${access.accessMode === 'guest' && t ? `?t=${encodeURIComponent(t)}` : ''}`}
+                    >
+                      <FileText className="mr-2 h-4 w-4" /> View Full Receipt
+                    </Link>
+                  </Button>
+                </CardFooter>
+              )}
             </Card>
           </div>
 

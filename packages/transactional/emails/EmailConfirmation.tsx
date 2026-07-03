@@ -32,6 +32,8 @@ export interface EmailTicket {
 
 export interface EmailOrder {
   id: string;
+  /** Guest ticket-access token — appended to the tickets link as `?t=`. */
+  accessToken?: string | null;
   firstName: string | null;
   lastName: string | null;
   email: string | null;
@@ -62,7 +64,9 @@ export default function EmailConfirmationTemplate({
   baseUrl: string;
 }) {
   const { event, tickets = [] } = order;
-  const ticketUrl = `${baseUrl}/orders/${order.id}/tickets`;
+  const ticketUrl = `${baseUrl}/orders/${order.id}/tickets${
+    order.accessToken ? `?t=${encodeURIComponent(order.accessToken)}` : ''
+  }`;
   const calendar = buildCalendarLinks(order, ticketUrl);
   const greetingName = order.firstName || 'Guest';
   const fullName =

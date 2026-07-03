@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import ShortUniqueId from 'short-unique-id';
 
 // One reentrant generator for the process — `generateId` is called many times
@@ -12,4 +13,13 @@ const uid = new ShortUniqueId({ dictionary: 'alphanum_upper', length: 12 });
  */
 export function generateId(): string {
   return uid.rnd();
+}
+
+/**
+ * High-entropy, URL-safe token for guest ticket access (the order's `accessToken`).
+ * 32 random bytes → base64url; unguessable, and deliberately separate from the row
+ * id so the PK never doubles as a bearer secret.
+ */
+export function generateAccessToken(): string {
+  return randomBytes(32).toString('base64url');
 }

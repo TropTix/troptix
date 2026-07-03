@@ -219,6 +219,11 @@ model Orders {
   billingState     String?
   tickets          Tickets[]
   ticketsLink      String?
+  // Guest ticket-access capability minted at order creation. Distinct from the
+  // PK (`id`) and any user-facing public code: this is the unguessable secret
+  // behind the email's `?t=` link and gates the order/tickets/receipt pages for
+  // non-authenticated viewers. Revocable (null it to kill outstanding links).
+  accessToken      String?     @unique
   status           OrderStatus @default(PENDING)
 
   // Reservation rebuild (Phase A — additive). Nullable until backfilled +

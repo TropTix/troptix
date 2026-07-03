@@ -26,7 +26,7 @@ import type {
   CompleteFreeInput,
   CompleteFreeResponse,
 } from '../contracts/reservations';
-import { generateId } from './_shared/ids';
+import { generateId, generateAccessToken } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
 
@@ -289,6 +289,8 @@ export interface ConfirmInput {
 
 export interface ConfirmResult {
   orderId: string;
+  /** Guest ticket-access token for the confirmation link (`?t=`). */
+  accessToken: string | null;
   /** True when this was a duplicate webhook delivery (no-op). */
   alreadyProcessed: boolean;
 }
@@ -321,7 +323,7 @@ async function materializeOrder(
     cardType?: string | null;
     cardLast4?: string | null;
   } = {}
-): Promise<string> {
+): Promise<{ orderId: string; accessToken: string }> {
   const isFree = reservation.totalCents === 0;
   const orderType = isFree ? OrderType.FREE : OrderType.PAID;
   const ticketsType = isFree ? TicketType.FREE : TicketType.PAID;
@@ -359,9 +361,11 @@ async function materializeOrder(
   }
 
   const orderId = generateId();
+  const accessToken = generateAccessToken();
   await tx.orders.create({
     data: {
       id: orderId,
+      accessToken,
       status: OrderStatus.COMPLETED,
       type: orderType,
       stripePaymentId: opts.paymentIntentId ?? null,
@@ -397,7 +401,7 @@ async function materializeOrder(
     },
   });
 
-  return orderId;
+  return { orderId, accessToken };
 }
 
 export async function confirm(
@@ -422,7 +426,15 @@ export async function confirm(
           `Reservation ${reservation.id} is CONVERTED but has no orderId`
         );
       }
-      return { orderId: reservation.orderId, alreadyProcessed: true };
+      const existing = await tx.orders.findUnique({
+        where: { id: reservation.orderId },
+        select: { accessToken: true },
+      });
+      return {
+        orderId: reservation.orderId,
+        accessToken: existing?.accessToken ?? null,
+        alreadyProcessed: true,
+      };
     }
 
     if (reservation.status !== ReservationStatus.HELD) {
@@ -431,12 +443,12 @@ export async function confirm(
       );
     }
 
-    const orderId = await materializeOrder(tx, reservation, {
+    const { orderId, accessToken } = await materializeOrder(tx, reservation, {
       paymentIntentId: input.paymentIntentId,
       cardType: input.cardType,
       cardLast4: input.cardLast4,
     });
-    return { orderId, alreadyProcessed: false };
+    return { orderId, accessToken, alreadyProcessed: false };
   });
 }
 
@@ -448,7 +460,12 @@ export interface SettleInput {
 }
 
 export type SettleResult =
-  | { kind: 'converted'; orderId: string; alreadyProcessed: boolean }
+  | {
+      kind: 'converted';
+      orderId: string;
+      accessToken: string | null;
+      alreadyProcessed: boolean;
+    }
   /** Paid after the hold expired and the tickets could not be re-acquired. */
   | { kind: 'needs_refund' }
   /** Already auto-refunded on a prior attempt (idempotent). */
@@ -505,9 +522,14 @@ export async function settle(
             `Reservation ${reservation.id} is CONVERTED but has no orderId`
           );
         }
+        const existing = await tx.orders.findUnique({
+          where: { id: reservation.orderId },
+          select: { accessToken: true },
+        });
         return {
           kind: 'converted' as const,
           orderId: reservation.orderId,
+          accessToken: existing?.accessToken ?? null,
           alreadyProcessed: true,
         };
       }
@@ -532,10 +554,15 @@ export async function settle(
         }
       }
 
-      const orderId = await materializeOrder(tx, reservation, opts);
+      const { orderId, accessToken } = await materializeOrder(
+        tx,
+        reservation,
+        opts
+      );
       return {
         kind: 'converted' as const,
         orderId,
+        accessToken,
         alreadyProcessed: false,
       };
     });
@@ -557,7 +584,7 @@ export async function completeFree(
   prisma: PrismaClient,
   input: CompleteFreeInput
 ): Promise<CompleteFreeResponse> {
-  const orderId = await prisma.$transaction(async (tx) => {
+  const { orderId, accessToken } = await prisma.$transaction(async (tx) => {
     const reservation = await tx.reservation.findUnique({
       where: { id: input.reservationId },
       include: { items: true },
@@ -573,7 +600,14 @@ export async function completeFree(
           `Reservation ${reservation.id} is CONVERTED but has no orderId`
         );
       }
-      return reservation.orderId;
+      const existing = await tx.orders.findUnique({
+        where: { id: reservation.orderId },
+        select: { accessToken: true },
+      });
+      return {
+        orderId: reservation.orderId,
+        accessToken: existing?.accessToken ?? null,
+      };
     }
 
     if (reservation.status !== ReservationStatus.HELD) {
@@ -598,6 +632,7 @@ export async function completeFree(
 
   return {
     orderId,
+    accessToken,
     tickets: tickets.map((t) => ({
       id: t.id,
       ticketTypeName: t.ticketType?.name ?? null,

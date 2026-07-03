@@ -36,7 +36,9 @@ export async function buildOrderConfirmation(
   order: EmailOrder,
   { baseUrl }: BuildOrderConfirmationOptions
 ): Promise<EmailContent> {
-  const ticketUrl = `${baseUrl}/orders/${order.id}/tickets`;
+  const ticketUrl = `${baseUrl}/orders/${order.id}/tickets${
+    order.accessToken ? `?t=${encodeURIComponent(order.accessToken)}` : ''
+  }`;
   const html = await render(
     createElement(EmailConfirmationTemplate, { order, baseUrl })
   );

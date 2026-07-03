@@ -150,6 +150,7 @@ async function getOrderDetails(orderId: string) {
 
 const OrderDetailsSelect = {
   id: true,
+  accessToken: true,
   firstName: true,
   lastName: true,
   email: true,
