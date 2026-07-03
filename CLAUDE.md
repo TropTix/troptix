@@ -42,6 +42,11 @@ Conventions for Claude Code (and other AI agents) working in this repo.
 - Force transitive dependency versions via the root `resolutions` field — not npm `overrides`.
 - **Exception:** the standalone Expo apps under `apps/` that can't hoist into the workspace carry their _own_ lockfile (`apps/organizer` → `yarn.lock`, `apps/organizer-v2` → `package-lock.json`). Match whichever lockfile is already committed in that app and never add a second one.
 
+## Database changes
+
+- Schema/migration changes go through the flow in [docs/plans/2026-06-migrations-adoption.md](docs/plans/2026-06-migrations-adoption.md) (`yarn db:new` → review SQL → `yarn db:apply`).
+- **When you write a migration, update `supabase/seed.sql` to match it.** That file is the preview-branch init script — it runs on every fresh per-PR preview branch after the migrations, and INSERTs an explicit column list. Keeping it current with the migration is what lets a reviewer actually exercise the schema change on the PR's preview deploy: the seed provides the relevant rows the new/changed columns need. A new NOT NULL / no-default column, or one the reservation/checkout flow reads without a fallback (e.g. `capacity`), MUST be added there or fresh preview branches break. Keep the fixture synthetic — no real/PII data.
+
 ## Naming
 
 - ADRs: `NNNN-kebab-slug.md` (4-digit zero-padded, sequential).

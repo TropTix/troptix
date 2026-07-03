@@ -14,7 +14,6 @@
     "test:watch": "jest --watch",
     "db:new": "tsx --env-file=.env scripts/new-migration.ts",
     "db:apply": "tsx --env-file=.env scripts/apply-migration.ts",
-    "db:seed": "tsx --env-file=.env scripts/seed-event.ts",
     "db:backfill-orgs": "tsx --env-file=.env scripts/backfill-organizations.ts",
     "knip": "knip"
   },
