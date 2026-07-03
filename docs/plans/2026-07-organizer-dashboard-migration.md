@@ -63,6 +63,30 @@ and UX repairs ride along in the same rewrite instead of patching code slated fo
    `capacity ?? quantity`, `sold` (not `quantitySold`), `startsAt ?? startDate`, matching the
    fallback idiom in `services/events.ts:135–140`. This moves the organizer surface off the legacy
    schema and unblocks the deferred column drops.
+
+   **On reading `sold`** (verified 2026-07-01, not assumed): a snapshot showed `sold == quantitySold`
+   for all 49 ticket types (1211 == 1211) — `sold` is a complete, accurate mirror today, so the
+   dashboard reads it directly (no `?? quantitySold` fallback, which would never fire since `sold`
+   defaults to `0`, not null). Two conditions keep this true, both tracked on the umbrella issue,
+   neither a blocker for this plan:
+   - This **completes the dashboard slice of the reservation-rebuild's Phase C**
+     ([checkout-reservation-rebuild](2026-06-checkout-reservation-rebuild.md), "Organizer reads").
+     That plan still owns the scan/check-in and complementary-path reads — coordinate so the swap
+     isn't done twice.
+   - Consistency holds only while nothing writes `quantitySold` **without** `sold`. The legacy
+     `pages/api/stripe/webhook.ts` (`updateTicketTypeQuantitySold`) still can, but is evidently
+     dormant (zero drift). Its retirement is the rebuild's B2/webhook cutover — until then, a live
+     order through that path would undercount `sold` for that ticket type. Re-run the parity query
+     (below) before executing Phase 2 to confirm still-zero drift.
+
+   Parity check to re-run before Phase 2:
+
+   ```sql
+   SELECT COUNT(*) FILTER (WHERE "sold" <> COALESCE("quantitySold",0)) AS drifted,
+          COUNT(*) AS total
+   FROM "TicketTypes";   -- drifted must be 0
+   ```
+
 3. **Honest, bounded queries.** SQL aggregates (`aggregate`/`count`/`groupBy`) for all stats,
    `take: 5` for recent orders, indexes on `Events(organizerUserId)` and `Orders(eventId, status)`,
    fabricated `netRevenue` removed.
@@ -100,19 +124,83 @@ and UX repairs ride along in the same rewrite instead of patching code slated fo
    `fetch`es `PATCH /api/events/[eventId]/toggle-publish`; it becomes a server action wrapping a
    `toggleEventPublish` service (same validation-requirements response). The REST route stays
    until nothing else calls it, then is deleted in Phase 5.
-4. **DTO money is integer cents** (`revenueCents`, `averageOrderCents`, `fromPriceCents`), per the
-   contracts convention; the UI edge formats via `formatCurrency`. Legacy `Orders.subtotal`
-   (float dollars) is converted at the service boundary (`Math.round(subtotal * 100)`), isolated
-   in one helper so the roadmap 2.12 column swap touches one line.
-5. **"Net revenue" is not shown until it can be computed honestly.** The overview shows gross
-   ticket revenue ("before fees & refunds"). Real net requires per-order fee attribution by
-   `ticketingFees` mode — a follow-up after cents land everywhere.
+4. **"Revenue" means `subtotal`, and DTO money is integer cents.** The canonical revenue metric
+   (dashboard, overview, tickets/orders stat cards) is **Ticket revenue** = `Σ Order.subtotal` over
+   `COMPLETED` orders — pre-fee, pre-refund (see [CONTEXT.md](../../CONTEXT.md) "Money"). Per-order
+   rows show `Order.total` relabeled **"Amount charged"** (a distinct number, not a second
+   definition of revenue). This fixes the current three-way split (`getDashboardData` headline uses
+   `subtotal` but its order rows use `total`; `getEventOverview` uses `subtotal`;
+   `getPlatformEventsData` uses `total` — the last is moot, that file is deleted per decision 9).
+   DTO money is integer cents (`revenueCents`, `averageOrderCents`, `fromPriceCents`); the UI edge
+   formats via `formatCurrency`. Conversion: **aggregate the float `subtotal` in SQL, then
+   `Math.round(sum * 100)` once** at the service edge — not per row (avoids float error and any
+   dependency on whether `subtotalCents` was backfilled), isolated in one helper so the roadmap
+   2.12 cents-column swap touches one line.
+5. **No "net revenue," no refund-netting — by necessity.** The overview shows Ticket revenue
+   labeled "before fees & refunds". **Payout** (revenue net of absorbed fees) needs per-order
+   `ticketingFees` attribution — deferred. **Refunds cannot be netted at all**: `OrderStatus` is
+   only `PENDING|CANCELLED|COMPLETED` — there is no `REFUNDED`, so no metric can subtract refunds
+   until refunds are modeled (connects to the deferred "order refund actions" direction finding).
 6. **Status derivation is a pure shared function** with injectable `now`, defined once
    (`getEventStatus`, `getEventStatusDisplay` built on it) so list and detail cannot disagree.
    It lives with the code that needs it server-side (services `_shared`) and is re-exported for
    UI badge mapping.
 7. **Actor construction is one helper** (`apps/web/src/server/actor.ts`,
    `userToActor(user): Actor`), used by every page and action — no inline actor literals.
+   `getServerUser`/`getUserFromIdTokenCookie` already return `{ uid, email, role }` off a live
+   Supabase session, so a real `{ kind:'user', userId, role }` Actor is constructible today (ADR
+   0013's "until Stage 1c every request is anonymous" note is stale for `apps/web`).
+8. **Access is ownership-only; there is no `ORGANIZER` role gate.** Anyone authenticated may use the
+   Organizer Dashboard (it shows their own events, empty if none) — "Organizer" is not a granted
+   role (see [CONTEXT.md](../../CONTEXT.md)). Organizer services authorize purely on
+   `event.organizerUserId === actor.userId` ownership; **no `role` check**. This reverses an earlier
+   draft that gated on `role === ORGANIZER` — that model is being retired (see the separate
+   _organizer onboarding & paid-ticketing approval_ direction below). What replaces the role as a
+   gate is **`Organization.paidTicketingEnabled`**, and only for the paid-ticketing action, enforced
+   in the ticket-type write service (decision 10) — not for dashboard access.
+   Platform Owner remains an **Admin capability, not an Organizer bypass**: the cross-organizer view
+   moves out of `/organizer/platform` into its own **`/admin` route group with its own layout + a
+   single `requirePlatformOwner` guard**; the `isPlatformOwner ? {} : {…}` bypass is removed from
+   every organizer service. The `@usetroptix.com` email check survives in exactly two places (the
+   `/admin` layout guard and the read-service View-as gate), tagged as a stopgap for the
+   ADR-0013-successor role matrix.
+9. **The Admin View is a thin index + read-only View-as, not a god-list.** `getPlatformEventsData`
+   and its per-event JS-reduce aggregation are **deleted, not ported** (this removes the audit's
+   heaviest query). The `/admin` landing is a cheap global event index (event, owner, status — no
+   stats) on indexed columns; each row deep-links into the **real** Organizer Dashboard scoped to
+   the row's owner via View-as (`?viewAs=<organizerUserId>` on the organizer routes). The organizer
+   **read**-services accept an optional `viewAsOrganizerUserId`, honored **only** when
+   `isPlatformOwner(actor)`; **write**-services never accept it. So a Platform Owner can observe any
+   organizer but cannot mutate on their behalf — a behavior change from today (admins currently can
+   edit any event); "admin edit" with an audit trail is deferred (ADR-0013 successor).
+10. **Paid ticketing is gated on `Organization.paidTicketingEnabled`, in the write service.** When
+    the ticket-type write service (Phase 3) creates/updates a ticket type with `price > 0`, it
+    requires the owning organization's `paidTicketingEnabled` (off by default; TropTix flips it
+    after the organizer talks to us). RSVP (`price = 0`) tickets are always allowed. Enforced in the
+    application layer, **not** a DB constraint; there is **no** `Event`-level RSVP/paid flag — the
+    create-form toggle is UI visibility over the price field (see [CONTEXT.md](../../CONTEXT.md)).
+    This is the migration's only interaction with the retired role model; the full onboarding /
+    approval experience is its **own initiative** (below) — this plan just makes the write service
+    honor the flag rather than the role.
+
+## Spawned initiative — organizer onboarding & paid-ticketing approval
+
+Surfaced during plan review; **not built by this plan**, but this plan is shaped to be compatible
+(decisions 8 and 10). Its own plan doc + ADR to follow. Decided so far:
+
+- **Everyone can organize.** The `ORGANIZER` role stops being an access gate (this plan already
+  authorizes on ownership). The fate of the `Role` enum (`PATRON`/`ORGANIZER`/`PROMOTER`) — retire
+  vs keep vestigial — is resolved in that initiative, not here.
+- **Paid ticketing is a capability, not a role**: `Organization.paidTicketingEnabled` (exists as a
+  concept via this plan's decision 10; default off, admin-flipped). Separate from
+  `Organization.verified` (attendee trust tick — orthogonal; earnable via free events).
+- **MVP is a single approval flow, not a general task engine.** The dashboard shows one
+  "Getting started" card — _"Talk to us to sell paid tickets"_ — that files a request; the general
+  task/checklist system is explicitly deferred until there's a real second task.
+- **Approval happens in `/admin`.** Flipping `paidTicketingEnabled` (and granting `verified`) is a
+  Platform-Owner **platform action on an organization** — a legitimate admin _write_, distinct from
+  read-only View-as (decision 9): admins don't edit an organizer's content, but they do act on the
+  account. `/admin` grows a "pending paid-ticketing requests" queue + approve action.
 
 ## Phases
 
@@ -132,14 +220,20 @@ In `packages/api`:
 - `contracts/organizer.ts` — DTOs (zod): `OrganizerDashboard` (stat cards + daily sales series +
   recent orders + active events), `OrganizerEventSummary` (list card: status enum, `soldCount`,
   `capacity`, `fromPriceCents`), `OrganizerEventOverview` (overview page: info, financials in
-  cents, ticket-type breakdown, recent orders, daily revenue series), `PlatformEventSummary`.
-  All money integer cents; all statuses from the shared enum.
+  cents, ticket-type breakdown, recent orders, daily revenue series), and `AdminEventIndexRow`
+  (event id, name, owner {id,name,email}, status — **no stats**). All money integer cents; all
+  statuses from the shared enum.
 - `services/organizer.ts` (extend; split `organizer-dashboard.ts` if it outgrows one file) —
-  `getDashboardData`, `getEventsList`, `getEventOverview`, `getPlatformEvents`, each
-  `(prisma, actor, …)` with `authorizeOrganizer` (platform-owner aware), typed errors
-  (`UnauthorizedError` added to `_shared/errors.ts` beside `NotFoundError`), **SQL aggregates
-  only** (pattern: `getDashboardData.ts:25–40`'s existing `aggregate` calls), `take: 5` recent
-  orders, ticket-type inventory from `sold`/`capacity` with legacy fallback.
+  `getDashboardData`, `getEventsList`, `getEventOverview`, each `(prisma, actor, …)`. Authorization
+  gates on `role === ORGANIZER` + `organizerUserId` ownership (no platform-owner bypass — decision
+  8). The read-services take an **optional `viewAsOrganizerUserId`** that is honored **only** when
+  `isPlatformOwner(actor)` (decision 9); otherwise scope is the actor's own id. Plus
+  `getAdminEventIndex(prisma, actor)` — the thin cross-organizer index, gated on
+  `isPlatformOwner(actor)`, a single cheap `findMany` on indexed columns with **no per-event
+  aggregation** (this replaces the deleted `getPlatformEventsData` god-list). Typed errors
+  (`UnauthorizedError` added to `_shared/errors.ts` beside `NotFoundError`); **SQL aggregates only**
+  for stats (pattern: `getDashboardData.ts:25–40`); `take: 5` recent orders; ticket-type inventory
+  from `sold`/`capacity` with legacy fallback.
 - `services/_shared/eventStatus.ts` — decision 6.
 - Migration: `@@index([organizerUserId])` on `Events`, `@@index([eventId, status])` on `Orders`
   (generated via `yarn --cwd apps/web db:new`, applied by the operator).
@@ -147,15 +241,23 @@ In `packages/api`:
   rejected, non-owner rejected, platform-owner allowed, aggregate mapping, cents conversion,
   legacy-fallback columns.
 
+(No role-gate pre-check — decision 8 authorizes on ownership only, so there is no `role === ORGANIZER`
+requirement that could lock owners out.)
+
 **Exit:** `yarn --cwd packages/api test` green; services exported from `server.ts`; web untouched.
 
 ### Phase 2 — Read cutover: pages consume services, `_lib` deleted
 
-- `organizer/page.tsx`, `organizer/events/page.tsx`, `organizer/events/[eventId]/page.tsx`,
-  `organizer/platform/events/page.tsx` switch to `@troptix/api/server` imports + `userToActor`;
-  `NotFoundError` → `notFound()` at the page.
+- `organizer/page.tsx`, `organizer/events/page.tsx`, `organizer/events/[eventId]/page.tsx` switch
+  to `@troptix/api/server` imports + `userToActor`; `NotFoundError` → `notFound()` at the page.
+  The organizer routes read an optional `?viewAs=<organizerUserId>` search param and pass it as
+  `viewAsOrganizerUserId` (the service ignores it unless the actor is a Platform Owner).
+- **Admin surface**: create the `/admin` route group with its own layout carrying a single
+  `requirePlatformOwner` guard; `/admin` renders the `getAdminEventIndex` table, each row linking to
+  `/organizer/events/[eventId]?viewAs=<ownerId>` (and/or `/organizer?viewAs=<ownerId>`). Delete the
+  old `/organizer/platform/**` tree.
 - Delete `_lib/getDashboardData.ts`, `_lib/getEventsData.ts`, `[eventId]/_lib/getEventOverview.ts`,
-  `platform/_lib/getPlatformEventsData.ts`.
+  `platform/_lib/getPlatformEventsData.ts` (the god-list — replaced by the thin index, not ported).
 - UI edge adopts the unified vocabulary in the same PR (the DTO shape forces it): `formatCurrency`
   (+ compact variant) and the shared date helpers replace every hand-rolled
   `toLocaleString`/`Intl.NumberFormat`/`toLocaleDateString` in organizer files; local
