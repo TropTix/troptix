@@ -29,6 +29,7 @@ import type {
 import { generateId } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
+import { enqueueOutbox, OUTBOX_ORDER_CONFIRMATION } from './_shared/outbox';
 
 /**
  * Server-side hold lifetime. The client shows a shorter deadline (10 min) than
@@ -396,6 +397,13 @@ async function materializeOrder(
         : {}),
     },
   });
+
+  // Enqueue the confirmation email in the same transaction as the order, so it
+  // is written exactly once per order and only when one is really created — no
+  // row on an idempotent re-run (this is a fresh `orders.create` each call).
+  // Covers all paths (free, paid-webhook, paid-sync-poll) since they funnel
+  // through here. Delivery is out of band (drain), never inside this txn.
+  await enqueueOutbox(tx, OUTBOX_ORDER_CONFIRMATION, { orderId });
 
   return orderId;
 }
