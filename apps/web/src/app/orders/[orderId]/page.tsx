@@ -1,5 +1,4 @@
 import {
-  PrismaClient,
   Orders as PrismaOrder,
   Tickets as PrismaTicket,
   Events as PrismaEvent,
@@ -11,323 +10,268 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import {
-  AlertTriangle,
-  Redo,
+  ChevronLeft,
   CalendarDays,
   MapPin,
+  Ticket,
   FileText,
-  Eye,
-  PartyPopper,
-  CheckCircle,
-  ArrowRight,
+  ArrowUpRight,
+  Redo,
+  AlertTriangle,
 } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import prisma from '@/server/prisma';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-
 import { getDateFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency } from '@/lib/utils';
-import TicketListInteractive from './_components/TicketList';
 
+// Kept for the receipt page, which types its own query against these.
 export interface EnrichedTicket extends PrismaTicket {
   ticketType: PrismaTicketType | null;
 }
-
 export interface EnrichedOrder extends PrismaOrder {
   event: PrismaEvent & { imageUrl?: string | null };
   tickets: EnrichedTicket[];
 }
 
-async function getOrder(orderId: string): Promise<EnrichedOrder | null> {
+async function getOrder(orderId: string) {
   try {
-    const order = await prisma.orders.findUnique({
+    return await prisma.orders.findUnique({
       where: { id: orderId },
-      include: {
-        event: true,
-        tickets: {
-          include: { ticketType: true },
-          orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        createdAt: true,
+        total: true,
+        totalCents: true,
+        type: true,
+        cardType: true,
+        cardLast4: true,
+        status: true,
+        event: {
+          select: {
+            id: true,
+            name: true,
+            imageUrl: true,
+            startDate: true,
+            endDate: true,
+            venue: true,
+          },
         },
+        _count: { select: { tickets: true } },
       },
     });
-    return order as EnrichedOrder;
   } catch (error) {
     console.error('Failed to fetch order:', error);
     return null;
   }
 }
 
+function CenteredState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-4 text-center">
+      {children}
+    </div>
+  );
+}
+
 export default async function OrderDetailsPage(props: {
   params: Promise<{ orderId: string }>;
 }) {
-  const params = await props.params;
-  const orderId = params.orderId;
+  const { orderId } = await props.params;
   const order = await getOrder(orderId);
-  const now = new Date();
-  const isPastEvent = order ? new Date(order.event.endDate) < now : false;
 
   if (!order) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 sm:p-6 bg-slate-50">
-        <Alert
-          variant="destructive"
-          className="max-w-lg text-left w-full sm:w-auto bg-white shadow-lg"
-        >
+      <CenteredState>
+        <Alert variant="destructive" className="text-left">
           <AlertTriangle className="h-5 w-5" />
-          <AlertTitle className="font-semibold text-lg">
-            Oops! Order Not Found
-          </AlertTitle>
-          <AlertDescription className="mt-2">
-            We couldn&apos;t locate an order with the ID{' '}
-            <strong className="font-medium">#{orderId}</strong>. Perhaps
-            it&apos;s still making its way through our system, or the ID might
-            be a tad off.
-            <br />
-            <br />
-            Double-check your confirmation email, or reach out to our support
-            crew if you need a hand!
+          <AlertTitle className="font-semibold">Order not found</AlertTitle>
+          <AlertDescription className="mt-1">
+            We couldn’t find an order with the ID{' '}
+            <span className="font-mono">{orderId}</span>. Double-check the link
+            in your confirmation email.
           </AlertDescription>
         </Alert>
-        <Button
-          asChild
-          className="mt-8 bg-primary hover:bg-primary/90 text-primary-foreground"
-        >
-          <Link href="/">Back to Homepage</Link>
+        <Button asChild variant="outline" className="mt-6">
+          <Link href="/orders">Back to your tickets</Link>
         </Button>
-      </div>
+      </CenteredState>
     );
   }
+
+  const now = new Date();
+  const isPastEvent = new Date(order.event.endDate) < now;
 
   if (order.status === OrderStatus.PENDING && !isPastEvent) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 sm:p-6 bg-slate-50">
-        <Alert className="max-w-lg text-left bg-blue-50 border-blue-300 text-blue-700 shadow-lg">
-          <Redo className="h-5 w-5 text-blue-600 animate-spin" />
-          <AlertTitle className="text-blue-800 font-semibold text-lg">
-            Hold Tight! Your Order is Processing
-          </AlertTitle>
-          <AlertDescription className="mt-2 text-blue-700">
-            We&apos;re busy preparing your tickets for{' '}
-            <strong className="font-medium">{order.event.name}</strong>. Your
-            confirmation email is on its way and should land in your inbox
-            shortly.
-            <br />
-            <br />
-            The excitement is building!
-          </AlertDescription>
-        </Alert>
-        <Button
-          asChild
-          className="mt-8 bg-primary hover:bg-primary/90 text-primary-foreground"
-        >
-          <Link href="/">Explore More Events</Link>
+      <CenteredState>
+        <Redo className="h-6 w-6 animate-spin text-primary" />
+        <h1 className="mt-4 text-xl font-extrabold tracking-tight">
+          Your order is processing
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          We’re preparing your tickets for{' '}
+          <span className="font-medium text-foreground">
+            {order.event.name}
+          </span>
+          . Your confirmation email is on its way.
+        </p>
+        <Button asChild className="mt-6">
+          <Link href="/">Explore more events</Link>
         </Button>
-      </div>
+      </CenteredState>
     );
   }
 
-  const defaultEventImageUrl = DEFAULT_EVENT_IMAGE;
   const isFree =
     order.type === OrderType.FREE || (order.totalCents ?? order.total) === 0;
   const totalDisplay = getFormattedCurrency(
     (order.totalCents ?? Math.round(order.total * 100)) / 100
   );
+  const isCompleted = order.status === OrderStatus.COMPLETED;
+  const ticketCount = order._count.tickets;
+  const poster = eventFlyerUrl(order.event.imageUrl) || DEFAULT_EVENT_IMAGE;
 
   return (
-    <div
-      className={`min-h-screen ${isPastEvent ? 'bg-slate-100' : 'bg-gradient-to-br from-primary/10 via-background to-background'}`}
-    >
-      <div className="max-w-5xl mx-auto py-8 md:py-12 px-4 sm:px-6 lg:px-8">
-        <Card
-          className={`mb-10 md:mb-12 shadow-xl overflow-hidden ${isPastEvent ? 'opacity-80' : ''}`}
-        >
-          <div className="md:flex">
-            <div className="md:w-2/5 relative">
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-2xl px-4 py-8 md:py-14">
+        <div className="mb-6 flex items-center gap-3">
+          <Link
+            href="/orders"
+            aria-label="Back to your tickets"
+            className="grid h-9 w-9 place-items-center rounded-full text-foreground transition-colors hover:bg-muted"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="text-lg font-semibold tracking-tight">
+            Order details
+          </h1>
+        </div>
+
+        <div className="space-y-4">
+          {/* Event */}
+          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
+            <div className="relative h-[76px] w-[62px] flex-shrink-0 overflow-hidden rounded-xl">
               <Image
-                src={
-                  eventFlyerUrl(order.event.imageUrl) || defaultEventImageUrl
-                }
-                alt={order.event.name || 'Event image'}
-                width={400}
-                height={400}
-                className="w-full h-64 md:h-full object-cover"
-                priority
+                src={poster}
+                alt={order.event.name || 'Event'}
+                fill
+                sizes="62px"
+                className={`object-cover ${isPastEvent ? 'opacity-80' : ''}`}
               />
-              {isPastEvent && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                  <Badge variant="secondary" className="text-lg px-4 py-2">
-                    Event Concluded
-                  </Badge>
-                </div>
-              )}
             </div>
-            <div className="md:w-3/5 p-6 sm:p-8 flex flex-col justify-center">
-              {isPastEvent ? (
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-700 mb-2">
-                  Throwback to: {order.event.name}
-                </h1>
-              ) : (
-                <>
-                  <div className="flex items-center text-primary mb-2">
-                    <PartyPopper className="h-6 w-6 mr-2" />
-                    <span className="text-sm font-semibold uppercase tracking-wider">
-                      You&apos;re Going!
-                    </span>
-                  </div>
-                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-3">
-                    {order.event.name}
-                  </h1>
-                </>
-              )}
-              <div className="flex items-center text-muted-foreground mb-1 text-sm sm:text-base">
-                <CalendarDays className="h-4 w-4 mr-2" />
-                <span>{getDateFormatter(new Date(order.event.startDate))}</span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-extrabold leading-tight tracking-tight">
+                {order.event.name}
+              </h2>
+              <div className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+                <CalendarDays className="h-4 w-4 text-muted-foreground/70" />
+                {getDateFormatter(new Date(order.event.startDate))}
               </div>
               {order.event.venue && (
-                <div className="flex items-center text-muted-foreground text-sm sm:text-base mb-4">
-                  {' '}
-                  {/* Added mb-4 here */}
-                  <MapPin className="h-4 w-4 mr-2" />
-                  <span>{order.event.venue}</span>
+                <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4 text-muted-foreground/70" />
+                  <span className="truncate">{order.event.venue}</span>
                 </div>
               )}
-              {/* View Event Details Button */}
-              <Button
-                asChild
-                variant="outline"
-                className="w-full sm:w-auto mt-2 mb-4 border-primary/50 hover:border-primary text-primary hover:bg-primary/5 group"
-              >
-                <Link href={`/e/${order.event.id}`}>
-                  {' '}
-                  {isPastEvent ? 'View Past Event Details' : 'View Event'}
-                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </Button>
-              <p
-                className={`text-sm sm:text-base ${isPastEvent ? 'text-slate-600' : 'text-muted-foreground'}`}
-              >
-                {isPastEvent
-                  ? `We hope you had a great time! Here&apos;s a look back at your order details.`
-                  : `Get ready for an amazing experience! Your order details are confirmed below.`}
-              </p>
             </div>
           </div>
-        </Card>
 
-        <div className="grid md:grid-cols-5 gap-6 lg:gap-8">
-          <div className="md:col-span-2 space-y-6">
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-lg sm:text-xl flex items-center">
-                  <CheckCircle className="h-5 w-5 mr-2 text-green-500" /> Order
-                  Confirmed
-                </CardTitle>
-                <CardDescription>Reference ID: #{order.id}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm sm:text-base">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Placed:</span>
-                  <span className="font-medium">
-                    {order.createdAt
-                      ? getDateFormatter(new Date(order.createdAt))
-                      : 'N/A'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total:</span>
+          {/* Primary action — the tickets are the point */}
+          <Button
+            asChild
+            size="lg"
+            className="h-[52px] w-full rounded-2xl text-base font-bold"
+          >
+            <Link href={`/orders/${order.id}/tickets`}>
+              <Ticket className="mr-2 h-5 w-5" />
+              View {ticketCount} {ticketCount === 1 ? 'ticket' : 'tickets'}
+            </Link>
+          </Button>
+
+          {/* Order summary — receipt-style, machine data in mono */}
+          <div>
+            <div className="mb-1.5 px-1 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+              Order
+            </div>
+            <dl className="overflow-hidden rounded-2xl border border-border bg-card">
+              <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+                <dt className="text-sm text-muted-foreground">Order number</dt>
+                <dd className="font-mono text-sm font-semibold tracking-wide">
+                  {order.id}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+                <dt className="text-sm text-muted-foreground">Placed</dt>
+                <dd className="text-sm font-semibold">
+                  {order.createdAt
+                    ? getDateFormatter(new Date(order.createdAt))
+                    : '—'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+                <dt className="text-sm text-muted-foreground">Total</dt>
+                <dd>
                   {isFree ? (
-                    <Badge className="bg-primary/10 text-primary border-primary/20">
+                    <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                       Free
-                    </Badge>
+                    </span>
                   ) : (
-                    <span className="font-bold text-md sm:text-lg">
+                    <span className="font-mono text-sm font-semibold">
                       {totalDisplay}
                     </span>
                   )}
+                </dd>
+              </div>
+              {!isFree && order.cardLast4 && (
+                <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+                  <dt className="text-sm text-muted-foreground">Paid with</dt>
+                  <dd className="text-sm font-semibold">
+                    {order.cardType ? `${order.cardType} ` : ''}····{' '}
+                    {order.cardLast4}
+                  </dd>
                 </div>
-                {!isFree && order.cardLast4 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Paid with:</span>
-                    <span className="font-medium">
-                      {order.cardType ? `${order.cardType} ` : ''}••••{' '}
-                      {order.cardLast4}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center pt-1">
-                  <span className="text-muted-foreground">Status:</span>
-                  <Badge
-                    variant={
-                      order.status === OrderStatus.COMPLETED
-                        ? 'default'
-                        : 'secondary'
-                    }
-                    className={`${order.status === OrderStatus.COMPLETED ? 'bg-green-100 text-green-700 border-green-300' : 'bg-slate-100 text-slate-600'} px-2 py-0.5 text-xs sm:text-sm`}
-                  >
-                    {order.status.charAt(0).toUpperCase() +
-                      order.status.slice(1).toLowerCase()}
-                  </Badge>
-                </div>
-              </CardContent>
-              {!isFree && (
-                <CardFooter>
-                  <Button
-                    asChild
-                    className="w-full bg-secondary hover:bg-secondary/80 text-secondary-foreground"
-                    size="sm"
-                  >
-                    <Link href={`/orders/${order.id}/receipt`}>
-                      <FileText className="mr-2 h-4 w-4" /> View Full Receipt
-                    </Link>
-                  </Button>
-                </CardFooter>
               )}
-            </Card>
+              <div className="flex items-center justify-between px-4 py-3">
+                <dt className="text-sm text-muted-foreground">Status</dt>
+                <dd>
+                  {isCompleted ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Completed
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold capitalize text-muted-foreground">
+                      {order.status.toLowerCase()}
+                    </span>
+                  )}
+                </dd>
+              </div>
+            </dl>
           </div>
 
-          <div className="md:col-span-3">
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">
-                  {isPastEvent
-                    ? 'Your Tickets from the Event'
-                    : `Your Ticket${order.tickets.length !== 1 ? 's' : ''} (${order.tickets.length})`}
-                </CardTitle>
-                <CardDescription className="text-sm sm:text-base">
-                  {isPastEvent
-                    ? 'A reminder of your access.'
-                    : 'Access your individual ticket details below.'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {order.tickets && order.tickets.length > 0 ? (
-                  <TicketListInteractive order={order} />
-                ) : (
-                  <p className="text-muted-foreground py-4 text-center text-sm sm:text-base">
-                    No individual tickets found in this order.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {/* Secondary actions */}
+          {!isFree && (
+            <Button
+              asChild
+              variant="outline"
+              className="h-12 w-full rounded-2xl font-semibold"
+            >
+              <Link href={`/orders/${order.id}/receipt`}>
+                <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
+                View full receipt
+              </Link>
+            </Button>
+          )}
+
+          <Link
+            href={`/e/${order.event.id}`}
+            className="flex items-center justify-center gap-1 py-1 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
+          >
+            View event page
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
     </div>
