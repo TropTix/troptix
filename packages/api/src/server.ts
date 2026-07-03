@@ -41,6 +41,12 @@ export {
 } from './services/organizations';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
 export { NotFoundError } from './services/_shared/errors';
+export {
+  OUTBOX_ORDER_CONFIRMATION,
+  OUTBOX_REFUND_NOTICE,
+  type OrderConfirmationPayload,
+  type RefundNoticePayload,
+} from './services/_shared/outbox';
 
 // tRPC adapter — router value, server-side caller, and per-request context.
 export { appRouter, createCaller } from './trpc/routers';

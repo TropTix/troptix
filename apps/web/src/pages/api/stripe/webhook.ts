@@ -178,7 +178,13 @@ async function updateOrderAfterPaymentSucceeds(
       });
     }
     console.log('Sending email to user', orderMap);
-    await sendEmailConfirmationEmailToUser(order.id);
+    // Swallow: the sender now throws, and a re-throw here would make Stripe retry
+    // and re-process an already-complete order. (Legacy path; dies at cutover.)
+    try {
+      await sendEmailConfirmationEmailToUser(order.id);
+    } catch (emailErr) {
+      console.error('[Order] Confirmation email failed (non-fatal):', emailErr);
+    }
   } catch (error) {
     console.error('[Order] Error updating order:', error);
     throw error;

@@ -1,12 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import type Stripe from 'stripe';
 import { confirmPaid } from '@troptix/api/server';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
-import {
-  sendEmailConfirmationEmailToUser,
-  sendRefundNoticeEmail,
-} from '@/server/lib/email';
+import { drainOutbox } from '@/server/lib/outbox';
 
 /**
  * Reservation checkout webhook (ADR 0018) — the canonical fulfiller for the new
@@ -16,7 +13,8 @@ import {
  * `checkout.session.completed` → `confirmPaid` (idempotent; auto-refunds on the
  * expiry race). We only act on Sessions carrying `metadata.reservationId`, and
  * dedupe by event id — both belt-and-suspenders on top of `settle`'s own
- * idempotency, and enough to avoid re-sending the confirmation email.
+ * idempotency. `confirmPaid` enqueues the email in-txn; we drain it via
+ * `after()` (post-response, no dangling promise), with the cron as backstop.
  */
 export const runtime = 'nodejs';
 
@@ -96,25 +94,15 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
         return;
       }
 
-      const state = await confirmPaid(prisma, stripe, {
+      await confirmPaid(prisma, stripe, {
         reservationId,
         paymentIntentId,
       });
-      if (state.kind === 'order') {
-        // Resend dedupes on `confirmation-${orderId}`, so this is safe to send
-        // here even though the client may also fire it on the success screen.
-        try {
-          await sendEmailConfirmationEmailToUser(state.orderId);
-        } catch (emailErr) {
-          console.error(
-            '[ReservationWebhook] Confirmation email failed (non-fatal):',
-            emailErr
-          );
-        }
-      } else if (state.kind === 'refunded') {
-        // Lost the expiry race — tell the buyer their payment was refunded.
-        await sendRefundNoticeEmail(reservationId);
-      }
+      after(() =>
+        drainOutbox().catch((err) =>
+          console.error('[ReservationWebhook] Outbox drain failed:', err)
+        )
+      );
       return;
     }
 

@@ -29,6 +29,7 @@ import type {
 import { generateId } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
+import { enqueueOutbox, OUTBOX_ORDER_CONFIRMATION } from './_shared/outbox';
 
 /**
  * Server-side hold lifetime. The client shows a shorter deadline (10 min) than
@@ -396,6 +397,10 @@ async function materializeOrder(
         : {}),
     },
   });
+
+  // Enqueue in-txn so it's written exactly once per order (a fresh order each
+  // call, so no row on an idempotent re-run); every path funnels through here.
+  await enqueueOutbox(tx, OUTBOX_ORDER_CONFIRMATION, { orderId });
 
   return orderId;
 }

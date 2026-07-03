@@ -44,7 +44,13 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // FK-safe teardown, scoped to the test event.
+  // FK-safe teardown, scoped to the test event. Outbox rows have no FK to the
+  // event — drop them first, by the order/reservation ids they reference.
+  await prisma.$executeRaw`
+    DELETE FROM "OutboxMessage"
+    WHERE (payload->>'orderId') IN (SELECT id FROM "Orders" WHERE "eventId" = ${TEST_EVENT_ID})
+       OR (payload->>'reservationId') IN (SELECT id FROM "Reservation" WHERE "eventId" = ${TEST_EVENT_ID})
+  `;
   await prisma.tickets.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.orders.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.reservation.deleteMany({ where: { eventId: TEST_EVENT_ID } }); // items cascade
@@ -340,6 +346,16 @@ describe('completeFree', () => {
       true
     );
 
+    // Exactly one confirmation row, enqueued with the order.
+    const outbox = await prisma.outboxMessage.findMany({
+      where: {
+        type: 'order_confirmation',
+        payload: { path: ['orderId'], equals: done.orderId },
+      },
+    });
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]?.status).toBe('PENDING');
+
     // idempotent: a second call returns the same order, no double-sell
     const again = await completeFree(prisma, {
       reservationId: res.reservationId,
@@ -348,6 +364,16 @@ describe('completeFree', () => {
     expect(
       (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.sold
     ).toBe(2);
+
+    // …and no second outbox row on the idempotent re-run.
+    expect(
+      await prisma.outboxMessage.count({
+        where: {
+          type: 'order_confirmation',
+          payload: { path: ['orderId'], equals: done.orderId },
+        },
+      })
+    ).toBe(1);
   });
 
   it('rejects a paid reservation', async () => {

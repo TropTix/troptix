@@ -112,24 +112,9 @@ export default function CheckoutSheet({
     if (state.kind === 'order') {
       setSuccessData({ orderId: state.orderId, tickets: state.tickets });
       setStep('success');
-      // Mirror the free flow: nudge the confirmation email (idempotent).
-      void fetch('/api/checkout/confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: state.orderId }),
-      }).catch(() => {});
+      // Email is server-triggered via the outbox — no client trigger here.
     } else if (state.kind === 'refunded') {
       setStep('refunded');
-      // The webhook normally sends this, but the sync-fulfillment poll can be
-      // what performs the refund (webhook slow/down) — nudge it here too
-      // (idempotent: Resend dedupes on refund-<reservationId>).
-      if (reservationId) {
-        void fetch('/api/checkout/refund-notice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reservationId }),
-        }).catch(() => {});
-      }
     } else if (state.kind === 'expired') {
       setStep('expired');
     } else if (
@@ -242,11 +227,7 @@ export default function CheckoutSheet({
         });
         setSuccessData({ orderId: order.orderId, tickets: order.tickets });
         setStep('success');
-        void fetch('/api/checkout/confirmation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId: order.orderId }),
-        }).catch(() => {});
+        // completeFree enqueued the email (outbox); the cron drain delivers it.
         return;
       }
 

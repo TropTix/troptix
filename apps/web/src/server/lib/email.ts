@@ -81,40 +81,35 @@ export async function sendEmailConfirmationEmailToUser(orderId: string) {
     baseUrl: getAppBaseUrl(),
   });
 
-  // A failed confirmation email must never break the order — the Stripe webhook
-  // re-throws, and Stripe would retry and re-process an already-complete order.
-  try {
-    await sendEmail(orderDetails.email, subject, html, orderId, attachments);
-  } catch (error) {
-    console.error('Failed to send order confirmation email:', error);
-  }
+  // Throws on transport failure so the outbox drainer can record it and retry.
+  await sendEmail(orderDetails.email, subject, html, orderId, attachments);
 }
 
 /**
  * Notify a buyer that their payment was auto-refunded because the tickets sold
  * out while it was processing (the expiry race, ADR 0018). Minimal inline HTML —
  * there's no order to render. Deduped by `refund-<reservationId>` so a retried
- * webhook never double-sends. Never throws (fired from the webhook).
+ * send never double-emails. Throws on a real transport failure so the outbox
+ * drainer can retry it.
  */
 export async function sendRefundNoticeEmail(reservationId: string) {
-  try {
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: reservationId },
-      select: {
-        email: true,
-        firstName: true,
-        totalCents: true,
-        event: { select: { name: true } },
-      },
-    });
-    if (!reservation?.email) {
-      console.error(`[Refund] No email for reservation ${reservationId}`);
-      return;
-    }
+  const reservation = await prisma.reservation.findUnique({
+    where: { id: reservationId },
+    select: {
+      email: true,
+      firstName: true,
+      totalCents: true,
+      event: { select: { name: true } },
+    },
+  });
+  if (!reservation?.email) {
+    console.error(`[Refund] No email for reservation ${reservationId}`);
+    return;
+  }
 
-    const eventName = reservation.event?.name ?? 'the event';
-    const amount = `$${(reservation.totalCents / 100).toFixed(2)}`;
-    const html = `
+  const eventName = reservation.event?.name ?? 'the event';
+  const amount = `$${(reservation.totalCents / 100).toFixed(2)}`;
+  const html = `
     <p>Hi ${reservation.firstName ?? 'there'},</p>
     <p>Unfortunately, tickets to <strong>${eventName}</strong> sold out while
     your payment was processing, so we&rsquo;ve refunded your ${amount} in full.</p>
@@ -122,20 +117,17 @@ export async function sendRefundNoticeEmail(reservationId: string) {
     charged for any tickets.</p>
     <p>— TropTix</p>`;
 
-    const { error } = await resend.emails.send(
-      {
-        from: 'TropTix <info@usetroptix.com>',
-        to: reservation.email,
-        subject: `Your ${eventName} payment was refunded`,
-        html,
-      },
-      { idempotencyKey: `refund-${reservationId}` }
-    );
-    if (error && !isConcurrentIdempotencyConflict(error)) {
-      console.error('[Refund] Resend failed to send refund notice:', error);
-    }
-  } catch (error) {
-    console.error('[Refund] Failed to send refund notice email:', error);
+  const { error } = await resend.emails.send(
+    {
+      from: 'TropTix <info@usetroptix.com>',
+      to: reservation.email,
+      subject: `Your ${eventName} payment was refunded`,
+      html,
+    },
+    { idempotencyKey: `refund-${reservationId}` }
+  );
+  if (error && !isConcurrentIdempotencyConflict(error)) {
+    throw new Error(`Resend failed to send refund notice: ${error.message}`);
   }
 }
 
