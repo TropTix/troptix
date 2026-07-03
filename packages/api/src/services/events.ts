@@ -120,6 +120,16 @@ export async function getEventDetail(
           saleEndDate: true,
         },
       },
+      spotlight: {
+        select: {
+          id: true,
+          title: true,
+          link: true,
+          imageUrl: true,
+          description: true,
+        },
+        orderBy: { order: 'asc' },
+      },
     },
   });
 
@@ -194,5 +204,6 @@ export async function getEventDetail(
     longitude: event.longitude,
     fromPriceCents,
     tickets,
+    spotlight: event.spotlight,
   };
 }

@@ -62,6 +62,23 @@ export function organizationLogoUrl(
   return `${PUBLIC_BASE}/${ORGANIZATION_LOGOS_BUCKET}/${path}`;
 }
 
+export const SPOTLIGHT_IMAGES_BUCKET = 'spotlight-images';
+
+/**
+ * Resolve a stored `Spotlight.imageUrl` to a renderable URL — same path-not-URL
+ * contract as `eventFlyerUrl` (ADR 0016), for the spotlight-images bucket. Falsy
+ * → `null` (callers fall back to a monogram). The upload counterpart lands with
+ * the spotlight authoring surface.
+ */
+export function spotlightImageUrl(
+  value: string | null | undefined
+): string | null {
+  if (!value) return null;
+  if (isAbsoluteUrl(value)) return value;
+  const path = value.replace(/^\/+/, '');
+  return `${PUBLIC_BASE}/${SPOTLIGHT_IMAGES_BUCKET}/${path}`;
+}
+
 /**
  * Upload an org logo to the `organization-logos` bucket; returns the stored PATH
  * (what goes into `Organization.logoUrl`). Governed by the bucket's authenticated

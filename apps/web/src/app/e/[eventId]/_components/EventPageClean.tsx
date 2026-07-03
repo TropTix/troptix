@@ -23,6 +23,7 @@ import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import type { EventDetail } from '@troptix/api';
 import CheckoutSheet from './CheckoutSheet';
 import VenueMap from './VenueMap';
+import SpotlightSection from './SpotlightSection';
 
 // Public event page (Luma-light). Immersive poster hero on mobile, two-column
 // on desktop. See docs/plans/2026-06-event-page-redesign.md.
@@ -378,6 +379,8 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                   </p>
                 </section>
               )}
+
+              <SpotlightSection spotlight={event.spotlight} />
 
               <section className="mt-10">
                 <SectionHeader>Location</SectionHeader>

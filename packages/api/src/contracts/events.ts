@@ -44,6 +44,18 @@ export const eventSummarySchema = z.object({
 });
 export type EventSummary = z.infer<typeof eventSummarySchema>;
 
+// --- Spotlight ----------------------------------------------------------------
+// A curated per-event card (DJ, artist, speaker, sponsor, …). Links out; `link`
+// may lack a scheme (the web layer prepends https), `imageUrl` is a stored path.
+export const spotlightItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  link: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  description: z.string().nullable(),
+});
+export type SpotlightItem = z.infer<typeof spotlightItemSchema>;
+
 export const eventDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -79,5 +91,7 @@ export const eventDetailSchema = z.object({
   fromPriceCents: z.number().int().nullable(),
   /** Public (non-code-gated) tiers, available first then by price. */
   tickets: z.array(eventTicketSchema),
+  /** Curated spotlight cards (DJs, sponsors, …), in display order. */
+  spotlight: z.array(spotlightItemSchema),
 });
 export type EventDetail = z.infer<typeof eventDetailSchema>;
