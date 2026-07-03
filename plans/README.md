@@ -8,7 +8,7 @@ Selection note: run non-interactively; plans were written for the top findings b
 
 | Plan | Title                                                                                   | Priority | Effort | Depends on | Status                                                                                              |
 | ---- | --------------------------------------------------------------------------------------- | -------- | ------ | ---------- | --------------------------------------------------------------------------------------------------- |
-| 001  | Auth + ownership on `updateTicketType` server action                                    | P1       | S      | —          | TODO                                                                                                |
+| 001  | Auth + ownership on `updateTicketType` server action                                    | P1       | S      | —          | DONE (local, unpushed) — commit adds `canAccessEvent` gate + tests                                  |
 | 002  | Harden the 4 organizer REST routes (scan IDOR, atomic scan, zod, policy)                | P1       | M      | —          | TODO                                                                                                |
 | 003  | Write `checkinTimestamp` on every check-in path                                         | P1       | M      | 002        | TODO                                                                                                |
 | 004  | Fix event-overview financials (fake 3% fee), bound queries, add `organizerUserId` index | P2       | M      | —          | SUPERSEDED — absorbed into `docs/plans/2026-07-organizer-dashboard-migration.md` (Phase 1–2)        |

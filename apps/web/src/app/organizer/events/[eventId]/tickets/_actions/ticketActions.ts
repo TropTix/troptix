@@ -9,6 +9,7 @@ import {
   ticketTypeSchema,
 } from '@/lib/schemas/ticketSchema';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { canAccessEvent } from '@/server/accessControl';
 import { redirect } from 'next/navigation';
 
 // Define the return type for actions
@@ -37,11 +38,9 @@ export async function createTicketType(
     if (!user) {
       redirect('/auth/signin');
     }
-    // Verify user is the organizer of the event
-    const event = await prisma.events.findUnique({
-      where: { id: eventId, organizerUserId: user.uid },
-    });
-    if (!event) {
+    // Verify the user owns this event (or is a platform owner).
+    const hasAccess = await canAccessEvent(user.uid, user.email, eventId);
+    if (!hasAccess) {
       return { success: false, error: 'Unauthorized' };
     }
     const ticketTypeEnum = data.price === 0 ? 'FREE' : 'PAID';
@@ -96,6 +95,28 @@ export async function updateTicketType(
   let eventIdForRevalidation: string | undefined;
 
   try {
+    const user = await getUserFromIdTokenCookie();
+    if (!user) {
+      redirect('/auth/signin');
+    }
+    // Resolve the ticket's event and verify the user owns it (or is a platform
+    // owner). Without this, any authenticated user could edit any ticket type.
+    const existing = await prisma.ticketTypes.findUnique({
+      where: { id: ticketId },
+      select: { eventId: true },
+    });
+    if (!existing) {
+      return { success: false, error: 'Ticket type not found.' };
+    }
+    const hasAccess = await canAccessEvent(
+      user.uid,
+      user.email,
+      existing.eventId
+    );
+    if (!hasAccess) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
     const ticketTypeEnum = data.price === 0 ? 'FREE' : 'PAID';
 
     const updatedTicket = await prisma.ticketTypes.update({
