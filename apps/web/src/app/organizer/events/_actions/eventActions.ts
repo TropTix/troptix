@@ -167,8 +167,8 @@ export async function updateEvent(
     revalidatePath(`/organizer/events/${eventId}`);
     // Public listing is ISR-cached (revalidate = 86400) — bust it on edit so
     // organizer changes aren't stale for up to 24h.
-    revalidatePath('/events');
-    revalidatePath(`/events/${eventId}`);
+    revalidatePath('/discover');
+    revalidatePath(`/e/${eventId}`);
 
     return { success: true, eventId: eventId };
   } catch (error) {

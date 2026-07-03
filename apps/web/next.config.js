@@ -6,11 +6,17 @@ const nextConfig = {
         // Checkout consolidation: the legacy /events/[id] checkout is superseded
         // by the reservation flow at /e/[id] (ADR 0018). Redirect all event
         // links — including share links already out in the wild — to the new
-        // flow. Temporary (307) during the cutover so it's trivially reversible;
-        // promote to permanent once the legacy /events page is removed.
+        // flow. Permanent (308) now that the legacy /events pages are removed.
         source: '/events/:eventId',
         destination: '/e/:eventId',
-        permanent: false,
+        permanent: true,
+      },
+      {
+        // The public /events listing was replaced by /discover. Point stale
+        // bookmarks and old inbound links at the new listing.
+        source: '/events',
+        destination: '/discover',
+        permanent: true,
       },
     ];
   },

@@ -97,7 +97,7 @@ export async function PATCH(
 
     revalidatePath(`/organizer/events/${eventId}`);
     revalidatePath(`/e/${eventId}`);
-    revalidatePath(`/events`);
+    revalidatePath('/discover');
 
     return NextResponse.json(
       {
