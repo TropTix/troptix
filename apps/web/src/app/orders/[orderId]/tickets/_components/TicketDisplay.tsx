@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, CalendarDays, MapPin } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  MapPin,
+  Receipt,
+} from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 export type TicketInfo = {
@@ -66,8 +72,8 @@ export default function TicketDisplayManager({
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col bg-white px-5 pb-8 pt-4">
       <div className="flex items-center justify-between">
         <Link
-          href={`/orders/${orderId}`}
-          aria-label="Back to order"
+          href="/orders"
+          aria-label="Back to your tickets"
           className="grid h-9 w-9 place-items-center rounded-full text-foreground transition-colors hover:bg-muted"
         >
           <ChevronLeft className="h-5 w-5" />
@@ -76,7 +82,13 @@ export default function TicketDisplayManager({
           TICKET {String(index + 1).padStart(2, '0')} /{' '}
           {String(total).padStart(2, '0')}
         </span>
-        <span className="h-9 w-9" aria-hidden />
+        <Link
+          href={`/orders/${orderId}`}
+          aria-label="Order details and receipt"
+          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Receipt className="h-[18px] w-[18px]" />
+        </Link>
       </div>
 
       <div className="relative flex flex-1 flex-col items-center justify-center">

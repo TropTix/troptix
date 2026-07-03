@@ -255,7 +255,7 @@ const OrderCard = ({ order }: OrderCardProps) => {
     <Card
       className={`group hover:shadow-lg transition-all duration-300 cursor-pointer ${isPastEvent ? 'opacity-75' : 'hover:scale-[1.02]'}`}
     >
-      <Link href={`/orders/${id}`} className="block">
+      <Link href={`/orders/${id}/tickets`} className="block">
         <div className="relative">
           <div className="aspect-video relative overflow-hidden rounded-t-lg">
             <Image
