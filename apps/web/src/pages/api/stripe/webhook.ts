@@ -178,7 +178,15 @@ async function updateOrderAfterPaymentSucceeds(
       });
     }
     console.log('Sending email to user', orderMap);
-    await sendEmailConfirmationEmailToUser(order.id);
+    // A confirmation-email failure must never break the order: this webhook
+    // re-throws, and Stripe would retry and re-process an already-complete order.
+    // (The sender now throws on failure — the new reservation flow routes email
+    // through the transactional outbox instead; this legacy path dies at cutover.)
+    try {
+      await sendEmailConfirmationEmailToUser(order.id);
+    } catch (emailErr) {
+      console.error('[Order] Confirmation email failed (non-fatal):', emailErr);
+    }
   } catch (error) {
     console.error('[Order] Error updating order:', error);
     throw error;

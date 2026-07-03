@@ -12,6 +12,7 @@ import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
 import { HOLD_TTL_MINUTES, expireHold, settle } from './reservations';
 import { NotFoundError } from './_shared/errors';
+import { enqueueOutbox, OUTBOX_REFUND_NOTICE } from './_shared/outbox';
 import type {
   BeginPaymentResponse,
   CheckoutState,
@@ -218,9 +219,23 @@ export async function confirmPaid(
     { payment_intent: input.paymentIntentId },
     { idempotencyKey: `refund-${input.reservationId}` }
   );
-  await prisma.reservation.update({
-    where: { id: input.reservationId },
-    data: { status: ReservationStatus.REFUNDED, stripeRefundId: refund.id },
+  // Mark REFUNDED and enqueue the notice atomically. The conditional update
+  // (status not-already-REFUNDED) makes the pair idempotent: concurrent settles
+  // that both reach `needs_refund` still enqueue exactly one notice — only the
+  // winner's updateMany touches a row.
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.reservation.updateMany({
+      where: {
+        id: input.reservationId,
+        status: { not: ReservationStatus.REFUNDED },
+      },
+      data: { status: ReservationStatus.REFUNDED, stripeRefundId: refund.id },
+    });
+    if (updated.count > 0) {
+      await enqueueOutbox(tx, OUTBOX_REFUND_NOTICE, {
+        reservationId: input.reservationId,
+      });
+    }
   });
   return { kind: 'refunded' };
 }
