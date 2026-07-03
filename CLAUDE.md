@@ -45,7 +45,7 @@ Conventions for Claude Code (and other AI agents) working in this repo.
 ## Database changes
 
 - Schema/migration changes go through the flow in [docs/plans/2026-06-migrations-adoption.md](docs/plans/2026-06-migrations-adoption.md) (`yarn db:new` → review SQL → `yarn db:apply`).
-- **After any schema change, evaluate whether `supabase/seed.sql` needs updating.** That file is the preview-branch init script — it runs on every fresh per-PR preview branch and INSERTs an explicit column list. A new NOT NULL / no-default column, or one the reservation/checkout flow reads without a fallback (e.g. `capacity`), must be added there or fresh preview branches break. Keep it in sync with `apps/web/scripts/seed-event.ts` (the local test-event seeder) and keep it synthetic — no real/PII data.
+- **When you write a migration, update `supabase/seed.sql` to match it.** That file is the preview-branch init script — it runs on every fresh per-PR preview branch after the migrations, and INSERTs an explicit column list. Keeping it current with the migration is what lets a reviewer actually exercise the schema change on the PR's preview deploy: the seed provides the relevant rows the new/changed columns need. A new NOT NULL / no-default column, or one the reservation/checkout flow reads without a fallback (e.g. `capacity`), MUST be added there or fresh preview branches break. Keep the fixture synthetic — no real/PII data.
 
 ## Naming
 

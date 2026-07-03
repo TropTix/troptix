@@ -131,9 +131,10 @@ edit apps/web/prisma/schema.prisma
 cd apps/web && yarn db:new add_promoter_payout_field   # diffs branch(at head) → schema → supabase/migrations/<ts>_*.sql
 # review the SQL, then apply it to the branch (keeps the branch at head + app testable):
 yarn db:apply
-# evaluate supabase/seed.sql: it INSERTs explicit columns, so a new NOT NULL /
-# no-default column, or one the reservation/checkout flow reads without a
-# fallback (e.g. capacity), must be added here or fresh preview branches break.
+# update supabase/seed.sql to match the migration so the preview branch has
+# relevant data to test the change (it INSERTs an explicit column list): a new
+# NOT NULL / no-default column, or one the reservation/checkout flow reads
+# without a fallback (e.g. capacity), must be added here or fresh branches break.
 git commit && push
   → the preview branch replays all migrations + seed from empty (the "replays cleanly" proof)
   → Vercel preview points at that branch DB automatically
