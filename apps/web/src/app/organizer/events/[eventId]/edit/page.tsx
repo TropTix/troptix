@@ -1,6 +1,7 @@
 import { BackButton } from '@/components/ui/back-button';
 import prisma from '@/server/prisma';
 import EventForm from '../../_components/EventForm';
+import { SpotlightManager } from '../../_components/SpotlightManager';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
@@ -93,6 +94,19 @@ export default async function EditEventPage(props: EditEventPageProps) {
     select: { displayName: true },
   });
 
+  // Existing spotlight cards, in display order — matches the SpotlightItem DTO.
+  const spotlight = await prisma.spotlight.findMany({
+    where: { eventId },
+    orderBy: { order: 'asc' },
+    select: {
+      id: true,
+      title: true,
+      link: true,
+      imageUrl: true,
+      description: true,
+    },
+  });
+
   return (
     <div className=" mx-auto py-8">
       <div className="mb-6 flex items-center gap-2">
@@ -115,6 +129,9 @@ export default async function EditEventPage(props: EditEventPageProps) {
         paidEventsEnabled={paidEventsEnabled}
         organizationName={org?.displayName}
       />
+      <div className="mt-8">
+        <SpotlightManager eventId={eventId} initial={spotlight} />
+      </div>
     </div>
   );
 }

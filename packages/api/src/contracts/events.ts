@@ -56,6 +56,33 @@ export const spotlightItemSchema = z.object({
 });
 export type SpotlightItem = z.infer<typeof spotlightItemSchema>;
 
+// Authoring input: one card as the organizer submits it. `title` is required;
+// everything else is optional. Order is positional — the array index becomes the
+// stored `order`, so the client sends cards in display order. Empty strings from
+// the form are normalized to null.
+const emptyToNull = z.preprocess(
+  (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+  z.string().trim().max(2000).nullable()
+);
+export const spotlightInputItemSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(120),
+  link: emptyToNull,
+  imageUrl: emptyToNull,
+  description: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+    z.string().trim().max(350).nullable()
+  ),
+});
+export type SpotlightInputItem = z.infer<typeof spotlightInputItemSchema>;
+
+export const saveEventSpotlightInputSchema = z.object({
+  eventId: z.string().min(1),
+  items: z.array(spotlightInputItemSchema).max(50),
+});
+export type SaveEventSpotlightInput = z.infer<
+  typeof saveEventSpotlightInputSchema
+>;
+
 export const eventDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
