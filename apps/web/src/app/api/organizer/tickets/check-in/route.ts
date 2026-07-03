@@ -1,5 +1,7 @@
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { isPlatformOwner } from '@/server/accessControl';
 import prisma from '@/server/prisma';
+import { checkInTicketSchema } from '@/lib/schemas/organizerApiSchemas';
 import { TicketStatus } from '@troptix/db';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,14 +21,15 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 403 });
   }
 
-  // 2. Get and validate the request body
-  const { ticketId } = await request.json();
-  if (!ticketId) {
+  // 2. Validate the request body
+  const parsed = checkInTicketSchema.safeParse(await request.json());
+  if (!parsed.success) {
     return NextResponse.json(
       { error: 'ticketId is required' },
       { status: 400 }
     );
   }
+  const { ticketId } = parsed.data;
 
   try {
     // 3. Find the ticket and verify organizer ownership
@@ -39,8 +42,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
     }
 
-    // Security Check: Ensure the authenticated user is the organizer for this ticket's event.
-    if (ticket.event.organizerUserId !== organizerId.uid) {
+    // Security Check: the caller must own this ticket's event, or be a platform
+    // owner (consistent with the events/orders routes).
+    if (
+      !isPlatformOwner(organizerId.email) &&
+      ticket.event.organizerUserId !== organizerId.uid
+    ) {
       return NextResponse.json(
         {
           error: 'Forbidden: You do not have permission to modify this ticket.',

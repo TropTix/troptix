@@ -1,5 +1,7 @@
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { canAccessEvent } from '@/server/accessControl';
 import prisma from '@/server/prisma';
+import { scanTicketSchema } from '@/lib/schemas/organizerApiSchemas';
 import { TicketStatus } from '@troptix/db';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,13 +21,24 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 403 });
   }
 
-  // 2. Get and validate the request body
-  const { ticketId, eventId } = await request.json();
-  if (!ticketId || !eventId) {
+  // 2. Validate the request body
+  const parsed = scanTicketSchema.safeParse(await request.json());
+  if (!parsed.success) {
     return NextResponse.json(
       { error: 'ticketId and eventId are required' },
       { status: 400 }
     );
+  }
+  const { ticketId, eventId } = parsed.data;
+
+  // 3. Authorize: the caller must own the event (or be a platform owner).
+  const hasAccess = await canAccessEvent(
+    organizerId.uid,
+    organizerId.email,
+    eventId
+  );
+  if (!hasAccess) {
+    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
   try {
@@ -41,67 +54,34 @@ export async function PUT(request: NextRequest) {
 }
 
 async function updateScannedTicketStatus(ticketId: string, eventId: string) {
-  if (!eventId || !ticketId) {
-    return {
-      ticketName: undefined,
-      ticketDescription: undefined,
-      scanSucceeded: false,
-    };
+  const failed = {
+    ticketName: undefined as string | undefined,
+    ticketDescription: undefined as string | undefined,
+    scanSucceeded: false,
+  };
+
+  const ticket = await prisma.tickets.findUnique({
+    where: { id: ticketId, eventId },
+    include: { ticketType: true },
+  });
+
+  if (!ticket) {
+    return failed;
   }
 
-  try {
-    const ticket = await prisma.tickets.findUnique({
-      where: {
-        id: ticketId,
-        eventId: eventId,
-      },
-    });
+  const ticketName = ticket.ticketType?.name ?? 'Complementary';
+  const ticketDescription = ticket.ticketType?.description ?? '';
 
-    if (!ticket) {
-      return {
-        ticketName: undefined,
-        ticketDescription: undefined,
-        scanSucceeded: false,
-      };
-    }
+  // Atomic check-then-flip: only the request that finds the ticket still
+  // AVAILABLE flips it, so two simultaneous scans can't both succeed.
+  const result = await prisma.tickets.updateMany({
+    where: { id: ticketId, eventId, status: TicketStatus.AVAILABLE },
+    data: { status: TicketStatus.NOT_AVAILABLE },
+  });
 
-    let ticketType: any = {
-      name: 'Complementary',
-      description: '',
-    };
-
-    if (ticket.ticketTypeId) {
-      ticketType = await prisma.ticketTypes.findUnique({
-        where: {
-          id: ticket.ticketTypeId,
-        },
-      });
-    }
-
-    if (ticket.status === TicketStatus.NOT_AVAILABLE) {
-      return {
-        ticketName: ticketType.name,
-        ticketDescription: ticketType.description,
-        scanSucceeded: false,
-      };
-    } else {
-      await prisma.tickets.update({
-        where: {
-          id: ticketId,
-        },
-        data: {
-          status: TicketStatus.NOT_AVAILABLE,
-        },
-      });
-
-      return {
-        ticketName: ticketType.name,
-        ticketDescription: ticketType.description,
-        scanSucceeded: true,
-      };
-    }
-  } catch (e) {
-    console.error('Request error', e);
-    throw e;
-  }
+  return {
+    ticketName,
+    ticketDescription,
+    scanSucceeded: result.count === 1,
+  };
 }
