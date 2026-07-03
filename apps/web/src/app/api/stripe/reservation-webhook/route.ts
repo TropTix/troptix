@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import type Stripe from 'stripe';
 import { confirmPaid } from '@troptix/api/server';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
+import { drainOrderConfirmation, drainRefundNotice } from '@/server/lib/outbox';
 
 /**
  * Reservation checkout webhook (ADR 0018) — the canonical fulfiller for the new
@@ -12,8 +13,9 @@ import { stripe } from '@/server/lib/stripe';
  * `checkout.session.completed` → `confirmPaid` (idempotent; auto-refunds on the
  * expiry race). We only act on Sessions carrying `metadata.reservationId`, and
  * dedupe by event id — both belt-and-suspenders on top of `settle`'s own
- * idempotency. `confirmPaid` enqueues the email in-txn; the once-a-minute cron
- * drains it (revisit near-instant inline drain in #425 if ever needed).
+ * idempotency. `confirmPaid` enqueues the email in-txn; we deliver that one row
+ * inline via `after()` (post-response, so it can't block or fail the 200), with
+ * the once-a-minute cron as the backstop.
  */
 export const runtime = 'nodejs';
 
@@ -93,10 +95,31 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
         return;
       }
 
-      await confirmPaid(prisma, stripe, {
+      const state = await confirmPaid(prisma, stripe, {
         reservationId,
         paymentIntentId,
       });
+      // Deliver the just-enqueued row inline for near-instant email; the cron
+      // still covers it if this send is cut short.
+      if (state.kind === 'order') {
+        after(() =>
+          drainOrderConfirmation(state.orderId).catch((err) =>
+            console.error(
+              '[ReservationWebhook] Confirmation drain failed:',
+              err
+            )
+          )
+        );
+      } else if (state.kind === 'refunded') {
+        after(() =>
+          drainRefundNotice(reservationId).catch((err) =>
+            console.error(
+              '[ReservationWebhook] Refund-notice drain failed:',
+              err
+            )
+          )
+        );
+      }
       return;
     }
 

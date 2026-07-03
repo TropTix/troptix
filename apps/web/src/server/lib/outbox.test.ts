@@ -17,25 +17,38 @@ jest.mock('./email', () => ({
 // the imported mock below — avoids the "referenced before initialization" trap.
 jest.mock('@/server/prisma', () => ({
   __esModule: true,
-  default: { outboxMessage: { findMany: jest.fn(), update: jest.fn() } },
+  default: {
+    outboxMessage: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
+  },
 }));
 
 import prismaMock from '@/server/prisma';
-import { drainOutbox, type OutboxSenders } from './outbox';
+import {
+  drainOutbox,
+  drainOrderConfirmation,
+  type OutboxSenders,
+} from './outbox';
 
-const mockFindMany = (
+const outbox = (
   prismaMock as unknown as {
-    outboxMessage: { findMany: jest.Mock; update: jest.Mock };
+    outboxMessage: {
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
   }
-).outboxMessage.findMany;
-const mockUpdate = (
-  prismaMock as unknown as {
-    outboxMessage: { findMany: jest.Mock; update: jest.Mock };
-  }
-).outboxMessage.update;
+).outboxMessage;
+const mockFindMany = outbox.findMany;
+const mockFindFirst = outbox.findFirst;
+const mockUpdate = outbox.update;
 
 beforeEach(() => {
   mockFindMany.mockReset();
+  mockFindFirst.mockReset();
   mockUpdate.mockReset();
   mockUpdate.mockResolvedValue({});
 });
@@ -133,5 +146,46 @@ describe('drainOutbox', () => {
         }),
       })
     );
+  });
+});
+
+describe('drainOrderConfirmation (inline single row)', () => {
+  it('queries only the matching pending row and marks it SENT', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 'm1',
+      type: 'order_confirmation',
+      payload: { orderId: 'o1' },
+      attempts: 0,
+    });
+    const send = jest.fn().mockResolvedValue(undefined);
+
+    await drainOrderConfirmation('o1', { order_confirmation: send });
+
+    expect(mockFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'PENDING',
+          type: 'order_confirmation',
+          payload: { path: ['orderId'], equals: 'o1' },
+        }),
+      })
+    );
+    expect(send).toHaveBeenCalledWith({ orderId: 'o1' });
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'm1' },
+        data: expect.objectContaining({ status: 'SENT' }),
+      })
+    );
+  });
+
+  it('is a no-op when the row is already gone (sent by the cron first)', async () => {
+    mockFindFirst.mockResolvedValue(null);
+    const send = jest.fn();
+
+    await drainOrderConfirmation('o1', { order_confirmation: send });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
