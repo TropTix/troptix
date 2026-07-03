@@ -9,7 +9,10 @@ import type { PrismaClient } from '@troptix/db';
 import {
   ensureOrganizationForUser,
   backfillOrganizations,
+  getOrganizationBySlug,
+  updateOrganizationProfile,
 } from './organizations';
+import { NotFoundError } from './_shared/errors';
 
 type OrgRow = {
   id: string;
@@ -198,5 +201,213 @@ describe('backfillOrganizations', () => {
     await backfillOrganizations(prisma);
     const second = await backfillOrganizations(prisma);
     expect(second).toEqual({ organizationsEnsured: 0, eventsLinked: 0 });
+  });
+});
+
+describe('getOrganizationBySlug', () => {
+  const DAY = 86_400_000;
+  function ev(
+    id: string,
+    startDays: number,
+    endDays: number,
+    tier?: { priceCents: number | null; price: number }
+  ) {
+    return {
+      id,
+      name: id,
+      imageUrl: null,
+      startDate: new Date(Date.now() + startDays * DAY),
+      endDate: new Date(Date.now() + endDays * DAY),
+      venue: 'The Deck',
+      ticketTypes: tier ? [tier] : [],
+    };
+  }
+
+  const fakePrisma = (events: unknown[] | null) =>
+    ({
+      organization: {
+        findUnique: async ({ where }: any) =>
+          events === null || where.slug !== 'island-vibes'
+            ? null
+            : {
+                slug: 'island-vibes',
+                displayName: 'Island Vibes',
+                logoUrl: null,
+                bio: 'Soca everywhere',
+                website: null,
+                instagram: 'islandvibes',
+                twitter: null,
+                linkedin: null,
+                verified: true,
+                events,
+              },
+      },
+    }) as unknown as PrismaClient;
+
+  it('throws NotFoundError when the slug does not exist', async () => {
+    await expect(
+      getOrganizationBySlug(fakePrisma(null), { slug: 'nope' })
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('splits events into upcoming (soonest first) and past (most-recent first)', async () => {
+    // provided startDate-asc, as the query returns them
+    const prisma = fakePrisma([
+      ev('past-old', -10, -9),
+      ev('past-recent', -3, -2),
+      ev('up-soon', 2, 3, { priceCents: 2500, price: 25 }),
+      ev('up-later', 8, 9),
+    ]);
+    const result = await getOrganizationBySlug(prisma, {
+      slug: 'island-vibes',
+    });
+
+    expect(result.displayName).toBe('Island Vibes');
+    expect(result.verified).toBe(true);
+    expect(result.instagram).toBe('islandvibes');
+    expect(result.upcomingEvents.map((e) => e.id)).toEqual([
+      'up-soon',
+      'up-later',
+    ]);
+    expect(result.pastEvents.map((e) => e.id)).toEqual([
+      'past-recent',
+      'past-old',
+    ]);
+    expect(result.upcomingEvents[0].fromPriceCents).toBe(2500);
+    expect(result.upcomingEvents[1].fromPriceCents).toBeNull();
+  });
+});
+
+describe('updateOrganizationProfile', () => {
+  type Org = {
+    id: string;
+    ownerUserId: string;
+    slug: string;
+    displayName: string;
+    createdAt: number;
+    bio?: string | null;
+    website?: string | null;
+    instagram?: string | null;
+    twitter?: string | null;
+    linkedin?: string | null;
+  };
+
+  function makeFake(seed: Org[]) {
+    const orgs = seed.map((o) => ({ ...o }));
+    const prisma = {
+      organization: {
+        findFirst: async ({ where }: any) =>
+          orgs
+            .filter((o) => o.ownerUserId === where.ownerUserId)
+            .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
+        findUnique: async ({ where }: any) =>
+          orgs.find((o) => o.slug === where.slug) ?? null,
+        update: async ({ where, data }: any) => {
+          const o = orgs.find((x) => x.id === where.id)!;
+          Object.assign(o, data);
+          return o;
+        },
+      },
+    } as unknown as PrismaClient;
+    return { prisma, orgs };
+  }
+
+  const base = {
+    ownerUserId: 'u1',
+    displayName: 'Island Vibes',
+    slug: 'island-vibes',
+    logoUrl: null,
+    bio: null,
+    website: null,
+    instagram: null,
+    twitter: null,
+    linkedin: null,
+  };
+
+  const seed = (): Org[] => [
+    {
+      id: 'a',
+      ownerUserId: 'u1',
+      slug: 'island-vibes',
+      displayName: 'Island Vibes',
+      createdAt: 0,
+    },
+    {
+      id: 'b',
+      ownerUserId: 'u2',
+      slug: 'sunset',
+      displayName: 'Sunset',
+      createdAt: 1,
+    },
+  ];
+
+  it('updates fields and blanks to null', async () => {
+    const { prisma, orgs } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      displayName: 'Island Vibes Collective',
+      bio: '  Soca everywhere  ',
+      instagram: '   ',
+    });
+    expect(result).toEqual({ ok: true, slug: 'island-vibes' });
+    const a = orgs.find((o) => o.id === 'a')!;
+    expect(a.displayName).toBe('Island Vibes Collective');
+    expect(a.bio).toBe('Soca everywhere');
+    expect(a.instagram).toBeNull();
+  });
+
+  it('allows keeping the current slug (no false "taken")', async () => {
+    const { prisma } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, base);
+    expect(result).toEqual({ ok: true, slug: 'island-vibes' });
+  });
+
+  it('rejects a slug taken by another org', async () => {
+    const { prisma } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      slug: 'sunset',
+    });
+    expect(result).toEqual({ ok: false, reason: 'slug_taken' });
+  });
+
+  it('rejects an invalid slug', async () => {
+    const { prisma } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      slug: 'ab',
+    });
+    expect(result).toEqual({ ok: false, reason: 'slug_invalid' });
+  });
+
+  it('returns not_found when the user has no org', async () => {
+    const { prisma } = makeFake(seed());
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      ownerUserId: 'nobody',
+    });
+    expect(result).toEqual({ ok: false, reason: 'not_found' });
+  });
+
+  it('maps a slug unique-constraint violation (race) to slug_taken', async () => {
+    const prisma = {
+      organization: {
+        findFirst: async () => ({
+          id: 'a',
+          ownerUserId: 'u1',
+          slug: 'island-vibes',
+          displayName: 'Island Vibes',
+        }),
+        findUnique: async () => null, // check passes…
+        update: async () => {
+          throw { code: 'P2002' }; // …but another write claimed the slug first
+        },
+      },
+    } as unknown as PrismaClient;
+    const result = await updateOrganizationProfile(prisma, {
+      ...base,
+      slug: 'new-slug',
+    });
+    expect(result).toEqual({ ok: false, reason: 'slug_taken' });
   });
 });

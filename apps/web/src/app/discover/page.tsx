@@ -5,7 +5,7 @@ import { listPublicEvents } from '@troptix/api/server';
 
 import { Button } from '@/components/ui/button';
 import prisma from '@/server/prisma';
-import EventCard from './_components/EventCard';
+import EventCard from '@/components/EventCard';
 
 export const revalidate = 86400; // 24 hours in seconds
 

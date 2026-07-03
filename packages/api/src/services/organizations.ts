@@ -8,7 +8,14 @@
  * docs/plans/2026-06-event-spotlight-and-organizer-brand.md (2, 2b).
  */
 import type { PrismaClient } from '@troptix/db';
-import { generateUniqueSlug } from './_shared/slug';
+import type { EventSummary } from '../contracts/events';
+import type {
+  OrganizationDetail,
+  OrganizationDetailInput,
+} from '../contracts/organizations';
+import { generateUniqueSlug, isValidSlug } from './_shared/slug';
+import { toEventSummary } from './_shared/eventSummary';
+import { NotFoundError } from './_shared/errors';
 
 type OrganizationRow = Awaited<
   ReturnType<PrismaClient['organization']['create']>
@@ -101,4 +108,153 @@ export async function backfillOrganizations(
   }
 
   return { organizationsEnsured, eventsLinked };
+}
+
+export type UpdateOrganizationProfileInput = {
+  ownerUserId: string;
+  displayName: string;
+  slug: string;
+  logoUrl: string | null;
+  bio: string | null;
+  website: string | null;
+  instagram: string | null;
+  twitter: string | null;
+  linkedin: string | null;
+};
+
+export type UpdateOrganizationProfileResult =
+  | { ok: true; slug: string }
+  | { ok: false; reason: 'not_found' | 'slug_invalid' | 'slug_taken' };
+
+const blankToNull = (value: string | null): string | null => {
+  const trimmed = value?.trim() ?? '';
+  return trimmed === '' ? null : trimmed;
+};
+
+/**
+ * Update the caller's Organization brand (the Profile Info editor, F6). Slug is
+ * only re-validated when it changes: format/reserved via `isValidSlug`, then a
+ * uniqueness check excluding the org itself. Returns a discriminated result for
+ * the expected slug failures (the caller maps them to form errors); the DB
+ * `slug` unique index is the final backstop. `ownerUserId` scopes the write.
+ */
+export async function updateOrganizationProfile(
+  prisma: PrismaClient,
+  input: UpdateOrganizationProfileInput
+): Promise<UpdateOrganizationProfileResult> {
+  const org = await prisma.organization.findFirst({
+    where: { ownerUserId: input.ownerUserId },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (!org) return { ok: false, reason: 'not_found' };
+
+  const nextSlug = input.slug.trim().toLowerCase();
+  if (nextSlug !== org.slug) {
+    if (!isValidSlug(nextSlug)) return { ok: false, reason: 'slug_invalid' };
+    const taken = await prisma.organization.findUnique({
+      where: { slug: nextSlug },
+    });
+    if (taken && taken.id !== org.id)
+      return { ok: false, reason: 'slug_taken' };
+  }
+
+  try {
+    await prisma.organization.update({
+      where: { id: org.id },
+      data: {
+        displayName: input.displayName.trim() || org.displayName,
+        slug: nextSlug,
+        logoUrl: blankToNull(input.logoUrl),
+        bio: blankToNull(input.bio),
+        website: blankToNull(input.website),
+        instagram: blankToNull(input.instagram),
+        twitter: blankToNull(input.twitter),
+        linkedin: blankToNull(input.linkedin),
+      },
+    });
+  } catch (err) {
+    // Lost a race for the slug between the check above and this write — the DB
+    // unique index is the real arbiter; map it back to the discriminated result.
+    if ((err as { code?: string }).code === 'P2002') {
+      return { ok: false, reason: 'slug_taken' };
+    }
+    throw err;
+  }
+
+  return { ok: true, slug: nextSlug };
+}
+
+/**
+ * The public organization page read (/o/[slug]): brand header + the org's
+ * published events, split into upcoming (soonest first) and past (most-recent
+ * first). No authorization (ADR 0013) — always public; drafts are never included.
+ */
+export async function getOrganizationBySlug(
+  prisma: PrismaClient,
+  input: OrganizationDetailInput
+): Promise<OrganizationDetail> {
+  const org = await prisma.organization.findUnique({
+    where: { slug: input.slug },
+    select: {
+      slug: true,
+      displayName: true,
+      logoUrl: true,
+      bio: true,
+      website: true,
+      instagram: true,
+      twitter: true,
+      linkedin: true,
+      verified: true,
+      events: {
+        where: { isDraft: false },
+        orderBy: { startDate: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          imageUrl: true,
+          startDate: true,
+          endDate: true,
+          venue: true,
+          ticketTypes: {
+            where: {
+              OR: [
+                { discountCode: { equals: null } },
+                { discountCode: { equals: '' } },
+              ],
+            },
+            select: { priceCents: true, price: true },
+            orderBy: { price: 'asc' },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  if (!org) {
+    throw new NotFoundError(`Organization not found: ${input.slug}`);
+  }
+
+  const now = Date.now();
+  const upcomingEvents: EventSummary[] = [];
+  const pastEvents: EventSummary[] = [];
+  for (const event of org.events) {
+    const bucket = event.endDate.getTime() > now ? upcomingEvents : pastEvents;
+    bucket.push(toEventSummary(event));
+  }
+  pastEvents.reverse(); // fetched startDate asc → most-recent past first
+
+  return {
+    slug: org.slug,
+    displayName: org.displayName,
+    logoUrl: org.logoUrl,
+    bio: org.bio,
+    website: org.website,
+    instagram: org.instagram,
+    twitter: org.twitter,
+    linkedin: org.linkedin,
+    verified: org.verified,
+    upcomingEvents,
+    pastEvents,
+  };
 }

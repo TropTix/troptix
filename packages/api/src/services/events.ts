@@ -17,6 +17,7 @@ import type {
   EventTicket,
 } from '../contracts/events';
 import { calculateFeesCents } from './_shared/fees';
+import { toEventSummary } from './_shared/eventSummary';
 import { NotFoundError } from './_shared/errors';
 
 /**
@@ -56,22 +57,7 @@ export async function listPublicEvents(
     },
   });
 
-  return events.map((event) => {
-    const cheapest = event.ticketTypes[0];
-    const fromPriceCents = cheapest
-      ? (cheapest.priceCents ?? Math.round(cheapest.price * 100))
-      : null;
-
-    return {
-      id: event.id,
-      name: event.name,
-      imageUrl: event.imageUrl,
-      startDate: event.startDate.toISOString(),
-      endDate: event.endDate.toISOString(),
-      venue: event.venue,
-      fromPriceCents,
-    };
-  });
+  return events.map(toEventSummary);
 }
 
 export async function getEventDetail(
@@ -89,6 +75,19 @@ export async function getEventDetail(
       isDraft: true,
       organizer: true,
       organizerUserId: true,
+      // The hosting Organization (brand) for the "Hosted by" block → /o/[slug].
+      organization: {
+        select: {
+          slug: true,
+          displayName: true,
+          logoUrl: true,
+          verified: true,
+          instagram: true,
+          twitter: true,
+          linkedin: true,
+          website: true,
+        },
+      },
       startDate: true,
       endDate: true,
       venue: true,
@@ -175,6 +174,18 @@ export async function getEventDetail(
     isDraft: event.isDraft,
     organizer: event.organizer,
     organizerUserId: event.organizerUserId,
+    hostedBy: event.organization
+      ? {
+          slug: event.organization.slug,
+          displayName: event.organization.displayName,
+          logoUrl: event.organization.logoUrl,
+          verified: event.organization.verified,
+          instagram: event.organization.instagram,
+          twitter: event.organization.twitter,
+          linkedin: event.organization.linkedin,
+          website: event.organization.website,
+        }
+      : null,
     startDate: event.startDate.toISOString(),
     endDate: event.endDate.toISOString(),
     venue: event.venue,

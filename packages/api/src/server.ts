@@ -38,6 +38,8 @@ export { getEventDetail, listPublicEvents } from './services/events';
 export {
   ensureOrganizationForUser,
   backfillOrganizations,
+  getOrganizationBySlug,
+  updateOrganizationProfile,
 } from './services/organizations';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
 export { NotFoundError } from './services/_shared/errors';

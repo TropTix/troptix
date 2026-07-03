@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
+  Building2,
   Calendar,
   Home,
   LogOut,
@@ -79,6 +80,7 @@ export default function UnifiedHeader() {
   const organizerNavItems = [
     { label: 'Dashboard', href: '/organizer', icon: Home },
     { label: 'My Events', href: '/organizer/events', icon: Calendar },
+    { label: 'Profile', href: '/organizer/profile', icon: Building2 },
   ];
 
   if (userIsPlatformOwner) {
