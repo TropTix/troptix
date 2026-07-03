@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
+import { CircleCheck, CircleX, Info, TriangleAlert } from 'lucide-react';
 import { Toaster as SonnerToaster } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -18,16 +19,18 @@ export default function Toaster() {
           '--normal-border': 'hsl(var(--border))',
         } as CSSProperties
       }
+      icons={{
+        success: <CircleCheck className="h-4 w-4 text-success" />,
+        error: <CircleX className="h-4 w-4 text-destructive" />,
+        warning: <TriangleAlert className="h-4 w-4 text-warning" />,
+        info: <Info className="h-4 w-4 text-primary" />,
+      }}
       toastOptions={{
         style: {
           borderRadius: 'var(--radius)',
         },
         classNames: {
           description: '!text-muted-foreground',
-          success: '[&_[data-icon]]:!text-success',
-          error: '[&_[data-icon]]:!text-destructive',
-          warning: '[&_[data-icon]]:!text-warning',
-          info: '[&_[data-icon]]:!text-primary',
         },
       }}
     />

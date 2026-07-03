@@ -34,15 +34,17 @@ export const notify = {
   eventCreated: () => success('Event created successfully!'),
   eventUpdated: () => success('Event updated successfully!'),
   eventSaveFailed: (detail?: string) => error(detail || GENERIC_ERROR),
-  formValidationFailed: (fields: string[]) =>
-    error('Form validation failed.', `Please check: ${fields.join(', ')}`),
   eventPublished: () => success('Event published successfully'),
   eventSetToDraft: () => success('Event set to draft'),
-  eventPublishBlocked: (message: string, summary?: string) =>
-    error(
-      message,
-      summary || 'Please complete all required fields before publishing.'
-    ),
+  eventPublishBlocked: (missing: string[], detail?: string) => {
+    const title = missing.length
+      ? `Missing requirements: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`
+      : detail || 'Event cannot be published yet';
+    return error(
+      title,
+      'Please complete all required fields before publishing.'
+    );
+  },
   eventStatusUpdateFailed: (detail?: string) =>
     error(detail || 'Failed to update event status'),
 
@@ -58,12 +60,17 @@ export const notify = {
     error(detail || 'Failed to update check-in status'),
 
   // Contact
-  contactMessage: (send: Promise<unknown>) =>
-    toast.promise(send, {
-      loading: 'Sending Message...',
-      success: 'Your message has been sent.',
-      error: 'Failed to send message. Please try again.',
-    }),
+  contactMessage: (send: Promise<unknown>) => {
+    const id = toast.loading('Sending Message...');
+    send
+      .then(() => toast.success('Your message has been sent.', { id }))
+      .catch(() =>
+        toast.error('Failed to send message. Please try again.', {
+          id,
+          duration: ERROR_DURATION,
+        })
+      );
+  },
 
   // Misc
   emailCopied: () => success('Email address copied to clipboard'),

@@ -26,16 +26,11 @@ const groups: { title: string; entries: [string, () => unknown][] }[] = [
         'eventSaveFailed (server detail)',
         () => notify.eventSaveFailed('An event with this name already exists.'),
       ],
-      [
-        'formValidationFailed',
-        () => notify.formValidationFailed(['name', 'startDate', 'venue']),
-      ],
       ['eventPublished', () => notify.eventPublished()],
       ['eventSetToDraft', () => notify.eventSetToDraft()],
       [
         'eventPublishBlocked',
-        () =>
-          notify.eventPublishBlocked('Missing requirements: name, venue, date'),
+        () => notify.eventPublishBlocked(['name', 'venue', 'date', 'capacity']),
       ],
       ['eventStatusUpdateFailed', () => notify.eventStatusUpdateFailed()],
     ],
