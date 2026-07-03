@@ -96,8 +96,13 @@ and UX repairs ride along in the same rewrite instead of patching code slated fo
 
 ## Non-goals
 
-- **The four legacy REST routes** (`/api/organizer/**`) — they serve the deployed Expo organizer
-  app; hardened by prerequisite `plans/002`, retired only when the RN rebuild ships tRPC.
+- **The four legacy REST routes** (`/api/organizer/**`) — consumed **only** by the old
+  `apps/organizer`; `organizer-v2` is tRPC-only and never calls them. Marked DEPRECATED in-file
+  and hardened by prerequisite `plans/002`. **Retirement is a coordinated unit, not just a
+  deletion:** `organizer-v2`'s scanner currently persists nothing (its `handleCheckInByScan` only
+  mutates local state; there is no tRPC check-in/scan mutation yet), so a real tRPC `checkIn`/`scan`
+  mutation must land — and be where `checkinTimestamp` is written (plan 003) — **before** these
+  routes and the old app are deleted, or organizers lose door check-in.
 - **Roadmap 2.5 status rename** (`VALID`/`USED`/…) and other schema drops/renames — separate
   cleanup, gated on cutovers like this one.
 - **Table/mobile-card consolidation** (`TicketTable`/`OrderTable`/`AttendeeTable` and their three

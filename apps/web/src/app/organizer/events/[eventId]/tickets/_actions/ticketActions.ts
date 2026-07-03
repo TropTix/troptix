@@ -33,11 +33,14 @@ export async function createTicketType(
 
   const data = validationResult.data;
 
+  // Resolve the session outside the try so redirect()'s control-flow throw
+  // isn't swallowed by the catch below.
+  const user = await getUserFromIdTokenCookie();
+  if (!user) {
+    redirect('/auth/signin');
+  }
+
   try {
-    const user = await getUserFromIdTokenCookie();
-    if (!user) {
-      redirect('/auth/signin');
-    }
     // Verify the user owns this event (or is a platform owner).
     const hasAccess = await canAccessEvent(user.uid, user.email, eventId);
     if (!hasAccess) {
@@ -94,11 +97,14 @@ export async function updateTicketType(
 
   let eventIdForRevalidation: string | undefined;
 
+  // Resolve the session outside the try so redirect()'s control-flow throw
+  // isn't swallowed by the catch below.
+  const user = await getUserFromIdTokenCookie();
+  if (!user) {
+    redirect('/auth/signin');
+  }
+
   try {
-    const user = await getUserFromIdTokenCookie();
-    if (!user) {
-      redirect('/auth/signin');
-    }
     // Resolve the ticket's event and verify the user owns it (or is a platform
     // owner). Without this, any authenticated user could edit any ticket type.
     const existing = await prisma.ticketTypes.findUnique({

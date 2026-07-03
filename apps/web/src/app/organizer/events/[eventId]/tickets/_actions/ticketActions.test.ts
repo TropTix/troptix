@@ -65,10 +65,14 @@ afterEach(() => {
 });
 
 describe('updateTicketType authorization', () => {
-  it('does not update when there is no session', async () => {
+  it('redirects and does not update when there is no session', async () => {
     mockGetUser.mockResolvedValue(null);
 
-    await updateTicketType('ticket_1', validForm);
+    // redirect() is resolved before the try, so its control-flow throw
+    // propagates (it is not swallowed by the catch).
+    await expect(updateTicketType('ticket_1', validForm)).rejects.toThrow(
+      'NEXT_REDIRECT'
+    );
 
     expect(redirect).toHaveBeenCalledWith('/auth/signin');
     expect(db.ticketTypes.update).not.toHaveBeenCalled();
