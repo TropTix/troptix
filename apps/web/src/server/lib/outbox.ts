@@ -14,9 +14,11 @@ import {
 /**
  * Transactional outbox drainer — the delivery half (ADR 0018). Lives here, not
  * in `@troptix/api`, because the email transport lib does (graduating it is the
- * email-worker work, #334). Fired from the cron backstop and an inline `after()`
- * on the webhook; overlap is safe because sends are idempotent (Resend dedupes on
- * confirmation-<orderId> / refund-<reservationId>).
+ * email-worker work, #334). Fired once a minute by the expire-reservations cron
+ * — the sole drainer, so both free and paid deliver within one tick. Sends are
+ * idempotent (Resend dedupes on confirmation-<orderId> / refund-<reservationId>)
+ * for the belt-and-suspenders case of an at-least-once cron. Near-instant inline
+ * drain is #425.
  */
 const MAX_ATTEMPTS = 5;
 const DEFAULT_LIMIT = 20;

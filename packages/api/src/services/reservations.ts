@@ -297,8 +297,9 @@ export interface ConfirmResult {
 /**
  * Materialize a paid (or free) order from a held reservation, atomically:
  * move `reserved → sold`, create the Order + one Ticket per unit (VALID), and
- * mark the reservation CONVERTED. The confirmation email is sent by the caller
- * after commit (never inside this transaction).
+ * mark the reservation CONVERTED. The confirmation email is enqueued to the
+ * outbox in this same transaction (exactly once) and delivered later by the cron
+ * drain — never sent inside this transaction.
  *
  * Idempotent: Stripe delivers webhooks at-least-once, so a second call for an
  * already-CONVERTED reservation is a no-op returning the existing order id.
