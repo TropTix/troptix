@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Loader2, X } from 'lucide-react';
 import {
   uploadOrganizationLogo,
@@ -10,6 +10,10 @@ import { Button } from '@/components/ui/button';
 import { initials } from '@/lib/utils';
 
 const MAX_BYTES = 5 * 1024 * 1024;
+// Match the organization-logos bucket allowlist so rejects surface client-side
+// with a clear message instead of a generic server error.
+const ACCEPT = 'image/png,image/jpeg,image/webp,image/avif';
+const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/avif'];
 
 // Uploads to the organization-logos bucket and reports back the stored PATH.
 // Preview shows the local file while uploading, then the resolved logo; falls
@@ -30,14 +34,21 @@ export function OrganizationLogoUpload({
 
   const preview = localPreview ?? organizationLogoUrl(value);
 
+  // Revoke a blob preview only when it's replaced or the component unmounts —
+  // never synchronously after upload, which would break the <img> still showing it.
+  useEffect(() => {
+    if (!localPreview?.startsWith('blob:')) return;
+    return () => URL.revokeObjectURL(localPreview);
+  }, [localPreview]);
+
   async function onSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-selecting the same file
     if (!file) return;
 
     setError(null);
-    if (!file.type.startsWith('image/')) {
-      setError('Choose an image file.');
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError('Use a PNG, JPG, WebP, or AVIF image.');
       return;
     }
     if (file.size > MAX_BYTES) {
@@ -45,8 +56,7 @@ export function OrganizationLogoUpload({
       return;
     }
 
-    const obj = URL.createObjectURL(file);
-    setLocalPreview(obj);
+    setLocalPreview(URL.createObjectURL(file));
     setUploading(true);
     try {
       const path = await uploadOrganizationLogo(file);
@@ -56,7 +66,6 @@ export function OrganizationLogoUpload({
       setLocalPreview(null);
     } finally {
       setUploading(false);
-      URL.revokeObjectURL(obj);
     }
   }
 
@@ -120,7 +129,7 @@ export function OrganizationLogoUpload({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPT}
         className="hidden"
         onChange={onSelect}
       />
