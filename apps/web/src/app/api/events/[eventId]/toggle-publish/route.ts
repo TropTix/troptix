@@ -48,6 +48,7 @@ export async function PATCH(
         venue: true,
         address: true,
         imageUrl: true,
+        organization: { select: { slug: true } },
         ticketTypes: {
           select: {
             id: true,
@@ -98,6 +99,10 @@ export async function PATCH(
     revalidatePath(`/organizer/events/${eventId}`);
     revalidatePath(`/e/${eventId}`);
     revalidatePath('/discover');
+    // Publishing/unpublishing changes the org's public event list.
+    if (event.organization?.slug) {
+      revalidatePath(`/o/${event.organization.slug}`);
+    }
 
     return NextResponse.json(
       {

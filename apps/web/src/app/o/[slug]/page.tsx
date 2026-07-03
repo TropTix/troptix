@@ -7,6 +7,12 @@ import OrganizationProfile from './_components/OrganizationProfile';
 // Public organization page (surface F5). See
 // docs/plans/2026-06-event-spotlight-and-organizer-brand.md.
 
+// ISR: the page is cached but self-heals hourly, so changes made outside the
+// app (SQL backfills/edits, a draft being published) don't stay stale forever.
+// App-driven changes revalidate on demand: profile save → this path, event
+// publish → the toggle-publish route revalidates `/o/[slug]`.
+export const revalidate = 3600;
+
 // Deduped per request so generateMetadata + the page share one DB read.
 const loadOrg = cache((slug: string) =>
   getOrganizationBySlug(prisma, { slug })
