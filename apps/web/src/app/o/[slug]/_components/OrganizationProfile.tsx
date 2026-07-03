@@ -1,60 +1,12 @@
 import type { ReactNode } from 'react';
-import { BadgeCheck, Globe, Instagram, Linkedin, Twitter } from 'lucide-react';
+import { BadgeCheck } from 'lucide-react';
 import type { EventSummary, OrganizationDetail } from '@troptix/api';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { initials } from '@/lib/utils';
+import { OrgAvatar } from '@/components/OrgAvatar';
+import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import EventCard from '@/components/EventCard';
 
 // Public organization page (/o/[slug], surface F5): brand header + the org's
 // upcoming/past events. Always public; drafts never reach here (service-side).
-
-const withScheme = (url: string) =>
-  /^https?:\/\//i.test(url) ? url : `https://${url}`;
-const handle = (username: string) => username.replace(/^@+/, '');
-
-function Socials({ org }: { org: OrganizationDetail }) {
-  const links = [
-    org.instagram && {
-      icon: Instagram,
-      href: `https://instagram.com/${handle(org.instagram)}`,
-      label: 'Instagram',
-    },
-    org.twitter && {
-      icon: Twitter,
-      href: `https://x.com/${handle(org.twitter)}`,
-      label: 'Twitter',
-    },
-    org.linkedin && {
-      icon: Linkedin,
-      href: withScheme(org.linkedin),
-      label: 'LinkedIn',
-    },
-    org.website && {
-      icon: Globe,
-      href: withScheme(org.website),
-      label: 'Website',
-    },
-  ].filter(Boolean) as { icon: typeof Globe; href: string; label: string }[];
-
-  if (links.length === 0) return null;
-
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
-      {links.map(({ icon: Icon, href, label }) => (
-        <a
-          key={label}
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={label}
-          className="grid h-9 w-9 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Icon className="h-4 w-4" />
-        </a>
-      ))}
-    </div>
-  );
-}
 
 function EventGrid({ events }: { events: EventSummary[] }) {
   return (
@@ -88,11 +40,11 @@ export default function OrganizationProfile({
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-5xl px-5 py-14 sm:px-6 lg:px-8">
         <header className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
-          <Avatar className="h-24 w-24 rounded-2xl text-2xl">
-            <AvatarFallback className="rounded-2xl bg-muted font-semibold text-foreground">
-              {initials(org.displayName)}
-            </AvatarFallback>
-          </Avatar>
+          <OrgAvatar
+            name={org.displayName}
+            logoUrl={org.logoUrl}
+            className="h-24 w-24 rounded-2xl text-2xl"
+          />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-3xl font-extrabold tracking-tight">
@@ -108,7 +60,7 @@ export default function OrganizationProfile({
             {org.bio && (
               <p className="mt-2 max-w-2xl text-muted-foreground">{org.bio}</p>
             )}
-            <Socials org={org} />
+            <OrgSocialLinks socials={org} className="mt-4" />
           </div>
         </header>
 

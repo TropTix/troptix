@@ -75,13 +75,17 @@ export async function getEventDetail(
       isDraft: true,
       organizer: true,
       organizerUserId: true,
-      // The hosting Organization (brand) for the "Hosted by" link → /o/[slug].
+      // The hosting Organization (brand) for the "Hosted by" block → /o/[slug].
       organization: {
         select: {
           slug: true,
           displayName: true,
           logoUrl: true,
           verified: true,
+          instagram: true,
+          twitter: true,
+          linkedin: true,
+          website: true,
         },
       },
       startDate: true,
@@ -176,6 +180,10 @@ export async function getEventDetail(
           displayName: event.organization.displayName,
           logoUrl: event.organization.logoUrl,
           verified: event.organization.verified,
+          instagram: event.organization.instagram,
+          twitter: event.organization.twitter,
+          linkedin: event.organization.linkedin,
+          website: event.organization.website,
         }
       : null,
     startDate: event.startDate.toISOString(),

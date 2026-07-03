@@ -55,7 +55,7 @@ export const eventDetailSchema = z.object({
   organizer: z.string(),
   /** The owning user — used by the page's draft-visibility guard. */
   organizerUserId: z.string(),
-  /** The hosting Organization (brand) for the "Hosted by" link → /o/[slug]. */
+  /** The hosting Organization (brand) for the "Hosted by" block → /o/[slug]. */
   hostedBy: z
     .object({
       slug: z.string(),
@@ -63,6 +63,10 @@ export const eventDetailSchema = z.object({
       /** Stored logo path (resolved to a URL by the web layer). */
       logoUrl: z.string().nullable(),
       verified: z.boolean(),
+      instagram: z.string().nullable(),
+      twitter: z.string().nullable(),
+      linkedin: z.string().nullable(),
+      website: z.string().nullable(),
     })
     .nullable(),
   startDate: z.string().datetime(),

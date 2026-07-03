@@ -56,6 +56,10 @@ type OrgRel = {
   displayName: string;
   logoUrl: string | null;
   verified: boolean;
+  instagram: string | null;
+  twitter: string | null;
+  linkedin: string | null;
+  website: string | null;
 } | null;
 
 function fakeEvent(
@@ -244,6 +248,10 @@ describe('getEventDetail — hostedBy', () => {
           displayName: 'Island Brunch Co.',
           logoUrl: null,
           verified: true,
+          instagram: 'islandbrunch',
+          twitter: null,
+          linkedin: null,
+          website: 'islandbrunch.co',
         },
       })
     );
@@ -253,6 +261,10 @@ describe('getEventDetail — hostedBy', () => {
       displayName: 'Island Brunch Co.',
       logoUrl: null,
       verified: true,
+      instagram: 'islandbrunch',
+      twitter: null,
+      linkedin: null,
+      website: 'islandbrunch.co',
     });
   });
 

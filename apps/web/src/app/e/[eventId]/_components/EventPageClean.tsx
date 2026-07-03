@@ -18,6 +18,8 @@ import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency, cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Banner } from '@/components/ui/banner';
+import { OrgAvatar } from '@/components/OrgAvatar';
+import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import type { EventDetail } from '@troptix/api';
 import CheckoutSheet from './CheckoutSheet';
 import VenueMap from './VenueMap';
@@ -68,30 +70,65 @@ function MetaRow({
   );
 }
 
-// The "Hosted by" / "Presented by" line: links to the organization page when
-// the event has a linked brand, else the legacy organizer name (pre-backfill).
-function HostedBy({
-  event,
-  className,
-}: {
-  event: EventDetail;
-  className?: string;
-}) {
+// The "Hosted by" / "Presented by" block: organization logo + name (→ /o/[slug])
+// + verified tick + social links. Used in the desktop poster aside and the mobile
+// section. Falls back to the legacy organizer name when there's no linked brand.
+function HostedBy({ event }: { event: EventDetail }) {
   if (!event.hostedBy) {
-    return <p className={cn('font-semibold', className)}>{event.organizer}</p>;
+    return <p className="mt-3 font-semibold">{event.organizer}</p>;
   }
-  const { slug, displayName, verified } = event.hostedBy;
+  const org = event.hostedBy;
+  return (
+    <div className="mt-3">
+      <Link
+        href={`/o/${org.slug}`}
+        className="group inline-flex items-center gap-3"
+      >
+        <OrgAvatar
+          name={org.displayName}
+          logoUrl={org.logoUrl}
+          className="h-11 w-11 rounded-xl"
+        />
+        <span className="inline-flex items-center gap-1.5 font-semibold transition-colors group-hover:text-primary">
+          {org.displayName}
+          {org.verified && (
+            <BadgeCheck
+              className="h-4 w-4 text-primary"
+              aria-label="Verified"
+            />
+          )}
+        </span>
+      </Link>
+      <OrgSocialLinks socials={org} className="mt-3" size="sm" />
+    </div>
+  );
+}
+
+// Compact inline variant for the top of the mobile layout: a small logo + name
+// (+ tick), no socials. Falls back to the plain organizer name.
+function HostedByInline({ event }: { event: EventDetail }) {
+  if (!event.hostedBy) {
+    return (
+      <span className="font-semibold text-foreground">{event.organizer}</span>
+    );
+  }
+  const org = event.hostedBy;
   return (
     <Link
-      href={`/o/${slug}`}
-      className={cn(
-        'inline-flex items-center gap-1.5 font-semibold transition-colors hover:text-primary',
-        className
-      )}
+      href={`/o/${org.slug}`}
+      className="inline-flex items-center gap-1.5 align-middle font-semibold text-foreground hover:text-primary"
     >
-      {displayName}
-      {verified && (
-        <BadgeCheck className="h-4 w-4 text-primary" aria-label="Verified" />
+      <OrgAvatar
+        name={org.displayName}
+        logoUrl={org.logoUrl}
+        className="h-5 w-5 rounded"
+      />
+      {org.displayName}
+      {org.verified && (
+        <BadgeCheck
+          className="h-3.5 w-3.5 text-primary"
+          aria-label="Verified"
+        />
       )}
     </Link>
   );
@@ -288,7 +325,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
               </div>
               <div className="mt-5 border-t border-border pt-5">
                 <p className={SECTION_LABEL}>Presented by</p>
-                <HostedBy event={event} className="mt-1" />
+                <HostedBy event={event} />
               </div>
             </aside>
 
@@ -317,22 +354,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
 
               {/* Host up top on mobile; desktop surfaces it in the poster aside. */}
               <p className="mt-3 text-sm text-muted-foreground md:hidden">
-                Hosted by{' '}
-                {event.hostedBy ? (
-                  <Link
-                    href={`/o/${event.hostedBy.slug}`}
-                    className="inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary"
-                  >
-                    {event.hostedBy.displayName}
-                    {event.hostedBy.verified && (
-                      <BadgeCheck className="h-3.5 w-3.5 text-primary" />
-                    )}
-                  </Link>
-                ) : (
-                  <span className="font-semibold text-foreground">
-                    {event.organizer}
-                  </span>
-                )}
+                Hosted by <HostedByInline event={event} />
               </p>
 
               <div className="mt-6 space-y-3">
@@ -362,6 +384,12 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
                 <p className="mt-4 font-semibold">{event.venue ?? 'Venue'}</p>
                 <p className="text-sm text-muted-foreground">{event.address}</p>
                 <VenueMap event={event} />
+              </section>
+
+              {/* Full hosted-by (logo + socials); desktop shows it in the aside. */}
+              <section className="mt-10 md:hidden">
+                <SectionHeader>Hosted by</SectionHeader>
+                <HostedBy event={event} />
               </section>
             </div>
           </div>

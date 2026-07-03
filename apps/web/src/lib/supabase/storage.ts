@@ -45,6 +45,23 @@ export function eventFlyerUrl(value: string | null | undefined): string | null {
   return `${PUBLIC_BASE}/${EVENT_FLYERS_BUCKET}/${path}`;
 }
 
+export const ORGANIZATION_LOGOS_BUCKET = 'organization-logos';
+
+/**
+ * Resolve a stored `Organization.logoUrl` to a renderable URL — same
+ * path-not-URL contract as `eventFlyerUrl` (ADR 0016), for the org-logos bucket.
+ * Falsy → `null` (callers fall back to a monogram). The upload counterpart lands
+ * with the logo editor; until then every logoUrl is null and this returns null.
+ */
+export function organizationLogoUrl(
+  value: string | null | undefined
+): string | null {
+  if (!value) return null;
+  if (isAbsoluteUrl(value)) return value;
+  const path = value.replace(/^\/+/, '');
+  return `${PUBLIC_BASE}/${ORGANIZATION_LOGOS_BUCKET}/${path}`;
+}
+
 /**
  * Upload a flyer to the `event-flyers` bucket and return the stored PATH (what
  * goes into `Events.imageUrl`). Writes are governed by the bucket's
