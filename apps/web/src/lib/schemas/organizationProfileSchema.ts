@@ -17,6 +17,8 @@ export const organizationProfileSchema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
       message: 'Use lowercase letters, numbers, and single hyphens only.',
     }),
+  /** Supabase Storage path (not a URL) for the logo, or '' for none. */
+  logoUrl: z.string().max(2000).optional(),
   bio: z.string().max(600).optional(),
   website: z.string().max(200).optional(),
   instagram: z.string().max(60).optional(),

@@ -316,6 +316,7 @@ describe('updateOrganizationProfile', () => {
     ownerUserId: 'u1',
     displayName: 'Island Vibes',
     slug: 'island-vibes',
+    logoUrl: null,
     bio: null,
     website: null,
     instagram: null,

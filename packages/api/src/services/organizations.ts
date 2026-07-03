@@ -114,6 +114,7 @@ export type UpdateOrganizationProfileInput = {
   ownerUserId: string;
   displayName: string;
   slug: string;
+  logoUrl: string | null;
   bio: string | null;
   website: string | null;
   instagram: string | null;
@@ -163,6 +164,7 @@ export async function updateOrganizationProfile(
       data: {
         displayName: input.displayName.trim() || org.displayName,
         slug: nextSlug,
+        logoUrl: blankToNull(input.logoUrl),
         bio: blankToNull(input.bio),
         website: blankToNull(input.website),
         instagram: blankToNull(input.instagram),

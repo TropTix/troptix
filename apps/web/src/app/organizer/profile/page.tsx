@@ -23,6 +23,7 @@ export default async function OrganizerProfilePage() {
       initial={{
         displayName: org.displayName,
         slug: org.slug,
+        logoUrl: org.logoUrl ?? '',
         bio: org.bio ?? '',
         website: org.website ?? '',
         instagram: org.instagram ?? '',

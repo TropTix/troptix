@@ -29,8 +29,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { initials } from '@/lib/utils';
+import { OrganizationLogoUpload } from './OrganizationLogoUpload';
 
 const PROFILE_URL_BASE = 'troptix.com/o/';
 
@@ -82,6 +81,7 @@ export default function OrganizationProfileForm({
 
   const displayName = form.watch('displayName');
   const slug = form.watch('slug');
+  const logoUrl = form.watch('logoUrl');
 
   const onSubmit = (data: OrganizationProfileValues) => {
     startTransition(async () => {
@@ -114,12 +114,14 @@ export default function OrganizationProfileForm({
         </p>
       </div>
 
-      <div className="mb-8 flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <Avatar className="h-20 w-20 rounded-2xl text-xl">
-          <AvatarFallback className="rounded-2xl bg-muted font-semibold text-foreground">
-            {initials(displayName || 'Organizer')}
-          </AvatarFallback>
-        </Avatar>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <OrganizationLogoUpload
+          value={logoUrl || null}
+          name={displayName}
+          onChange={(path) =>
+            form.setValue('logoUrl', path ?? '', { shouldDirty: true })
+          }
+        />
         <Button asChild variant="outline" size="sm" className="gap-1.5">
           <a href={`/o/${savedSlug}`} target="_blank" rel="noopener noreferrer">
             View profile <ExternalLink className="h-3.5 w-3.5" />

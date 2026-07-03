@@ -38,6 +38,7 @@ export async function saveOrganizationProfile(
     ownerUserId: user.uid,
     displayName: d.displayName,
     slug: d.slug,
+    logoUrl: d.logoUrl ?? null,
     bio: d.bio ?? null,
     website: d.website ?? null,
     instagram: d.instagram ?? null,
