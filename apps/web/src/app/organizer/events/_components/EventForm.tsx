@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useForm, useFieldArray, FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Edit, Loader2, PlusCircle, X } from 'lucide-react';
@@ -58,6 +59,8 @@ interface EventFormProps {
   ticketTypes?: TicketTypeFormValues[];
   isDraft?: boolean;
   paidEventsEnabled: boolean;
+  /** The organizer's brand — this event's host. Editable at /organizer/profile. */
+  organizationName?: string;
 }
 
 export default function EventForm({
@@ -67,6 +70,7 @@ export default function EventForm({
   ticketTypes,
   isDraft,
   paidEventsEnabled,
+  organizationName,
 }: EventFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition(); // Loading state hook
@@ -89,7 +93,6 @@ export default function EventForm({
       // Use initialData if provided, otherwise default
       eventName: '',
       description: '',
-      organizer: '',
       startDate: tomorrow,
       endDate: nextDay,
       venue: '',
@@ -282,7 +285,7 @@ export default function EventForm({
                 id: eventId || '',
                 name: form.watch('eventName'),
                 description: form.watch('description'),
-                organizer: form.watch('organizer'),
+                organizer: organizationName ?? '',
                 startDate: form.watch('startDate'),
                 endDate: form.watch('endDate'),
                 venue: form.watch('venue'),
@@ -358,26 +361,22 @@ export default function EventForm({
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="organizer"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Organizer</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., Troptix Events"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                        <FormDescription>
-                          Name of the person or organization organizing the
-                          event.
-                        </FormDescription>
-                      </FormItem>
-                    )}
-                  />
+                  <FormItem>
+                    <FormLabel>Hosted by</FormLabel>
+                    <div className="flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-medium">
+                      {organizationName ?? 'Your organizer profile'}
+                    </div>
+                    <FormDescription>
+                      Events are hosted by your organization.{' '}
+                      <Link
+                        href="/organizer/profile"
+                        className="underline underline-offset-2 hover:text-primary"
+                      >
+                        Edit your profile
+                      </Link>
+                      .
+                    </FormDescription>
+                  </FormItem>
 
                   <div className="grid md:grid-cols-2 gap-4">
                     {/* Start Date */}

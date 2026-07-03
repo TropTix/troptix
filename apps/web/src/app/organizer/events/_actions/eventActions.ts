@@ -6,6 +6,7 @@ import { generateId } from '@/lib/utils';
 import { reservationColumns } from '@/lib/reservationColumns';
 import { eventFormSchema, EventFormValues } from '@/lib/schemas/eventSchema';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { ensureOrganizationForUser } from '@troptix/api/server';
 import { redirect } from 'next/navigation';
 interface ActionResult {
   success: boolean;
@@ -40,15 +41,24 @@ export async function createEvent(
 
     const newEventId = generateId();
 
+    // The event is hosted by the organizer's Organization (auto-created on their
+    // first event). `organizer` is a denormalized mirror of the brand name; the
+    // per-event organizer field was retired.
+    const org = await ensureOrganizationForUser(prisma, {
+      ownerUserId: user.uid,
+      displayName: user.email ?? '',
+    });
+
     await prisma.$transaction(async (tx) => {
       await tx.events.create({
         data: {
           id: newEventId,
           organizerUserId: user.uid,
+          organizationId: org.id,
           isDraft: true,
           name: data.eventName,
           description: data.description ?? '',
-          organizer: data.organizer,
+          organizer: org.displayName,
           startDate: data.startDate,
           endDate: data.endDate,
           venue: data.venue,
@@ -142,13 +152,20 @@ export async function updateEvent(
       return { success: false, error: 'Event not found or unauthorized.' };
     }
 
+    // Keep the event pointed at the organizer's Organization + mirror its name.
+    const org = await ensureOrganizationForUser(prisma, {
+      ownerUserId: user.uid,
+      displayName: user.email ?? '',
+    });
+
     // Update the Event
     await prisma.events.update({
       where: { id: eventId },
       data: {
         name: data.eventName,
         description: data.description ?? '',
-        organizer: data.organizer,
+        organizationId: org.id,
+        organizer: org.displayName,
         startDate: data.startDate,
         endDate: data.endDate,
         venue: data.venue,

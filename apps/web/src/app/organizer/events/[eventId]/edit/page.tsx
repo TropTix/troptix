@@ -85,8 +85,13 @@ export default async function EditEventPage(props: EditEventPageProps) {
     longitude: event?.longitude ?? null,
     imageUrl: event?.imageUrl ?? '',
     description: event?.description ?? '',
-    organizer: event?.organizer ?? '',
   };
+
+  // Host brand for the read-only "Hosted by" line on the form.
+  const org = await prisma.organization.findFirst({
+    where: { ownerUserId: userId },
+    select: { displayName: true },
+  });
 
   return (
     <div className=" mx-auto py-8">
@@ -108,6 +113,7 @@ export default async function EditEventPage(props: EditEventPageProps) {
         }
         isDraft={event.isDraft}
         paidEventsEnabled={paidEventsEnabled}
+        organizationName={org?.displayName}
       />
     </div>
   );

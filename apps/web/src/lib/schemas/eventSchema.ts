@@ -11,7 +11,6 @@ export const eventFormSchema = z
       required_error: 'Start date is required.',
       invalid_type_error: 'Start date must be a valid date.', // Added invalid type error
     }),
-    organizer: z.string().min(1, { message: 'Name of organizer is required.' }),
     endDate: z.date({
       required_error: 'End date is required.',
       invalid_type_error: 'End date must be a valid date.', // Added invalid type error
