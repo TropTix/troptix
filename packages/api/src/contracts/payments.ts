@@ -56,8 +56,6 @@ export const checkoutStateSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('order'),
     orderId: z.string(),
-    /** Guest ticket-access token for the confirmation link (`?t=`). */
-    accessToken: z.string().nullable(),
     tickets: z.array(checkoutOrderTicketSchema),
   }),
   z.object({ kind: z.literal('expired') }),

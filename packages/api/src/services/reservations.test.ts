@@ -322,8 +322,6 @@ describe('completeFree', () => {
       reservationId: res.reservationId,
     });
     expect(done.tickets).toHaveLength(2);
-    // Guest access token is minted and returned for the confirmation link.
-    expect(done.accessToken).toBeTruthy();
 
     const ttAfter = await prisma.ticketTypes.findUnique({
       where: { id: tt.id },

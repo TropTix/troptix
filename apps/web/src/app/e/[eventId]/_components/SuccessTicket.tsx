@@ -9,16 +9,14 @@ import type { EventDetail } from '@troptix/api';
 
 // Post-checkout confirmation: poster-forward on a light tinted field, with a
 // single "View tickets" action that hands off to the real swipeable QR view
-// (carrying the guest access token). The QR lives only there — never inline here.
+// The QR lives only there — never inline here.
 export default function SuccessTicket({
   event,
   orderId,
-  accessToken,
   tickets,
 }: {
   event: EventDetail;
   orderId: string;
-  accessToken: string | null;
   tickets: { id: string; ticketTypeName: string | null }[];
 }) {
   const { copyToClipboard } = useCopyToClipboard();
@@ -32,9 +30,7 @@ export default function SuccessTicket({
     day: 'numeric',
   })} at ${start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 
-  const ticketsHref = `/orders/${orderId}/tickets${
-    accessToken ? `?t=${encodeURIComponent(accessToken)}` : ''
-  }`;
+  const ticketsHref = `/orders/${orderId}/tickets`;
 
   async function onShare() {
     const url =

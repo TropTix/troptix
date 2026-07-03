@@ -33,7 +33,6 @@ import { Badge } from '@/components/ui/badge';
 
 import { getDateFormatter } from '@/lib/dateUtils'; // Assuming getTimeFormatter
 import { getFormattedCurrency } from '@/lib/utils';
-import { resolveOrderAccess } from '@/server/orderAccess';
 import { EnrichedOrder } from '../page';
 
 interface AggregatedTicketRow {
@@ -116,35 +115,9 @@ function aggregateTicketsForReceipt(
 
 export default async function OrderReceiptPage(props: {
   params: Promise<{ orderId: string }>;
-  searchParams: Promise<{ t?: string }>;
 }) {
   const params = await props.params;
-  const { t } = await props.searchParams;
   const orderId = params.orderId;
-
-  const access = await resolveOrderAccess(orderId, t);
-  if (access.accessMode === 'denied') {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="text-2xl font-semibold">
-          {access.orderExists
-            ? 'Sign in to view this receipt'
-            : 'Order not found'}
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          {access.orderExists
-            ? 'Open the link from your confirmation email, or sign in with the email you used to buy.'
-            : 'We couldn’t find this order. Double-check the link in your confirmation email.'}
-        </p>
-        {access.orderExists && (
-          <Button asChild className="mt-6">
-            <Link href="/auth/signin">Sign in</Link>
-          </Button>
-        )}
-      </div>
-    );
-  }
-
   const order = await getOrderForReceipt(orderId);
 
   if (!order) {
@@ -240,7 +213,7 @@ export default async function OrderReceiptPage(props: {
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   Date Placed:{' '}
                   <span className="font-medium text-slate-700 dark:text-slate-300">
-                    {getDateFormatter(new Date(order.createdAt ?? new Date()))}
+                    {getDateFormatter(new Date(order.createdAt || Date.now()))}
                   </span>
                 </p>
               </div>
@@ -375,50 +348,47 @@ export default async function OrderReceiptPage(props: {
               </div>
             </section>
 
-            {/* Billing Information — owner-only; withheld from token guests. */}
-            {access.accessMode === 'owner' && (
-              <section>
-                <h2 className="text-lg font-semibold mb-3 text-slate-700 dark:text-slate-200">
-                  Billing Information
-                </h2>
-                <div className="text-sm p-4 bg-slate-100 dark:bg-slate-800/50 rounded-lg border dark:border-slate-700 space-y-1">
+            {/* Billing Information */}
+            <section>
+              <h2 className="text-lg font-semibold mb-3 text-slate-700 dark:text-slate-200">
+                Billing Information
+              </h2>
+              <div className="text-sm p-4 bg-slate-100 dark:bg-slate-800/50 rounded-lg border dark:border-slate-700 space-y-1">
+                <p>
+                  <strong className="text-slate-500 dark:text-slate-400 w-28 inline-block">
+                    Name:
+                  </strong>{' '}
+                  {order.firstName || order.name} {order.lastName || ''}
+                </p>
+                <p>
+                  <strong className="text-slate-500 dark:text-slate-400 w-28 inline-block">
+                    Email:
+                  </strong>{' '}
+                  {order.email}
+                </p>
+                {order.billingAddress1 && (
                   <p>
                     <strong className="text-slate-500 dark:text-slate-400 w-28 inline-block">
-                      Name:
+                      Address:
                     </strong>{' '}
-                    {order.firstName || order.name} {order.lastName || ''}
+                    {order.billingAddress1}
+                    {order.billingAddress2
+                      ? `, ${order.billingAddress2}`
+                      : ''}, {order.billingCity}, {order.billingState}{' '}
+                    {order.billingZip}, {order.billingCountry}
                   </p>
-                  <p>
+                )}
+                {order.cardLast4 && (
+                  <p className="mt-1">
                     <strong className="text-slate-500 dark:text-slate-400 w-28 inline-block">
-                      Email:
+                      Payment:
                     </strong>{' '}
-                    {order.email}
+                    Card ending in **** {order.cardLast4} (
+                    {order.cardType || 'Card'})
                   </p>
-                  {order.billingAddress1 && (
-                    <p>
-                      <strong className="text-slate-500 dark:text-slate-400 w-28 inline-block">
-                        Address:
-                      </strong>{' '}
-                      {order.billingAddress1}
-                      {order.billingAddress2
-                        ? `, ${order.billingAddress2}`
-                        : ''}
-                      , {order.billingCity}, {order.billingState}{' '}
-                      {order.billingZip}, {order.billingCountry}
-                    </p>
-                  )}
-                  {order.cardLast4 && (
-                    <p className="mt-1">
-                      <strong className="text-slate-500 dark:text-slate-400 w-28 inline-block">
-                        Payment:
-                      </strong>{' '}
-                      Card ending in **** {order.cardLast4} (
-                      {order.cardType || 'Card'})
-                    </p>
-                  )}
-                </div>
-              </section>
-            )}
+                )}
+              </div>
+            </section>
 
             {/* Actions */}
             <section className="text-center space-y-3 pt-6 border-t dark:border-slate-700">
@@ -432,9 +402,7 @@ export default async function OrderReceiptPage(props: {
                   size="lg"
                   className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
-                  <Link
-                    href={`/orders/${order.id}${access.accessMode === 'guest' && t ? `?t=${encodeURIComponent(t)}` : ''}`}
-                  >
+                  <Link href={`/orders/${order.id}`}>
                     {' '}
                     {/* Link to the general order details page */}
                     <TicketIconLucide className="mr-2 h-5 w-5" /> View Order &

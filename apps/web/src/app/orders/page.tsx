@@ -43,17 +43,6 @@ async function fetchUserOrders(): Promise<UserOrder[]> {
     return [];
   }
 
-  // Opportunistic claim: stamp this user onto any orders they bought as a guest
-  // (matched by email, userId still null). Durable link beyond the email string.
-  try {
-    await prisma.orders.updateMany({
-      where: { email: user.email, userId: null },
-      data: { userId: user.uid },
-    });
-  } catch (error) {
-    console.error('Failed to backfill order ownership:', error);
-  }
-
   try {
     const userOrders = await prisma.orders.findMany({
       where: {

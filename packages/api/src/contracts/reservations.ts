@@ -57,8 +57,6 @@ export type ReleaseInput = z.infer<typeof releaseInputSchema>;
 
 export const completeFreeResponseSchema = z.object({
   orderId: z.string(),
-  /** Guest ticket-access token for the confirmation link (`?t=`). */
-  accessToken: z.string().nullable(),
   tickets: z.array(
     z.object({ id: z.string(), ticketTypeName: z.string().nullable() })
   ),

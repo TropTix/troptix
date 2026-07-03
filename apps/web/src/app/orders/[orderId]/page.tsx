@@ -45,7 +45,6 @@ import { Badge } from '@/components/ui/badge';
 
 import { getDateFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency } from '@/lib/utils';
-import { resolveOrderAccess } from '@/server/orderAccess';
 import TicketListInteractive from './_components/TicketList';
 
 export interface EnrichedTicket extends PrismaTicket {
@@ -78,35 +77,9 @@ async function getOrder(orderId: string): Promise<EnrichedOrder | null> {
 
 export default async function OrderDetailsPage(props: {
   params: Promise<{ orderId: string }>;
-  searchParams: Promise<{ t?: string }>;
 }) {
   const params = await props.params;
-  const { t } = await props.searchParams;
   const orderId = params.orderId;
-
-  const access = await resolveOrderAccess(orderId, t);
-  if (access.accessMode === 'denied') {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="text-2xl font-semibold">
-          {access.orderExists
-            ? 'Sign in to view this order'
-            : 'Order not found'}
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          {access.orderExists
-            ? 'Open the link from your confirmation email, or sign in with the email you used to buy.'
-            : 'We couldn’t find this order. Double-check the link in your confirmation email.'}
-        </p>
-        {access.orderExists && (
-          <Button asChild className="mt-6">
-            <Link href="/auth/signin">Sign in</Link>
-          </Button>
-        )}
-      </div>
-    );
-  }
-
   const order = await getOrder(orderId);
   const now = new Date();
   const isPastEvent = order ? new Date(order.event.endDate) < now : false;
@@ -321,9 +294,7 @@ export default async function OrderDetailsPage(props: {
                     className="w-full bg-secondary hover:bg-secondary/80 text-secondary-foreground"
                     size="sm"
                   >
-                    <Link
-                      href={`/orders/${order.id}/receipt${access.accessMode === 'guest' && t ? `?t=${encodeURIComponent(t)}` : ''}`}
-                    >
+                    <Link href={`/orders/${order.id}/receipt`}>
                       <FileText className="mr-2 h-4 w-4" /> View Full Receipt
                     </Link>
                   </Button>

@@ -7,6 +7,18 @@ tracking-issue: TBD
 
 # Orders & Tickets Redesign — Wallet-First
 
+> **Status note (2026-07-02):** The first PR ships the **wallet-first UI** (QR-first swipeable
+> ticket view, order-detail money summary + free-order suppression, upcoming/past list) and lands
+> the `Orders.accessToken` **column + migration** — but the **guest access-token feature is
+> deferred**. Minting the token, the `accessMode` guard on the order/tickets/receipt pages, the
+> `?t=` link threading, receipt billing gating, and the opportunistic `userId` backfill are all
+> **out of this PR** and tracked as a follow-up. Reason: token propagation had too many link sites
+> to thread safely in one pass (order→tickets nav via `TicketList`, the ticket-view back button,
+> the legacy Stripe confirmation page), and the pre-migration order backlog needs an access story.
+> The column lands now so the follow-up doesn't need a second migration. Until the follow-up, the
+> order pages keep their existing behavior. Everything below the fold describes the **full** target
+> design (the follow-up's spec), not what this first PR ships.
+
 A redesign of how attendees view the tickets and orders they've purchased, aligned with the
 new design language and the `/e/[eventId]` checkout. The guiding frame is **wallet-first**: the
 primary job of these pages is _getting into the event_ — a big, scannable QR on a phone at the

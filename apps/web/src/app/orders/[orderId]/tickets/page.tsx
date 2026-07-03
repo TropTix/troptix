@@ -3,7 +3,6 @@ import prisma from '@/server/prisma';
 import TicketDisplayManager from './_components/TicketDisplay';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { resolveOrderAccess } from '@/server/orderAccess';
 
 async function getOrderWithTicketsData(orderId: string) {
   const orderData = await prisma.orders.findUnique({
@@ -53,41 +52,19 @@ async function getOrderWithTicketsData(orderId: string) {
 
 interface OrderTicketsPageProps {
   params: Promise<{ orderId: string }>;
-  searchParams: Promise<{ ticketId?: string; t?: string }>;
+  searchParams: Promise<{ ticketId?: string }>;
 }
 
 export default async function OrderTicketsPage(props: OrderTicketsPageProps) {
   const searchParams = await props.searchParams;
   const params = await props.params;
   const { orderId } = params;
-  const { ticketId, t } = searchParams;
+  const { ticketId } = searchParams;
 
   if (!orderId) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <p className="text-destructive">Order ID is missing.</p>
-      </div>
-    );
-  }
-
-  const { accessMode, orderExists } = await resolveOrderAccess(orderId, t);
-
-  if (accessMode === 'denied') {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="text-2xl font-semibold">
-          {orderExists ? 'Sign in to view these tickets' : 'Order not found'}
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          {orderExists
-            ? 'Open the link from your confirmation email, or sign in with the email you used to buy.'
-            : 'We couldn’t find this order. Double-check the link in your confirmation email.'}
-        </p>
-        {orderExists && (
-          <Button asChild className="mt-6">
-            <Link href="/auth/signin">Sign in</Link>
-          </Button>
-        )}
       </div>
     );
   }

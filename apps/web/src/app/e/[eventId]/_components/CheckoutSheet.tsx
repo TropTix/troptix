@@ -36,7 +36,6 @@ const STEP_TITLE: Record<Step, string> = {
 
 type SuccessData = {
   orderId: string;
-  accessToken: string | null;
   tickets: { id: string; ticketTypeName: string | null }[];
 };
 
@@ -111,11 +110,7 @@ export default function CheckoutSheet({
     if (step !== 'finalizing' || !stateQuery.data) return;
     const state = stateQuery.data;
     if (state.kind === 'order') {
-      setSuccessData({
-        orderId: state.orderId,
-        accessToken: state.accessToken,
-        tickets: state.tickets,
-      });
+      setSuccessData({ orderId: state.orderId, tickets: state.tickets });
       setStep('success');
       // Mirror the free flow: nudge the confirmation email (idempotent).
       void fetch('/api/checkout/confirmation', {
@@ -245,11 +240,7 @@ export default function CheckoutSheet({
         const order = await completeFree.mutateAsync({
           reservationId: reservation.reservationId,
         });
-        setSuccessData({
-          orderId: order.orderId,
-          accessToken: order.accessToken,
-          tickets: order.tickets,
-        });
+        setSuccessData({ orderId: order.orderId, tickets: order.tickets });
         setStep('success');
         void fetch('/api/checkout/confirmation', {
           method: 'POST',
@@ -321,7 +312,6 @@ export default function CheckoutSheet({
           <SuccessTicket
             event={event}
             orderId={successData.orderId}
-            accessToken={successData.accessToken}
             tickets={successData.tickets}
           />
         ) : (
