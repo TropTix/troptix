@@ -1,9 +1,8 @@
-import { NextResponse, after } from 'next/server';
+import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { confirmPaid } from '@troptix/api/server';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
-import { drainOutbox } from '@/server/lib/outbox';
 
 /**
  * Reservation checkout webhook (ADR 0018) — the canonical fulfiller for the new
@@ -13,8 +12,8 @@ import { drainOutbox } from '@/server/lib/outbox';
  * `checkout.session.completed` → `confirmPaid` (idempotent; auto-refunds on the
  * expiry race). We only act on Sessions carrying `metadata.reservationId`, and
  * dedupe by event id — both belt-and-suspenders on top of `settle`'s own
- * idempotency. `confirmPaid` enqueues the email in-txn; we drain it via
- * `after()` (post-response, no dangling promise), with the cron as backstop.
+ * idempotency. `confirmPaid` enqueues the email in-txn; the once-a-minute cron
+ * drains it (revisit near-instant inline drain in #425 if ever needed).
  */
 export const runtime = 'nodejs';
 
@@ -98,11 +97,6 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
         reservationId,
         paymentIntentId,
       });
-      after(() =>
-        drainOutbox().catch((err) =>
-          console.error('[ReservationWebhook] Outbox drain failed:', err)
-        )
-      );
       return;
     }
 

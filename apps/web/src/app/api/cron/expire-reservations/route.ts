@@ -25,7 +25,12 @@ export async function POST(req: Request) {
 
   try {
     const result = await sweepExpiredHolds(prisma, stripe);
-    const drain = await drainOutbox();
+    // Isolated: a drain failure must not report the (already-committed) sweep as
+    // failed. The next tick retries the outbox anyway.
+    const drain = await drainOutbox().catch((error) => {
+      console.error('[ExpireReservations] Outbox drain failed:', error);
+      return { sent: 0, failed: 0 };
+    });
     return NextResponse.json({ success: true, ...result, drain });
   } catch (error) {
     console.error('[ExpireReservations] Sweep failed:', error);
