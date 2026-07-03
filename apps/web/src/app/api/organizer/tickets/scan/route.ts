@@ -76,7 +76,7 @@ async function updateScannedTicketStatus(ticketId: string, eventId: string) {
   // AVAILABLE flips it, so two simultaneous scans can't both succeed.
   const result = await prisma.tickets.updateMany({
     where: { id: ticketId, eventId, status: TicketStatus.AVAILABLE },
-    data: { status: TicketStatus.NOT_AVAILABLE },
+    data: { status: TicketStatus.NOT_AVAILABLE, checkinTimestamp: new Date() },
   });
 
   return {

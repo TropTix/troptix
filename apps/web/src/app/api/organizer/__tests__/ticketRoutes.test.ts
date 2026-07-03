@@ -83,6 +83,10 @@ describe('scan route authorization + atomicity', () => {
       scanSucceeded: true,
     });
     expect(second.scanSucceeded).toBe(false);
+    // Records the check-in time on the flip (roadmap 2.11).
+    expect(
+      db.tickets.updateMany.mock.calls[0][0].data.checkinTimestamp
+    ).toBeInstanceOf(Date);
   });
 
   it('handles a ticket with no ticket type without throwing', async () => {
@@ -121,6 +125,10 @@ describe('check-in route platform-owner policy', () => {
 
     expect(res.status).toBe(200);
     expect(db.tickets.update).toHaveBeenCalledTimes(1);
+    // Checking in (AVAILABLE -> NOT_AVAILABLE) stamps the time.
+    expect(
+      db.tickets.update.mock.calls[0][0].data.checkinTimestamp
+    ).toBeInstanceOf(Date);
   });
 
   it('rejects a non-owner who is not a platform owner with 403', async () => {

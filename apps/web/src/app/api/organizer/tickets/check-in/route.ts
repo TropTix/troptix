@@ -56,16 +56,15 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // 4. Determine the new status and update the ticket
-    const newStatus: TicketStatus =
-      ticket.status === 'AVAILABLE' ? 'NOT_AVAILABLE' : 'AVAILABLE';
-
+    // 4. Toggle check-in: flip status and record/clear the check-in time.
+    const checkingIn = ticket.status === 'AVAILABLE';
     const updatedTicket = await prisma.tickets.update({
       where: {
         id: ticketId,
       },
       data: {
-        status: newStatus,
+        status: checkingIn ? 'NOT_AVAILABLE' : 'AVAILABLE',
+        checkinTimestamp: checkingIn ? new Date() : null,
       },
     });
 
