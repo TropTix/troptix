@@ -1,0 +1,632 @@
+<title>TropTix — Landing hero options</title>
+<style>
+  :root {
+    /* defaults = Sunset variant; each body.v-* overrides these */
+    --ground: #0b0a1f;
+    --ink: #f4f2ff;
+    --muted: #a6a2ce;
+    --faint: #6f6b9c;
+    --accent: #6366f1;
+    --accent2: #ff5c8a;
+    --glass: rgba(255, 255, 255, 0.06);
+    --glass-line: rgba(255, 255, 255, 0.12);
+    --h1grad: linear-gradient(105deg, #ffb347 0%, #ff5c8a 38%, #8b5cf6 70%, #6366f1 100%);
+    --font: -apple-system, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+    --btn-radius: 999px;
+    --card-radius: 24px;
+    --h1-case: none;
+    --h1-weight: 800;
+    --h1-track: -0.035em;
+    --h1-size: clamp(2.8rem, 7vw, 6rem);
+    --maxw: 1180px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    transition: color 0.5s, background 0.5s;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; display: block; }
+  .veil {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0.42) 0%, transparent 20%, transparent 55%, rgba(0,0,0,0.35) 100%);
+    transition: opacity 0.5s;
+  }
+
+  .stage { position: relative; z-index: 2; min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ---------- nav ---------- */
+  nav {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    max-width: var(--maxw); width: 100%; margin: 0 auto; padding: 1.25rem 1.5rem;
+  }
+  .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; letter-spacing: -0.02em; font-size: 1.28rem; }
+  .brand .mark {
+    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+    background: linear-gradient(150deg, var(--accent), var(--accent2));
+    box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 55%, transparent);
+    font-size: 1rem; font-weight: 800; color: #fff;
+  }
+  .nav-links { display: flex; align-items: center; gap: 1.9rem; }
+  .nav-links a { color: var(--muted); font-size: 0.94rem; font-weight: 500; transition: color 0.18s; }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-cta { display: flex; align-items: center; gap: 0.85rem; }
+  .signin { color: var(--muted); font-size: 0.94rem; font-weight: 500; }
+  .signin:hover { color: var(--ink); }
+  @media (max-width: 880px) { .nav-links { display: none; } }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.45rem; font-weight: 600; font-size: 0.95rem;
+    padding: 0.62rem 1.15rem; border-radius: var(--btn-radius); border: 1px solid transparent;
+    cursor: pointer; transition: transform 0.16s ease, box-shadow 0.2s ease, background 0.2s;
+    font-family: inherit;
+  }
+  .btn-primary { background: linear-gradient(140deg, #fff, #eae7ff); color: #191534; box-shadow: 0 8px 24px rgba(255,255,255,0.14); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(255,255,255,0.22); }
+  .btn-ghost { background: var(--glass); border-color: var(--glass-line); color: var(--ink); backdrop-filter: blur(12px); }
+  .btn-ghost:hover { transform: translateY(-2px); background: rgba(255,255,255,0.1); }
+  .btn-brand { background: linear-gradient(140deg, var(--accent), var(--accent2)); color: #fff; box-shadow: 0 10px 34px color-mix(in srgb, var(--accent) 50%, transparent); }
+  .btn-brand:hover { transform: translateY(-2px); box-shadow: 0 16px 40px color-mix(in srgb, var(--accent) 62%, transparent); }
+  .btn-lg { padding: 0.85rem 1.5rem; font-size: 1rem; }
+
+  /* ---------- hero ---------- */
+  .hero {
+    flex: 1; display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 3rem; align-items: center;
+    max-width: var(--maxw); width: 100%; margin: 0 auto; padding: 1rem 1.5rem 7rem;
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 0.6rem; font-size: 0.76rem; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+    padding: 0.4rem 0.85rem; border-radius: var(--btn-radius); background: var(--glass);
+    border: 1px solid var(--glass-line); backdrop-filter: blur(10px);
+  }
+  .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 10px var(--accent2); }
+  h1 {
+    font-size: var(--h1-size); line-height: 0.98; letter-spacing: var(--h1-track);
+    font-weight: var(--h1-weight); text-transform: var(--h1-case);
+    margin: 1.4rem 0 1.1rem; text-wrap: balance; max-width: 13ch;
+  }
+  h1 .grad { background: var(--h1grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { font-size: clamp(1.02rem, 1.6vw, 1.2rem); line-height: 1.55; color: var(--muted); max-width: 42ch; margin: 0 0 2rem; }
+  .hero-cta { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+  .trust { display: flex; align-items: center; gap: 0.9rem; margin-top: 2.4rem; color: var(--faint); font-size: 0.85rem; flex-wrap: wrap; }
+  .trust .avatars { display: flex; }
+  .trust .avatars i { width: 26px; height: 26px; border-radius: 50%; margin-left: -8px; border: 2px solid var(--ground); }
+  .trust .avatars i:nth-child(1) { background: linear-gradient(135deg, #ff5c8a, #ffb347); margin-left: 0; }
+  .trust .avatars i:nth-child(2) { background: linear-gradient(135deg, #6366f1, #2dd4bf); }
+  .trust .avatars i:nth-child(3) { background: linear-gradient(135deg, #8b5cf6, #ff5c8a); }
+  .trust .avatars i:nth-child(4) { background: linear-gradient(135deg, #2dd4bf, #6366f1); }
+  .trust b { color: var(--muted); font-weight: 600; }
+
+  /* ---------- ticket card ---------- */
+  .visual { display: flex; justify-content: center; perspective: 1200px; }
+  .ticket {
+    width: 100%; max-width: 335px; border-radius: var(--card-radius);
+    background: rgba(20, 18, 46, 0.5); border: 1px solid var(--glass-line);
+    backdrop-filter: blur(22px) saturate(140%);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    overflow: hidden; transform-style: preserve-3d; transition: transform 0.15s ease-out; will-change: transform;
+  }
+  .ticket-poster {
+    height: 160px; position: relative; overflow: hidden;
+    background:
+      radial-gradient(90% 120% at 20% 0%, #ffb347, transparent 55%),
+      radial-gradient(90% 120% at 100% 30%, #ff5c8a, transparent 60%),
+      linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 40%, #000));
+  }
+  .ticket-poster .badge {
+    position: absolute; top: 12px; left: 12px; font-size: 0.66rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 0.32rem 0.6rem; border-radius: 999px;
+    background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); color: #fff;
+  }
+  .ticket-poster .sun {
+    position: absolute; bottom: -70px; right: -30px; width: 180px; height: 180px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(255,179,71,0.2) 60%, transparent 70%); filter: blur(2px);
+  }
+  .ticket-body { padding: 1.1rem 1.2rem 0; }
+  .ticket-body h3 { margin: 0 0 0.35rem; font-size: 1.3rem; letter-spacing: -0.02em; font-weight: 800; }
+  .ticket-meta { display: flex; flex-direction: column; gap: 0.32rem; color: var(--muted); font-size: 0.88rem; }
+  .ticket-meta .row { display: flex; align-items: center; gap: 0.5rem; }
+  .ticket-price { display: flex; align-items: baseline; justify-content: space-between; margin-top: 1rem; }
+  .ticket-price .amt { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .ticket-price .amt small { font-size: 0.78rem; font-weight: 500; color: var(--faint); }
+  .perf { position: relative; margin-top: 1rem; height: 24px; border-top: 1.5px dashed rgba(255,255,255,0.16); }
+  .perf::before, .perf::after { content: ""; position: absolute; top: -12px; width: 24px; height: 24px; border-radius: 50%; background: var(--ground); }
+  .perf::before { left: -24px; } .perf::after { right: -24px; }
+  .ticket-foot { padding: 0 1.2rem 1.2rem; }
+  .ticket-foot .btn { width: 100%; justify-content: center; }
+
+  @media (max-width: 920px) {
+    .hero { grid-template-columns: 1fr; gap: 2.4rem; padding-bottom: 8rem; }
+    .visual { order: -1; }
+    h1 { max-width: 100%; }
+  }
+
+  /* ================= VARIANT OVERRIDES ================= */
+
+  /* Aurora — glowing ribbons on midnight, minimal + centered */
+  body.v-aurora {
+    --ground: #05060f; --ink: #eaf6ff; --muted: #93aec4; --faint: #5e7791;
+    --accent: #2dd4bf; --accent2: #6366f1;
+    --h1grad: linear-gradient(100deg, #7ef0e0, #8b9bff 60%, #b79bff);
+    --h1-size: clamp(3rem, 8vw, 6.8rem);
+  }
+  body.v-aurora .hero { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+  body.v-aurora .visual { display: none; }
+  body.v-aurora h1 { max-width: 15ch; }
+  body.v-aurora .sub { max-width: 46ch; }
+  body.v-aurora .hero-cta, body.v-aurora .trust { justify-content: center; }
+
+  /* Dither — 1-bit retro duotone, brutalist + mono */
+  body.v-dither {
+    --ground: #0b0a1f; --ink: #f6efe0; --muted: #c7b79c; --faint: #8f8368;
+    --accent: #ff5c8a; --accent2: #6366f1;
+    --font: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    --btn-radius: 4px; --card-radius: 6px; --h1-case: uppercase;
+    --h1-track: -0.01em; --h1-weight: 800; --h1-size: clamp(2.4rem, 6vw, 5rem);
+  }
+  body.v-dither .grad { background: none; -webkit-background-clip: initial; background-clip: initial; color: var(--accent); }
+  body.v-dither .eyebrow { border-radius: 4px; }
+  body.v-dither .ticket { background: rgba(11,10,31,0.82); backdrop-filter: none; border: 1.5px solid var(--ink); box-shadow: 8px 8px 0 var(--accent); }
+  body.v-dither .btn-brand { box-shadow: 5px 5px 0 rgba(0,0,0,0.4); }
+
+  /* Liquid — saturated warp, oversized gradient type, asymmetric */
+  body.v-liquid {
+    --ground: #100320; --ink: #ffffff; --muted: #d7b6ef; --faint: #9b7bb8;
+    --accent: #ff2d9b; --accent2: #22d3ee;
+    --h1grad: linear-gradient(100deg, #ff8fd0, #c084fc 55%, #67e8f9);
+    --h1-size: clamp(3.2rem, 9vw, 7.4rem); --h1-track: -0.045em;
+  }
+  body.v-liquid .hero { grid-template-columns: 1fr; }
+  body.v-liquid .visual { display: none; }
+  body.v-liquid h1 { max-width: 16ch; }
+
+  /* Halftone — pulsing dot field, playful + centered */
+  body.v-halftone {
+    --ground: #0a0f22; --ink: #ffffff; --muted: #a9b4e0; --faint: #6d78a8;
+    --accent: #6366f1; --accent2: #ff5c8a; --btn-radius: 999px;
+    --h1grad: linear-gradient(100deg, #a5b4fc, #f0abfc);
+    --h1-size: clamp(2.9rem, 7.5vw, 6.4rem);
+  }
+  body.v-halftone .hero { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+  body.v-halftone .visual { display: none; }
+  body.v-halftone h1 { max-width: 14ch; }
+  body.v-halftone .hero-cta, body.v-halftone .trust { justify-content: center; }
+
+  /* Map — Caribbean map with live event pins over an ocean shader */
+  body.v-map {
+    --ground: #05101d; --ink: #eaf6ff; --muted: #9fc0d4; --faint: #5f86a0;
+    --accent: #ff5c8a; --accent2: #2dd4bf;
+    --h1grad: linear-gradient(100deg, #ffd59e, #ff8fb0 45%, #7ee0d6);
+    --h1-size: clamp(2.8rem, 7vw, 6rem);
+  }
+  body.v-map .hero { grid-template-columns: 1fr; }
+  body.v-map .visual { display: none; }
+  body.v-map .copy { max-width: 560px; }
+  body.v-map h1 { max-width: 14ch; }
+  body.v-map .veil {
+    background:
+      linear-gradient(90deg, rgba(4,10,20,0.95) 0%, rgba(4,10,20,0.74) 32%, rgba(4,10,20,0.18) 58%, transparent 78%),
+      linear-gradient(180deg, rgba(4,10,20,0.55), transparent 16%, transparent 76%, rgba(4,10,20,0.72));
+  }
+
+  /* ---------- caribbean map layer ---------- */
+  #mapLayer { position: fixed; inset: 0; z-index: 1; display: none; pointer-events: none; }
+  body.v-map #mapLayer { display: block; }
+  #mapLayer svg { width: 100%; height: 100%; }
+  .graticule line { stroke: rgba(120,150,220,0.10); stroke-width: 1; }
+  .sea { fill: rgba(150,200,230,0.14); font: 700 26px -apple-system, system-ui, sans-serif; letter-spacing: 0.42em; text-anchor: middle; }
+  .mainland { fill: rgba(38,52,86,0.6); stroke: rgba(120,140,200,0.28); stroke-width: 1; }
+  .isle { fill: url(#isleGrad); stroke: rgba(180,195,255,0.55); stroke-width: 1.2; }
+  .route { fill: none; stroke: rgba(255,160,190,0.5); stroke-width: 1.6; stroke-dasharray: 5 9; animation: flow 3s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset: -28; } }
+  .pin .ring { fill: none; stroke: var(--accent); stroke-width: 1.6; transform-box: fill-box; transform-origin: center; animation: ping 2.6s ease-out infinite; animation-delay: var(--d, 0s); }
+  .pin .dot { fill: var(--accent); stroke: #fff; stroke-width: 1.4; }
+  .pin .lbl { fill: #eaf6ff; font: 600 15px -apple-system, system-ui, sans-serif; paint-order: stroke; stroke: rgba(2,14,26,0.8); stroke-width: 3.5px; stroke-linejoin: round; }
+  .pin.hot .dot { fill: var(--accent2); r: 6; }
+  .pin.hot .ring { stroke: var(--accent2); }
+  .pin.hot .lbl { fill: #bafff2; font-weight: 700; }
+  .callout rect { fill: rgba(6,16,28,0.78); stroke: var(--accent2); stroke-width: 1; }
+  .callout text { fill: #eaf6ff; font: 600 14px -apple-system, system-ui, sans-serif; }
+  .callout line { stroke: var(--accent2); stroke-width: 1.2; stroke-dasharray: 2 3; }
+  @keyframes ping { 0% { transform: scale(1); opacity: 0.6; } 70% { opacity: 0; } 100% { transform: scale(2.9); opacity: 0; } }
+
+  /* ---------- variant switcher ---------- */
+  .switcher {
+    position: fixed; z-index: 40; bottom: 1.1rem; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 0.25rem; padding: 0.35rem;
+    background: rgba(10, 9, 25, 0.6); border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 999px; backdrop-filter: blur(20px) saturate(160%);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  .switcher button {
+    appearance: none; border: 0; background: transparent; color: #cfcbe8; cursor: pointer;
+    font-family: -apple-system, system-ui, sans-serif; font-size: 0.85rem; font-weight: 600;
+    padding: 0.5rem 0.95rem; border-radius: 999px; transition: color 0.18s, background 0.18s; white-space: nowrap;
+  }
+  .switcher button:hover { color: #fff; }
+  .switcher button[aria-pressed="true"] { background: #fff; color: #17143a; }
+  .switcher button:focus-visible { outline: 2px solid #8b9bff; outline-offset: 2px; }
+  .caption {
+    position: fixed; z-index: 40; bottom: 3.7rem; left: 50%; transform: translateX(-50%);
+    font-size: 0.78rem; color: rgba(255,255,255,0.55); font-family: -apple-system, system-ui, sans-serif;
+    white-space: nowrap; letter-spacing: 0.01em;
+  }
+  .caption b { color: rgba(255,255,255,0.85); font-weight: 600; }
+  @media (max-width: 720px) {
+    .switcher { flex-wrap: wrap; max-width: 94vw; justify-content: center; bottom: 0.6rem; }
+    .caption { display: none; }
+    .hero { padding-bottom: 9rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ticket { transition: none; }
+    .route, .pin .ring { animation: none; }
+  }
+</style>
+
+<canvas id="gl" aria-hidden="true"></canvas>
+
+<div id="mapLayer" aria-hidden="true">
+  <svg viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="isleGrad" cx="38%" cy="28%" r="85%">
+        <stop offset="0%" stop-color="#8188ff"/>
+        <stop offset="55%" stop-color="#5b53e0"/>
+        <stop offset="100%" stop-color="#372c96"/>
+      </radialGradient>
+      <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="5" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <g class="graticule">
+      <line x1="170" y1="0" x2="170" y2="640"/><line x1="330" y1="0" x2="330" y2="640"/>
+      <line x1="490" y1="0" x2="490" y2="640"/><line x1="650" y1="0" x2="650" y2="640"/>
+      <line x1="810" y1="0" x2="810" y2="640"/><line x1="970" y1="0" x2="970" y2="640"/>
+      <line x1="0" y1="120" x2="1000" y2="120"/><line x1="0" y1="260" x2="1000" y2="260"/>
+      <line x1="0" y1="400" x2="1000" y2="400"/><line x1="0" y1="540" x2="1000" y2="540"/>
+    </g>
+
+    <text class="sea" x="470" y="452">CARIBBEAN SEA</text>
+
+    <g class="mainlands">
+      <path class="mainland" d="M604,640 L604,602 C688,586 770,590 848,598 C910,604 962,612 1000,602 L1000,640 Z"/>
+      <path class="mainland" d="M0,206 C58,198 108,210 120,240 C126,276 112,302 92,302 L0,302 Z"/>
+      <path class="mainland" d="M0,470 C70,460 152,470 212,510 C252,536 250,600 300,640 L0,640 Z"/>
+    </g>
+
+    <g class="isles" filter="url(#glow)">
+      <path class="isle" d="M182,214 C250,182 348,206 436,236 C506,259 548,262 566,276 C548,292 500,286 440,272 C352,252 262,242 200,242 C186,234 176,224 182,214 Z"/>
+      <ellipse class="isle" cx="430" cy="96" rx="12" ry="7"/>
+      <ellipse class="isle" cx="462" cy="120" rx="8" ry="6"/>
+      <ellipse class="isle" cx="404" cy="82" rx="7" ry="5"/>
+      <ellipse class="isle" cx="486" cy="146" rx="7" ry="5"/>
+      <ellipse class="isle" cx="447" cy="150" rx="6" ry="4"/>
+      <ellipse class="isle" cx="428" cy="334" rx="32" ry="14" transform="rotate(-8 428 334)"/>
+      <path class="isle" d="M560,302 C582,286 622,282 662,289 C692,294 702,306 691,316 C666,330 610,331 576,321 C560,315 552,309 560,302 Z"/>
+      <ellipse class="isle" cx="752" cy="330" rx="26" ry="11"/>
+      <ellipse class="isle" cx="853" cy="332" rx="7" ry="9"/>
+      <ellipse class="isle" cx="876" cy="360" rx="6" ry="8"/>
+      <ellipse class="isle" cx="893" cy="390" rx="7" ry="9"/>
+      <ellipse class="isle" cx="904" cy="426" rx="6" ry="8"/>
+      <ellipse class="isle" cx="911" cy="454" rx="7" ry="10"/>
+      <ellipse class="isle" cx="912" cy="478" rx="6" ry="8"/>
+      <ellipse class="isle" cx="896" cy="508" rx="6" ry="9"/>
+      <ellipse class="isle" cx="889" cy="535" rx="7" ry="9"/>
+      <ellipse class="isle" cx="952" cy="499" rx="8" ry="9"/>
+      <ellipse class="isle" cx="900" cy="585" rx="22" ry="15"/>
+      <ellipse class="isle" cx="921" cy="562" rx="7" ry="5"/>
+    </g>
+
+    <g class="routes">
+      <path class="route" d="M430,110 Q640,150 752,326"/>
+      <path class="route" d="M430,334 Q660,300 898,583"/>
+      <path class="route" d="M752,330 Q900,370 952,499" style="animation-delay:-1.2s"/>
+    </g>
+
+    <g class="pins">
+      <g class="pin" transform="translate(430,100)" style="--d:0s"><circle class="ring" r="6"/><circle class="dot" r="4"/><text class="lbl" x="11" y="4">Nassau</text></g>
+      <g class="pin" transform="translate(270,206)" style="--d:.5s"><circle class="ring" r="6"/><circle class="dot" r="4"/><text class="lbl" x="11" y="4">Havana</text></g>
+      <g class="pin" transform="translate(428,334)" style="--d:1s"><circle class="ring" r="6"/><circle class="dot" r="4"/><text class="lbl" x="11" y="4">Kingston</text></g>
+      <g class="pin" transform="translate(752,326)" style="--d:1.5s"><circle class="ring" r="6"/><circle class="dot" r="4"/><text class="lbl" x="11" y="4">San Juan</text></g>
+      <g class="pin" transform="translate(952,499)" style="--d:.9s"><circle class="ring" r="6"/><circle class="dot" r="4"/><text class="lbl" x="-11" y="4" text-anchor="end">Bridgetown</text></g>
+      <g class="callout">
+        <line x1="872" y1="606" x2="898" y2="583"/>
+        <rect x="672" y="592" width="200" height="30" rx="8"/>
+        <text x="684" y="612">Sunset Fete 2026 · Trinidad</text>
+      </g>
+      <g class="pin hot" transform="translate(898,583)" style="--d:.2s"><circle class="ring" r="8"/><circle class="dot" r="5"/><text class="lbl" x="14" y="5">Port of Spain</text></g>
+    </g>
+  </svg>
+</div>
+
+<div class="veil" aria-hidden="true"></div>
+
+<div class="stage">
+  <nav>
+    <a class="brand" href="#"><span class="mark">T</span>TropTix</a>
+    <div class="nav-links">
+      <a href="#">Discover</a><a href="#">For organizers</a><a href="#">Pricing</a><a href="#">Help</a>
+    </div>
+    <div class="nav-cta">
+      <a class="signin" href="#">Sign in</a>
+      <a class="btn btn-primary" href="#">Get started</a>
+    </div>
+  </nav>
+
+  <main class="hero">
+    <div class="copy">
+      <span class="eyebrow"><span class="dot"></span>Ticketing, built for the Caribbean</span>
+      <h1>Your next <span class="grad">unforgettable</span> experience starts here.</h1>
+      <p class="sub">Discover the fetes, concerts and carnivals everyone will talk about tomorrow — and grab your tickets before they’re gone.</p>
+      <div class="hero-cta">
+        <a class="btn btn-brand btn-lg" href="#">Discover events</a>
+        <a class="btn btn-ghost btn-lg" href="#">For organizers →</a>
+      </div>
+      <div class="trust">
+        <div class="avatars"><i></i><i></i><i></i><i></i></div>
+        <span><b>40,000+</b> tickets sold from Trinidad to Jamaica this season</span>
+      </div>
+    </div>
+
+    <div class="visual">
+      <article class="ticket" id="ticket">
+        <div class="ticket-poster"><span class="badge">Selling fast</span><span class="sun"></span></div>
+        <div class="ticket-body">
+          <h3>Sunset Fete 2026</h3>
+          <div class="ticket-meta">
+            <div class="row">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              Sat, Aug 15 · 4:00 PM
+            </div>
+            <div class="row">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0116 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Maracas Bay, Trinidad
+            </div>
+          </div>
+          <div class="ticket-price">
+            <span class="amt">$45 <small>/ general</small></span>
+            <span class="amt" style="color:var(--accent2);font-size:0.92rem;">312 left</span>
+          </div>
+        </div>
+        <div class="perf"></div>
+        <div class="ticket-foot"><a class="btn btn-brand" href="#">Get tickets</a></div>
+      </article>
+    </div>
+  </main>
+</div>
+
+<div class="caption" id="caption"></div>
+<div class="switcher" id="switcher" role="group" aria-label="Landing page background style">
+  <button data-i="0" aria-pressed="true">Sunset</button>
+  <button data-i="1" aria-pressed="false">Aurora</button>
+  <button data-i="2" aria-pressed="false">Dither</button>
+  <button data-i="3" aria-pressed="false">Liquid</button>
+  <button data-i="4" aria-pressed="false">Halftone</button>
+  <button data-i="5" aria-pressed="false">Map</button>
+</div>
+
+<script>
+(function () {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ticket pointer tilt */
+  const ticket = document.getElementById("ticket");
+  const hero = document.querySelector(".hero");
+  if (ticket && hero && !reduce) {
+    hero.addEventListener("pointermove", function (e) {
+      const r = hero.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      ticket.style.transform = "rotateY(" + px * 12 + "deg) rotateX(" + -py * 12 + "deg)";
+    });
+    hero.addEventListener("pointerleave", function () { ticket.style.transform = ""; });
+  }
+
+  /* ---------- WebGL ---------- */
+  const canvas = document.getElementById("gl");
+  const gl = canvas.getContext("webgl", { antialias: false, alpha: false });
+
+  const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
+
+  const COMMON = [
+    "precision highp float;",
+    "uniform vec2 u_res; uniform float u_time;",
+    "vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}",
+    "vec2 mod289(vec2 x){return x-floor(x*(1./289.))*289.;}",
+    "vec3 permute(vec3 x){return mod289(((x*34.)+1.)*x);}",
+    "float snoise(vec2 v){const vec4 C=vec4(0.211324865,0.366025403,-0.577350269,0.024390243);",
+    "vec2 i=floor(v+dot(v,C.yy));vec2 x0=v-i+dot(i,C.xx);",
+    "vec2 i1=(x0.x>x0.y)?vec2(1.,0.):vec2(0.,1.);vec4 x12=x0.xyxy+C.xxzz;x12.xy-=i1;i=mod289(i);",
+    "vec3 pp=permute(permute(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.));",
+    "vec3 m=max(0.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.);m=m*m;m=m*m;",
+    "vec3 x=2.*fract(pp*C.www)-1.;vec3 h=abs(x)-0.5;vec3 ox=floor(x+0.5);vec3 a0=x-ox;",
+    "m*=1.79284291-0.85373472*(a0*a0+h*h);vec3 g;g.x=a0.x*x0.x+h.x*x0.y;g.yz=a0.yz*x12.xz+h.yz*x12.yw;return 130.*dot(m,g);}",
+    "float fbm(vec2 p){float s=0.,a=0.5;for(int i=0;i<5;i++){s+=a*snoise(p);p*=2.02;a*=0.5;}return s;}",
+    "mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}",
+    "float Bayer2(vec2 a){a=floor(a);return fract(a.x*0.5+a.y*a.y*0.75);}",
+    "float Bayer4(vec2 a){return Bayer2(0.5*a)*0.25+Bayer2(a);}",
+    "float Bayer8(vec2 a){return Bayer4(0.5*a)*0.25+Bayer4(a);}",
+    "float vign(vec2 uv,float asp){return smoothstep(1.3,0.35,length((uv-0.5)*vec2(asp,1.)));}"
+  ].join("\n");
+
+  const SUNSET = COMMON + [
+    "void main(){vec2 uv=gl_FragCoord.xy/u_res.xy;float asp=u_res.x/u_res.y;",
+    "vec2 p=vec2(uv.x*asp,uv.y)*1.7;float t=u_time*0.045;",
+    "vec2 q=vec2(fbm(p),fbm(p+vec2(5.2,1.3)-t));",
+    "vec2 r=vec2(fbm(p+3.4*q+vec2(1.7,9.2)+0.10*t),fbm(p+3.4*q+vec2(8.3,2.8)-0.08*t));",
+    "float f=fbm(p+3.0*r);",
+    "vec3 col=mix(vec3(0.055,0.047,0.14),vec3(0.30,0.31,0.86),clamp((f+0.6)*0.9,0.,1.));",
+    "col=mix(col,vec3(0.55,0.36,0.92),clamp(length(q)*0.6,0.,1.));",
+    "col=mix(col,vec3(1.0,0.36,0.54),clamp(r.x*0.8+0.15,0.,1.)*0.6);",
+    "col=mix(col,vec3(1.0,0.70,0.28),clamp(r.y*0.7,0.,1.)*0.35);",
+    "col=mix(col,vec3(0.18,0.83,0.75),clamp(q.y*0.5,0.,1.)*0.14);",
+    "col*=mix(0.72,1.08,uv.y*0.6+0.4);col*=mix(0.62,1.0,vign(uv,asp));",
+    "gl_FragColor=vec4(col,1.);}"
+  ].join("\n");
+
+  const AURORA = COMMON + [
+    "void main(){vec2 uv=gl_FragCoord.xy/u_res.xy;float asp=u_res.x/u_res.y;float t=u_time*0.22;",
+    "float x=uv.x*asp;vec3 col=vec3(0.015,0.02,0.05);",
+    "float y1=0.56+0.16*sin(x*2.2+t)+0.06*fbm(vec2(x*1.5+t*0.6,1.));",
+    "float y2=0.62+0.20*sin(x*1.7-t*0.8+1.5)+0.07*fbm(vec2(x*1.3-t*0.5,4.));",
+    "float y3=0.49+0.14*sin(x*2.7+t*0.5+3.0)+0.05*fbm(vec2(x*1.9+t*0.4,9.));",
+    "col+=vec3(0.18,0.83,0.75)*exp(-pow((uv.y-y1)*7.,2.))*0.75;",
+    "col+=vec3(0.32,0.34,0.95)*exp(-pow((uv.y-y2)*6.,2.))*0.65;",
+    "col+=vec3(0.60,0.36,0.92)*exp(-pow((uv.y-y3)*8.,2.))*0.6;",
+    "float star=step(0.9985,fract(sin(dot(floor(gl_FragCoord.xy*0.5),vec2(12.9,78.2)))*43758.5));",
+    "col+=star*0.5*smoothstep(0.4,1.0,uv.y);",
+    "col*=mix(0.5,1.05,smoothstep(0.0,0.5,uv.y));col*=mix(0.7,1.0,vign(uv,asp));",
+    "gl_FragColor=vec4(col,1.);}"
+  ].join("\n");
+
+  const DITHER = COMMON + [
+    "void main(){vec2 uv=gl_FragCoord.xy/u_res.xy;float asp=u_res.x/u_res.y;float t=u_time*0.08;",
+    "vec2 p=vec2(uv.x*asp,uv.y)*2.0;",
+    "float g=0.5+0.45*fbm(p+vec2(t,t*0.3));g=clamp(g+0.14*sin(uv.x*3.0+t*2.0)-uv.y*0.12,0.,1.);",
+    "float b=Bayer8(gl_FragCoord.xy*0.5);float m=step(b,g);",
+    "vec3 ground=vec3(0.05,0.045,0.13);",
+    "vec3 fg=mix(vec3(1.0,0.36,0.54),vec3(0.42,0.42,1.0),clamp(uv.x+0.25*sin(t),0.,1.));",
+    "vec3 col=mix(ground,fg,m);gl_FragColor=vec4(col,1.);}"
+  ].join("\n");
+
+  const LIQUID = COMMON + [
+    "void main(){vec2 uv=gl_FragCoord.xy/u_res.xy;float asp=u_res.x/u_res.y;",
+    "vec2 p=vec2(uv.x*asp,uv.y)*1.5;float t=u_time*0.08;",
+    "vec2 q=vec2(fbm(p+t),fbm(p+vec2(3.1,1.7)-t));p+=0.6*q;",
+    "p*=rot(fbm(p*0.5+t)*1.6);",
+    "vec2 r=vec2(fbm(p+2.0*q+vec2(1.7,9.2)+t),fbm(p+2.0*q+vec2(8.3,2.8)-t));",
+    "float f=fbm(p+2.5*r);",
+    "vec3 col=mix(vec3(0.07,0.02,0.13),vec3(0.34,0.20,0.95),clamp(f+0.5,0.,1.));",
+    "col=mix(col,vec3(0.95,0.15,0.60),clamp(length(q)*0.7,0.,1.));",
+    "col=mix(col,vec3(0.15,0.78,0.95),clamp(r.y*0.6,0.,1.)*0.55);",
+    "col=pow(col,vec3(0.9));col*=mix(0.7,1.05,vign(uv,asp));",
+    "gl_FragColor=vec4(col,1.);}"
+  ].join("\n");
+
+  const HALFTONE = COMMON + [
+    "void main(){vec2 uv=gl_FragCoord.xy/u_res.xy;float asp=u_res.x/u_res.y;float t=u_time*0.14;",
+    "vec3 ground=vec3(0.035,0.055,0.135);float N=24.0;",
+    "vec2 gp=vec2(uv.x*asp,uv.y)*N;vec2 cell=fract(gp)-0.5;vec2 id=floor(gp);",
+    "float field=0.5+0.5*fbm(id*0.12+vec2(t,t*0.5));",
+    "field=clamp(field+0.22*sin(uv.x*4.0-t*2.0+uv.y*3.0),0.,1.);",
+    "float radius=0.06+field*0.42;float d=length(cell);",
+    "float dot=smoothstep(radius,radius-0.07,d);",
+    "vec3 dc=mix(vec3(0.39,0.40,0.95),vec3(1.0,0.36,0.54),clamp(field*1.1,0.,1.));",
+    "dc=mix(dc,vec3(0.18,0.83,0.75),clamp(uv.y-0.5,0.,1.)*0.5);",
+    "vec3 col=mix(ground,dc,dot);col*=mix(0.8,1.0,vign(uv,asp));",
+    "gl_FragColor=vec4(col,1.);}"
+  ].join("\n");
+
+  const OCEAN = COMMON + [
+    "void main(){vec2 uv=gl_FragCoord.xy/u_res.xy;float asp=u_res.x/u_res.y;float t=u_time*0.05;",
+    "vec2 p=vec2(uv.x*asp,uv.y)*3.0;",
+    "float n=fbm(p+vec2(t,t*0.5));",
+    "float c=fbm(p*1.5+vec2(-t,n));c=pow(abs(sin(c*3.14159+t*1.5)),3.0);",
+    "vec3 deep=vec3(0.02,0.055,0.13);vec3 shallow=vec3(0.04,0.17,0.27);",
+    "vec3 col=mix(deep,shallow,clamp(n*0.5+0.5,0.,1.));",
+    "col+=vec3(0.2,0.68,0.68)*c*0.10;",
+    "col*=mix(0.78,1.06,uv.y);col*=mix(0.7,1.0,vign(uv,asp));",
+    "gl_FragColor=vec4(col,1.);}"
+  ].join("\n");
+
+  const VARIANTS = [
+    { name: "Sunset",   cls: "v-sunset",   frag: SUNSET,   desc: "Warm mesh gradient · glass ticket" },
+    { name: "Aurora",   cls: "v-aurora",   frag: AURORA,   desc: "Glowing ribbons on midnight" },
+    { name: "Dither",   cls: "v-dither",   frag: DITHER,   desc: "1-bit retro duotone · brutalist" },
+    { name: "Liquid",   cls: "v-liquid",   frag: LIQUID,   desc: "Saturated liquid warp" },
+    { name: "Halftone", cls: "v-halftone", frag: HALFTONE, desc: "Pulsing dot field · playful" },
+    { name: "Map",      cls: "v-map",      frag: OCEAN,    desc: "Caribbean map · live event pins" }
+  ];
+
+  const caption = document.getElementById("caption");
+  const buttons = Array.prototype.slice.call(document.querySelectorAll(".switcher button"));
+
+  function setBodyClass(cls) {
+    document.body.className = cls;
+  }
+
+  if (!gl) {
+    // graceful fallback: CSS gradient, toggle still swaps theme
+    canvas.style.background = "linear-gradient(140deg,#1e1b4b,#6d28d9,#db2777)";
+    let ci = 0;
+    function pickNoGL(i){ ci=i; setBodyClass(VARIANTS[i].cls); caption.innerHTML="<b>"+VARIANTS[i].name+"</b> — "+VARIANTS[i].desc; buttons.forEach((b,j)=>b.setAttribute("aria-pressed", j===i?"true":"false")); }
+    buttons.forEach(b=>b.addEventListener("click",()=>pickNoGL(+b.dataset.i)));
+    pickNoGL(0);
+    return;
+  }
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.warn("shader:", gl.getShaderInfoLog(s));
+    return s;
+  }
+  const vs = compile(gl.VERTEX_SHADER, VS);
+  const programs = VARIANTS.map(function (v) {
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, v.frag));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) console.warn("link:", gl.getProgramInfoLog(prog));
+    return { p: prog, loc: gl.getAttribLocation(prog, "p"), uRes: gl.getUniformLocation(prog, "u_res"), uTime: gl.getUniformLocation(prog, "u_time") };
+  });
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.6);
+    const w = Math.floor(window.innerWidth * dpr), h = Math.floor(window.innerHeight * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  let cur = 0;
+  const start = performance.now();
+
+  function draw(now) {
+    const pr = programs[cur];
+    gl.useProgram(pr.p);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.enableVertexAttribArray(pr.loc);
+    gl.vertexAttribPointer(pr.loc, 2, gl.FLOAT, false, 0, 0);
+    gl.uniform2f(pr.uRes, canvas.width, canvas.height);
+    gl.uniform1f(pr.uTime, reduce ? 6.0 : (now - start) / 1000);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  function frame(now) { draw(now); requestAnimationFrame(frame); }
+
+  function pick(i) {
+    cur = i;
+    setBodyClass(VARIANTS[i].cls);
+    caption.innerHTML = "<b>" + VARIANTS[i].name + "</b> — " + VARIANTS[i].desc;
+    buttons.forEach(function (b, j) { b.setAttribute("aria-pressed", j === i ? "true" : "false"); });
+    if (reduce) draw(performance.now());
+  }
+
+  buttons.forEach(function (b) { b.addEventListener("click", function () { pick(+b.dataset.i); }); });
+  window.addEventListener("keydown", function (e) {
+    if (e.key >= "1" && e.key <= "6") pick(+e.key - 1);
+    else if (e.key === "ArrowRight") pick((cur + 1) % VARIANTS.length);
+    else if (e.key === "ArrowLeft") pick((cur + VARIANTS.length - 1) % VARIANTS.length);
+  });
+
+  pick(0);
+  if (reduce) draw(performance.now()); else requestAnimationFrame(frame);
+})();
+</script>
