@@ -41,6 +41,13 @@
       linear-gradient(180deg, rgba(0,0,0,0.42) 0%, transparent 20%, transparent 55%, rgba(0,0,0,0.35) 100%);
     transition: opacity 0.5s;
   }
+  /* fine film grain — premium texture on the two calm variants */
+  .grain {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.05; display: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+  body.v-map .grain, body.v-light .grain { display: block; }
 
   .stage { position: relative; z-index: 2; min-height: 100vh; display: flex; flex-direction: column; }
 
@@ -249,9 +256,10 @@
   .sea { fill: rgba(150,200,230,0.14); font: 700 26px -apple-system, system-ui, sans-serif; letter-spacing: 0.42em; text-anchor: middle; }
   .mainland { fill: rgba(38,52,86,0.6); stroke: rgba(120,140,200,0.28); stroke-width: 1; }
   .isle { fill: url(#isleGrad); stroke: rgba(180,195,255,0.55); stroke-width: 1.2; }
-  .route { fill: none; stroke: rgba(255,160,190,0.5); stroke-width: 1.6; stroke-dasharray: 5 9; animation: flow 3s linear infinite; }
+  .route { fill: none; stroke: rgba(255,160,190,0.3); stroke-width: 1.4; stroke-dasharray: 4 10; animation: flow 6s linear infinite; }
   @keyframes flow { to { stroke-dashoffset: -28; } }
-  .pin .ring { fill: none; stroke: var(--accent); stroke-width: 1.6; transform-box: fill-box; transform-origin: center; animation: ping 2.6s ease-out infinite; animation-delay: var(--d, 0s); }
+  .pin .ring { fill: none; stroke: var(--accent); stroke-width: 1.6; transform-box: fill-box; transform-origin: center; }
+  .pin.hot .ring { animation: ping 3.4s ease-out infinite; animation-delay: var(--d, 0s); }
   .pin .dot { fill: var(--accent); stroke: #fff; stroke-width: 1.4; }
   .pin .lbl { fill: #eaf6ff; font: 600 15px -apple-system, system-ui, sans-serif; paint-order: stroke; stroke: rgba(2,14,26,0.8); stroke-width: 3.5px; stroke-linejoin: round; }
   .pin.hot .dot { fill: var(--accent2); r: 6; }
@@ -261,6 +269,13 @@
   .callout text { fill: #eaf6ff; font: 600 14px -apple-system, system-ui, sans-serif; }
   .callout line { stroke: var(--accent2); stroke-width: 1.2; stroke-dasharray: 2 3; }
   @keyframes ping { 0% { transform: scale(1); opacity: 0.6; } 70% { opacity: 0; } 100% { transform: scale(2.9); opacity: 0; } }
+
+  /* map "life": a light travelling along a route + sparse ticket-sale ripples */
+  .spark { fill: #fff; filter: drop-shadow(0 0 5px #ffd59e); }
+  .sale { fill: none; stroke: var(--accent); stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: sale 1.6s ease-out forwards; }
+  @keyframes sale { 0% { transform: scale(0.6); opacity: 0.85; } 100% { transform: scale(3.6); opacity: 0; } }
+  .sale-lbl { fill: var(--accent); font: 700 12px -apple-system, system-ui, sans-serif; text-anchor: middle; paint-order: stroke; stroke: rgba(2,14,26,0.7); stroke-width: 3px; stroke-linejoin: round; transform-box: fill-box; transform-origin: center; animation: saleRise 1.6s ease-out forwards; }
+  @keyframes saleRise { 0% { opacity: 0; transform: translateY(4px); } 22% { opacity: 1; } 100% { opacity: 0; transform: translateY(-12px); } }
 
   /* ---------- variant switcher ---------- */
   .switcher {
@@ -374,6 +389,7 @@
 </div>
 
 <div class="veil" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
 
 <div class="stage">
   <nav>
@@ -553,29 +569,31 @@
   ].join("\n");
 
   const OCEAN = COMMON + [
-    "void main(){vec2 uv=gl_FragCoord.xy/u_res.xy;float asp=u_res.x/u_res.y;float t=u_time*0.05;",
-    "vec2 p=vec2(uv.x*asp,uv.y)*3.0;",
+    "void main(){vec2 uv=gl_FragCoord.xy/u_res.xy;float asp=u_res.x/u_res.y;float t=u_time*0.03;",
+    "vec2 p=vec2(uv.x*asp,uv.y)*2.3;",
     "float n=fbm(p+vec2(t,t*0.5));",
-    "float c=fbm(p*1.5+vec2(-t,n));c=pow(abs(sin(c*3.14159+t*1.5)),3.0);",
-    "vec3 deep=vec3(0.02,0.055,0.13);vec3 shallow=vec3(0.04,0.17,0.27);",
+    "float c=fbm(p*1.4+vec2(-t,n));c=pow(abs(sin(c*3.14159+t)),4.0);",
+    "vec3 deep=vec3(0.02,0.06,0.13);vec3 shallow=vec3(0.03,0.12,0.20);",
     "vec3 col=mix(deep,shallow,clamp(n*0.5+0.5,0.,1.));",
-    "col+=vec3(0.2,0.68,0.68)*c*0.10;",
-    "col*=mix(0.78,1.06,uv.y);col*=mix(0.7,1.0,vign(uv,asp));",
+    "col+=vec3(0.18,0.6,0.62)*c*0.05;",
+    "col*=mix(0.82,1.04,uv.y);col*=mix(0.72,1.0,vign(uv,asp));",
     "gl_FragColor=vec4(col,1.);}"
   ].join("\n");
 
   const DAYLIGHT = COMMON + [
     "void main(){vec2 uv=gl_FragCoord.xy/u_res.xy;float asp=u_res.x/u_res.y;",
-    "vec2 p=vec2(uv.x*asp,uv.y)*1.6;float t=u_time*0.04;",
-    "vec2 q=vec2(fbm(p),fbm(p+vec2(5.2,1.3)-t));",
-    "vec2 r=vec2(fbm(p+3.0*q+vec2(1.7,9.2)+0.08*t),fbm(p+3.0*q+vec2(8.3,2.8)-0.06*t));",
-    "float f=fbm(p+2.6*r);",
-    "vec3 white=vec3(0.965,0.965,0.995);",
-    "vec3 col=mix(white,vec3(0.83,0.82,0.98),clamp((f+0.6)*0.7,0.,1.));",
-    "col=mix(col,vec3(0.74,0.76,0.99),clamp(length(q)*0.5,0.,1.)*0.7);",
-    "col=mix(col,vec3(1.0,0.86,0.80),clamp(r.x*0.7+0.2,0.,1.)*0.5);",
-    "col=mix(col,vec3(0.82,0.96,0.91),clamp(q.y*0.5,0.,1.)*0.35);",
-    "col=mix(col,white,0.15);col*=mix(0.98,1.03,uv.y);",
+    "vec2 P=vec2(uv.x*asp,uv.y);float t=u_time*0.03;",
+    "P+=vec2(fbm(P*0.8+t),fbm(P*0.8-t))*0.05;",
+    "vec2 c1=vec2(0.30*asp,0.36)+vec2(0.06*asp*sin(t*0.7),0.05*cos(t*0.9));",
+    "vec2 c2=vec2(0.74*asp,0.60)+vec2(0.07*asp*sin(t*0.5+2.0),0.06*cos(t*0.6+1.0));",
+    "vec2 c3=vec2(0.54*asp,0.16)+vec2(0.05*asp*cos(t*0.8),0.04*sin(t*0.7));",
+    "float b1=exp(-dot(P-c1,P-c1)/0.075);",
+    "float b2=exp(-dot(P-c2,P-c2)/0.090);",
+    "float b3=exp(-dot(P-c3,P-c3)/0.060);",
+    "vec3 col=vec3(0.968,0.966,0.995);",
+    "col=mix(col,vec3(0.79,0.81,0.99),b1*0.55);",
+    "col=mix(col,vec3(1.0,0.87,0.82),b2*0.50);",
+    "col=mix(col,vec3(0.84,0.97,0.93),b3*0.40);",
     "gl_FragColor=vec4(col,1.);}"
   ].join("\n");
 
@@ -667,5 +685,65 @@
 
   pick(0);
   if (reduce) draw(performance.now()); else requestAnimationFrame(frame);
+
+  /* ---------- Map "life": a light travels a route + sparse ticket-sale pings ---------- */
+  (function mapLife() {
+    const svg = document.querySelector("#mapLayer svg");
+    if (!svg || reduce) return;
+    const NS = "http://www.w3.org/2000/svg";
+    const cities = [[430,100],[270,206],[428,334],[752,326],[952,499],[898,583]];
+    const fx = document.createElementNS(NS, "g");
+    svg.appendChild(fx);
+    const onMap = function () { return document.body.classList.contains("v-map"); };
+
+    // a light that flows island-to-island along the route lines
+    const routes = Array.prototype.slice.call(svg.querySelectorAll(".route"));
+    const spark = document.createElementNS(NS, "circle");
+    spark.setAttribute("r", "3.2");
+    spark.setAttribute("class", "spark");
+    spark.style.opacity = "0";
+    fx.appendChild(spark);
+    let ri = 0, prog = 0, last = 0;
+    const SPEED = 0.00016; // fraction of a route per ms (~6s end to end)
+    function step(now) {
+      if (!last) last = now;
+      const dt = now - last; last = now;
+      if (onMap() && routes.length) {
+        prog += dt * SPEED;
+        if (prog >= 1) { prog = 0; ri = (ri + 1) % routes.length; }
+        const path = routes[ri];
+        const pt = path.getPointAtLength(prog * path.getTotalLength());
+        spark.setAttribute("cx", pt.x);
+        spark.setAttribute("cy", pt.y);
+        spark.style.opacity = "1";
+      } else {
+        spark.style.opacity = "0";
+      }
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+
+    // "a ticket just sold" — a ripple + a floating +1 on a random city
+    function ping() {
+      if (onMap()) {
+        const c = cities[Math.floor(Math.random() * cities.length)];
+        const g = document.createElementNS(NS, "g");
+        g.setAttribute("transform", "translate(" + c[0] + "," + c[1] + ")");
+        const ring = document.createElementNS(NS, "circle");
+        ring.setAttribute("r", "6");
+        ring.setAttribute("class", "sale");
+        const lbl = document.createElementNS(NS, "text");
+        lbl.setAttribute("class", "sale-lbl");
+        lbl.setAttribute("y", "-10");
+        lbl.textContent = "+1";
+        g.appendChild(ring);
+        g.appendChild(lbl);
+        fx.appendChild(g);
+        setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 1700);
+      }
+      setTimeout(ping, 1800 + Math.random() * 2000);
+    }
+    setTimeout(ping, 1400);
+  })();
 })();
 </script>
