@@ -14,7 +14,7 @@ preview won't show them; open the deployed links instead.
 On this PR's Vercel preview deployment (grab the base URL from the Vercel bot
 comment on the PR), open:
 
-- **Hero options (toggle between 6):** `/prototypes/landing-page/hero-options.html`
+- **Hero options (toggle between 7):** `/prototypes/landing-page/hero-options.html`
 - **Sunset landing (fuller page):** `/prototypes/landing-page/sunset-landing.html`
 
 Locally: `cd apps/web && yarn dev`, then hit
@@ -27,10 +27,10 @@ Source lives in [`apps/web/public/prototypes/landing-page/`](../../../apps/web/p
 
 | File                  | What it is                                                                                                                                           |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hero-options.html`   | One hero, six switchable background engines. Use the pill switcher at the bottom, or keys **1–6** / **← →**.                                         |
+| `hero-options.html`   | One hero, seven switchable background engines. Use the pill switcher at the bottom, or keys **1–7** / **← →**.                                       |
 | `sunset-landing.html` | A more complete single landing page (nav → hero → category marquee → organizer features → CTA → footer) using the "Sunset" mesh-gradient background. |
 
-## The six background options
+## The seven background options
 
 Each maps to a different shader style from the Paper Shaders catalog and retunes
 palette, type, and layout to match:
@@ -41,6 +41,7 @@ palette, type, and layout to match:
 4. **Liquid** — saturated swirling warp; expressive, oversized gradient headline.
 5. **Halftone** — pulsing dot / metaball field; playful, centered.
 6. **Map** — a live Caribbean map (islands + animated event pins on major cities) over an ocean shader.
+7. **Daylight** — soft pastel mesh on near-white; the light-mode option, matching the app's light-only design system.
 
 ## Notes / caveats
 
