@@ -14,6 +14,32 @@ assumptions where they differ (the migration was a lift-and-shift; this is a red
 
 Vocabulary follows [CONTEXT.md](../../CONTEXT.md). Money is integer cents at the API edge.
 
+## Responsive strategy — desktop vs mobile
+
+Guiding principle: **desktop is the workshop** (build events, configure tickets, analyze, export,
+admin); **mobile is the field kit** (glance at performance, check people in at the door, quick
+lookups/actions on the go). Everything is responsive and nothing is broken on either — but each
+screen is optimized for where it's actually used, and a few lean deliberately to one platform.
+
+| Screen             | Class            | Desktop                           | Mobile                                                                   |
+| ------------------ | ---------------- | --------------------------------- | ------------------------------------------------------------------------ |
+| A Home             | Parity           | multi-column                      | single-column stack, full                                                |
+| B Events list      | Parity           | table + row "…" menu              | cards + bottom-sheet actions                                             |
+| C Overview         | Parity           | vitals grid + side-by-side charts | vitals stack, tabs → segmented control                                   |
+| D Create/edit      | Desktop-primary  | two-column (form + flyer/preview) | stacked, functional, rail collapses                                      |
+| E Ticket types     | Desktop-primary  | table + drag-reorder              | cards; **add/edit via sheet (real post-launch need)**; reorder = up/down |
+| F1 Attendees       | Desktop-primary  | full table + CSV export           | search/lookup + correct check-in; no CSV                                 |
+| F2 Check-in        | **Mobile-first** | tablet/laptop kiosk               | **the** door screen — big targets, running counter                       |
+| G Orders           | Desktop-primary  | table + detail + CSV + resend     | list + detail (view + resend); no CSV                                    |
+| H Admin            | Desktop-only     | full internal tool                | not designed for mobile                                                  |
+| I Profile/settings | Parity           | sectioned                         | stacked, full                                                            |
+
+**Rules that fall out:** CSV exports are desktop-only (you download a file to work with). Dense
+tables reshape to cards/lists on mobile, never horizontal-scroll spreadsheets. Add/edit a ticket
+tier stays mobile-capable (opening more inventory happens at the event). App shell: desktop left
+sidebar (Dashboard · Events · Profile); mobile bottom nav; the in-event tab bar becomes a scrollable
+segmented control on mobile.
+
 ## Screen A — Dashboard home (`/organizer`)
 
 **Job:** get the organizer into the event they care about right now, and show what's happening
