@@ -1,3 +1,7 @@
+// SUPERSEDED by `getDashboard` in @troptix/api (services/organizer-dashboard).
+// This loader is deleted when the page moves onto the service; until then don't
+// add behavior here — it would diverge from the DTO the cutover ships.
+// See docs/plans/2026-07-organizer-dashboard-migration.md (Phase 2).
 import { OrderStatus, Prisma } from '@troptix/db';
 import prisma from '@/server/prisma';
 

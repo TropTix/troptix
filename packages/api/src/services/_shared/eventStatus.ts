@@ -4,23 +4,19 @@
  * it separately). `now` is injectable for tests.
  */
 import type { EventStatus } from '../../contracts/organizer';
-
-export type { EventStatus };
+import { endsAtOf, startsAtOf } from './organizerMapping';
 
 /**
  * - `Draft`    — not published.
  * - `Upcoming` — published, starts in the future.
  * - `Active`   — published, currently running (start ≤ now ≤ end).
  * - `Past`     — published, already ended.
- *
- * Prefers the reservation-era `startsAt`/`endsAt` single-DateTime columns,
- * falling back to the legacy split `startDate`/`endDate` until the backfill.
  */
 export function getEventStatus(
   event: {
     isDraft: boolean;
-    startsAt?: Date | null;
-    endsAt?: Date | null;
+    startsAt: Date | null;
+    endsAt: Date | null;
     startDate: Date;
     endDate: Date;
   },
@@ -28,10 +24,7 @@ export function getEventStatus(
 ): EventStatus {
   if (event.isDraft) return 'Draft';
 
-  const start = event.startsAt ?? event.startDate;
-  const end = event.endsAt ?? event.endDate;
-
-  if (now < start) return 'Upcoming';
-  if (now > end) return 'Past';
+  if (now < startsAtOf(event)) return 'Upcoming';
+  if (now > endsAtOf(event)) return 'Past';
   return 'Active';
 }

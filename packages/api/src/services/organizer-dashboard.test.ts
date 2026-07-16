@@ -49,26 +49,7 @@ function fakePrisma(opts: FakeOpts = {}) {
     $queryRaw: queryRaw,
   } as unknown as PrismaClient;
 
-  return { prisma, eventsFindMany, ordersFindMany, orgFindFirst };
-}
-
-function eventRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'e1',
-    name: 'Demo Festival',
-    imageUrl: 'flyer.jpg',
-    isDraft: false,
-    startsAt: new Date('2026-07-14T18:00:00Z'),
-    startDate: new Date('2026-07-14T18:00:00Z'),
-    endsAt: new Date('2026-07-16T02:00:00Z'),
-    endDate: new Date('2026-07-16T02:00:00Z'),
-    ticketTypes: [
-      { capacity: 100, quantity: 100 },
-      { capacity: null, quantity: 50 },
-    ],
-    _count: { tickets: 42 },
-    ...overrides,
-  };
+  return { prisma, eventsFindMany, ordersFindMany };
 }
 
 describe('getDashboard — authorization', () => {
@@ -148,9 +129,28 @@ describe('getDashboard — shaping', () => {
   });
 
   it('sums capacity across tiers with the legacy quantity fallback', async () => {
-    const { prisma } = fakePrisma({ events: [eventRow()] });
+    const { prisma } = fakePrisma({
+      events: [
+        {
+          id: 'e1',
+          name: 'Demo Festival',
+          imageUrl: 'flyer.jpg',
+          isDraft: false,
+          startsAt: new Date('2026-07-14T18:00:00Z'),
+          startDate: new Date('2026-07-14T18:00:00Z'),
+          endsAt: new Date('2026-07-16T02:00:00Z'),
+          endDate: new Date('2026-07-16T02:00:00Z'),
+          ticketTypes: [
+            { capacity: 100, quantity: 100 },
+            { capacity: null, quantity: 50 }, // falls back to quantity
+          ],
+          _count: { tickets: 42 },
+        },
+      ],
+    });
+
     const result = await getDashboard(prisma, OWNER, {}, NOW);
-    // capacity 100 + (null → quantity 50)
+
     expect(result.activeEvents[0]).toMatchObject({
       sold: 42,
       capacity: 150,

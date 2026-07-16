@@ -36,7 +36,11 @@ export type ViewAsInput = z.infer<typeof viewAsInputSchema>;
 
 // --- Screen A: dashboard home -------------------------------------------------
 
-export const dashboardActiveEventSchema = z.object({
+/**
+ * An event as a card: the shape Screen A's active-events row and Screen B's
+ * list both render. One schema — they're the same card in two places.
+ */
+export const organizerEventSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   thumbnailUrl: z.string().nullable(),
@@ -45,7 +49,7 @@ export const dashboardActiveEventSchema = z.object({
   capacity: z.number().int(),
   status: eventStatusSchema,
 });
-export type DashboardActiveEvent = z.infer<typeof dashboardActiveEventSchema>;
+export type OrganizerEventSummary = z.infer<typeof organizerEventSummarySchema>;
 
 export const dashboardRecentOrderSchema = z.object({
   id: z.string(),
@@ -74,7 +78,7 @@ export const organizerSetupStateSchema = z.object({
 export type OrganizerSetupState = z.infer<typeof organizerSetupStateSchema>;
 
 export const organizerDashboardSchema = z.object({
-  activeEvents: z.array(dashboardActiveEventSchema),
+  activeEvents: z.array(organizerEventSummarySchema),
   recentOrders: z.array(dashboardRecentOrderSchema),
   revenue: z.object({
     totalRevenueCents: z.number().int(),
@@ -92,16 +96,7 @@ export const listEventsInputSchema = viewAsInputSchema.extend({
 });
 export type ListEventsInput = z.infer<typeof listEventsInputSchema>;
 
-export const organizerEventSummarySchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  thumbnailUrl: z.string().nullable(),
-  startsAt: z.string().datetime(),
-  status: eventStatusSchema,
-  sold: z.number().int(),
-  capacity: z.number().int(),
-});
-export type OrganizerEventSummary = z.infer<typeof organizerEventSummarySchema>;
+// Rows are `organizerEventSummarySchema` — the same event card Screen A renders.
 
 // --- Screen C: event overview -------------------------------------------------
 
@@ -216,14 +211,9 @@ export const listOrdersInputSchema = z.object({
 });
 export type ListOrdersInput = z.infer<typeof listOrdersInputSchema>;
 
-export const organizerOrderSummarySchema = z.object({
-  id: z.string(),
-  customerDisplay: z.string(),
-  amountChargedCents: z.number().int(),
+/** The dashboard's recent-order row, plus the count the orders table shows. */
+export const organizerOrderSummarySchema = dashboardRecentOrderSchema.extend({
   ticketCount: z.number().int(),
-  /** Nullable because `Orders.createdAt` still is (roadmap 2.9). */
-  createdAt: z.string().datetime().nullable(),
-  status: orderStatusSchema,
 });
 export type OrganizerOrderSummary = z.infer<typeof organizerOrderSummarySchema>;
 

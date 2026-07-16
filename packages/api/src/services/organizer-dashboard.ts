@@ -10,9 +10,9 @@
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type {
-  DashboardActiveEvent,
   DashboardRecentOrder,
   OrganizerDashboard,
+  OrganizerEventSummary,
   ViewAsInput,
 } from '../contracts/organizer';
 import { getEventStatus } from './_shared/eventStatus';
@@ -23,11 +23,28 @@ import {
   toCents,
   toDayKey,
 } from './_shared/organizerMapping';
+import { isProfileComplete } from './_shared/organizerSetup';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const ACTIVE_EVENTS_LIMIT = 5;
 const RECENT_ORDERS_LIMIT = 5;
 const SALES_TREND_DAYS = 30;
+
+/**
+ * A "day" is UTC, everywhere: the window bounds here, `date_trunc` in the trend
+ * query (the column is `timestamp` and Prisma writes UTC), and `toDayKey`. They
+ * are joined by day-string, so a server-local boundary would misalign the
+ * buckets off-UTC and silently zero the edge days.
+ */
+function startOfUtcDay(instant: Date): Date {
+  return new Date(
+    Date.UTC(
+      instant.getUTCFullYear(),
+      instant.getUTCMonth(),
+      instant.getUTCDate()
+    )
+  );
+}
 
 /** A day-bucketed ticket count from the raw trend query. */
 interface DailySalesRow {
@@ -41,16 +58,15 @@ export async function getDashboard(
   input: ViewAsInput = {},
   now: Date = new Date()
 ): Promise<OrganizerDashboard> {
-  const { organizerUserId } = await resolveOrganizerScope(
+  const organizerUserId = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
   );
 
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
+  const startOfToday = startOfUtcDay(now);
   const trendStart = new Date(startOfToday);
-  trendStart.setDate(trendStart.getDate() - (SALES_TREND_DAYS - 1));
+  trendStart.setUTCDate(trendStart.getUTCDate() - (SALES_TREND_DAYS - 1));
 
   const ownedEvents = { organizerUserId, deletedAt: null };
 
@@ -120,18 +136,20 @@ export async function getDashboard(
       }),
     ]);
 
-  const activeEvents: DashboardActiveEvent[] = activeEventRows.map((event) => ({
-    id: event.id,
-    name: event.name,
-    thumbnailUrl: event.imageUrl ?? null,
-    startsAt: startsAtOf(event).toISOString(),
-    sold: event._count.tickets,
-    capacity: event.ticketTypes.reduce(
-      (total, tier) => total + capacityOf(tier),
-      0
-    ),
-    status: getEventStatus(event, now),
-  }));
+  const activeEvents: OrganizerEventSummary[] = activeEventRows.map(
+    (event) => ({
+      id: event.id,
+      name: event.name,
+      thumbnailUrl: event.imageUrl ?? null,
+      startsAt: startsAtOf(event).toISOString(),
+      sold: event._count.tickets,
+      capacity: event.ticketTypes.reduce(
+        (total, tier) => total + capacityOf(tier),
+        0
+      ),
+      status: getEventStatus(event, now),
+    })
+  );
 
   const recentOrders: DashboardRecentOrder[] = recentOrderRows.map((order) => ({
     id: order.id,
@@ -149,8 +167,7 @@ export async function getDashboard(
       dailySales: buildSalesTrend(dailySalesRows, trendStart),
     },
     setup: {
-      // "Complete enough to look like a brand" — a logo and a bio.
-      profileComplete: Boolean(org?.logoUrl && org?.bio),
+      profileComplete: isProfileComplete(org),
       paidTicketingEnabled: org?.paidTicketingEnabled ?? false,
     },
   };
@@ -164,7 +181,7 @@ function buildSalesTrend(rows: DailySalesRow[], trendStart: Date) {
 
   return Array.from({ length: SALES_TREND_DAYS }, (_, offset) => {
     const day = new Date(trendStart);
-    day.setDate(trendStart.getDate() + offset);
+    day.setUTCDate(trendStart.getUTCDate() + offset);
     const date = toDayKey(day);
     return { date, tickets: counts.get(date) ?? 0 };
   });

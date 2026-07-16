@@ -1,7 +1,12 @@
 /**
  * Shaping helpers shared by the organizer reads: the float→cents boundary and
- * the reservation-era-column fallbacks. One home so the fallback rules can't
- * drift between screens while the legacy columns are still around.
+ * the reservation-era-column fallbacks.
+ *
+ * These are the organizer surface's home for the rules. The same fallbacks are
+ * still inlined in `services/events.ts`, `services/checkout.ts`,
+ * `services/reservations.ts` and `_shared/eventSummary.ts` — pointing those at
+ * these helpers is worth a follow-up, so that dropping a fallback after the
+ * backfill is one edit rather than five.
  */
 
 /**
@@ -18,14 +23,6 @@ export function capacityOf(tier: {
   quantity: number;
 }): number {
   return tier.capacity ?? tier.quantity;
-}
-
-/** Reservation-era `priceCents`, falling back to legacy `price` dollars. */
-export function priceCentsOf(tier: {
-  priceCents: number | null;
-  price: number;
-}): number {
-  return tier.priceCents ?? toCents(tier.price);
 }
 
 /** Atomic `startsAt`, falling back to the legacy split `startDate`. */
