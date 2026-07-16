@@ -324,9 +324,6 @@ model TicketTypes {
   maxPurchasePerUser Int
   quantity           Int
   quantitySold       Int?   @default(0)
-  // Buyer-facing display order of tiers within an event (Screen E reorder).
-  // Backfilled by createdAt.
-  sortOrder          Int    @default(0)
 
   // Reservation rebuild (Phase A — additive). Counter inventory: availability
   // = capacity - reserved - sold. `capacity` backfills from `quantity`,

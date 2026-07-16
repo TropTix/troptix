@@ -21,18 +21,18 @@ admin); **mobile is the field kit** (glance at performance, check people in at t
 lookups/actions on the go). Everything is responsive and nothing is broken on either — but each
 screen is optimized for where it's actually used, and a few lean deliberately to one platform.
 
-| Screen             | Class            | Desktop                           | Mobile                                                                   |
-| ------------------ | ---------------- | --------------------------------- | ------------------------------------------------------------------------ |
-| A Home             | Parity           | multi-column                      | single-column stack, full                                                |
-| B Events list      | Parity           | table + row "…" menu              | cards + bottom-sheet actions                                             |
-| C Overview         | Parity           | vitals grid + side-by-side charts | vitals stack, tabs → segmented control                                   |
-| D Create/edit      | Desktop-primary  | two-column (form + flyer/preview) | stacked, functional, rail collapses                                      |
-| E Ticket types     | Desktop-primary  | table + drag-reorder              | cards; **add/edit via sheet (real post-launch need)**; reorder = up/down |
-| F1 Attendees       | Desktop-primary  | full table + CSV export           | search/lookup + correct check-in; no CSV                                 |
-| F2 Check-in        | **Mobile-first** | tablet/laptop kiosk               | **the** door screen — big targets, running counter                       |
-| G Orders           | Desktop-primary  | table + detail + CSV + resend     | list + detail (view + resend); no CSV                                    |
-| H Admin            | Desktop-only     | full internal tool                | not designed for mobile                                                  |
-| I Profile/settings | Parity           | sectioned                         | stacked, full                                                            |
+| Screen             | Class            | Desktop                           | Mobile                                                |
+| ------------------ | ---------------- | --------------------------------- | ----------------------------------------------------- |
+| A Home             | Parity           | multi-column                      | single-column stack, full                             |
+| B Events list      | Parity           | table + row "…" menu              | cards + bottom-sheet actions                          |
+| C Overview         | Parity           | vitals grid + side-by-side charts | vitals stack, tabs → segmented control                |
+| D Create/edit      | Desktop-primary  | two-column (form + flyer/preview) | stacked, functional, rail collapses                   |
+| E Ticket types     | Desktop-primary  | table                             | cards; **add/edit via sheet (real post-launch need)** |
+| F1 Attendees       | Desktop-primary  | full table + CSV export           | search/lookup + correct check-in; no CSV              |
+| F2 Check-in        | **Mobile-first** | tablet/laptop kiosk               | **the** door screen — big targets, running counter    |
+| G Orders           | Desktop-primary  | table + detail + CSV + resend     | list + detail (view + resend); no CSV                 |
+| H Admin            | Desktop-only     | full internal tool                | not designed for mobile                               |
+| I Profile/settings | Parity           | sectioned                         | stacked, full                                         |
 
 **Rules that fall out:** CSV exports are desktop-only (you download a file to work with). Dense
 tables reshape to cards/lists on mobile, never horizontal-scroll spreadsheets. Add/edit a ticket
@@ -180,16 +180,17 @@ the canonical "add a ticket after go-live" surface.
 
 - **Add tier — available anytime, incl. post-publish** (the primary point of this screen alongside
   monitoring).
-- **Edit**, **Duplicate tier** (VIP variants), **Delete / deactivate** (guarded when it has sales),
-  and **reorder** (buyer-facing display order).
+- **Edit**, **Duplicate tier** (VIP variants), **Delete / deactivate** (guarded when it has sales).
 - All add/edit go through the **one shared ticket form** (plan 007) — same component as Screen D's
   inline drawer, so the **paid-ticketing gate** (`price > 0` ⇒ approved) lives in one place.
+- **Reorder — deferred.** Tiers render in natural (creation) order; drag/up-down reordering and the
+  `sortOrder` column are dropped for now (complexity we don't need yet) and ship as a follow-up.
 
 **Data this screen needs:** ticket-type list with per-tier sales
 `{ id, name, priceCents, sold, capacity, saleState, revenueCents }[]`; **writes:** create / update /
-duplicate / delete / reorder ticket type (all honoring the paid gate).
+duplicate / delete ticket type (all honoring the paid gate).
 
-_Status: locked. Adding tiers post-launch is a first-class action here._
+_Status: locked. Adding tiers post-launch is a first-class action here; reorder deferred._
 
 ## Screen F — Attendees & Check-in (two separate screens)
 
@@ -290,13 +291,13 @@ into the phasing:
 - **Duplicate / delete event** (Screen B) — delete is a **soft-delete** (`deletedAt`).
 - **Web check-in door surface** + **CSV export** for attendees & orders (Screens F, G).
 - **Resend confirmation email** (Screen G).
-- **Reorder ticket tiers** (Screen E).
 - **Profile & settings screen** with the setup-tasks area (Screen I) — overlaps the onboarding plan.
 - **Reframed dashboards** — home as entry-point-first (A); overview as a funnel service-center (C).
 
 **Deferred (own efforts):** **page views & conversion** (the `EventPageView` tracking + the funnel
-vitals on Screen C), order actions (refund / cancel / comp), event-page richness (theming + live
-preview, waitlist, recurring, guestlist, media), native Google Sheets export, web QR scanning.
+vitals on Screen C), **tier reorder** (the `sortOrder` column + drag/up-down on Screen E), order
+actions (refund / cancel / comp), event-page richness (theming + live preview, waitlist, recurring,
+guestlist, media), native Google Sheets export, web QR scanning.
 
 ## API surface (derived from the screens)
 
@@ -314,7 +315,7 @@ reads only, and only for a Platform Owner); writes never take `viewAs`; services
 | `getDashboard(actor, {viewAs?})`                    | A      | `{ activeEvents[], recentOrders[], revenue:{ totalCents, dailySeries[] }, setup:{ profileComplete, paidTicketingEnabled } }`                                                                                                  |
 | `listEvents(actor, {viewAs?, status?, search?})`    | B      | `EventSummary[] { id, name, thumbnailUrl, date, status, sold, capacity }`                                                                                                                                                     |
 | `getEventOverview(actor, eventId)`                  | C      | `{ vitals:{ sold, capacity, revenueCents, ordersCount }, series[]:{ date, revenueCents, tickets }, ticketBreakdown[]:{ name, sold, capacity, revenueCents }, checkIn:{ checkedIn, total } }` (page views/conversion deferred) |
-| `listTicketTypes(actor, eventId)`                   | E      | `{ summary:{ sold, revenueCents }, tiers[]:{ id, name, priceCents, sold, capacity, saleState, revenueCents, sortOrder } }`                                                                                                    |
+| `listTicketTypes(actor, eventId)`                   | E      | `{ summary:{ sold, revenueCents }, tiers[]:{ id, name, priceCents, sold, capacity, saleState, revenueCents } }` (natural/creation order; reorder deferred)                                                                    |
 | `listAttendees(actor, eventId, {search?, filter?})` | F1/F2  | `Attendee[] { ticketId, name, email, ticketType, orderId, checkedIn, checkedInAt }` (+ `checkInSummary`)                                                                                                                      |
 | `listOrders(actor, eventId, {search?, filter?})`    | G      | `OrderSummary[] { id, customerDisplay, amountChargedCents, ticketCount, createdAt, status }`                                                                                                                                  |
 | `getOrderDetail(actor, orderId)`                    | G      | `{ lineItems[], subtotalCents, feesCents, totalCents, paymentMethod, customer, timeline[] }`                                                                                                                                  |
@@ -331,7 +332,6 @@ reads only, and only for a Platform Owner); writes never take `viewAs`; services
 | `toggleEventPublish(actor, eventId)`                                              | B/C    | exists; honors publish requirements                          |
 | `createTicketType` / `updateTicketType`                                           | D/E    | **paid gate**: `priceCents > 0` ⇒ org `paidTicketingEnabled` |
 | `duplicateTicketType` / `deleteTicketType`                                        | E      | delete guarded when the tier has sales                       |
-| `reorderTicketTypes(actor, eventId, orderedIds[])`                                | E      | writes `sortOrder`                                           |
 | `setCheckInStatus(actor, ticketId, checkedIn)`                                    | F      | reuses the existing check-in path (+ `checkinTimestamp`)     |
 | `resendOrderConfirmation(actor, orderId)`                                         | G      | re-sends the transactional email; no money movement          |
 | `updateOrganizationProfile(actor, input)`                                         | I      | exists (brand)                                               |
@@ -351,8 +351,9 @@ reads only, and only for a Platform Owner); writes never take `viewAs`; services
 - **`Organization.paidTicketingEnabled` (bool, default false) + `paidTicketingRequestedAt` (nullable)**
   — from the [onboarding plan](2026-07-organizer-onboarding-paid-approval.md); **backfill existing
   paid-selling orgs to true** at rollout.
-- **`TicketTypes.sortOrder` (int)** — for buyer-facing tier order (Screen E reorder). Backfill by
-  `createdAt`.
+- **~~`TicketTypes.sortOrder`~~ — DEFERRED.** Tier reorder is deliberately dropped for now (added
+  complexity for a feature we don't need yet); tiers render in their natural (creation) order. Ships
+  with the reorder follow-up.
 - **Indexes:** `Events(organizerUserId)`, `Orders(eventId, status)` (already in the migration plan).
 - **Deferred:** `EventPageView` table + `recordEventPageView` (page views / conversion) — ships with
   the funnel follow-up, not this build.
@@ -361,8 +362,8 @@ reads only, and only for a Platform Owner); writes never take `viewAs`; services
 
 This replaces the migration plan's provisional read/write list. The migration's **phasing still
 holds** (contracts + reads → page cutover → writes → retire), but the _set_ of services is the table
-above, and Phases now also carry the new schema (page views, paid flag, sortOrder) and the new write
-services (duplicate/delete/reorder/resend/request/export). The migration plan should be updated to
+above, and Phases now also carry the new schema (soft-delete, paid flag) and the new write
+services (duplicate/delete/resend/request/export). The migration plan should be updated to
 point here for the service inventory.
 
 _Status: API surface drafted from locked screens; ready to build per the migration plan's phasing._
