@@ -2,8 +2,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { getDashboard } from '@troptix/api/server';
-import type { DashboardRecentOrder, OrganizerEventSummary } from '@troptix/api';
-import { CalendarClock, DollarSign, Plus } from 'lucide-react';
+import {
+  dashboardRangeSchema,
+  type DashboardRange,
+  type DashboardRecentOrder,
+  type OrganizerEventSummary,
+} from '@troptix/api';
+import { CalendarClock, DollarSign, Plus, Ticket } from 'lucide-react';
 
 import {
   Card,
@@ -21,59 +26,84 @@ import { DEFAULT_EVENT_IMAGE, eventFlyerUrl } from '@/lib/supabase/storage';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
+import { RangeSelect, RANGE_LABELS } from './_components/RangeSelect';
 import { TicketSalesChart } from './_components/TicketSalesChart';
 
 export default async function OrganizerDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ viewAs?: string }>;
+  searchParams: Promise<{ viewAs?: string; range?: string }>;
 }) {
   const user = await getServerUser();
   if (!user) {
     redirect('/auth/signin');
   }
 
+  const { viewAs, range: rawRange } = await searchParams;
+  // An unknown ?range simply falls back to the service's default.
+  const range = dashboardRangeSchema.safeParse(rawRange).data;
+
   // `viewAs` is honored only for a Platform Owner; the service decides.
-  const { viewAs } = await searchParams;
   const dashboard = await getDashboard(prisma, userToActor(user), {
     viewAsOrganizerUserId: viewAs,
+    range,
   });
 
-  const { activeEvents, recentOrders, revenue, setup } = dashboard;
+  const { activeEvents, recentOrders, stats, salesSeries, setup } = dashboard;
+  const rangeLabel = RANGE_LABELS[dashboard.range].toLowerCase();
 
   return (
     <div className="space-y-8">
       {!setup.paidTicketingEnabled && <PaidWarningBannerOrganizer />}
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <Button asChild>
-          <Link href="/organizer/events/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Create event
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <RangeSelect value={dashboard.range} />
+          <Button asChild>
+            <Link href="/organizer/events/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Create event
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      <section className="grid gap-4 sm:grid-cols-2">
+        <StatCard
+          label="Ticket revenue"
+          value={formatCents(stats.revenueCents)}
+          hint={`${rangeLabel} · before fees & refunds`}
+          icon={<DollarSign className="h-5 w-5 text-muted-foreground" />}
+        />
+        <StatCard
+          label="Tickets sold"
+          value={stats.ticketsSold.toLocaleString()}
+          hint={rangeLabel}
+          icon={<Ticket className="h-5 w-5 text-muted-foreground" />}
+        />
+      </section>
 
       <ActiveEvents events={activeEvents} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
-        <section className="space-y-6 lg:col-span-2">
+        <section className="lg:col-span-2">
           <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-4 pb-2">
-              <div>
-                <CardDescription>Ticket revenue</CardDescription>
-                <CardTitle className="text-3xl">
-                  {formatCents(revenue.totalRevenueCents)}
-                </CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Across all events, before fees &amp; refunds
-                </p>
-              </div>
-              <DollarSign className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Ticket sales</CardTitle>
+              <CardDescription className="capitalize">
+                {RANGE_LABELS[dashboard.range]}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <TicketSalesChart data={revenue.dailySales} />
+              <TicketSalesChart
+                data={salesSeries}
+                bucket={
+                  dashboard.range === 'today' || dashboard.range === 'yesterday'
+                    ? 'hour'
+                    : 'day'
+                }
+              />
             </CardContent>
           </Card>
         </section>
@@ -83,6 +113,33 @@ export default async function OrganizerDashboardPage({
         </section>
       </div>
     </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+  icon,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4 pb-2">
+        <div>
+          <CardDescription>{label}</CardDescription>
+          <CardTitle className="text-3xl">{value}</CardTitle>
+        </div>
+        <span className="shrink-0">{icon}</span>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs capitalize text-muted-foreground">{hint}</p>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -2,38 +2,62 @@
  * Screen A — the `/organizer` landing read.
  *
  * Entry-point first: the active events an organizer jumps into, their latest
- * orders, a revenue summary, and the setup state that drives the banner. Pure
- * over an injected `prisma`; authorization is the scope seam (organizer-scope).
+ * orders, range-scoped stats + sales chart, and the setup state that drives the
+ * banner. Pure over an injected `prisma`; authorization is the scope seam
+ * (organizer-scope).
  *
  * Every stat is a SQL aggregate — nothing is reduced in JS over a full table.
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type {
+  DashboardInput,
+  DashboardRange,
   DashboardRecentOrder,
   OrganizerDashboard,
   OrganizerEventSummary,
-  ViewAsInput,
+  SalesPoint,
 } from '../contracts/organizer';
 import { getEventStatus } from './_shared/eventStatus';
 import {
   capacityOf,
   customerDisplay,
   toCents,
-  toDayKey,
 } from './_shared/organizerMapping';
 import { isProfileComplete } from './_shared/organizerSetup';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const ACTIVE_EVENTS_LIMIT = 5;
 const RECENT_ORDERS_LIMIT = 5;
-const SALES_TREND_DAYS = 30;
+const DEFAULT_RANGE: DashboardRange = 'month';
+
+/** Postgres `date_trunc` unit — one bucket per point on the chart. */
+type Bucket = 'hour' | 'day';
+
+interface RangeWindow {
+  /** Inclusive. */
+  from: Date;
+  /** Exclusive. */
+  to: Date;
+  bucket: Bucket;
+  /**
+   * How many buckets the chart plots. Explicit rather than derived from
+   * `to`, so a `now` landing exactly on a boundary can't drop the current
+   * (partial) bucket.
+   */
+  points: number;
+}
+
+/** A bucketed ticket count from the raw sales query. */
+interface SalesRow {
+  at: Date;
+  tickets: bigint;
+}
 
 /**
- * A "day" is UTC, everywhere: the window bounds here, `date_trunc` in the trend
- * query (the column is `timestamp` and Prisma writes UTC), and `toDayKey`. They
- * are joined by day-string, so a server-local boundary would misalign the
- * buckets off-UTC and silently zero the edge days.
+ * A "day" is UTC, everywhere: the window bounds, `date_trunc` in the sales query
+ * (the column is `timestamp` and Prisma writes UTC), and the zero-fill. They're
+ * joined by bucket-instant, so a server-local boundary would misalign them.
  */
 function startOfUtcDay(instant: Date): Date {
   return new Date(
@@ -45,16 +69,56 @@ function startOfUtcDay(instant: Date): Date {
   );
 }
 
-/** A day-bucketed ticket count from the raw trend query. */
-interface DailySalesRow {
-  day: Date;
-  tickets: bigint;
+function addUtcDays(instant: Date, days: number): Date {
+  const next = new Date(instant);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+/**
+ * Rolling windows, not calendar ones. Short ranges bucket hourly so "today"
+ * is a shape rather than a single point.
+ */
+function rangeWindow(range: DashboardRange, now: Date): RangeWindow {
+  const startOfToday = startOfUtcDay(now);
+
+  switch (range) {
+    case 'today':
+      return {
+        from: startOfToday,
+        to: now,
+        bucket: 'hour',
+        // Midnight through the hour in progress.
+        points: now.getUTCHours() + 1,
+      };
+    case 'yesterday':
+      return {
+        from: addUtcDays(startOfToday, -1),
+        to: startOfToday,
+        bucket: 'hour',
+        points: 24,
+      };
+    case 'week':
+      return {
+        from: addUtcDays(startOfToday, -6),
+        to: now,
+        bucket: 'day',
+        points: 7,
+      };
+    case 'month':
+      return {
+        from: addUtcDays(startOfToday, -29),
+        to: now,
+        bucket: 'day',
+        points: 30,
+      };
+  }
 }
 
 export async function getDashboard(
   prisma: PrismaClient,
   actor: Actor,
-  input: ViewAsInput = {},
+  input: DashboardInput = {},
   now: Date = new Date()
 ): Promise<OrganizerDashboard> {
   const organizerUserId = await resolveOrganizerScope(
@@ -63,30 +127,35 @@ export async function getDashboard(
     input.viewAsOrganizerUserId
   );
 
+  const range = input.range ?? DEFAULT_RANGE;
+  const window = rangeWindow(range, now);
   const startOfToday = startOfUtcDay(now);
-  const trendStart = new Date(startOfToday);
-  trendStart.setUTCDate(trendStart.getUTCDate() - (SALES_TREND_DAYS - 1));
-
   const ownedEvents = { organizerUserId, deletedAt: null };
 
-  const [revenue, dailySalesRows, activeEventRows, recentOrderRows, org] =
+  const [revenue, salesRows, activeEventRows, recentOrderRows, org] =
     await Promise.all([
       prisma.orders.aggregate({
         _sum: { subtotal: true },
-        where: { status: 'COMPLETED', event: ownedEvents },
+        where: {
+          status: 'COMPLETED',
+          event: ownedEvents,
+          createdAt: { gte: window.from, lt: window.to },
+        },
       }),
 
-      // Day-bucketed in SQL rather than grouping by raw timestamp and folding
-      // in JS (which returns ~a row per ticket).
-      prisma.$queryRaw<DailySalesRow[]>`
-        SELECT date_trunc('day', t."createdAt") AS day, count(*)::bigint AS tickets
+      // Bucketed in SQL rather than grouping by raw timestamp and folding in JS
+      // (which returns ~a row per ticket). Doubles as the tickets-sold total.
+      prisma.$queryRaw<SalesRow[]>`
+        SELECT date_trunc(${window.bucket}, t."createdAt") AS at,
+               count(*)::bigint AS tickets
         FROM "Tickets" t
         JOIN "Orders" o ON o."id" = t."orderId"
         JOIN "Events" e ON e."id" = t."eventId"
         WHERE o."status" = 'COMPLETED'
           AND e."organizerUserId" = ${organizerUserId}
           AND e."deletedAt" IS NULL
-          AND t."createdAt" >= ${trendStart}
+          AND t."createdAt" >= ${window.from}
+          AND t."createdAt" < ${window.to}
         GROUP BY 1
         ORDER BY 1
       `,
@@ -157,12 +226,14 @@ export async function getDashboard(
   }));
 
   return {
+    range,
+    stats: {
+      revenueCents: toCents(revenue._sum.subtotal),
+      ticketsSold: salesRows.reduce((sum, row) => sum + Number(row.tickets), 0),
+    },
+    salesSeries: buildSalesSeries(salesRows, window),
     activeEvents,
     recentOrders,
-    revenue: {
-      totalRevenueCents: toCents(revenue._sum.subtotal),
-      dailySales: buildSalesTrend(dailySalesRows, trendStart),
-    },
     setup: {
       profileComplete: isProfileComplete(org),
       paidTicketingEnabled: org?.paidTicketingEnabled ?? false,
@@ -170,16 +241,21 @@ export async function getDashboard(
   };
 }
 
-/** Zero-fills the window so the chart has a point per day, not just sale days. */
-function buildSalesTrend(rows: DailySalesRow[], trendStart: Date) {
+/** Zero-fills the window so the chart has a point per bucket, not per sale. */
+function buildSalesSeries(rows: SalesRow[], window: RangeWindow): SalesPoint[] {
   const counts = new Map(
-    rows.map((row) => [toDayKey(row.day), Number(row.tickets)])
+    rows.map((row) => [row.at.toISOString(), Number(row.tickets)])
   );
 
-  return Array.from({ length: SALES_TREND_DAYS }, (_, offset) => {
-    const day = new Date(trendStart);
-    day.setUTCDate(trendStart.getUTCDate() + offset);
-    const date = toDayKey(day);
-    return { date, tickets: counts.get(date) ?? 0 };
+  return Array.from({ length: window.points }, (_, offset) => {
+    const cursor = new Date(window.from);
+    if (window.bucket === 'hour') {
+      cursor.setUTCHours(cursor.getUTCHours() + offset);
+    } else {
+      cursor.setUTCDate(cursor.getUTCDate() + offset);
+    }
+
+    const at = cursor.toISOString();
+    return { at, tickets: counts.get(at) ?? 0 };
   });
 }

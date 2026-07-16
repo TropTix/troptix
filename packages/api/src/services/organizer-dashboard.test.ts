@@ -18,7 +18,7 @@ const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 interface FakeOpts {
   email?: string;
   subtotalSum?: number | null;
-  dailySales?: { day: Date; tickets: bigint }[];
+  sales?: { at: Date; tickets: bigint }[];
   events?: unknown[];
   orders?: unknown[];
   org?: unknown;
@@ -31,7 +31,7 @@ function fakePrisma(opts: FakeOpts = {}) {
     .fn()
     .mockResolvedValue({ _sum: { subtotal: opts.subtotalSum ?? 0 } });
   const orgFindFirst = vi.fn().mockResolvedValue(opts.org ?? null);
-  const queryRaw = vi.fn().mockResolvedValue(opts.dailySales ?? []);
+  const queryRaw = vi.fn().mockResolvedValue(opts.sales ?? []);
 
   const prisma = {
     users: {
@@ -119,13 +119,13 @@ describe('getDashboard — shaping', () => {
     // A float sum that would drift if rounded per row.
     const { prisma } = fakePrisma({ subtotalSum: 59.969999999999999 });
     const result = await getDashboard(prisma, OWNER, {}, NOW);
-    expect(result.revenue.totalRevenueCents).toBe(5997);
+    expect(result.stats.revenueCents).toBe(5997);
   });
 
   it('reports zero revenue when there are no completed orders', async () => {
     const { prisma } = fakePrisma({ subtotalSum: null });
     const result = await getDashboard(prisma, OWNER, {}, NOW);
-    expect(result.revenue.totalRevenueCents).toBe(0);
+    expect(result.stats.revenueCents).toBe(0);
   });
 
   it('sums capacity across tiers with the legacy quantity fallback', async () => {
@@ -202,20 +202,120 @@ describe('getDashboard — shaping', () => {
 
   it('zero-fills the 30-day sales trend around days that had sales', async () => {
     const { prisma } = fakePrisma({
-      dailySales: [{ day: new Date('2026-07-15T00:00:00Z'), tickets: 7n }],
+      sales: [{ at: new Date('2026-07-15T00:00:00Z'), tickets: 7n }],
     });
 
     const result = await getDashboard(prisma, OWNER, {}, NOW);
 
-    expect(result.revenue.dailySales).toHaveLength(30);
-    expect(result.revenue.dailySales.at(-1)).toEqual({
-      date: '2026-07-15',
+    expect(result.salesSeries).toHaveLength(30);
+    expect(result.salesSeries.at(-1)).toEqual({
+      at: '2026-07-15T00:00:00.000Z',
       tickets: 7,
     });
-    expect(result.revenue.dailySales[0]).toEqual({
-      date: '2026-06-16',
+    expect(result.salesSeries[0]).toEqual({
+      at: '2026-06-16T00:00:00.000Z',
       tickets: 0,
     });
+  });
+});
+
+describe('getDashboard — range', () => {
+  const bucketOf = (prismaMock: { $queryRaw: unknown }) =>
+    // The tagged-template call passes the bound values after the strings array.
+    (prismaMock.$queryRaw as ReturnType<typeof vi.fn>).mock.calls[0][1];
+
+  it('defaults to the past month, bucketed daily', async () => {
+    const { prisma } = fakePrisma();
+    const result = await getDashboard(prisma, OWNER, {}, NOW);
+
+    expect(result.range).toBe('month');
+    expect(result.salesSeries).toHaveLength(30);
+    expect(bucketOf(prisma as never)).toBe('day');
+  });
+
+  it('buckets today hourly, from midnight through the current hour', async () => {
+    const { prisma } = fakePrisma();
+    const result = await getDashboard(prisma, OWNER, { range: 'today' }, NOW);
+
+    expect(result.range).toBe('today');
+    expect(bucketOf(prisma as never)).toBe('hour');
+    // NOW is 12:00Z → hours 00:00..12:00 inclusive.
+    expect(result.salesSeries).toHaveLength(13);
+    expect(result.salesSeries[0].at).toBe('2026-07-15T00:00:00.000Z');
+    expect(result.salesSeries.at(-1)?.at).toBe('2026-07-15T12:00:00.000Z');
+  });
+
+  it('covers yesterday as a full 24 hours, ending at midnight', async () => {
+    const { prisma } = fakePrisma();
+    const result = await getDashboard(
+      prisma,
+      OWNER,
+      { range: 'yesterday' },
+      NOW
+    );
+
+    expect(result.salesSeries).toHaveLength(24);
+    expect(result.salesSeries[0].at).toBe('2026-07-14T00:00:00.000Z');
+    expect(result.salesSeries.at(-1)?.at).toBe('2026-07-14T23:00:00.000Z');
+  });
+
+  it('keeps the in-progress bucket when now lands exactly on a boundary', async () => {
+    const { prisma } = fakePrisma();
+    const midnight = new Date('2026-07-15T00:00:00.000Z');
+
+    // Today at exactly 00:00 is still one (empty) hour of data, and the month
+    // still ends on today — an off-by-one here silently drops the newest bucket.
+    const today = await getDashboard(
+      prisma,
+      OWNER,
+      { range: 'today' },
+      midnight
+    );
+    expect(today.salesSeries).toHaveLength(1);
+    expect(today.salesSeries[0].at).toBe('2026-07-15T00:00:00.000Z');
+
+    const month = await getDashboard(
+      prisma,
+      OWNER,
+      { range: 'month' },
+      midnight
+    );
+    expect(month.salesSeries).toHaveLength(30);
+    expect(month.salesSeries.at(-1)?.at).toBe('2026-07-15T00:00:00.000Z');
+  });
+
+  it('covers the past week as 7 days', async () => {
+    const { prisma } = fakePrisma();
+    const result = await getDashboard(prisma, OWNER, { range: 'week' }, NOW);
+
+    expect(result.salesSeries).toHaveLength(7);
+    expect(result.salesSeries[0].at).toBe('2026-07-09T00:00:00.000Z');
+  });
+
+  it('scopes the revenue aggregate to the range window', async () => {
+    const { prisma } = fakePrisma();
+    await getDashboard(prisma, OWNER, { range: 'today' }, NOW);
+
+    const where = (prisma.orders.aggregate as ReturnType<typeof vi.fn>).mock
+      .calls[0][0].where;
+    expect(where.createdAt.gte).toEqual(new Date('2026-07-15T00:00:00.000Z'));
+    expect(where.createdAt.lt).toEqual(NOW);
+  });
+
+  it('derives tickets sold from the same buckets the chart uses', async () => {
+    const { prisma } = fakePrisma({
+      sales: [
+        { at: new Date('2026-07-15T09:00:00Z'), tickets: 4n },
+        { at: new Date('2026-07-15T11:00:00Z'), tickets: 3n },
+      ],
+    });
+
+    const result = await getDashboard(prisma, OWNER, { range: 'today' }, NOW);
+
+    expect(result.stats.ticketsSold).toBe(7);
+    expect(
+      result.salesSeries.reduce((sum, point) => sum + point.tickets, 0)
+    ).toBe(7);
   });
 });
 

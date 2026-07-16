@@ -33,6 +33,26 @@ export const viewAsInputSchema = z.object({
 export type ViewAsInput = z.infer<typeof viewAsInputSchema>;
 
 /**
+ * The window the dashboard's stats and sales chart cover. Rolling, not calendar:
+ * `week`/`month` are the last 7/30 days through today.
+ *
+ * Boundaries are UTC — the organizer's own timezone isn't modelled yet, so
+ * "today" means the UTC day (worth revisiting for far-from-UTC organizers).
+ */
+export const dashboardRangeSchema = z.enum([
+  'today',
+  'yesterday',
+  'week',
+  'month',
+]);
+export type DashboardRange = z.infer<typeof dashboardRangeSchema>;
+
+export const dashboardInputSchema = viewAsInputSchema.extend({
+  range: dashboardRangeSchema.optional(),
+});
+export type DashboardInput = z.infer<typeof dashboardInputSchema>;
+
+/**
  * An event as a card — the shape the dashboard's active-events row renders (and
  * the events list will reuse).
  */
@@ -60,12 +80,12 @@ export const dashboardRecentOrderSchema = z.object({
 });
 export type DashboardRecentOrder = z.infer<typeof dashboardRecentOrderSchema>;
 
-export const dailyTicketSalesSchema = z.object({
-  /** yyyy-mm-dd */
-  date: z.string(),
+export const salesPointSchema = z.object({
+  /** Bucket start, ISO. Hourly for today/yesterday, daily for week/month. */
+  at: z.string().datetime(),
   tickets: z.number().int(),
 });
-export type DailyTicketSales = z.infer<typeof dailyTicketSalesSchema>;
+export type SalesPoint = z.infer<typeof salesPointSchema>;
 
 /** Drives the home screen's setup banner; no banner when both are satisfied. */
 export const organizerSetupStateSchema = z.object({
@@ -75,12 +95,19 @@ export const organizerSetupStateSchema = z.object({
 export type OrganizerSetupState = z.infer<typeof organizerSetupStateSchema>;
 
 export const organizerDashboardSchema = z.object({
-  activeEvents: z.array(organizerEventSummarySchema),
-  recentOrders: z.array(dashboardRecentOrderSchema),
-  revenue: z.object({
-    totalRevenueCents: z.number().int(),
-    dailySales: z.array(dailyTicketSalesSchema),
+  /** Echoed back so the UI can render the selector from the resolved range. */
+  range: dashboardRangeSchema,
+  /** Scoped to `range` — not all-time. */
+  stats: z.object({
+    revenueCents: z.number().int(),
+    ticketsSold: z.number().int(),
   }),
+  /** Zero-filled across the whole range, so the chart has no gaps. */
+  salesSeries: z.array(salesPointSchema),
+  /** Current state, deliberately NOT range-scoped — an event is active now. */
+  activeEvents: z.array(organizerEventSummarySchema),
+  /** The latest orders, deliberately NOT range-scoped. */
+  recentOrders: z.array(dashboardRecentOrderSchema),
   setup: organizerSetupStateSchema,
 });
 export type OrganizerDashboard = z.infer<typeof organizerDashboardSchema>;
