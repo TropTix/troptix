@@ -35,6 +35,7 @@ export {
 
 export { getCheckoutConfig, applyCode } from './services/checkout';
 export { getEventDetail, listPublicEvents } from './services/events';
+export { getDashboard } from './services/organizer-dashboard';
 export {
   ensureOrganizationForUser,
   backfillOrganizations,
@@ -42,7 +43,7 @@ export {
   updateOrganizationProfile,
 } from './services/organizations';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
-export { NotFoundError } from './services/_shared/errors';
+export { NotFoundError, UnauthorizedError } from './services/_shared/errors';
 
 // tRPC adapter — router value, server-side caller, and per-request context.
 export { appRouter, createCaller } from './trpc/routers';

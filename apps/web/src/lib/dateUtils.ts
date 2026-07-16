@@ -36,6 +36,13 @@ export const formatCurrency = (amount: number | null): string => {
   });
 };
 
+/**
+ * Integer cents → currency. The API carries money as cents; formatting is the
+ * UI edge's job, so this is where the two meet.
+ */
+export const formatCents = (cents: number | null): string =>
+  formatCurrency(cents === null ? null : cents / 100);
+
 export const combineDateTime = (
   datePart: Date | undefined,
   timePart: string
