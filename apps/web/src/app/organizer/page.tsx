@@ -51,7 +51,7 @@ export default async function OrganizerDashboardPage({
   });
 
   const { activeEvents, recentOrders, stats, salesSeries, setup } = dashboard;
-  const rangeLabel = RANGE_LABELS[dashboard.range].toLowerCase();
+  const rangeLabel = RANGE_LABELS[dashboard.range];
 
   return (
     <div className="space-y-8">
@@ -92,9 +92,7 @@ export default async function OrganizerDashboardPage({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Ticket sales</CardTitle>
-              <CardDescription className="capitalize">
-                {RANGE_LABELS[dashboard.range]}
-              </CardDescription>
+              <CardDescription>{rangeLabel}</CardDescription>
             </CardHeader>
             <CardContent>
               <TicketSalesChart
@@ -138,7 +136,7 @@ function StatCard({
         <span className="shrink-0">{icon}</span>
       </CardHeader>
       <CardContent>
-        <p className="text-xs capitalize text-muted-foreground">{hint}</p>
+        <p className="text-xs text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
   );
