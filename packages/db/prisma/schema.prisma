@@ -88,9 +88,6 @@ model Organization {
   ownerUserId String
   verified    Boolean  @default(false)
 
-  // Capability to sell PAID tickets (ADR 0019). Off by default; TropTix flips it
-  // after the organizer talks to us. Orthogonal to `verified` (attendee trust
-  // tick). `paidTicketingRequestedAt` records a pending "talk to us" request.
   paidTicketingEnabled     Boolean   @default(false)
   paidTicketingRequestedAt DateTime?
 
@@ -255,8 +252,6 @@ model Events {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   isDraft   Boolean  @default(true)
-  // Soft-delete: organizer reads filter `deletedAt: null`; `deleteEvent` sets it
-  // (order/attendee records preserved). "Delete" = archive.
   deletedAt DateTime?
 
   // Event Details
