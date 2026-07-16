@@ -53,7 +53,8 @@ export const dashboardRecentOrderSchema = z.object({
   customerDisplay: z.string(),
   /** What the buyer paid (Order.total) — not revenue. */
   amountChargedCents: z.number().int(),
-  createdAt: z.string().datetime(),
+  /** Nullable because `Orders.createdAt` still is (roadmap 2.9). */
+  createdAt: z.string().datetime().nullable(),
   status: orderStatusSchema,
 });
 export type DashboardRecentOrder = z.infer<typeof dashboardRecentOrderSchema>;
@@ -220,7 +221,8 @@ export const organizerOrderSummarySchema = z.object({
   customerDisplay: z.string(),
   amountChargedCents: z.number().int(),
   ticketCount: z.number().int(),
-  createdAt: z.string().datetime(),
+  /** Nullable because `Orders.createdAt` still is (roadmap 2.9). */
+  createdAt: z.string().datetime().nullable(),
   status: orderStatusSchema,
 });
 export type OrganizerOrderSummary = z.infer<typeof organizerOrderSummarySchema>;
@@ -242,7 +244,8 @@ export type OrderTimelineEntry = z.infer<typeof orderTimelineEntrySchema>;
 export const organizerOrderDetailSchema = z.object({
   id: z.string(),
   status: orderStatusSchema,
-  createdAt: z.string().datetime(),
+  /** Nullable because `Orders.createdAt` still is (roadmap 2.9). */
+  createdAt: z.string().datetime().nullable(),
   customer: z.object({
     name: z.string().nullable(),
     email: z.string().nullable(),
