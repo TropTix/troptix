@@ -192,7 +192,10 @@ export async function getDashboard(
           status: true,
           createdAt: true,
         },
-        orderBy: { createdAt: 'desc' },
+        // Postgres sorts NULLs as larger than any value, so a plain `desc`
+        // means NULLS FIRST — undated legacy orders would lead the rail.
+        // Vestigial today (0 null rows) but the column is still nullable.
+        orderBy: { createdAt: { sort: 'desc', nulls: 'last' } },
         take: RECENT_ORDERS_LIMIT,
       }),
 
