@@ -70,6 +70,8 @@ export default async function OrganizerDashboardPage({
         </div>
       </div>
 
+      <ActiveEvents events={activeEvents} />
+
       <section className="grid gap-4 sm:grid-cols-2">
         <StatCard
           label="Ticket revenue"
@@ -84,8 +86,6 @@ export default async function OrganizerDashboardPage({
           icon={<Ticket className="h-5 w-5 text-muted-foreground" />}
         />
       </section>
-
-      <ActiveEvents events={activeEvents} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
         <section className="lg:col-span-2">
