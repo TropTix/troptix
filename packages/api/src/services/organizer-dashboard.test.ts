@@ -136,9 +136,7 @@ describe('getDashboard — shaping', () => {
           name: 'Demo Festival',
           imageUrl: 'flyer.jpg',
           isDraft: false,
-          startsAt: new Date('2026-07-14T18:00:00Z'),
           startDate: new Date('2026-07-14T18:00:00Z'),
-          endsAt: new Date('2026-07-16T02:00:00Z'),
           endDate: new Date('2026-07-16T02:00:00Z'),
           ticketTypes: [
             { capacity: 100, quantity: 100 },

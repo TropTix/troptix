@@ -3,62 +3,44 @@ import { getEventStatus } from './eventStatus';
 
 const now = new Date('2026-07-15T12:00:00Z');
 
-/** Legacy split columns only — the reservation-era ones are still null. */
-const legacy = (startDate: string, endDate: string, isDraft = false) => ({
+const event = (startDate: string, endDate: string, isDraft = false) => ({
   isDraft,
-  startsAt: null,
-  endsAt: null,
   startDate: new Date(startDate),
   endDate: new Date(endDate),
 });
 
 describe('getEventStatus', () => {
   it('is Draft regardless of dates when unpublished', () => {
-    expect(getEventStatus(legacy('2026-07-01', '2026-07-02', true), now)).toBe(
+    expect(getEventStatus(event('2026-07-01', '2026-07-02', true), now)).toBe(
       'Draft'
     );
-    expect(getEventStatus(legacy('2026-12-01', '2026-12-02', true), now)).toBe(
+    expect(getEventStatus(event('2026-12-01', '2026-12-02', true), now)).toBe(
       'Draft'
     );
   });
 
   it('is Upcoming before the start', () => {
-    expect(getEventStatus(legacy('2026-08-01', '2026-08-02'), now)).toBe(
+    expect(getEventStatus(event('2026-08-01', '2026-08-02'), now)).toBe(
       'Upcoming'
     );
   });
 
   it('is Active between start and end', () => {
-    expect(getEventStatus(legacy('2026-07-14', '2026-07-16'), now)).toBe(
+    expect(getEventStatus(event('2026-07-14', '2026-07-16'), now)).toBe(
       'Active'
     );
   });
 
   it('is Past after the end', () => {
-    expect(getEventStatus(legacy('2026-06-01', '2026-06-02'), now)).toBe(
-      'Past'
-    );
+    expect(getEventStatus(event('2026-06-01', '2026-06-02'), now)).toBe('Past');
   });
 
   it('treats the exact start and end instants as Active (inclusive bounds)', () => {
-    const startsNow = legacy('2026-07-15T12:00:00Z', '2026-07-16');
-    const endsNow = legacy('2026-07-14', '2026-07-15T12:00:00Z');
-    expect(getEventStatus(startsNow, now)).toBe('Active');
-    expect(getEventStatus(endsNow, now)).toBe('Active');
-  });
-
-  it('prefers startsAt/endsAt over the legacy split columns', () => {
-    // Legacy columns say Past; the reservation-era columns say Upcoming.
-    const status = getEventStatus(
-      {
-        isDraft: false,
-        startsAt: new Date('2026-08-01'),
-        endsAt: new Date('2026-08-02'),
-        startDate: new Date('2026-06-01'),
-        endDate: new Date('2026-06-02'),
-      },
-      now
-    );
-    expect(status).toBe('Upcoming');
+    expect(
+      getEventStatus(event('2026-07-15T12:00:00Z', '2026-07-16'), now)
+    ).toBe('Active');
+    expect(
+      getEventStatus(event('2026-07-14', '2026-07-15T12:00:00Z'), now)
+    ).toBe('Active');
   });
 });

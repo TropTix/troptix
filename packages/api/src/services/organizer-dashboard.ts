@@ -19,7 +19,6 @@ import { getEventStatus } from './_shared/eventStatus';
 import {
   capacityOf,
   customerDisplay,
-  startsAtOf,
   toCents,
   toDayKey,
 } from './_shared/organizerMapping';
@@ -103,9 +102,7 @@ export async function getDashboard(
           name: true,
           imageUrl: true,
           isDraft: true,
-          startsAt: true,
           startDate: true,
-          endsAt: true,
           endDate: true,
           ticketTypes: { select: { capacity: true, quantity: true } },
           _count: {
@@ -141,7 +138,7 @@ export async function getDashboard(
       id: event.id,
       name: event.name,
       thumbnailUrl: event.imageUrl ?? null,
-      startsAt: startsAtOf(event).toISOString(),
+      startsAt: event.startDate.toISOString(),
       sold: event._count.tickets,
       capacity: event.ticketTypes.reduce(
         (total, tier) => total + capacityOf(tier),

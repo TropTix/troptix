@@ -25,18 +25,10 @@ export function capacityOf(tier: {
   return tier.capacity ?? tier.quantity;
 }
 
-/** Atomic `startsAt`, falling back to the legacy split `startDate`. */
-export function startsAtOf(event: {
-  startsAt: Date | null;
-  startDate: Date;
-}): Date {
-  return event.startsAt ?? event.startDate;
-}
-
-/** Atomic `endsAt`, falling back to the legacy split `endDate`. */
-export function endsAtOf(event: { endsAt: Date | null; endDate: Date }): Date {
-  return event.endsAt ?? event.endDate;
-}
+// No `startsAtOf`/`endsAtOf`: `Events.startsAt`/`endsAt` were backfilled once and
+// are maintained by nothing (createEvent leaves them null, updateEvent leaves
+// them stale), so reads use `startDate`/`endDate` directly — the legacy columns
+// are the reliable ones until roadmap 2.10 wires the writes.
 
 /** yyyy-mm-dd, for the day-bucketed series the charts render. */
 export function toDayKey(date: Date): string {
