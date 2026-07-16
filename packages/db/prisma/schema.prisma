@@ -186,7 +186,10 @@ model Tickets {
   user         Users?       @relation(fields: [userId], references: [id])
   userId       String?
 
-  @@index([eventId])
+  // createdAt trails eventId so the dashboard's sales trend range-scans its
+  // window instead of reading every ticket the event ever sold. Supersedes a
+  // bare [eventId] — Postgres serves that from this index's leading column.
+  @@index([eventId, createdAt])
   @@index([orderId])
   @@index([ticketTypeId])
   @@index([userId])
@@ -243,7 +246,10 @@ model Orders {
   eventId String
 
   @@index([eventId])
-  @@index([eventId, status])
+  // Serves both dashboard reads off one index: the revenue aggregate seeks
+  // straight to a status + date range, and recent-orders gets an ordered path
+  // instead of top-N sorting every completed order.
+  @@index([eventId, status, createdAt])
   @@index([userId])
 }
 
