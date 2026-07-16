@@ -26,12 +26,22 @@
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
 values ('seed_org_1', now(), now(), 'demo-organizer@troptix.test', 'Demo Organizer', 'Demo', 'Organizer', 'ORGANIZER');
 
+-- Demo organizer's Organization (brand). Approved for paid ticketing to match
+-- the paid festival below (seed_event_1); not verified.
+insert into public."Organization" (
+  id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
+  verified, "paidTicketingEnabled"
+) values (
+  'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer', 'seed_org_1',
+  false, true
+);
+
 -- Published events, owned by the demo organizer. Legacy split date columns AND
 -- the reservation-era atomic `startsAt`/`endsAt` (roadmap 2.10) are both set.
 insert into public."Events" (
   id, "createdAt", "updatedAt", "isDraft", name, description, summary,
   organizer, "organizerUserId", "startDate", "endDate", "startsAt", "endsAt",
-  venue, address, country, "countryCode"
+  venue, address, country, "countryCode", "organizationId"
 ) values
   (
     'seed_event_1', now(), now(), false,
@@ -39,7 +49,7 @@ insert into public."Events" (
     'Demo Organizer', 'seed_org_1',
     '2026-08-15 18:00:00', '2026-08-15 23:00:00',
     '2026-08-15 18:00:00', '2026-08-15 23:00:00',
-    'Demo Arena', '123 Demo Street, Kingston', 'Jamaica', 'JM'
+    'Demo Arena', '123 Demo Street, Kingston', 'Jamaica', 'JM', 'seed_organization_1'
   ),
   (
     'seed_event_2', now(), now(), false,
@@ -47,7 +57,7 @@ insert into public."Events" (
     'Demo Organizer', 'seed_org_1',
     '2026-09-05 12:00:00', '2026-09-05 18:00:00',
     '2026-09-05 12:00:00', '2026-09-05 18:00:00',
-    'Demo Park', '45 Community Ave, Kingston', 'Jamaica', 'JM'
+    'Demo Park', '45 Community Ave, Kingston', 'Jamaica', 'JM', 'seed_organization_1'
   ),
   (
     'seed_event_3', now(), now(), false,
@@ -55,7 +65,7 @@ insert into public."Events" (
     'Demo Organizer', 'seed_org_1',
     '2026-09-20 19:00:00', '2026-09-21 01:00:00',
     '2026-09-20 19:00:00', '2026-09-21 01:00:00',
-    'Demo Hall', '9 Edge Lane, Kingston', 'Jamaica', 'JM'
+    'Demo Hall', '9 Edge Lane, Kingston', 'Jamaica', 'JM', 'seed_organization_1'
   );
 
 -- Ticket types across the three events, one row per state we want to test.

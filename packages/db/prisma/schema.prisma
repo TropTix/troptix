@@ -88,6 +88,9 @@ model Organization {
   ownerUserId String
   verified    Boolean  @default(false)
 
+  paidTicketingEnabled     Boolean   @default(false)
+  paidTicketingRequestedAt DateTime?
+
   owner  Users    @relation(fields: [ownerUserId], references: [id])
   events Events[]
 
@@ -240,6 +243,7 @@ model Orders {
   eventId String
 
   @@index([eventId])
+  @@index([eventId, status])
   @@index([userId])
 }
 
@@ -248,6 +252,7 @@ model Events {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   isDraft   Boolean  @default(true)
+  deletedAt DateTime?
 
   // Event Details
   imageUrl        String? @db.VarChar(2000)
@@ -290,6 +295,7 @@ model Events {
   spotlight    Spotlight[]
 
   @@index([organizationId])
+  @@index([organizerUserId])
 }
 
 enum TicketFeeStructure {
