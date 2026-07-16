@@ -137,7 +137,7 @@ export async function getDashboard(
     (event) => ({
       id: event.id,
       name: event.name,
-      thumbnailUrl: event.imageUrl ?? null,
+      imageUrl: event.imageUrl ?? null,
       startsAt: event.startDate.toISOString(),
       sold: event._count.tickets,
       capacity: event.ticketTypes.reduce(

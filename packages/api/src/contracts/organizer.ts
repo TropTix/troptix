@@ -39,7 +39,8 @@ export type ViewAsInput = z.infer<typeof viewAsInputSchema>;
 export const organizerEventSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
-  thumbnailUrl: z.string().nullable(),
+  /** Stored flyer path (resolved to an absolute URL by the web layer). */
+  imageUrl: z.string().nullable(),
   startsAt: z.string().datetime(),
   sold: z.number().int(),
   capacity: z.number().int(),

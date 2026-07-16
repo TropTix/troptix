@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { getDashboard } from '@troptix/api/server';
 import type { DashboardRecentOrder, OrganizerEventSummary } from '@troptix/api';
-import { CalendarClock, DollarSign, ImageIcon, Plus } from 'lucide-react';
+import { CalendarClock, DollarSign, Plus } from 'lucide-react';
 
 import {
   Card,
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { PaidWarningBannerOrganizer } from '@/components/PaidWarningBanner';
 import { formatCents, getDateFormatter } from '@/lib/dateUtils';
+import { DEFAULT_EVENT_IMAGE, eventFlyerUrl } from '@/lib/supabase/storage';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
@@ -129,25 +130,21 @@ function ActiveEvents({ events }: { events: OrganizerEventSummary[] }) {
 function ActiveEventCard({ event }: { event: OrganizerEventSummary }) {
   const soldPercent =
     event.capacity > 0 ? (event.sold / event.capacity) * 100 : 0;
+  // Rows store a bucket path, not a URL — resolve it the way the public card does.
+  const flyerUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
   return (
     <Link href={`/organizer/events/${event.id}`} className="group">
       <Card className="h-full transition-colors group-hover:border-primary/50">
         <CardContent className="flex gap-4 p-4">
           <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-            {event.thumbnailUrl ? (
-              <Image
-                src={event.thumbnailUrl}
-                alt=""
-                fill
-                sizes="64px"
-                className="object-cover"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <ImageIcon className="h-5 w-5 text-muted-foreground" />
-              </div>
-            )}
+            <Image
+              src={flyerUrl}
+              alt=""
+              fill
+              sizes="64px"
+              className="object-cover"
+            />
           </div>
 
           <div className="min-w-0 flex-1 space-y-1.5">

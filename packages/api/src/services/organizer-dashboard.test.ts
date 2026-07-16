@@ -153,7 +153,8 @@ describe('getDashboard — shaping', () => {
       sold: 42,
       capacity: 150,
       status: 'Active',
-      thumbnailUrl: 'flyer.jpg',
+      // The stored path, unresolved — the web layer turns it into a URL.
+      imageUrl: 'flyer.jpg',
     });
   });
 
