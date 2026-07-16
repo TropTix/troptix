@@ -26,7 +26,8 @@ import { DEFAULT_EVENT_IMAGE, eventFlyerUrl } from '@/lib/supabase/storage';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
-import { RangeSelect, RANGE_LABELS } from './_components/RangeSelect';
+import { RangeSelect } from './_components/RangeSelect';
+import { RANGE_LABELS } from './_components/ranges';
 import { TicketSalesChart } from './_components/TicketSalesChart';
 
 export default async function OrganizerDashboardPage({

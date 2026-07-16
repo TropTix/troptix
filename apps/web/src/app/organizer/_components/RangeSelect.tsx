@@ -10,13 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-export const RANGE_LABELS: Record<DashboardRange, string> = {
-  today: 'Today',
-  yesterday: 'Yesterday',
-  week: 'Past week',
-  month: 'Past month',
-};
+import { RANGE_LABELS } from './ranges';
 
 /**
  * Drives the dashboard's range via the URL, so the page stays a server
