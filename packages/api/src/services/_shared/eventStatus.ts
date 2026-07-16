@@ -3,7 +3,9 @@
  * so the events list and the event detail can't disagree (they used to compute
  * it separately). `now` is injectable for tests.
  */
-export type EventStatus = 'Draft' | 'Upcoming' | 'Active' | 'Past';
+import type { EventStatus } from '../../contracts/organizer';
+
+export type { EventStatus };
 
 /**
  * - `Draft`    — not published.
