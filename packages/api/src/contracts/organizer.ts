@@ -70,6 +70,8 @@ export type OrganizerEventSummary = z.infer<typeof organizerEventSummarySchema>;
 
 export const dashboardRecentOrderSchema = z.object({
   id: z.string(),
+  /** The order's event, so a cross-event rail can link into its detail. */
+  eventId: z.string(),
   /** Name, falling back to email, falling back to 'N/A'. */
   customerDisplay: z.string(),
   /** What the buyer paid (Order.total) — not revenue. */
@@ -172,3 +174,52 @@ export const eventOverviewSchema = z.object({
   recentOrders: z.array(dashboardRecentOrderSchema),
 });
 export type EventOverview = z.infer<typeof eventOverviewSchema>;
+
+// --- Screen G — orders (`/organizer/events/[id]/orders`) ---
+
+/** A row in the orders list. */
+export const eventOrderRowSchema = z.object({
+  id: z.string(),
+  customerDisplay: z.string(),
+  /** What the buyer paid (Order.total). */
+  amountChargedCents: z.number().int(),
+  ticketCount: z.number().int(),
+  createdAt: z.string().datetime().nullable(),
+  status: orderStatusSchema,
+});
+export type EventOrderRow = z.infer<typeof eventOrderRowSchema>;
+
+/** One tier's slice of an order — the tickets bought at a single price. */
+export const orderLineItemSchema = z.object({
+  /** Tier name, or 'Ticket' when the tier is gone/unknown. */
+  name: z.string(),
+  quantity: z.number().int(),
+  unitPriceCents: z.number().int(),
+  subtotalCents: z.number().int(),
+});
+export type OrderLineItem = z.infer<typeof orderLineItemSchema>;
+
+/**
+ * A single order in full. Money is cents throughout; the breakdown prefers the
+ * reservation-era `*Cents` columns and falls back to the legacy float columns
+ * for orders written before that cutover.
+ */
+export const orderDetailSchema = z.object({
+  id: z.string(),
+  status: orderStatusSchema,
+  /** Placed. A fuller placed→paid→emailed timeline needs event sourcing we
+   * don't store yet, so it's deferred rather than faked. */
+  createdAt: z.string().datetime().nullable(),
+  customer: z.object({
+    name: z.string().nullable(),
+    email: z.string().nullable(),
+    phone: z.string().nullable(),
+  }),
+  lineItems: z.array(orderLineItemSchema),
+  subtotalCents: z.number().int(),
+  feesCents: z.number().int(),
+  totalCents: z.number().int(),
+  /** e.g. "Visa ····4242", or null for free/legacy orders. */
+  paymentMethod: z.string().nullable(),
+});
+export type OrderDetail = z.infer<typeof orderDetailSchema>;

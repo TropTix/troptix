@@ -270,30 +270,32 @@ function RecentOrders({
             No orders yet.
           </p>
         ) : (
-          // Not links: /orders/[id] is the patron's view, and the organizer's
-          // order detail is the Orders tab (Screen G), reached via View all.
+          // Links into the organizer's order detail (Screen G), not the
+          // patron-facing /orders/[id].
           <ul className="divide-y">
             {orders.map((order) => (
-              <li
-                key={order.id}
-                className="flex items-center justify-between gap-3 py-3 first:pt-0"
-              >
-                <div className="min-w-0">
-                  <p
-                    className="truncate text-sm font-medium"
-                    title={order.customerDisplay}
-                  >
-                    {order.customerDisplay}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {order.createdAt
-                      ? getDateFormatter(new Date(order.createdAt), 'MMM d')
-                      : '—'}
-                  </p>
-                </div>
-                <span className="shrink-0 text-sm font-medium">
-                  {formatCents(order.amountChargedCents)}
-                </span>
+              <li key={order.id}>
+                <Link
+                  href={`/organizer/events/${order.eventId}/orders/${order.id}`}
+                  className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-3 hover:bg-muted/50"
+                >
+                  <div className="min-w-0">
+                    <p
+                      className="truncate text-sm font-medium"
+                      title={order.customerDisplay}
+                    >
+                      {order.customerDisplay}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {order.createdAt
+                        ? getDateFormatter(new Date(order.createdAt), 'MMM d')
+                        : '—'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-medium">
+                    {formatCents(order.amountChargedCents)}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

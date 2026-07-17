@@ -38,6 +38,7 @@ export { getEventDetail, listPublicEvents } from './services/events';
 export { getDashboard } from './services/organizer-dashboard';
 export { listOrganizerEvents } from './services/organizer-events';
 export { getEventOverview } from './services/organizer-event-overview';
+export { listEventOrders, getOrderDetail } from './services/organizer-orders';
 export {
   ensureOrganizationForUser,
   backfillOrganizations,
