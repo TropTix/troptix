@@ -44,8 +44,8 @@ interface TicketType {
   price: number;
   quantity: number;
   quantitySold: number | null;
-  saleStartDate: Date;
-  saleEndDate: Date;
+  saleStartsAt: Date;
+  saleEndsAt: Date;
 }
 
 const priceFilterFn: FilterFn<TicketType> = (row, columnId, filterValue) => {
@@ -103,10 +103,10 @@ const createColumns = (isMobile: boolean): ColumnDef<TicketType>[] => [
     },
   },
   {
-    accessorKey: 'saleStartDate',
+    accessorKey: 'saleStartsAt',
     header: 'Sale Starts',
     cell: ({ row }) => {
-      const date = row.getValue('saleStartDate') as Date;
+      const date = row.getValue('saleStartsAt') as Date;
       return <div>{date.toLocaleDateString()}</div>;
     },
     meta: {
@@ -114,10 +114,10 @@ const createColumns = (isMobile: boolean): ColumnDef<TicketType>[] => [
     },
   },
   {
-    accessorKey: 'saleEndDate',
+    accessorKey: 'saleEndsAt',
     header: 'Sale Ends',
     cell: ({ row }) => {
-      const date = row.getValue('saleEndDate') as Date;
+      const date = row.getValue('saleEndsAt') as Date;
       return <div>{date.toLocaleDateString()}</div>;
     },
     meta: {
@@ -129,10 +129,10 @@ const createColumns = (isMobile: boolean): ColumnDef<TicketType>[] => [
     header: 'Status',
     accessorFn: (row) => {
       const now = new Date();
-      const startDate = row.saleStartDate;
-      const endDate = row.saleEndDate;
-      if (now < startDate) return 'Upcoming';
-      if (now > endDate) return 'Ended';
+      const startsAt = row.saleStartsAt;
+      const endsAt = row.saleEndsAt;
+      if (now < startsAt) return 'Upcoming';
+      if (now > endsAt) return 'Ended';
       return 'On Sale';
     },
     filterFn: 'equalsString',
@@ -263,8 +263,8 @@ function MobileCardView({
                     </div>
                     <div className="text-sm text-muted-foreground px-3 py-1 bg-muted rounded-md inline-block max-w-fit">
                       <span className="truncate">
-                        {ticket.saleStartDate.toLocaleDateString()} -{' '}
-                        {ticket.saleEndDate.toLocaleDateString()}
+                        {ticket.saleStartsAt.toLocaleDateString()} -{' '}
+                        {ticket.saleEndsAt.toLocaleDateString()}
                       </span>
                     </div>
                   </div>
@@ -384,8 +384,8 @@ export default function TicketTableWrapper({
   // Get ticket status
   const getTicketStatus = (ticket: TicketType) => {
     const now = new Date();
-    if (now < ticket.saleStartDate) return 'Upcoming';
-    if (now > ticket.saleEndDate) return 'Ended';
+    if (now < ticket.saleStartsAt) return 'Upcoming';
+    if (now > ticket.saleEndsAt) return 'Ended';
     return 'On Sale';
   };
 

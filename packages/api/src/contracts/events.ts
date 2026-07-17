@@ -36,8 +36,8 @@ export const eventSummarySchema = z.object({
   name: z.string(),
   /** Stored flyer path (resolved to an absolute URL by the web layer). */
   imageUrl: z.string().nullable(),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
   venue: z.string().nullable(),
   /** Cheapest public tier, integer cents. Null = free / no public tiers. */
   fromPriceCents: z.number().int().nullable(),
@@ -69,8 +69,8 @@ export const eventDetailSchema = z.object({
       website: z.string().nullable(),
     })
     .nullable(),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
   venue: z.string().nullable(),
   address: z.string(),
   latitude: z.number().nullable(),

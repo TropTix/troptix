@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         id: true,
         imageUrl: true,
         name: true,
-        startDate: true,
+        startsAt: true,
         organizer: true,
         venue: true,
         address: true,
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       },
       where: whereClause,
       orderBy: {
-        startDate: 'desc', // Optional: order events by start date
+        startsAt: 'desc', // Optional: order events by start date
       },
     });
 

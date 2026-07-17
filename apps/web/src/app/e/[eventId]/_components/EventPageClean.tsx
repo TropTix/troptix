@@ -215,8 +215,8 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
     };
   }, [imageUrl]);
 
-  const start = new Date(event.startDate);
-  const end = new Date(event.endDate);
+  const start = new Date(event.startsAt);
+  const end = new Date(event.endsAt);
   const heroChip = `${start.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',

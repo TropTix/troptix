@@ -47,6 +47,16 @@ Conventions for Claude Code (and other AI agents) working in this repo.
 - Schema/migration changes go through the flow in [docs/plans/2026-06-migrations-adoption.md](docs/plans/2026-06-migrations-adoption.md) (`yarn db:new` → review SQL → `yarn db:apply`).
 - **When you write a migration, update `supabase/seed.sql` to match it.** That file is the preview-branch init script — it runs on every fresh per-PR preview branch after the migrations, and INSERTs an explicit column list. Keeping it current with the migration is what lets a reviewer actually exercise the schema change on the PR's preview deploy: the seed provides the relevant rows the new/changed columns need. A new NOT NULL / no-default column, or one the reservation/checkout flow reads without a fallback (e.g. `capacity`), MUST be added there or fresh preview branches break. Keep the fixture synthetic — no real/PII data.
 
+## Dates and times
+
+See [ADR 0021](docs/adr/0021-event-times-are-venue-local.md). There is no lint rule for any of this — the convention is the enforcement.
+
+- **An event's times are venue-local.** Start, end, and sale windows are wall-clock times at the venue, shown identically to everyone, labelled with the zone. They render through the shared formatter module, which takes the **event** — never `format()`, `toLocaleDateString/TimeString/String`, or `Intl.DateTimeFormat` on an event's date field.
+- **Operational timestamps** (order placed, check-in, created/updated) are viewer-local and unlabelled. They render through `<LocalTime>`, because a Server Component cannot know the viewer's zone — `format()`/`toLocale*` in an `async` component resolves in the **server's** zone, which is UTC on Vercel. That is the single most common way to get this wrong.
+- **Instants are stored UTC; the zone is stored alongside.** Both halves are needed — an instant alone can't say what "6pm" meant. Never add a column that duplicates either.
+- **The wall clock is the truth, the instant is derived.** Changing an event's venue keeps 6:00pm and moves the instant.
+- A form that reads a time out and writes it back is a **matched pair** — change both halves together or you shift the event by an hour on save.
+
 ## Naming
 
 - ADRs: `NNNN-kebab-slug.md` (4-digit zero-padded, sequential).

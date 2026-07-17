@@ -23,12 +23,10 @@ type Row = {
   reserved: number;
   sold: number;
   priceCents: number | null;
-  saleStartsAt: Date | null;
-  saleEndsAt: Date | null;
   quantity: number;
   price: number;
-  saleStartDate: Date;
-  saleEndDate: Date;
+  saleStartsAt: Date;
+  saleEndsAt: Date;
   event: { isDraft: boolean };
 };
 
@@ -44,12 +42,10 @@ function row(overrides: Partial<Row> = {}): Row {
     reserved: 0,
     sold: 0,
     priceCents: 5000,
-    saleStartsAt: PAST,
-    saleEndsAt: FUTURE,
     quantity: 100,
     price: 50,
-    saleStartDate: PAST,
-    saleEndDate: FUTURE,
+    saleStartsAt: PAST,
+    saleEndsAt: FUTURE,
     event: { isDraft: false },
     ...overrides,
   };
@@ -155,8 +151,6 @@ describe('getCheckoutConfig', () => {
         price: 42,
         capacity: null,
         quantity: 7, // → availability 7, low
-        saleStartsAt: null,
-        saleEndsAt: null,
       })
     );
     expect(ticket.priceCents).toBe(4200);

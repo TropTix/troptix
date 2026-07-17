@@ -23,8 +23,8 @@ interface FetchedTicketType {
   price: number;
   quantity: number;
   quantitySold: number | null;
-  saleStartDate: Date;
-  saleEndDate: Date;
+  saleStartsAt: Date;
+  saleEndsAt: Date;
 }
 
 async function fetchTicketTypes(
@@ -36,7 +36,7 @@ async function fetchTicketTypes(
   try {
     // Verify access first
     await verifyEventAccess(userId, userEmail, eventId);
-    
+
     const ticketTypes = await prisma.ticketTypes.findMany({
       where: {
         eventId: eventId,
@@ -48,8 +48,8 @@ async function fetchTicketTypes(
         price: true,
         quantity: true,
         quantitySold: true,
-        saleStartDate: true,
-        saleEndDate: true,
+        saleStartsAt: true,
+        saleEndsAt: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -97,7 +97,7 @@ function calculateTicketStats(ticketTypes: FetchedTicketType[]) {
   );
   const now = new Date();
   const activeTypes = ticketTypes.filter(
-    (ticket) => now >= ticket.saleStartDate && now <= ticket.saleEndDate
+    (ticket) => now >= ticket.saleStartsAt && now <= ticket.saleEndsAt
   ).length;
 
   return {
@@ -122,7 +122,11 @@ export default async function EventTicketsPage(props: EventTicketsPageProps) {
   if (!user) {
     redirect('/auth/signin');
   }
-  const initialTicketTypes = await fetchTicketTypes(eventId, user.uid, user.email);
+  const initialTicketTypes = await fetchTicketTypes(
+    eventId,
+    user.uid,
+    user.email
+  );
   const eventName = await fetchEventName(eventId, user.uid, user.email);
   const stats = calculateTicketStats(initialTicketTypes);
 

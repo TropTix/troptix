@@ -32,15 +32,15 @@ export async function listPublicEvents(
   const events = await prisma.events.findMany({
     where: {
       isDraft: false,
-      endDate: { gt: new Date() },
+      endsAt: { gt: new Date() },
     },
-    orderBy: { startDate: Prisma.SortOrder.asc },
+    orderBy: { startsAt: Prisma.SortOrder.asc },
     select: {
       id: true,
       name: true,
       imageUrl: true,
-      startDate: true,
-      endDate: true,
+      startsAt: true,
+      endsAt: true,
       venue: true,
       // Cheapest public tier only (a null/empty discount code means public).
       ticketTypes: {
@@ -88,8 +88,8 @@ export async function getEventDetail(
           website: true,
         },
       },
-      startDate: true,
-      endDate: true,
+      startsAt: true,
+      endsAt: true,
       venue: true,
       address: true,
       latitude: true,
@@ -115,9 +115,7 @@ export async function getEventDetail(
           sold: true,
           maxPurchasePerUser: true,
           saleStartsAt: true,
-          saleStartDate: true,
           saleEndsAt: true,
-          saleEndDate: true,
         },
       },
     },
@@ -130,14 +128,13 @@ export async function getEventDetail(
   const now = new Date();
   const tickets: EventTicket[] = event.ticketTypes
     .map((tt) => {
-      // New columns with legacy fallbacks (until the Stage-3 backfill).
+      // New columns with legacy fallbacks (until the Stage-3 backfill). The
+      // sale window needs none — one pair, full timestamps (ADR 0020).
       const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
       const capacity = tt.capacity ?? tt.quantity;
-      const saleStartsAt = tt.saleStartsAt ?? tt.saleStartDate;
-      const saleEndsAt = tt.saleEndsAt ?? tt.saleEndDate;
 
       const availability = Math.max(0, capacity - tt.reserved - tt.sold);
-      const onSale = now >= saleStartsAt && now <= saleEndsAt;
+      const onSale = now >= tt.saleStartsAt && now <= tt.saleEndsAt;
       const maxAllowedToAdd =
         onSale && !event.isDraft
           ? Math.max(0, Math.min(availability, tt.maxPurchasePerUser))
@@ -186,8 +183,8 @@ export async function getEventDetail(
           website: event.organization.website,
         }
       : null,
-    startDate: event.startDate.toISOString(),
-    endDate: event.endDate.toISOString(),
+    startsAt: event.startsAt.toISOString(),
+    endsAt: event.endsAt.toISOString(),
     venue: event.venue,
     address: event.address,
     latitude: event.latitude,

@@ -23,7 +23,7 @@ export default function SuccessTicket({
 
   const qty = tickets.length;
   const poster = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
-  const start = new Date(event.startDate);
+  const start = new Date(event.startsAt);
   const dateLine = `${start.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
