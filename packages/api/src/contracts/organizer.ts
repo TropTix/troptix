@@ -53,8 +53,8 @@ export const dashboardInputSchema = viewAsInputSchema.extend({
 export type DashboardInput = z.infer<typeof dashboardInputSchema>;
 
 /**
- * An event as a card — the shape the dashboard's active-events row renders (and
- * the events list will reuse).
+ * An event as a card — the shape both the dashboard's active-events row and the
+ * events list (Screen B) render, so a card looks the same wherever it appears.
  */
 export const organizerEventSummarySchema = z.object({
   id: z.string(),
