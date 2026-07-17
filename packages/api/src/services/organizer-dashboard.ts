@@ -20,8 +20,10 @@ import type {
 } from '../contracts/organizer';
 import { getEventStatus } from './_shared/eventStatus';
 import {
+  addUtcDays,
   capacityOf,
   customerDisplay,
+  startOfUtcDay,
   toCents,
 } from './_shared/organizerMapping';
 import { isProfileComplete } from './_shared/organizerSetup';
@@ -55,29 +57,9 @@ interface SalesRow {
 }
 
 /**
- * A "day" is UTC, everywhere: the window bounds, `date_trunc` in the sales query
- * (the column is `timestamp` and Prisma writes UTC), and the zero-fill. They're
- * joined by bucket-instant, so a server-local boundary would misalign them.
- */
-function startOfUtcDay(instant: Date): Date {
-  return new Date(
-    Date.UTC(
-      instant.getUTCFullYear(),
-      instant.getUTCMonth(),
-      instant.getUTCDate()
-    )
-  );
-}
-
-function addUtcDays(instant: Date, days: number): Date {
-  const next = new Date(instant);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
-/**
  * Rolling windows, not calendar ones. Short ranges bucket hourly so "today"
- * is a shape rather than a single point.
+ * is a shape rather than a single point. (`startOfUtcDay`/`addUtcDays` are the
+ * shared UTC-day helpers — see organizerMapping.)
  */
 function rangeWindow(range: DashboardRange, now: Date): RangeWindow {
   const startOfToday = startOfUtcDay(now);
