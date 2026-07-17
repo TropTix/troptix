@@ -18,17 +18,17 @@ import type {
   OrganizerEventSummary,
   SalesPoint,
 } from '../contracts/organizer';
-import { getEventStatus } from './_shared/eventStatus';
+import { addUtcDays, startOfUtcDay, toCents } from './_shared/organizerMapping';
 import {
-  capacityOf,
-  customerDisplay,
-  toCents,
-} from './_shared/organizerMapping';
+  eventCardSelect,
+  recentOrdersQuery,
+  toEventSummary,
+  toRecentOrder,
+} from './_shared/organizerReads';
 import { isProfileComplete } from './_shared/organizerSetup';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const ACTIVE_EVENTS_LIMIT = 5;
-const RECENT_ORDERS_LIMIT = 5;
 const DEFAULT_RANGE: DashboardRange = 'month';
 
 /** Postgres `date_trunc` unit — one bucket per point on the chart. */
@@ -55,29 +55,9 @@ interface SalesRow {
 }
 
 /**
- * A "day" is UTC, everywhere: the window bounds, `date_trunc` in the sales query
- * (the column is `timestamp` and Prisma writes UTC), and the zero-fill. They're
- * joined by bucket-instant, so a server-local boundary would misalign them.
- */
-function startOfUtcDay(instant: Date): Date {
-  return new Date(
-    Date.UTC(
-      instant.getUTCFullYear(),
-      instant.getUTCMonth(),
-      instant.getUTCDate()
-    )
-  );
-}
-
-function addUtcDays(instant: Date, days: number): Date {
-  const next = new Date(instant);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
-/**
  * Rolling windows, not calendar ones. Short ranges bucket hourly so "today"
- * is a shape rather than a single point.
+ * is a shape rather than a single point. (`startOfUtcDay`/`addUtcDays` are the
+ * shared UTC-day helpers — see organizerMapping.)
  */
 function rangeWindow(range: DashboardRange, now: Date): RangeWindow {
   const startOfToday = startOfUtcDay(now);
@@ -145,8 +125,13 @@ export async function getDashboard(
 
       // Bucketed in SQL rather than grouping by raw timestamp and folding in JS
       // (which returns ~a row per ticket). Doubles as the tickets-sold total.
+      //
+      // `AT TIME ZONE 'UTC'` re-tags the truncated naive `timestamp` as a
+      // `timestamptz` so node-postgres parses the bucket as a UTC instant. On a
+      // non-UTC host it would otherwise parse in the process zone, and the
+      // UTC-keyed zero-fill in buildSalesSeries would miss every bucket.
       prisma.$queryRaw<SalesRow[]>`
-        SELECT date_trunc(${window.bucket}, t."createdAt") AS at,
+        SELECT date_trunc(${window.bucket}, t."createdAt") AT TIME ZONE 'UTC' AS at,
                count(*)::bigint AS tickets
         FROM "Tickets" t
         JOIN "Orders" o ON o."id" = t."orderId"
@@ -166,38 +151,14 @@ export async function getDashboard(
           isDraft: false,
           endsAt: { gte: startOfToday },
         },
-        select: {
-          id: true,
-          name: true,
-          imageUrl: true,
-          isDraft: true,
-          startsAt: true,
-          endsAt: true,
-          ticketTypes: { select: { capacity: true, quantity: true } },
-          _count: {
-            select: { tickets: { where: { order: { status: 'COMPLETED' } } } },
-          },
-        },
+        select: eventCardSelect,
         orderBy: { startsAt: 'asc' },
         take: ACTIVE_EVENTS_LIMIT,
       }),
 
-      prisma.orders.findMany({
-        where: { status: 'COMPLETED', event: ownedEvents },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          total: true,
-          status: true,
-          createdAt: true,
-        },
-        // Postgres sorts NULLs as larger than any value, so a plain `desc`
-        // means NULLS FIRST — undated legacy orders would lead the rail.
-        // Vestigial today (0 null rows) but the column is still nullable.
-        orderBy: { createdAt: { sort: 'desc', nulls: 'last' } },
-        take: RECENT_ORDERS_LIMIT,
-      }),
+      prisma.orders.findMany(
+        recentOrdersQuery({ status: 'COMPLETED', event: ownedEvents })
+      ),
 
       prisma.organization.findFirst({
         where: { ownerUserId: organizerUserId },
@@ -205,28 +166,12 @@ export async function getDashboard(
       }),
     ]);
 
-  const activeEvents: OrganizerEventSummary[] = activeEventRows.map(
-    (event) => ({
-      id: event.id,
-      name: event.name,
-      imageUrl: event.imageUrl ?? null,
-      startsAt: event.startsAt.toISOString(),
-      sold: event._count.tickets,
-      capacity: event.ticketTypes.reduce(
-        (total, tier) => total + capacityOf(tier),
-        0
-      ),
-      status: getEventStatus(event, now),
-    })
+  const activeEvents: OrganizerEventSummary[] = activeEventRows.map((event) =>
+    toEventSummary(event, now)
   );
 
-  const recentOrders: DashboardRecentOrder[] = recentOrderRows.map((order) => ({
-    id: order.id,
-    customerDisplay: customerDisplay(order),
-    amountChargedCents: toCents(order.total),
-    createdAt: order.createdAt?.toISOString() ?? null,
-    status: order.status,
-  }));
+  const recentOrders: DashboardRecentOrder[] =
+    recentOrderRows.map(toRecentOrder);
 
   return {
     range,

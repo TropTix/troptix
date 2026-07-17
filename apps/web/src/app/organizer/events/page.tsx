@@ -1,12 +1,10 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { listOrganizerEvents } from '@troptix/api/server';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getServerUser } from '@/server/authUser';
-import { userToActor } from '@/server/actor';
+import { requireOrganizerActor } from '@/server/actor';
 import prisma from '@/server/prisma';
 import { EventsList } from './_components/EventsList';
 
@@ -15,13 +13,10 @@ export default async function OrganizerEventsPage({
 }: {
   searchParams: Promise<{ viewAs?: string }>;
 }) {
-  const user = await getServerUser();
-  if (!user) {
-    redirect('/auth/signin');
-  }
+  const actor = await requireOrganizerActor();
 
   const { viewAs } = await searchParams;
-  const events = await listOrganizerEvents(prisma, userToActor(user), {
+  const events = await listOrganizerEvents(prisma, actor, {
     viewAsOrganizerUserId: viewAs,
   });
 

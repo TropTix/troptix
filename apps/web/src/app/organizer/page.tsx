@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { redirect } from 'next/navigation';
 import { getDashboard } from '@troptix/api/server';
 import {
   dashboardRangeSchema,
@@ -23,8 +22,7 @@ import { Progress } from '@/components/ui/progress';
 import { PaidWarningBannerOrganizer } from '@/components/PaidWarningBanner';
 import { formatCents, getDateFormatter } from '@/lib/dateUtils';
 import { DEFAULT_EVENT_IMAGE, eventFlyerUrl } from '@/lib/supabase/storage';
-import { getServerUser } from '@/server/authUser';
-import { userToActor } from '@/server/actor';
+import { requireOrganizerActor } from '@/server/actor';
 import prisma from '@/server/prisma';
 import { RangeSelect } from './_components/RangeSelect';
 import { RANGE_LABELS } from './_components/ranges';
@@ -35,17 +33,14 @@ export default async function OrganizerDashboardPage({
 }: {
   searchParams: Promise<{ viewAs?: string; range?: string }>;
 }) {
-  const user = await getServerUser();
-  if (!user) {
-    redirect('/auth/signin');
-  }
+  const actor = await requireOrganizerActor();
 
   const { viewAs, range: rawRange } = await searchParams;
   // An unknown ?range simply falls back to the service's default.
   const range = dashboardRangeSchema.safeParse(rawRange).data;
 
   // `viewAs` is honored only for a Platform Owner; the service decides.
-  const dashboard = await getDashboard(prisma, userToActor(user), {
+  const dashboard = await getDashboard(prisma, actor, {
     viewAsOrganizerUserId: viewAs,
     range,
   });
