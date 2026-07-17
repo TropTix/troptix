@@ -164,21 +164,21 @@ export async function getDashboard(
         where: {
           ...ownedEvents,
           isDraft: false,
-          endDate: { gte: startOfToday },
+          endsAt: { gte: startOfToday },
         },
         select: {
           id: true,
           name: true,
           imageUrl: true,
           isDraft: true,
-          startDate: true,
-          endDate: true,
+          startsAt: true,
+          endsAt: true,
           ticketTypes: { select: { capacity: true, quantity: true } },
           _count: {
             select: { tickets: { where: { order: { status: 'COMPLETED' } } } },
           },
         },
-        orderBy: { startDate: 'asc' },
+        orderBy: { startsAt: 'asc' },
         take: ACTIVE_EVENTS_LIMIT,
       }),
 
@@ -210,7 +210,7 @@ export async function getDashboard(
       id: event.id,
       name: event.name,
       imageUrl: event.imageUrl ?? null,
-      startsAt: event.startDate.toISOString(),
+      startsAt: event.startsAt.toISOString(),
       sold: event._count.tickets,
       capacity: event.ticketTypes.reduce(
         (total, tier) => total + capacityOf(tier),

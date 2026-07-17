@@ -46,6 +46,17 @@ A free ticket (`price = 0`). Any Organizer can create these — no approval need
 **Paid ticket**:
 A priced ticket (`price > 0`). Creating one requires the owning Organization's `paidTicketingEnabled`. There is no `Event`-level RSVP/paid flag — an event is "paid" simply if it has any Paid ticket; the create-form toggle is a **visibility** affordance over the ticket price field, not stored state. The gate is enforced in the ticket-type write service (application layer, per ADR 0013), **not** a database constraint. Paid tickets can be added to an existing RSVP event later, once approved.
 
+### Time
+
+**Event time zone**:
+The IANA zone (e.g. `America/Jamaica`) an Event's wall-clock times are expressed in. Auto-filled from the venue's coordinates but always an explicit, organizer-overridable field — an online event or a mis-geocoded venue still needs one. _Avoid_: "the event's offset" (`GMT-5` is DST-dependent output derived from the zone and a date, never the stored thing).
+
+**Venue-local**:
+The rule that an Event's own times — start, end, sale windows — are wall-clock times **at the venue**, shown identically to every viewer regardless of where they are. What "6:00pm" means is fixed by the Event time zone. _Avoid_: "local time" unqualified (ambiguous — whose local?).
+
+**Operational timestamp**:
+A moment something happened — order placed, check-in, created/updated. Rendered in the **viewer's** own zone, because it answers "when did this happen to me", not "when should I show up". The counterpart to Venue-local, and never labelled with a zone. _Avoid_: treating these and Event times as one concept.
+
 ### Surfaces
 
 **Organizer Dashboard**:

@@ -47,8 +47,8 @@ const validForm: TicketTypeFormValues = {
   price: 10,
   quantity: 100,
   maxPurchasePerUser: 10,
-  saleStartDate: new Date('2026-08-01T00:00:00Z'),
-  saleEndDate: new Date('2026-08-10T00:00:00Z'),
+  saleStartsAt: new Date('2026-08-01T00:00:00Z'),
+  saleEndsAt: new Date('2026-08-10T00:00:00Z'),
   ticketingFees: 'PASS_TICKET_FEES',
   discountCode: undefined,
 };

@@ -15,8 +15,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { EventCardData, getAllOrganizerEvents } from '../_lib/getEventsData'; // Adjust import path
 
-const formatEventTime = (date: Date | null): string => {
-  if (!date) return '';
+const formatEventTime = (date: Date): string => {
   return date.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -128,12 +127,10 @@ export default async function AllEventsListPage() {
                             </div>
 
                             <p className="text-sm text-muted-foreground mb-1">
-                              {event.startDate.toLocaleDateString('en-US', {
+                              {event.startsAt.toLocaleDateString('en-US', {
                                 dateStyle: 'medium',
                               })}
-                              {event.startTime
-                                ? ` @ ${formatEventTime(event.startTime)}`
-                                : ''}
+                              {` @ ${formatEventTime(event.startsAt)}`}
                             </p>
                             <p className="text-sm text-muted-foreground mb-3">
                               {event.venue}

@@ -6,9 +6,8 @@ import prisma from '@/server/prisma';
 export type EventCardData = {
   id: string;
   name: string;
-  startDate: Date; // Keep as Date object for easier comparison
-  startTime: Date | null; // Keep as Date object
-  endDate: Date; // Keep as Date object
+  startsAt: Date; // Keep as Date object for easier comparison
+  endsAt: Date; // Keep as Date object
   venue: string | null;
   description: string | null; // Keep full description, limit with CSS
   imageUrl: string | null;
@@ -30,9 +29,8 @@ export const getAllOrganizerEvents = async (
     select: {
       id: true,
       name: true,
-      startDate: true,
-      startTime: true,
-      endDate: true, // Needed for status calculation
+      startsAt: true,
+      endsAt: true, // Needed for status calculation
       venue: true,
       description: true,
       imageUrl: true,
@@ -40,7 +38,7 @@ export const getAllOrganizerEvents = async (
     },
     // Initial sort is less critical now as we sort after grouping
     // orderBy: {
-    //   startDate: 'desc',
+    //   startsAt: 'desc',
     // },
   });
   console.log('eventsRaw', eventsRaw);
@@ -54,9 +52,9 @@ export const getAllOrganizerEvents = async (
 
     if (event.isDraft) {
       status = 'Draft';
-    } else if (new Date(event.endDate) < today) {
+    } else if (new Date(event.endsAt) < today) {
       status = 'Past';
-    } else if (new Date(event.startDate) <= today) {
+    } else if (new Date(event.startsAt) <= today) {
       // Starts today or earlier, ends today or later
       status = 'Active';
     } else {
@@ -84,13 +82,11 @@ export const getAllOrganizerEvents = async (
 
   // Sort within groups
   // Upcoming: Soonest first
-  grouped.Upcoming?.sort(
-    (a, b) => a.startDate.getTime() - b.startDate.getTime()
-  );
+  grouped.Upcoming?.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   // Active, Past, Draft: Most recent start date first
-  grouped.Active?.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
-  grouped.Past?.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
-  grouped.Draft?.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+  grouped.Active?.sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+  grouped.Past?.sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+  grouped.Draft?.sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
 
   return grouped;
 };

@@ -53,8 +53,8 @@ async function getOrder(orderId: string) {
             id: true,
             name: true,
             imageUrl: true,
-            startDate: true,
-            endDate: true,
+            startsAt: true,
+            endsAt: true,
             venue: true,
           },
         },
@@ -101,7 +101,7 @@ export default async function OrderDetailsPage(props: {
   }
 
   const now = new Date();
-  const isPastEvent = new Date(order.event.endDate) < now;
+  const isPastEvent = new Date(order.event.endsAt) < now;
 
   if (order.status === OrderStatus.PENDING && !isPastEvent) {
     return (
@@ -167,7 +167,7 @@ export default async function OrderDetailsPage(props: {
               </h2>
               <div className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
                 <CalendarDays className="h-4 w-4 text-muted-foreground/70" />
-                {getDateFormatter(new Date(order.event.startDate))}
+                {getDateFormatter(new Date(order.event.startsAt))}
               </div>
               {order.event.venue && (
                 <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">

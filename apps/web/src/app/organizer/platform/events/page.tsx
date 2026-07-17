@@ -230,13 +230,11 @@ export default async function PlatformEventsPage() {
                       <TableCell>
                         <div className="space-y-1">
                           <div className="text-sm">
-                            {format(event.startDate, 'MMM d, yyyy')}
+                            {format(event.startsAt, 'MMM d, yyyy')}
                           </div>
-                          {event.startTime && (
-                            <div className="text-xs text-muted-foreground">
-                              {format(event.startTime, 'h:mm a')}
-                            </div>
-                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {format(event.startsAt, 'h:mm a')}
+                          </div>
                         </div>
                       </TableCell>
 

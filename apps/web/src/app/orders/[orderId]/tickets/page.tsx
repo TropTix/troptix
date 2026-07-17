@@ -21,8 +21,8 @@ async function getOrderWithTicketsData(orderId: string) {
           event: {
             select: {
               name: true,
-              startDate: true,
-              endDate: true,
+              startsAt: true,
+              endsAt: true,
               venue: true,
               address: true,
               imageUrl: true,
@@ -81,7 +81,7 @@ export default async function OrderTicketsPage(props: OrderTicketsPageProps) {
     event: {
       name: ticket.event.name,
       imageUrl: ticket.event.imageUrl ?? '',
-      startDate: ticket.event.startDate,
+      startsAt: ticket.event.startsAt,
       venue: ticket.event.venue ?? '',
       address: ticket.event.address ?? '',
     },

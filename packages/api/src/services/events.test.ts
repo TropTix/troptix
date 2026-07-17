@@ -24,10 +24,8 @@ type TierRow = {
   reserved: number;
   sold: number;
   maxPurchasePerUser: number;
-  saleStartsAt: Date | null;
-  saleStartDate: Date;
-  saleEndsAt: Date | null;
-  saleEndDate: Date;
+  saleStartsAt: Date;
+  saleEndsAt: Date;
 };
 
 function tier(overrides: Partial<TierRow> = {}): TierRow {
@@ -43,10 +41,8 @@ function tier(overrides: Partial<TierRow> = {}): TierRow {
     reserved: 0,
     sold: 0,
     maxPurchasePerUser: 10,
-    saleStartsAt: null,
-    saleStartDate: PAST,
-    saleEndsAt: null,
-    saleEndDate: FUTURE,
+    saleStartsAt: PAST,
+    saleEndsAt: FUTURE,
     ...overrides,
   };
 }
@@ -75,8 +71,8 @@ function fakeEvent(
     organizer: 'Island Brunch Co.',
     organizerUserId: 'user-1',
     organization: overrides.organization ?? null,
-    startDate: new Date('2026-07-01T18:00:00.000Z'),
-    endDate: new Date('2026-07-01T22:00:00.000Z'),
+    startsAt: new Date('2026-07-01T18:00:00.000Z'),
+    endsAt: new Date('2026-07-01T22:00:00.000Z'),
     venue: "Omar's Kitchen",
     address: '171 Ludlow St, New York, NY',
     latitude: 40.72,
@@ -149,8 +145,8 @@ describe('getEventDetail', () => {
   it('serializes dates to ISO strings', async () => {
     const prisma = fakePrisma(fakeEvent());
     const result = await getEventDetail(prisma, { eventId: 'ev-1' });
-    expect(result.startDate).toBe('2026-07-01T18:00:00.000Z');
-    expect(result.endDate).toBe('2026-07-01T22:00:00.000Z');
+    expect(result.startsAt).toBe('2026-07-01T18:00:00.000Z');
+    expect(result.endsAt).toBe('2026-07-01T22:00:00.000Z');
   });
 
   it('throws NotFoundError when the event does not exist', async () => {
@@ -167,8 +163,8 @@ type SummaryRow = {
   id: string;
   name: string;
   imageUrl: string | null;
-  startDate: Date;
-  endDate: Date;
+  startsAt: Date;
+  endsAt: Date;
   venue: string | null;
   ticketTypes: SummaryTier[];
 };
@@ -178,8 +174,8 @@ function summaryRow(overrides: Partial<SummaryRow> = {}): SummaryRow {
     id: 'ev-1',
     name: 'Rum Punch Brunch',
     imageUrl: 'flyer.jpg',
-    startDate: new Date('2026-07-01T18:00:00.000Z'),
-    endDate: new Date('2026-07-01T22:00:00.000Z'),
+    startsAt: new Date('2026-07-01T18:00:00.000Z'),
+    endsAt: new Date('2026-07-01T22:00:00.000Z'),
     venue: "Omar's Kitchen",
     ticketTypes: [{ priceCents: 2500, price: 25 }],
     ...overrides,
@@ -208,8 +204,8 @@ describe('listPublicEvents', () => {
     expect(result[0]).toMatchObject({
       id: 'a',
       fromPriceCents: 2500,
-      startDate: '2026-07-01T18:00:00.000Z',
-      endDate: '2026-07-01T22:00:00.000Z',
+      startsAt: '2026-07-01T18:00:00.000Z',
+      endsAt: '2026-07-01T22:00:00.000Z',
     });
     expect(result[1]).toMatchObject({
       id: 'b',

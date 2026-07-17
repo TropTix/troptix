@@ -93,8 +93,8 @@ export default function EventForm({
       // Use initialData if provided, otherwise default
       eventName: '',
       description: '',
-      startDate: tomorrow,
-      endDate: nextDay,
+      startsAt: tomorrow,
+      endsAt: nextDay,
       venue: '',
       address: '',
       country: '',
@@ -286,8 +286,8 @@ export default function EventForm({
                 name: form.watch('eventName'),
                 description: form.watch('description'),
                 organizer: organizationName ?? '',
-                startDate: form.watch('startDate'),
-                endDate: form.watch('endDate'),
+                startsAt: form.watch('startsAt'),
+                endsAt: form.watch('endsAt'),
                 venue: form.watch('venue'),
                 address: form.watch('address'),
                 imageUrl: form.watch('imageUrl'),
@@ -297,8 +297,8 @@ export default function EventForm({
                     price: ticket.price,
                     quantity: ticket.quantity,
                     maxPurchasePerUser: ticket.maxPurchasePerUser,
-                    saleStartDate: ticket.saleStartDate,
-                    saleEndDate: ticket.saleEndDate,
+                    saleStartsAt: ticket.saleStartsAt,
+                    saleEndsAt: ticket.saleEndsAt,
                   })) || [],
               }}
             />
@@ -383,7 +383,7 @@ export default function EventForm({
                     <div className="flex flex-col gap-4">
                       <FormField
                         control={form.control}
-                        name="startDate"
+                        name="startsAt"
                         render={({ field }) => (
                           <FormItem className="flex-1">
                             <FormLabel>Start Date</FormLabel>
@@ -428,7 +428,7 @@ export default function EventForm({
                     <div className="flex flex-col gap-4">
                       <FormField
                         control={form.control}
-                        name="endDate"
+                        name="endsAt"
                         render={({ field }) => (
                           <FormItem className="flex-1">
                             <FormLabel>End Date</FormLabel>
@@ -642,7 +642,7 @@ export default function EventForm({
           onSubmit={handleDrawerSubmit} // Parent function to update RHF state
           initialData={currentTicketData} // Pass data for editing/defaults for new
           ticketSchema={ticketTypeSchema} // Pass schema for validation within drawer
-          eventStartDate={form.getValues('startDate')}
+          eventStartDate={form.getValues('startsAt')}
         />
       )}
     </div>

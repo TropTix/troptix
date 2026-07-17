@@ -3,10 +3,10 @@ import { getEventStatus } from './eventStatus';
 
 const now = new Date('2026-07-15T12:00:00Z');
 
-const event = (startDate: string, endDate: string, isDraft = false) => ({
+const event = (startsAt: string, endsAt: string, isDraft = false) => ({
   isDraft,
-  startDate: new Date(startDate),
-  endDate: new Date(endDate),
+  startsAt: new Date(startsAt),
+  endsAt: new Date(endsAt),
 });
 
 describe('getEventStatus', () => {

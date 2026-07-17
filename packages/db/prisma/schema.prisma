@@ -271,17 +271,11 @@ model Events {
   // keys on organizerUserId (dual-written == organization.ownerUserId).
   organizationId  String?
 
-  // Date and Time Details
-  startDate DateTime
-  startTime DateTime?
-  endDate   DateTime
-  endTime   DateTime?
-
-  // Reservation rebuild (Phase A — additive). Single DateTime fields (roadmap
-  // 2.10) that fix the sale-window-ignores-time bug; backfilled from the split
-  // columns, replace them in cleanup.
-  startsAt DateTime?
-  endsAt   DateTime?
+  // Date and Time Details. Full timestamps — the event form folds the time
+  // input into these before submitting, so there is no separate time column
+  // and no separate atomic column (ADR 0020).
+  startsAt DateTime
+  endsAt   DateTime
 
   // Location Details
   venue       String?
@@ -334,16 +328,11 @@ model TicketTypes {
   reserved Int  @default(0) // held by active, unexpired reservations
   sold     Int  @default(0) // confirmed/paid (← quantitySold)
 
-  // Sale Date Details
-  saleStartDate DateTime
-  saleStartTime DateTime?
-  saleEndDate   DateTime
-  saleEndTime   DateTime?
-
-  // Single DateTime sale-window fields (roadmap 2.10), backfilled from the
-  // split columns; fix the sale-window-ignores-time bug. Replace them in cleanup.
-  saleStartsAt DateTime?
-  saleEndsAt   DateTime?
+  // Sale Date Details. Full timestamps — the ticket form folds the time input
+  // into these before submitting, so there is no separate time column and no
+  // separate atomic column (ADR 0020).
+  saleStartsAt DateTime
+  saleEndsAt   DateTime
 
   // Price Details
   price         Float

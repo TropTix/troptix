@@ -21,7 +21,7 @@ export type TicketInfo = {
   event: {
     name: string;
     imageUrl: string;
-    startDate: Date;
+    startsAt: Date;
     venue: string;
     address: string;
   };
@@ -153,7 +153,7 @@ export default function TicketDisplayManager({
           </h1>
           <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
             <CalendarDays className="h-4 w-4" />
-            {formatDate(ticket.event.startDate)}
+            {formatDate(ticket.event.startsAt)}
           </p>
           {(ticket.event.venue || ticket.event.address) && (
             <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-muted-foreground">

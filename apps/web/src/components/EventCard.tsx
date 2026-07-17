@@ -21,7 +21,7 @@ function getRelativeDate(eventDate: Date, now: Date) {
 }
 
 export default function EventCard({ event }: { event: EventSummary }) {
-  const eventDate = new Date(event.startDate);
+  const eventDate = new Date(event.startsAt);
   const now = new Date();
 
   const displayImageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;

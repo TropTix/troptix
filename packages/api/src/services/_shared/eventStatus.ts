@@ -3,10 +3,8 @@
  * so the events list and the event detail can't disagree (they used to compute
  * it separately). `now` is injectable for tests.
  *
- * Reads `startDate`/`endDate`, NOT the reservation-era `startsAt`/`endsAt`:
- * those were backfilled once and are written by nothing (`createEvent` leaves
- * them null, `updateEvent` leaves them stale), so the legacy columns are the
- * maintained source of truth. Revisit when roadmap 2.10 wires the writes.
+ * `startsAt`/`endsAt` are full timestamps — the event form folds the time input
+ * into them before submitting (see ADR 0020).
  */
 import type { EventStatus } from '../../contracts/organizer';
 
@@ -17,11 +15,11 @@ import type { EventStatus } from '../../contracts/organizer';
  * - `Past`     — published, already ended.
  */
 export function getEventStatus(
-  event: { isDraft: boolean; startDate: Date; endDate: Date },
+  event: { isDraft: boolean; startsAt: Date; endsAt: Date },
   now: Date = new Date()
 ): EventStatus {
   if (event.isDraft) return 'Draft';
-  if (now < event.startDate) return 'Upcoming';
-  if (now > event.endDate) return 'Past';
+  if (now < event.startsAt) return 'Upcoming';
+  if (now > event.endsAt) return 'Past';
   return 'Active';
 }

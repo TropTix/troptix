@@ -28,8 +28,8 @@ beforeAll(async () => {
       description: 'Fixture for payments.test.ts',
       organizer: 'Test Org',
       organizerUserId: 'test-organizer',
-      startDate: new Date(),
-      endDate: new Date(Date.now() + 86_400_000),
+      startsAt: new Date(),
+      endsAt: new Date(Date.now() + 86_400_000),
       address: '123 Test St',
     },
   });
@@ -55,8 +55,8 @@ async function makeTicketType(capacity: number, priceCents = 1000) {
       capacity,
       price: priceCents / 100,
       priceCents,
-      saleStartDate: new Date(Date.now() - 86_400_000),
-      saleEndDate: new Date(Date.now() + 86_400_000),
+      saleStartsAt: new Date(Date.now() - 86_400_000),
+      saleEndsAt: new Date(Date.now() + 86_400_000),
       event: { connect: { id: TEST_EVENT_ID } },
     },
   });

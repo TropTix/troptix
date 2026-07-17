@@ -1,7 +1,10 @@
 import prisma from '@/server/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest, props: { params: Promise<{ eventId: string }> }) {
+export async function GET(
+  request: NextRequest,
+  props: { params: Promise<{ eventId: string }> }
+) {
   const params = await props.params;
   const { eventId } = params;
 
@@ -17,7 +20,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ event
       select: {
         id: true,
         name: true,
-        startDate: true,
+        startsAt: true,
         organizer: true,
         address: true,
       },
