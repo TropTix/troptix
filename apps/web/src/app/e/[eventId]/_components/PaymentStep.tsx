@@ -38,7 +38,7 @@ function OrderSummary({
   event: EventDetail;
   summary: PaymentSummary;
 }) {
-  const start = new Date(event.startDate);
+  const start = new Date(event.startsAt);
   const dateLine = `${start.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',

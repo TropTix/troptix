@@ -29,7 +29,7 @@ type UserOrder = {
     venue: string | null;
     address: string | null;
     imageUrl: string | null;
-    startDate: Date;
+    startsAt: Date;
   } | null;
   _count: {
     tickets: number;
@@ -59,7 +59,7 @@ async function fetchUserOrders(): Promise<UserOrder[]> {
             venue: true,
             address: true,
             imageUrl: true,
-            startDate: true,
+            startsAt: true,
             createdAt: true,
           },
         },
@@ -71,7 +71,7 @@ async function fetchUserOrders(): Promise<UserOrder[]> {
       },
       orderBy: {
         event: {
-          startDate: 'desc',
+          startsAt: 'desc',
         },
       },
     });
@@ -83,8 +83,8 @@ async function fetchUserOrders(): Promise<UserOrder[]> {
 }
 
 function toCardProps(order: UserOrder) {
-  const eventDate = order.event?.startDate
-    ? new Date(order.event.startDate)
+  const eventDate = order.event?.startsAt
+    ? new Date(order.event.startsAt)
     : null;
   const now = new Date();
   const isPastEvent = eventDate ? eventDate < now : false;
@@ -111,7 +111,7 @@ export default async function OrdersPage() {
   const orders = await fetchUserOrders();
   const now = new Date().getTime();
   const startMs = (o: UserOrder) =>
-    o.event?.startDate ? new Date(o.event.startDate).getTime() : 0;
+    o.event?.startsAt ? new Date(o.event.startsAt).getTime() : 0;
 
   // Upcoming leads (soonest first — the ticket you're about to use); past trails.
   const upcoming = orders

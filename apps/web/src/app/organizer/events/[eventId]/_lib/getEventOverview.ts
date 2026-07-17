@@ -10,10 +10,8 @@ interface EventInfo {
   status: 'draft' | 'published' | 'live' | 'ended';
   createdAt: Date;
   updatedAt: Date;
-  startDate: Date;
-  startTime: Date | null;
-  endDate: Date | null;
-  endTime: Date | null;
+  startsAt: Date;
+  endsAt: Date | null;
   venue: string | null;
   address: string | null;
 }
@@ -80,14 +78,14 @@ export interface EventOverview {
 // Helper function to determine event status
 function getEventStatus(
   isDraft: boolean,
-  startDate: Date,
-  endDate: Date | null
+  startsAt: Date,
+  endsAt: Date | null
 ): EventInfo['status'] {
   if (isDraft) return 'draft';
 
   const now = new Date();
-  const eventStart = new Date(startDate);
-  const eventEnd = endDate ? new Date(endDate) : null;
+  const eventStart = new Date(startsAt);
+  const eventEnd = endsAt ? new Date(endsAt) : null;
 
   if (now < eventStart) return 'published';
   if (eventEnd && now > eventEnd) return 'ended';
@@ -96,12 +94,12 @@ function getEventStatus(
 
 // Helper function to calculate days until event
 function getDaysUntilEvent(
-  startDate: Date,
-  endDate: Date | null
+  startsAt: Date,
+  endsAt: Date | null
 ): EventTiming['daysUntilEvent'] {
   const now = new Date();
-  const eventStart = new Date(startDate);
-  const eventEnd = endDate ? new Date(endDate) : null;
+  const eventStart = new Date(startsAt);
+  const eventEnd = endsAt ? new Date(endsAt) : null;
 
   if (eventEnd && now > eventEnd) return 'ended';
   if (now >= eventStart && (!eventEnd || now <= eventEnd)) return 'live';
@@ -199,15 +197,13 @@ export async function getEventOverview(
     name: eventData.name,
     status: getEventStatus(
       eventData.isDraft,
-      eventData.startDate,
-      eventData.endDate
+      eventData.startsAt,
+      eventData.endsAt
     ),
     createdAt: eventData.createdAt,
     updatedAt: eventData.updatedAt,
-    startDate: eventData.startDate,
-    startTime: eventData.startTime,
-    endDate: eventData.endDate,
-    endTime: eventData.endTime,
+    startsAt: eventData.startsAt,
+    endsAt: eventData.endsAt,
     venue: eventData.venue,
     address: eventData.address,
   };
@@ -258,8 +254,8 @@ export async function getEventOverview(
 
   // Process timing data
   const daysUntilEvent = getDaysUntilEvent(
-    eventData.startDate,
-    eventData.endDate
+    eventData.startsAt,
+    eventData.endsAt
   );
   const eventPhase: EventTiming['eventPhase'] =
     daysUntilEvent === 'ended'

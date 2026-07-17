@@ -207,13 +207,13 @@ export async function getOrganizationBySlug(
       verified: true,
       events: {
         where: { isDraft: false },
-        orderBy: { startDate: 'asc' },
+        orderBy: { startsAt: 'asc' },
         select: {
           id: true,
           name: true,
           imageUrl: true,
-          startDate: true,
-          endDate: true,
+          startsAt: true,
+          endsAt: true,
           venue: true,
           ticketTypes: {
             where: {
@@ -239,10 +239,10 @@ export async function getOrganizationBySlug(
   const upcomingEvents: EventSummary[] = [];
   const pastEvents: EventSummary[] = [];
   for (const event of org.events) {
-    const bucket = event.endDate.getTime() > now ? upcomingEvents : pastEvents;
+    const bucket = event.endsAt.getTime() > now ? upcomingEvents : pastEvents;
     bucket.push(toEventSummary(event));
   }
-  pastEvents.reverse(); // fetched startDate asc → most-recent past first
+  pastEvents.reverse(); // fetched startsAt asc → most-recent past first
 
   return {
     slug: org.slug,

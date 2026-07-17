@@ -15,8 +15,8 @@ export interface EventForValidation {
   name: string | null;
   description: string | null;
   organizer: string | null;
-  startDate: Date | null;
-  endDate: Date | null;
+  startsAt: Date | null;
+  endsAt: Date | null;
   venue: string | null;
   address: string | null;
   imageUrl: string | null;
@@ -25,8 +25,8 @@ export interface EventForValidation {
     price: number;
     quantity: number;
     maxPurchasePerUser: number;
-    saleStartDate: Date;
-    saleEndDate: Date;
+    saleStartsAt: Date;
+    saleEndsAt: Date;
   }>;
 }
 
@@ -93,28 +93,28 @@ export function validateEventForPublish(
   }
 
   // Date and Timing Validation
-  if (!event.startDate) {
+  if (!event.startsAt) {
     errors.push({
-      field: 'startDate',
+      field: 'startsAt',
       message: 'Event start date is required',
       category: 'timing',
     });
     missingRequirements.push('Event start date');
   }
 
-  if (!event.endDate) {
+  if (!event.endsAt) {
     errors.push({
-      field: 'endDate',
+      field: 'endsAt',
       message: 'Event end date is required',
       category: 'timing',
     });
     missingRequirements.push('Event end date');
   }
 
-  if (event.startDate && event.endDate) {
-    if (event.endDate <= event.startDate) {
+  if (event.startsAt && event.endsAt) {
+    if (event.endsAt <= event.startsAt) {
       errors.push({
-        field: 'endDate',
+        field: 'endsAt',
         message: 'Event end date must be after start date',
         category: 'timing',
       });
@@ -123,9 +123,9 @@ export function validateEventForPublish(
 
     // Check if event is in the past
     const now = new Date();
-    if (event.endDate <= now) {
+    if (event.endsAt <= now) {
       errors.push({
-        field: 'endDate',
+        field: 'endsAt',
         message: 'Event end date must be in the future',
         category: 'timing',
       });
@@ -198,9 +198,9 @@ export function validateEventForPublish(
       }
 
       // Validate ticket sale dates
-      if (ticket.saleEndDate <= ticket.saleStartDate) {
+      if (ticket.saleEndsAt <= ticket.saleStartsAt) {
         errors.push({
-          field: `ticketTypes[${index}].saleEndDate`,
+          field: `ticketTypes[${index}].saleEndsAt`,
           message: `Ticket "${ticket.name || 'Unnamed'}" sale end date must be after sale start date`,
           category: 'tickets',
         });
@@ -210,9 +210,9 @@ export function validateEventForPublish(
       }
 
       // Check if ticket sales end before or at event start
-      if (event.endDate && ticket.saleEndDate > event.endDate) {
+      if (event.endsAt && ticket.saleEndsAt > event.endsAt) {
         errors.push({
-          field: `ticketTypes[${index}].saleEndDate`,
+          field: `ticketTypes[${index}].saleEndsAt`,
           message: `Ticket "${ticket.name || 'Unnamed'}" sales should end before or at event end `,
           category: 'tickets',
         });

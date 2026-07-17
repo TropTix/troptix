@@ -216,8 +216,8 @@ describe('getOrganizationBySlug', () => {
       id,
       name: id,
       imageUrl: null,
-      startDate: new Date(Date.now() + startDays * DAY),
-      endDate: new Date(Date.now() + endDays * DAY),
+      startsAt: new Date(Date.now() + startDays * DAY),
+      endsAt: new Date(Date.now() + endDays * DAY),
       venue: 'The Deck',
       ticketTypes: tier ? [tier] : [],
     };
@@ -251,7 +251,7 @@ describe('getOrganizationBySlug', () => {
   });
 
   it('splits events into upcoming (soonest first) and past (most-recent first)', async () => {
-    // provided startDate-asc, as the query returns them
+    // provided startsAt-asc, as the query returns them
     const prisma = fakePrisma([
       ev('past-old', -10, -9),
       ev('past-recent', -3, -2),

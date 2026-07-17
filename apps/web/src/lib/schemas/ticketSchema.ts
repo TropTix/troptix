@@ -21,16 +21,16 @@ export const ticketTypeSchema = z
       .number({ invalid_type_error: 'Max purchase must be a number.' })
       .int({ message: 'Max purchase must be a whole number.' })
       .positive({ message: 'Max purchase must be greater than zero.' }),
-    saleStartDate: z.date({
+    saleStartsAt: z.date({
       required_error: 'Sale start date is required.',
     }),
-    saleEndDate: z.date({ required_error: 'Sale end date is required.' }),
+    saleEndsAt: z.date({ required_error: 'Sale end date is required.' }),
     ticketingFees: TicketFeeStructure,
     discountCode: z.string().optional(),
   })
-  .refine((data) => data.saleEndDate > data.saleStartDate, {
+  .refine((data) => data.saleEndsAt > data.saleStartsAt, {
     message: 'Sale end date must be after the start date.',
-    path: ['saleEndDate'], // Associate error with the end date field
+    path: ['saleEndsAt'], // Associate error with the end date field
   });
 
 // Type inferred from the schema

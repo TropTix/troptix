@@ -33,8 +33,8 @@ export function PublishRequirements({
     name: eventData.name || null,
     description: eventData.description || null,
     organizer: eventData.organizer || null,
-    startDate: eventData.startDate || null,
-    endDate: eventData.endDate || null,
+    startsAt: eventData.startsAt || null,
+    endsAt: eventData.endsAt || null,
     venue: eventData.venue || null,
     address: eventData.address || null,
     imageUrl: eventData.imageUrl || null,
@@ -92,27 +92,27 @@ export function PublishRequirements({
       items: [
         {
           label: 'Start Date',
-          field: 'startDate',
-          completed: !!eventData.startDate,
+          field: 'startsAt',
+          completed: !!eventData.startsAt,
         },
         {
           label: 'End Date',
-          field: 'endDate',
-          completed: !!eventData.endDate,
+          field: 'endsAt',
+          completed: !!eventData.endsAt,
         },
         {
           label: 'Valid Date Range',
           field: 'dateRange',
           completed: !!(
-            eventData.startDate &&
-            eventData.endDate &&
-            eventData.endDate > eventData.startDate
+            eventData.startsAt &&
+            eventData.endsAt &&
+            eventData.endsAt > eventData.startsAt
           ),
         },
         {
           label: 'Future Event Date',
           field: 'futureDate',
-          completed: !!(eventData.endDate && eventData.endDate > new Date()),
+          completed: !!(eventData.endsAt && eventData.endsAt > new Date()),
         },
       ],
     },

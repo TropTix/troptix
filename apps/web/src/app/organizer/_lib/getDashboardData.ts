@@ -45,7 +45,7 @@ export const getOrganizerDashboardDataOptimized = async (
       where: {
         organizerUserId: organizerUserId,
         isDraft: false,
-        endDate: { gte: today }, // endDate is today or later
+        endsAt: { gte: today }, // endsAt is today or later
       },
     }),
 
@@ -72,13 +72,13 @@ export const getOrganizerDashboardDataOptimized = async (
       where: {
         organizerUserId: organizerUserId,
         isDraft: false,
-        endDate: { gte: today },
+        endsAt: { gte: today },
       },
       select: {
         // Select only needed fields
         id: true,
         name: true,
-        startDate: true,
+        startsAt: true,
         ticketTypes: { select: { quantity: true } }, // For capacity calculation
         _count: {
           // Count tickets linked to completed orders for THIS event
@@ -88,7 +88,7 @@ export const getOrganizerDashboardDataOptimized = async (
         },
       },
       take: 5, // Limit results for the dashboard preview
-      orderBy: { startDate: 'asc' }, // Show upcoming active events first
+      orderBy: { startsAt: 'asc' }, // Show upcoming active events first
     }),
 
     prisma.orders.findMany({
@@ -150,7 +150,7 @@ export const getOrganizerDashboardDataOptimized = async (
     return {
       id: event.id,
       name: event.name,
-      date: event.startDate.toISOString().split('T')[0],
+      date: event.startsAt.toISOString().split('T')[0],
       ticketsSold: sold,
       capacity: capacity,
       status: 'Active', // Derived from the query filter

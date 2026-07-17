@@ -125,14 +125,7 @@ export default async function EventOverviewPage(props: {
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
-                  <span>
-                    {format(eventData.event.startDate, 'PPP')}
-                    {eventData.event.startTime && (
-                      <span className="ml-1">
-                        at {format(eventData.event.startTime, 'p')}
-                      </span>
-                    )}
-                  </span>
+                  <span>{format(eventData.event.startsAt, "PPP 'at' p")}</span>
                 </div>
 
                 {eventData.event.venue && (

@@ -29,8 +29,8 @@ export async function getEvents(prisma: PrismaClient, actor: Actor) {
     select: {
       id: true,
       name: true,
-      startDate: true,
-      endDate: true,
+      startsAt: true,
+      endsAt: true,
       venue: true,
       address: true,
       imageUrl: true,
@@ -43,14 +43,14 @@ export async function getEvents(prisma: PrismaClient, actor: Actor) {
         },
       },
     },
-    orderBy: { startDate: 'desc' },
+    orderBy: { startsAt: 'desc' },
   });
 
   return events.map((e) => ({
     id: e.id,
     name: e.name,
-    startDate: e.startDate,
-    endDate: e.endDate,
+    startsAt: e.startsAt,
+    endsAt: e.endsAt,
     venue: e.venue ?? '',
     address: e.address,
     imageUrl: e.imageUrl ?? null,
@@ -88,7 +88,7 @@ export async function getEvent(
   return {
     id: event.id,
     name: event.name,
-    date: event.startDate,
+    date: event.startsAt,
     venue: event.venue ?? '',
     city: event.address?.split(',')[1]?.trim() ?? '', // Simple fallback for city
     guests: event.tickets.map((t) => ({

@@ -79,7 +79,7 @@ export const checkoutTicketSchema = z.object({
   description: z.string(),
   /** Integer cents (← `priceCents`). */
   priceCents: z.number().int(),
-  /** ISO-8601 string of the single-DateTime sale window start (← `saleStartsAt`). */
+  /** ISO-8601 sale-window bounds — same names as the columns (ADR 0020). */
   saleStartsAt: z.string().datetime(),
   saleEndsAt: z.string().datetime(),
   /** Quantity the buyer may add now — clamped to availability, max-per-user, sale window, draft state. */

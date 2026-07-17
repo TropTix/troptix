@@ -11,25 +11,20 @@ export type EventStatus = 'Draft' | 'Upcoming' | 'Active' | 'Past';
  * - `Active`   — published, currently running (start ≤ now ≤ end).
  * - `Past`     — published, already ended.
  *
- * Prefers the reservation-era `startsAt`/`endsAt` single-DateTime columns,
- * falling back to the legacy split `startDate`/`endDate` until the backfill.
+ * `startsAt`/`endsAt` are full timestamps — the event form folds the time
+ * input into them before submitting (see ADR 0020).
  */
 export function getEventStatus(
   event: {
     isDraft: boolean;
-    startsAt?: Date | null;
-    endsAt?: Date | null;
-    startDate: Date;
-    endDate: Date;
+    startsAt: Date;
+    endsAt: Date;
   },
   now: Date = new Date()
 ): EventStatus {
   if (event.isDraft) return 'Draft';
 
-  const start = event.startsAt ?? event.startDate;
-  const end = event.endsAt ?? event.endDate;
-
-  if (now < start) return 'Upcoming';
-  if (now > end) return 'Past';
+  if (now < event.startsAt) return 'Upcoming';
+  if (now > event.endsAt) return 'Past';
   return 'Active';
 }
