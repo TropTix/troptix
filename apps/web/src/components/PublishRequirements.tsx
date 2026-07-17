@@ -137,7 +137,7 @@ export function PublishRequirements({
                 ticket.name &&
                 ticket.name.length >= 3 &&
                 ticket.price >= 0 &&
-                ticket.quantity > 0 &&
+                ticket.capacity > 0 &&
                 ticket.maxPurchasePerUser > 0
             )
           ),

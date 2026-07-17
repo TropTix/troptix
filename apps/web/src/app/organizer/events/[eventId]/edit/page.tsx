@@ -24,7 +24,7 @@ async function getEvent(eventId: string, userId: string, userEmail?: string) {
           select: {
             name: true,
             price: true,
-            quantity: true,
+            capacity: true,
             description: true,
             maxPurchasePerUser: true,
             saleStartsAt: true,

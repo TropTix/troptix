@@ -110,7 +110,6 @@ export async function getEventDetail(
           price: true,
           ticketingFees: true,
           capacity: true,
-          quantity: true,
           reserved: true,
           sold: true,
           maxPurchasePerUser: true,
@@ -128,12 +127,10 @@ export async function getEventDetail(
   const now = new Date();
   const tickets: EventTicket[] = event.ticketTypes
     .map((tt) => {
-      // New columns with legacy fallbacks (until the Stage-3 backfill). The
-      // sale window needs none — one pair, full timestamps (ADR 0020).
+      // priceCents falls back to price * 100; the sale window needs no fallback
+      // — one pair, full timestamps (ADR 0020).
       const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
-      const capacity = tt.capacity ?? tt.quantity;
-
-      const availability = Math.max(0, capacity - tt.reserved - tt.sold);
+      const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
       const onSale = now >= tt.saleStartsAt && now <= tt.saleEndsAt;
       const maxAllowedToAdd =
         onSale && !event.isDraft

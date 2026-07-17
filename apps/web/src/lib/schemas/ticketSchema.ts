@@ -13,7 +13,7 @@ export const ticketTypeSchema = z
       .multipleOf(0.01, {
         message: 'Price must have at most 2 decimal places.',
       }),
-    quantity: z.coerce // Coerce input string to number
+    capacity: z.coerce // Coerce input string to number
       .number({ invalid_type_error: 'Quantity must be a number.' })
       .int({ message: 'Quantity must be a whole number.' })
       .positive({ message: 'Quantity must be greater than zero.' }),

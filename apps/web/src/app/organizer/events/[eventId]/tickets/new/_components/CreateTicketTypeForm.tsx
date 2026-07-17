@@ -42,7 +42,7 @@ const defaultFormValues: TicketTypeFormValues = {
   name: '',
   description: '',
   price: 0,
-  quantity: 100,
+  capacity: 100,
   maxPurchasePerUser: 10,
   saleStartsAt: today,
   saleEndsAt: tomorrow,
@@ -210,7 +210,7 @@ export function CreateTicketTypeForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
-            name="quantity"
+            name="capacity"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Quantity Available</FormLabel>

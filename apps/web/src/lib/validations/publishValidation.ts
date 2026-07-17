@@ -23,7 +23,7 @@ export interface EventForValidation {
   ticketTypes: Array<{
     name: string;
     price: number;
-    quantity: number;
+    capacity: number;
     maxPurchasePerUser: number;
     saleStartsAt: Date;
     saleEndsAt: Date;
@@ -175,9 +175,9 @@ export function validateEventForPublish(
         );
       }
 
-      if (ticket.quantity <= 0) {
+      if (ticket.capacity <= 0) {
         errors.push({
-          field: `ticketTypes[${index}].quantity`,
+          field: `ticketTypes[${index}].capacity`,
           message: `Ticket "${ticket.name || 'Unnamed'}" must have a positive quantity`,
           category: 'tickets',
         });

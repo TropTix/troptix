@@ -114,7 +114,7 @@ export default function EventForm({
 
   const handleOpenDrawerForNew = () => {
     setEditingTicketIndex(null);
-    setCurrentTicketData({ name: '', price: 0, quantity: 1 });
+    setCurrentTicketData({ name: '', price: 0, capacity: 1 });
     setIsDrawerOpen(true);
   };
 
@@ -295,7 +295,7 @@ export default function EventForm({
                   ticketTypes?.map((ticket) => ({
                     name: ticket.name,
                     price: ticket.price,
-                    quantity: ticket.quantity,
+                    capacity: ticket.capacity,
                     maxPurchasePerUser: ticket.maxPurchasePerUser,
                     saleStartsAt: ticket.saleStartsAt,
                     saleEndsAt: ticket.saleEndsAt,
@@ -563,7 +563,7 @@ export default function EventForm({
                                 <TableCell>
                                   ${field.price?.toFixed(2)}
                                 </TableCell>
-                                <TableCell>{field.quantity}</TableCell>
+                                <TableCell>{field.capacity}</TableCell>
                                 <TableCell className="text-right space-x-1">
                                   {/* Edit Button -> Opens drawer */}
                                   <Button

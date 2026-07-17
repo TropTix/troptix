@@ -19,8 +19,7 @@ type TierRow = {
   priceCents: number | null;
   price: number;
   ticketingFees: 'PASS_TICKET_FEES' | 'ABSORB_TICKET_FEES';
-  capacity: number | null;
-  quantity: number;
+  capacity: number;
   reserved: number;
   sold: number;
   maxPurchasePerUser: number;
@@ -37,7 +36,6 @@ function tier(overrides: Partial<TierRow> = {}): TierRow {
     price: 25,
     ticketingFees: 'ABSORB_TICKET_FEES',
     capacity: 100,
-    quantity: 100,
     reserved: 0,
     sold: 0,
     maxPurchasePerUser: 10,

@@ -36,7 +36,7 @@ async function getTicketTypeData(
         discountCode: true,
         description: true,
         price: true,
-        quantity: true,
+        capacity: true,
         maxPurchasePerUser: true,
         saleStartsAt: true,
         saleEndsAt: true,

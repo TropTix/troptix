@@ -326,9 +326,8 @@ async function materializeOrder(
   const orderType = isFree ? OrderType.FREE : OrderType.PAID;
   const ticketsType = isFree ? TicketType.FREE : TicketType.PAID;
 
-  // In one pass per item: move reserved → sold (dual-writing the legacy
-  // `quantitySold` until Phase C swaps the dashboard read to `sold`), and build
-  // one VALID ticket row per reserved unit.
+  // In one pass per item: move reserved → sold, and build one VALID ticket row
+  // per reserved unit.
   const ticketRows: Prisma.TicketsCreateManyOrderInput[] = [];
   for (const item of reservation.items) {
     await tx.ticketTypes.update({
@@ -336,7 +335,6 @@ async function materializeOrder(
       data: {
         reserved: { decrement: item.quantity },
         sold: { increment: item.quantity },
-        quantitySold: { increment: item.quantity },
       },
     });
 

@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { generateId } from '@/lib/utils';
-import { reservationColumns } from '@/lib/reservationColumns';
 import { eventFormSchema, EventFormValues } from '@/lib/schemas/eventSchema';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { ensureOrganizationForUser } from '@troptix/api/server';
@@ -82,14 +81,13 @@ export async function createEvent(
                 name: ticket.name,
                 description: ticket.description ?? '',
                 price: ticket.price,
-                quantity: ticket.quantity,
+                priceCents: Math.round(ticket.price * 100),
+                capacity: ticket.capacity,
                 maxPurchasePerUser: ticket.maxPurchasePerUser,
                 saleStartsAt: ticket.saleStartsAt,
                 saleEndsAt: ticket.saleEndsAt,
                 ticketingFees: ticket.ticketingFees,
                 ticketType: ticketTypeEnum,
-                // Reservation-era columns the new checkout reads.
-                ...reservationColumns(ticket),
               },
             });
           })

@@ -45,7 +45,7 @@ const validForm: TicketTypeFormValues = {
   name: 'General Admission',
   description: 'desc',
   price: 10,
-  quantity: 100,
+  capacity: 100,
   maxPurchasePerUser: 10,
   saleStartsAt: new Date('2026-08-01T00:00:00Z'),
   saleEndsAt: new Date('2026-08-10T00:00:00Z'),

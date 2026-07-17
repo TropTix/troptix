@@ -42,8 +42,8 @@ interface TicketType {
   id: string;
   name: string;
   price: number;
-  quantity: number;
-  quantitySold: number | null;
+  capacity: number;
+  sold: number;
   saleStartsAt: Date;
   saleEndsAt: Date;
 }
@@ -97,8 +97,8 @@ const createColumns = (isMobile: boolean): ColumnDef<TicketType>[] => [
     header: 'Sold / Available',
     cell: ({ row }) => {
       const ticket = row.original;
-      const sold = ticket.quantitySold ?? 0;
-      const available = ticket.quantity;
+      const sold = ticket.sold;
+      const available = ticket.capacity;
       return <div>{`${sold} / ${available}`}</div>;
     },
   },
@@ -215,8 +215,8 @@ function MobileCardView({
       <div className="space-y-4">
         {filteredTickets.map((ticket) => {
           const status = getTicketStatus(ticket);
-          const sold = ticket.quantitySold ?? 0;
-          const available = ticket.quantity;
+          const sold = ticket.sold;
+          const available = ticket.capacity;
           const price =
             ticket.price === 0
               ? 'Free'

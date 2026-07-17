@@ -19,11 +19,7 @@ import type {
   SalesPoint,
 } from '../contracts/organizer';
 import { getEventStatus } from './_shared/eventStatus';
-import {
-  capacityOf,
-  customerDisplay,
-  toCents,
-} from './_shared/organizerMapping';
+import { customerDisplay, toCents } from './_shared/organizerMapping';
 import { isProfileComplete } from './_shared/organizerSetup';
 import { resolveOrganizerScope } from './organizer-scope';
 
@@ -173,7 +169,7 @@ export async function getDashboard(
           isDraft: true,
           startsAt: true,
           endsAt: true,
-          ticketTypes: { select: { capacity: true, quantity: true } },
+          ticketTypes: { select: { capacity: true } },
           _count: {
             select: { tickets: { where: { order: { status: 'COMPLETED' } } } },
           },
@@ -213,7 +209,7 @@ export async function getDashboard(
       startsAt: event.startsAt.toISOString(),
       sold: event._count.tickets,
       capacity: event.ticketTypes.reduce(
-        (total, tier) => total + capacityOf(tier),
+        (total, tier) => total + tier.capacity,
         0
       ),
       status: getEventStatus(event, now),

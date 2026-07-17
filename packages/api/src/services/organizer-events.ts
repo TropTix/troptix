@@ -15,7 +15,6 @@ import type {
   ViewAsInput,
 } from '../contracts/organizer';
 import { getEventStatus } from './_shared/eventStatus';
-import { capacityOf } from './_shared/organizerMapping';
 import { resolveOrganizerScope } from './organizer-scope';
 
 export async function listOrganizerEvents(
@@ -39,7 +38,7 @@ export async function listOrganizerEvents(
       isDraft: true,
       startsAt: true,
       endsAt: true,
-      ticketTypes: { select: { capacity: true, quantity: true } },
+      ticketTypes: { select: { capacity: true } },
       _count: {
         select: { tickets: { where: { order: { status: 'COMPLETED' } } } },
       },
@@ -56,7 +55,7 @@ export async function listOrganizerEvents(
     startsAt: event.startsAt.toISOString(),
     sold: event._count.tickets,
     capacity: event.ticketTypes.reduce(
-      (total, tier) => total + capacityOf(tier),
+      (total, tier) => total + tier.capacity,
       0
     ),
     status: getEventStatus(event, now),

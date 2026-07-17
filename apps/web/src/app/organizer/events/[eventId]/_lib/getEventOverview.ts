@@ -153,8 +153,8 @@ export async function getEventOverview(
       ticketTypes: {
         select: {
           name: true,
-          quantity: true,
-          quantitySold: true,
+          capacity: true,
+          sold: true,
           price: true,
         },
       },
@@ -228,15 +228,15 @@ export async function getEventOverview(
     0
   );
   const totalCapacity = eventData.ticketTypes.reduce(
-    (sum, tt) => sum + (tt.quantity || 0),
+    (sum, tt) => sum + tt.capacity,
     0
   );
 
   const ticketTypesWithRevenue = eventData.ticketTypes.map((tt) => ({
     name: tt.name,
-    sold: tt.quantitySold || 0,
-    capacity: tt.quantity || 0,
-    revenue: (tt.quantitySold || 0) * tt.price,
+    sold: tt.sold,
+    capacity: tt.capacity,
+    revenue: tt.sold * tt.price,
   }));
 
   const topSellingType =
