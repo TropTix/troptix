@@ -1,5 +1,9 @@
 import { notFound } from 'next/navigation';
-import { listEventOrders, NotFoundError } from '@troptix/api/server';
+import {
+  listEventOrders,
+  NotFoundError,
+  ORDERS_LIST_LIMIT,
+} from '@troptix/api/server';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { requireOrganizerActor } from '@/server/actor';
@@ -34,8 +38,11 @@ export default async function EventOrdersPage({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
-            {orders.length.toLocaleString()}{' '}
-            {orders.length === 1 ? 'order' : 'orders'}
+            {orders.length >= ORDERS_LIST_LIMIT
+              ? `Latest ${ORDERS_LIST_LIMIT.toLocaleString()} orders`
+              : `${orders.length.toLocaleString()} ${
+                  orders.length === 1 ? 'order' : 'orders'
+                }`}
           </CardTitle>
         </CardHeader>
         <CardContent>

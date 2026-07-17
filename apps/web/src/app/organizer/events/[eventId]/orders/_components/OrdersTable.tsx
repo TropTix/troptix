@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
-import type { EventOrderRow, OrderStatusDto } from '@troptix/api';
+import type { EventOrderRow } from '@troptix/api';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,12 +19,12 @@ import { formatCents, getDateFormatter } from '@/lib/dateUtils';
 import { formatOrderNumber } from '@/lib/utils';
 import StatusBadge from './StatusBadge';
 
-type Filter = 'All' | OrderStatusDto;
-const FILTERS: Filter[] = ['All', 'COMPLETED', 'PENDING', 'CANCELLED'];
+// PENDING is excluded server-side (in-flight checkouts aren't orders to manage).
+type Filter = 'All' | 'COMPLETED' | 'CANCELLED';
+const FILTERS: Filter[] = ['All', 'COMPLETED', 'CANCELLED'];
 const FILTER_LABEL: Record<Filter, string> = {
   All: 'All',
   COMPLETED: 'Completed',
-  PENDING: 'Pending',
   CANCELLED: 'Cancelled',
 };
 

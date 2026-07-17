@@ -19,6 +19,9 @@ import { NotFoundError } from './_shared/errors';
 import { customerDisplay, toCents } from './_shared/organizerMapping';
 import { resolveOrganizerScope } from './organizer-scope';
 
+/** Newest-N cap on the list read. The full set is the CSV export's job. */
+export const ORDERS_LIST_LIMIT = 200;
+
 export async function listEventOrders(
   prisma: PrismaClient,
   actor: Actor,
@@ -40,7 +43,9 @@ export async function listEventOrders(
       select: { id: true },
     }),
     prisma.orders.findMany({
-      where: { eventId, event: ownedEvent },
+      // PENDING is an in-flight/abandoned checkout, not an order to manage —
+      // the list is the terminal states (completed, cancelled).
+      where: { eventId, event: ownedEvent, status: { not: 'PENDING' } },
       select: {
         id: true,
         name: true,
@@ -51,6 +56,7 @@ export async function listEventOrders(
         _count: { select: { tickets: true } },
       },
       orderBy: { createdAt: { sort: 'desc', nulls: 'last' } },
+      take: ORDERS_LIST_LIMIT,
     }),
   ]);
 
@@ -108,6 +114,7 @@ export async function getOrderDetail(
       totalCents: true,
       tickets: {
         select: {
+          subtotal: true,
           ticketType: { select: { id: true, name: true, price: true } },
         },
       },
@@ -152,33 +159,48 @@ function fullName(order: {
   return joined || null;
 }
 
-/** Collapse an order's tickets into one line per tier (quantity × unit price). */
+/**
+ * Collapse an order's tickets into one line per tier. The line subtotal is the
+ * sum of what was actually paid (`Tickets.subtotal`), so the line items
+ * reconcile with the order's subtotal — a deleted or repriced tier can't drift
+ * them apart. Falls back to the tier's list price for legacy tickets that
+ * predate per-ticket subtotals. The unit price is the per-ticket average, which
+ * equals the price when a tier's tickets all cost the same (the common case).
+ */
 function toLineItems(
   tickets: {
+    subtotal: number | null;
     ticketType: { id: string; name: string; price: number } | null;
   }[]
 ): OrderLineItem[] {
   const byTier = new Map<
     string,
-    { name: string; unitPriceCents: number; quantity: number }
+    { name: string; quantity: number; subtotalDollars: number }
   >();
 
   for (const ticket of tickets) {
     const key = ticket.ticketType?.id ?? '__none__';
+    const paid = ticket.subtotal ?? ticket.ticketType?.price ?? 0;
     const existing = byTier.get(key);
     if (existing) {
       existing.quantity += 1;
+      existing.subtotalDollars += paid;
     } else {
       byTier.set(key, {
         name: ticket.ticketType?.name ?? 'Ticket',
-        unitPriceCents: toCents(ticket.ticketType?.price),
         quantity: 1,
+        subtotalDollars: paid,
       });
     }
   }
 
-  return Array.from(byTier.values()).map((item) => ({
-    ...item,
-    subtotalCents: item.unitPriceCents * item.quantity,
-  }));
+  return Array.from(byTier.values()).map((tier) => {
+    const subtotalCents = toCents(tier.subtotalDollars);
+    return {
+      name: tier.name,
+      quantity: tier.quantity,
+      unitPriceCents: Math.round(subtotalCents / tier.quantity),
+      subtotalCents,
+    };
+  });
 }
