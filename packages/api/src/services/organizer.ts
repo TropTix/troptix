@@ -1,3 +1,14 @@
+/**
+ * LEGACY — the mobile-oriented reads for `apps/organizer-v2` only. Frozen: do
+ * not extend, and do not copy `authorizeOrganizer` into new code.
+ *
+ * The web organizer surface uses `organizer-scope.ts` +
+ * `organizer-dashboard.ts` instead. This file still carries the
+ * `isPlatformOwner ? {} : { organizerUserId }` cross-organizer bypass that
+ * ADR 0018 removes, and throws string errors the tRPC router matches on rather
+ * than the typed errors in `_shared/errors.ts`. Both are retired when v2 moves
+ * onto the new seam (see docs/plans/2026-07-organizer-dashboard-migration.md).
+ */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 
