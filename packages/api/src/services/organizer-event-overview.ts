@@ -30,10 +30,10 @@ import { getEventStatus } from './_shared/eventStatus';
 import {
   addUtcDays,
   capacityOf,
-  customerDisplay,
   startOfUtcDay,
   toCents,
 } from './_shared/organizerMapping';
+import { recentOrdersQuery, toRecentOrder } from './_shared/organizerReads';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const RECENT_ORDERS_LIMIT = 5;
@@ -133,19 +133,9 @@ export async function getEventOverview(
         },
       }),
 
-      prisma.orders.findMany({
-        where: { eventId, status: 'COMPLETED' },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          total: true,
-          status: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: { sort: 'desc', nulls: 'last' } },
-        take: RECENT_ORDERS_LIMIT,
-      }),
+      prisma.orders.findMany(
+        recentOrdersQuery({ eventId, status: 'COMPLETED' }, RECENT_ORDERS_LIMIT)
+      ),
     ]);
 
   const tiers = buildTiers(event.ticketTypes, tierRollups);
@@ -173,13 +163,7 @@ export async function getEventOverview(
     revenueSeries: buildRevenueSeries(seriesRows, seriesFrom, startOfToday),
     tiers,
     checkIn: { checkedIn, total: sold },
-    recentOrders: recentOrderRows.map((order) => ({
-      id: order.id,
-      customerDisplay: customerDisplay(order),
-      amountChargedCents: toCents(order.total),
-      createdAt: order.createdAt?.toISOString() ?? null,
-      status: order.status,
-    })),
+    recentOrders: recentOrderRows.map(toRecentOrder),
   };
 }
 

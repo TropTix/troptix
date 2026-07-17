@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import {
   ArrowUpRight,
   DollarSign,
@@ -26,8 +26,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { getServerUser } from '@/server/authUser';
-import { userToActor } from '@/server/actor';
+import { requireOrganizerActor } from '@/server/actor';
 import prisma from '@/server/prisma';
 import { formatCents, getDateFormatter } from '@/lib/dateUtils';
 import { DailyRevenueChart } from './_components/DailyRevenueChart';
@@ -46,17 +45,14 @@ export default async function EventOverviewPage({
   params: Promise<{ eventId: string }>;
   searchParams: Promise<{ viewAs?: string }>;
 }) {
-  const user = await getServerUser();
-  if (!user) {
-    redirect('/auth/signin');
-  }
+  const actor = await requireOrganizerActor();
 
   const { eventId } = await params;
   const { viewAs } = await searchParams;
 
   let overview: EventOverview;
   try {
-    overview = await getEventOverview(prisma, userToActor(user), eventId, {
+    overview = await getEventOverview(prisma, actor, eventId, {
       viewAsOrganizerUserId: viewAs,
     });
   } catch (error) {

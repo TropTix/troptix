@@ -18,14 +18,13 @@ import type {
   OrganizerEventSummary,
   SalesPoint,
 } from '../contracts/organizer';
-import { getEventStatus } from './_shared/eventStatus';
+import { addUtcDays, startOfUtcDay, toCents } from './_shared/organizerMapping';
 import {
-  addUtcDays,
-  capacityOf,
-  customerDisplay,
-  startOfUtcDay,
-  toCents,
-} from './_shared/organizerMapping';
+  eventCardSelect,
+  recentOrdersQuery,
+  toEventSummary,
+  toRecentOrder,
+} from './_shared/organizerReads';
 import { isProfileComplete } from './_shared/organizerSetup';
 import { resolveOrganizerScope } from './organizer-scope';
 
@@ -148,38 +147,17 @@ export async function getDashboard(
           isDraft: false,
           endsAt: { gte: startOfToday },
         },
-        select: {
-          id: true,
-          name: true,
-          imageUrl: true,
-          isDraft: true,
-          startsAt: true,
-          endsAt: true,
-          ticketTypes: { select: { capacity: true, quantity: true } },
-          _count: {
-            select: { tickets: { where: { order: { status: 'COMPLETED' } } } },
-          },
-        },
+        select: eventCardSelect,
         orderBy: { startsAt: 'asc' },
         take: ACTIVE_EVENTS_LIMIT,
       }),
 
-      prisma.orders.findMany({
-        where: { status: 'COMPLETED', event: ownedEvents },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          total: true,
-          status: true,
-          createdAt: true,
-        },
-        // Postgres sorts NULLs as larger than any value, so a plain `desc`
-        // means NULLS FIRST — undated legacy orders would lead the rail.
-        // Vestigial today (0 null rows) but the column is still nullable.
-        orderBy: { createdAt: { sort: 'desc', nulls: 'last' } },
-        take: RECENT_ORDERS_LIMIT,
-      }),
+      prisma.orders.findMany(
+        recentOrdersQuery(
+          { status: 'COMPLETED', event: ownedEvents },
+          RECENT_ORDERS_LIMIT
+        )
+      ),
 
       prisma.organization.findFirst({
         where: { ownerUserId: organizerUserId },
@@ -187,28 +165,12 @@ export async function getDashboard(
       }),
     ]);
 
-  const activeEvents: OrganizerEventSummary[] = activeEventRows.map(
-    (event) => ({
-      id: event.id,
-      name: event.name,
-      imageUrl: event.imageUrl ?? null,
-      startsAt: event.startsAt.toISOString(),
-      sold: event._count.tickets,
-      capacity: event.ticketTypes.reduce(
-        (total, tier) => total + capacityOf(tier),
-        0
-      ),
-      status: getEventStatus(event, now),
-    })
+  const activeEvents: OrganizerEventSummary[] = activeEventRows.map((event) =>
+    toEventSummary(event, now)
   );
 
-  const recentOrders: DashboardRecentOrder[] = recentOrderRows.map((order) => ({
-    id: order.id,
-    customerDisplay: customerDisplay(order),
-    amountChargedCents: toCents(order.total),
-    createdAt: order.createdAt?.toISOString() ?? null,
-    status: order.status,
-  }));
+  const recentOrders: DashboardRecentOrder[] =
+    recentOrderRows.map(toRecentOrder);
 
   return {
     range,
