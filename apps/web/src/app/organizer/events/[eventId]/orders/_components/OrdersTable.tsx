@@ -75,62 +75,96 @@ export function OrdersTable({
         </div>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="text-right">Tickets</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="h-24 text-center text-muted-foreground"
+      {visible.length === 0 ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">
+          No orders match.
+        </p>
+      ) : (
+        <>
+          {/* Mobile: a tappable card per order (tables reshape to cards on
+              mobile, never horizontal-scroll spreadsheets — UX plan). */}
+          <ul className="space-y-3 md:hidden">
+            {visible.map((order) => (
+              <li key={order.id}>
+                <Link
+                  href={`/organizer/events/${eventId}/orders/${order.id}`}
+                  className="block rounded-lg border p-4 active:bg-muted/50"
                 >
-                  No orders match.
-                </TableCell>
-              </TableRow>
-            ) : (
-              visible.map((order) => (
-                <TableRow key={order.id} className="cursor-pointer">
-                  <TableCell className="p-0">
-                    <Link
-                      href={`/organizer/events/${eventId}/orders/${order.id}`}
-                      className="block truncate px-4 py-3 font-medium"
+                  <div className="flex items-start justify-between gap-3">
+                    <span
+                      className="truncate font-medium"
                       title={order.customerDisplay}
                     >
                       {order.customerDisplay}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCents(order.amountChargedCents)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {order.ticketCount.toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    {order.createdAt
-                      ? getDateFormatter(
-                          new Date(order.createdAt),
-                          'MMM d, yyyy'
-                        )
-                      : '—'}
-                  </TableCell>
-                  <TableCell>
+                    </span>
                     <StatusBadge status={order.status} />
-                  </TableCell>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+                    <span>
+                      {order.createdAt
+                        ? getDateFormatter(new Date(order.createdAt), 'MMM d')
+                        : '—'}
+                      {' · '}
+                      {order.ticketCount.toLocaleString()}{' '}
+                      {order.ticketCount === 1 ? 'ticket' : 'tickets'}
+                    </span>
+                    <span className="font-medium text-foreground">
+                      {formatCents(order.amountChargedCents)}
+                    </span>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {/* Desktop: the full table. */}
+          <div className="hidden rounded-md border md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Tickets</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {visible.map((order) => (
+                  <TableRow key={order.id} className="cursor-pointer">
+                    <TableCell className="p-0">
+                      <Link
+                        href={`/organizer/events/${eventId}/orders/${order.id}`}
+                        className="block truncate px-4 py-3 font-medium"
+                        title={order.customerDisplay}
+                      >
+                        {order.customerDisplay}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCents(order.amountChargedCents)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {order.ticketCount.toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      {order.createdAt
+                        ? getDateFormatter(
+                            new Date(order.createdAt),
+                            'MMM d, yyyy'
+                          )
+                        : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={order.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
