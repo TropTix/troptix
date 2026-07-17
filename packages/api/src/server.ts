@@ -36,6 +36,7 @@ export {
 export { getCheckoutConfig, applyCode } from './services/checkout';
 export { getEventDetail, listPublicEvents } from './services/events';
 export { getDashboard } from './services/organizer-dashboard';
+export { listOrganizerEvents } from './services/organizer-events';
 export {
   ensureOrganizationForUser,
   backfillOrganizations,
