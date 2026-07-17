@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatCents, getDateFormatter } from '@/lib/dateUtils';
+import { formatOrderNumber } from '@/lib/utils';
 import StatusBadge from './StatusBadge';
 
 type Filter = 'All' | OrderStatusDto;
@@ -44,7 +45,7 @@ export function OrdersTable({
         (filter === 'All' || order.status === filter) &&
         (q === '' ||
           order.customerDisplay.toLowerCase().includes(q) ||
-          order.id.toLowerCase().includes(q))
+          formatOrderNumber(order.id).toLowerCase().includes(q))
     );
   }, [orders, filter, query]);
 
@@ -91,12 +92,17 @@ export function OrdersTable({
                   className="block rounded-lg border p-4 active:bg-muted/50"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <span
-                      className="truncate font-medium"
-                      title={order.customerDisplay}
-                    >
-                      {order.customerDisplay}
-                    </span>
+                    <div className="min-w-0">
+                      <span
+                        className="block truncate font-medium"
+                        title={order.customerDisplay}
+                      >
+                        {order.customerDisplay}
+                      </span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {formatOrderNumber(order.id)}
+                      </span>
+                    </div>
                     <StatusBadge status={order.status} />
                   </div>
                   <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
@@ -122,6 +128,7 @@ export function OrdersTable({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Order</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Tickets</TableHead>
@@ -135,11 +142,13 @@ export function OrdersTable({
                     <TableCell className="p-0">
                       <Link
                         href={`/organizer/events/${eventId}/orders/${order.id}`}
-                        className="block truncate px-4 py-3 font-medium"
-                        title={order.customerDisplay}
+                        className="block px-4 py-3 font-mono text-xs text-muted-foreground"
                       >
-                        {order.customerDisplay}
+                        {formatOrderNumber(order.id)}
                       </Link>
+                    </TableCell>
+                    <TableCell className="truncate font-medium">
+                      {order.customerDisplay}
                     </TableCell>
                     <TableCell className="text-right">
                       {formatCents(order.amountChargedCents)}

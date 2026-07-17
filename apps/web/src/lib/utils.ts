@@ -15,6 +15,14 @@ export function getFormattedCurrency(price) {
   return formatter.format(price);
 }
 
+/**
+ * Human-readable order reference derived from the id (which stays the real key
+ * in URLs). Matches the `TT-` short code shown elsewhere in the app.
+ */
+export function formatOrderNumber(id: string): string {
+  return `TT-${id.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+}
+
 /** Up to two uppercase initials from a name, or '?' when there are none. */
 export function initials(name: string): string {
   const result = name

@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { requireOrganizerActor } from '@/server/actor';
 import prisma from '@/server/prisma';
 import { formatCents, getDateFormatter } from '@/lib/dateUtils';
+import { formatOrderNumber } from '@/lib/utils';
 import StatusBadge from '../_components/StatusBadge';
 
 export default async function OrderDetailPage({
@@ -44,6 +45,9 @@ export default async function OrderDetailPage({
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
+            <p className="font-mono text-xs text-muted-foreground">
+              {formatOrderNumber(order.id)}
+            </p>
             <h1 className="text-2xl font-bold tracking-tight">
               {order.customer.name ?? order.customer.email ?? 'Order'}
             </h1>
