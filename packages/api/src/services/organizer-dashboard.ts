@@ -29,7 +29,6 @@ import { isProfileComplete } from './_shared/organizerSetup';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const ACTIVE_EVENTS_LIMIT = 5;
-const RECENT_ORDERS_LIMIT = 5;
 const DEFAULT_RANGE: DashboardRange = 'month';
 
 /** Postgres `date_trunc` unit — one bucket per point on the chart. */
@@ -126,8 +125,13 @@ export async function getDashboard(
 
       // Bucketed in SQL rather than grouping by raw timestamp and folding in JS
       // (which returns ~a row per ticket). Doubles as the tickets-sold total.
+      //
+      // `AT TIME ZONE 'UTC'` re-tags the truncated naive `timestamp` as a
+      // `timestamptz` so node-postgres parses the bucket as a UTC instant. On a
+      // non-UTC host it would otherwise parse in the process zone, and the
+      // UTC-keyed zero-fill in buildSalesSeries would miss every bucket.
       prisma.$queryRaw<SalesRow[]>`
-        SELECT date_trunc(${window.bucket}, t."createdAt") AS at,
+        SELECT date_trunc(${window.bucket}, t."createdAt") AT TIME ZONE 'UTC' AS at,
                count(*)::bigint AS tickets
         FROM "Tickets" t
         JOIN "Orders" o ON o."id" = t."orderId"
@@ -153,10 +157,7 @@ export async function getDashboard(
       }),
 
       prisma.orders.findMany(
-        recentOrdersQuery(
-          { status: 'COMPLETED', event: ownedEvents },
-          RECENT_ORDERS_LIMIT
-        )
+        recentOrdersQuery({ status: 'COMPLETED', event: ownedEvents })
       ),
 
       prisma.organization.findFirst({

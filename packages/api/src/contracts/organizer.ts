@@ -138,7 +138,11 @@ export const eventTierBreakdownSchema = z.object({
   name: z.string(),
   sold: z.number().int(),
   capacity: z.number().int(),
-  /** Σ of this tier's completed-ticket subtotals (reconciles to event revenue). */
+  /**
+   * Σ of this tier's completed-ticket subtotals. Close to — but not guaranteed
+   * equal to — the event's Ticket revenue: that's Σ Order.subtotal, a different
+   * column, and each is rounded to cents at its own granularity.
+   */
   revenueCents: z.number().int(),
 });
 export type EventTierBreakdown = z.infer<typeof eventTierBreakdownSchema>;

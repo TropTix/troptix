@@ -10,12 +10,14 @@
  * rather than someone else's event — the old email-bypass (accessControl's
  * getEventWhereClause) is gone (ADR 0018/0019).
  *
- * Two revenue sources, each canonical for its level and reconciling by
- * construction (an order's subtotal is the sum of its tickets' subtotals):
+ * Two revenue sources, each canonical for its level:
  *   - vitals.revenueCents — Σ Order.subtotal, the same "Ticket revenue" the
  *     dashboard reports.
  *   - tier / series revenue — Σ Tickets.subtotal, so a tier maps to its own
- *     tickets and the tiers sum back to the event total.
+ *     tickets.
+ * They track closely (an order's subtotal is the sum of its tickets') but
+ * aren't guaranteed cent-equal — different columns, each rounded at its own
+ * granularity — so treat the tier column as ≈ the event total, not a checksum.
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -36,7 +38,6 @@ import {
 import { recentOrdersQuery, toRecentOrder } from './_shared/organizerReads';
 import { resolveOrganizerScope } from './organizer-scope';
 
-const RECENT_ORDERS_LIMIT = 5;
 /** Chart never shows more than this many days; older events start at day −29. */
 const MAX_SERIES_DAYS = 30;
 
@@ -112,8 +113,14 @@ export async function getEventOverview(
 
       // Daily revenue + tickets, bucketed in SQL. Revenue is Σ ticket subtotal
       // so it reconciles with the per-tier breakdown.
+      //
+      // `AT TIME ZONE 'UTC'` re-tags the truncated naive `timestamp` as a
+      // `timestamptz`: without it, node-postgres parses the bucket in the
+      // process zone, and on a non-UTC host `row.at.toISOString()` no longer
+      // equals the UTC-midnight keys buildRevenueSeries generates — the whole
+      // chart would silently zero-fill.
       prisma.$queryRaw<SeriesRow[]>`
-        SELECT date_trunc('day', t."createdAt") AS at,
+        SELECT date_trunc('day', t."createdAt") AT TIME ZONE 'UTC' AS at,
                count(*)::bigint AS tickets,
                sum(t."subtotal") AS revenue
         FROM "Tickets" t
@@ -134,7 +141,7 @@ export async function getEventOverview(
       }),
 
       prisma.orders.findMany(
-        recentOrdersQuery({ eventId, status: 'COMPLETED' }, RECENT_ORDERS_LIMIT)
+        recentOrdersQuery({ eventId, status: 'COMPLETED' })
       ),
     ]);
 
