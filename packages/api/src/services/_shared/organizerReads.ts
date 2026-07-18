@@ -52,6 +52,7 @@ export function toEventSummary(
 
 const recentOrderSelect = {
   id: true,
+  eventId: true,
   name: true,
   email: true,
   total: true,
@@ -84,6 +85,7 @@ export function recentOrdersQuery(
 export function toRecentOrder(order: RecentOrderRow): DashboardRecentOrder {
   return {
     id: order.id,
+    eventId: order.eventId,
     customerDisplay: customerDisplay(order),
     amountChargedCents: toCents(order.total),
     createdAt: order.createdAt?.toISOString() ?? null,

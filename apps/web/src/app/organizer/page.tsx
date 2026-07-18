@@ -236,31 +236,33 @@ function RecentOrders({ orders }: { orders: DashboardRecentOrder[] }) {
             No orders yet.
           </p>
         ) : (
-          // Deliberately not links: `/orders/[id]` is the patron's view of their
-          // own order, not an organizer surface. The organizer's order detail is
-          // Screen G's to define — wire the rail up to it then.
+          // Links into the organizer's order detail (Screen G) — the order's
+          // own event, so a cross-event rail lands on the right page. NOT
+          // `/orders/[id]`, which is the patron's view of their own order.
           <ul className="divide-y">
             {orders.map((order) => (
-              <li
-                key={order.id}
-                className="flex items-center justify-between gap-3 py-3"
-              >
-                <div className="min-w-0">
-                  <p
-                    className="truncate text-sm font-medium"
-                    title={order.customerDisplay}
-                  >
-                    {order.customerDisplay}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {order.createdAt
-                      ? getDateFormatter(new Date(order.createdAt), 'MMM d')
-                      : '—'}
-                  </p>
-                </div>
-                <span className="shrink-0 text-sm font-medium">
-                  {formatCents(order.amountChargedCents)}
-                </span>
+              <li key={order.id}>
+                <Link
+                  href={`/organizer/events/${order.eventId}/orders/${order.id}`}
+                  className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-3 hover:bg-muted/50"
+                >
+                  <div className="min-w-0">
+                    <p
+                      className="truncate text-sm font-medium"
+                      title={order.customerDisplay}
+                    >
+                      {order.customerDisplay}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {order.createdAt
+                        ? getDateFormatter(new Date(order.createdAt), 'MMM d')
+                        : '—'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-medium">
+                    {formatCents(order.amountChargedCents)}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>
