@@ -254,10 +254,10 @@ model Orders {
 }
 
 model Events {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDraft   Boolean  @default(true)
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDraft   Boolean   @default(true)
   deletedAt DateTime?
 
   // Event Details
@@ -317,16 +317,11 @@ model TicketTypes {
   name               String
   description        String
   maxPurchasePerUser Int
-  quantity           Int
-  quantitySold       Int?   @default(0)
 
-  // Reservation rebuild (Phase A — additive). Counter inventory: availability
-  // = capacity - reserved - sold. `capacity` backfills from `quantity`,
-  // `sold` from `quantitySold`; these replace `quantity`/`quantitySold` in
-  // cleanup. reserved/sold are NOT NULL with a default (safe additive).
-  capacity Int? // immutable total (← quantity)
-  reserved Int  @default(0) // held by active, unexpired reservations
-  sold     Int  @default(0) // confirmed/paid (← quantitySold)
+  // Counter inventory — one standard: availability = capacity - reserved - sold.
+  capacity Int // immutable total for this tier
+  reserved Int @default(0) // held by active, unexpired reservations
+  sold     Int @default(0) // confirmed/paid
 
   // Sale Date Details. Full timestamps — the ticket form folds the time input
   // into these before submitting, so there is no separate time column and no
@@ -357,16 +352,16 @@ model TicketTypes {
 // An explicit, time-boxed hold on inventory. Replaces "a PENDING Orders row is
 // the reservation". The Order is materialized only when the hold is confirmed.
 model Reservation {
-  id                    String            @id @default(uuid())
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
-  status                ReservationStatus @default(HELD)
-  expiresAt             DateTime
-  stripePaymentIntentId String?           @unique
+  id                      String            @id @default(uuid())
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  status                  ReservationStatus @default(HELD)
+  expiresAt               DateTime
+  stripePaymentIntentId   String?           @unique
   // Checkout Sessions API (ADR 0018): the Session drives the paid flow; its
   // PaymentIntent id is backfilled into `stripePaymentIntentId` at confirm time
   // for refund traceability. `stripeRefundId` is set on the expiry-race refund.
-  stripeCheckoutSessionId String?         @unique
+  stripeCheckoutSessionId String?           @unique
   stripeRefundId          String?
 
   // buyer contact captured at hold time

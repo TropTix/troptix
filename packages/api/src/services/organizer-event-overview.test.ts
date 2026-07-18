@@ -35,8 +35,8 @@ const defaultEvent = {
   venue: 'The Warehouse',
   createdAt: new Date('2026-07-10T00:00:00Z'),
   ticketTypes: [
-    { id: 't-ga', name: 'GA', capacity: 100, quantity: 100 },
-    { id: 't-vip', name: 'VIP', capacity: null, quantity: 20 }, // capacity fallback
+    { id: 't-ga', name: 'GA', capacity: 100 },
+    { id: 't-vip', name: 'VIP', capacity: 20 },
   ],
 };
 
@@ -128,7 +128,7 @@ describe('getEventOverview — vitals & tiers', () => {
     expect(result.vitals.ordersCount).toBe(9);
   });
 
-  it('breaks tiers down with subtotal revenue and the capacity→quantity fallback', async () => {
+  it('breaks tiers down with subtotal revenue and per-tier capacity', async () => {
     const { prisma } = fakePrisma({
       tierRollups: [tier('t-ga', 40, 400), tier('t-vip', 5, 250)],
     });

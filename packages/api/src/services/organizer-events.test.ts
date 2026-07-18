@@ -125,14 +125,11 @@ describe('listOrganizerEvents — shaping', () => {
     ]);
   });
 
-  it('sums capacity across tiers with the legacy quantity fallback', async () => {
+  it('sums capacity across tiers', async () => {
     const { prisma } = fakePrisma({
       events: [
         event({
-          ticketTypes: [
-            { capacity: 100, quantity: 100 },
-            { capacity: null, quantity: 50 }, // falls back to quantity
-          ],
+          ticketTypes: [{ capacity: 100 }, { capacity: 50 }],
         }),
       ],
     });

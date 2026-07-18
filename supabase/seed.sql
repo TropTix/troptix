@@ -11,9 +11,8 @@
 --   • seed_event_2 — free RSVP event
 --   • seed_event_3 — edge cases: near-capacity, sold-out, upcoming-sale, gated
 --
--- Reservation-era columns MUST be set, not just the legacy ones:
---  - `capacity` — the hold SQL reads the raw column (GREATEST(capacity-reserved-sold, 0))
---    with NO quantity fallback, so a NULL capacity reserves as sold-out.
+-- Inventory is one counter standard: availability = capacity - reserved - sold.
+--  - `capacity` is NOT NULL — the hold SQL reads it raw (GREATEST(capacity-reserved-sold, 0)).
 --  - `reserved`/`sold` are NOT NULL (default 0); set explicitly for clarity.
 --    Availability shown to buyers = capacity - reserved - sold.
 --  - `priceCents` (integer cents, roadmap 2.12) — the checkout read falls back
@@ -69,23 +68,23 @@ insert into public."Events" (
 -- Ticket types across the three events, one row per state we want to test.
 insert into public."TicketTypes" (
   id, "ticketType", "createdAt", "updatedAt", name, description,
-  "maxPurchasePerUser", quantity, "quantitySold", capacity, reserved, sold,
+  "maxPurchasePerUser", capacity, reserved, sold,
   "saleStartsAt", "saleEndsAt",
   price, "priceCents", "ticketingFees", "discountCode", "eventId"
 ) values
   -- seed_event_1: happy-path paid tiers, on sale now, plenty available
-  ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 500, 0, 0, now(), '2026-08-15 18:00:00', 25.00, 2500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
-  ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks',  4,  50, 0,  50, 0, 0, now(), '2026-08-15 18:00:00', 75.00, 7500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
+  ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 0, now(), '2026-08-15 18:00:00', 25.00, 2500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
+  ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks',  4,  50, 0, 0, now(), '2026-08-15 18:00:00', 75.00, 7500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
 
   -- seed_event_2: free RSVP tier, on sale now, organizer absorbs fees
-  ('seed_tt_rsvp', 'FREE', now(), now(), 'Free RSVP', 'Reserve a free spot',          6, 300, 0, 300, 0, 0, now(), '2026-09-05 12:00:00', 0.00, 0, 'ABSORB_TICKET_FEES', null, 'seed_event_2'),
+  ('seed_tt_rsvp', 'FREE', now(), now(), 'Free RSVP', 'Reserve a free spot',          6, 300, 0, 0, now(), '2026-09-05 12:00:00', 0.00, 0, 'ABSORB_TICKET_FEES', null, 'seed_event_2'),
 
   -- seed_event_3: edge-case tiers
   --   near-capacity: capacity - reserved - sold = 2  → "Only 2 left"
-  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity tier',      10, 100, 98, 100, 0, 98, now(), '2026-09-20 19:00:00', 30.00, 3000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity tier',      10, 100, 0, 98, now(), '2026-09-20 19:00:00', 30.00, 3000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   sold-out: capacity == sold → availability 0
-  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold tier',          4,  50, 50,  50, 0, 50, now(), '2026-09-20 19:00:00', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold tier',          4,  50, 0, 50, now(), '2026-09-20 19:00:00', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   upcoming: sale window opens in the future → not yet on sale
-  ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200,  0, 200, 0,  0, now() + interval '7 days', '2026-09-20 19:00:00', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', '2026-09-20 19:00:00', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   gated: non-empty discountCode → hidden until 'UNLOCK2026' is entered
-  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80,  0,  80, 0,  0, now(), '2026-09-20 19:00:00', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3');
+  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), '2026-09-20 19:00:00', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3');

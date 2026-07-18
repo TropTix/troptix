@@ -78,7 +78,7 @@ export function AddTicketTypeDrawer({
   const defaultValues = {
     name: 'Default Ticket',
     price: 0,
-    quantity: 100,
+    capacity: 100,
     maxPurchasePerUser: 10,
     ticketingFees: 'PASS_TICKET_FEES' as const,
     saleStartsAt: today,
@@ -178,7 +178,7 @@ export function AddTicketTypeDrawer({
               />
               <FormField
                 control={form.control}
-                name="quantity"
+                name="capacity"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>

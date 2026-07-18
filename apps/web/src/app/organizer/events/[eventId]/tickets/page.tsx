@@ -21,8 +21,8 @@ interface FetchedTicketType {
   id: string;
   name: string;
   price: number;
-  quantity: number;
-  quantitySold: number | null;
+  capacity: number;
+  sold: number;
   saleStartsAt: Date;
   saleEndsAt: Date;
 }
@@ -46,8 +46,8 @@ async function fetchTicketTypes(
         id: true,
         name: true,
         price: true,
-        quantity: true,
-        quantitySold: true,
+        capacity: true,
+        sold: true,
         saleStartsAt: true,
         saleEndsAt: true,
       },
@@ -84,15 +84,12 @@ async function fetchEventName(
 function calculateTicketStats(ticketTypes: FetchedTicketType[]) {
   const totalTypes = ticketTypes.length;
   const totalCapacity = ticketTypes.reduce(
-    (sum, ticket) => sum + ticket.quantity,
+    (sum, ticket) => sum + ticket.capacity,
     0
   );
-  const totalSold = ticketTypes.reduce(
-    (sum, ticket) => sum + (ticket.quantitySold || 0),
-    0
-  );
+  const totalSold = ticketTypes.reduce((sum, ticket) => sum + ticket.sold, 0);
   const totalRevenue = ticketTypes.reduce(
-    (sum, ticket) => sum + (ticket.quantitySold || 0) * ticket.price,
+    (sum, ticket) => sum + ticket.sold * ticket.price,
     0
   );
   const now = new Date();

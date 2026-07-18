@@ -1,7 +1,6 @@
 /**
  * Shaping helpers shared by the organizer reads: the float→cents boundary and
- * the `capacity`/`quantity` fallback (the date columns were collapsed to a
- * single `startsAt`/`endsAt` pair in ADR 0020, so there's no date fallback).
+ * the day-key / customer-display formatters.
  */
 
 /**
@@ -10,14 +9,6 @@
  */
 export function toCents(dollars: number | null | undefined): number {
   return Math.round((dollars ?? 0) * 100);
-}
-
-/** Reservation-era `capacity`, falling back to legacy `quantity`. */
-export function capacityOf(tier: {
-  capacity: number | null;
-  quantity: number;
-}): number {
-  return tier.capacity ?? tier.quantity;
 }
 
 /** yyyy-mm-dd, for the day-bucketed series the charts render. */

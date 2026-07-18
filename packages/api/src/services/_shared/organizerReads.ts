@@ -12,7 +12,7 @@ import type {
   OrganizerEventSummary,
 } from '../../contracts/organizer';
 import { getEventStatus } from './eventStatus';
-import { capacityOf, customerDisplay, toCents } from './organizerMapping';
+import { customerDisplay, toCents } from './organizerMapping';
 
 const RECENT_ORDERS_LIMIT = 5;
 
@@ -24,7 +24,7 @@ export const eventCardSelect = {
   isDraft: true,
   startsAt: true,
   endsAt: true,
-  ticketTypes: { select: { capacity: true, quantity: true } },
+  ticketTypes: { select: { capacity: true } },
   _count: {
     select: { tickets: { where: { order: { status: 'COMPLETED' } } } },
   },
@@ -43,7 +43,7 @@ export function toEventSummary(
     startsAt: event.startsAt.toISOString(),
     sold: event._count.tickets,
     capacity: event.ticketTypes.reduce(
-      (total, tier) => total + capacityOf(tier),
+      (total, tier) => total + tier.capacity,
       0
     ),
     status: getEventStatus(event, now),

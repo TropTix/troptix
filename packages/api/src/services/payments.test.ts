@@ -51,7 +51,6 @@ async function makeTicketType(capacity: number, priceCents = 1000) {
       name: 'GA',
       description: 'General admission',
       maxPurchasePerUser: 10,
-      quantity: capacity,
       capacity,
       price: priceCents / 100,
       priceCents,

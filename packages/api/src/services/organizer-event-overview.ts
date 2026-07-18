@@ -29,12 +29,7 @@ import type {
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
 import { getEventStatus } from './_shared/eventStatus';
-import {
-  addUtcDays,
-  capacityOf,
-  startOfUtcDay,
-  toCents,
-} from './_shared/organizerMapping';
+import { addUtcDays, startOfUtcDay, toCents } from './_shared/organizerMapping';
 import { recentOrdersQuery, toRecentOrder } from './_shared/organizerReads';
 import { resolveOrganizerScope } from './organizer-scope';
 
@@ -79,7 +74,7 @@ export async function getEventOverview(
       venue: true,
       createdAt: true,
       ticketTypes: {
-        select: { id: true, name: true, capacity: true, quantity: true },
+        select: { id: true, name: true, capacity: true },
       },
     },
   });
@@ -178,8 +173,7 @@ function buildTiers(
   ticketTypes: {
     id: string;
     name: string;
-    capacity: number | null;
-    quantity: number;
+    capacity: number;
   }[],
   rollups: TierRollup[]
 ): EventTierBreakdown[] {
@@ -196,7 +190,7 @@ function buildTiers(
       id: tier.id,
       name: tier.name,
       sold: rollup?.sold ?? 0,
-      capacity: capacityOf(tier),
+      capacity: tier.capacity,
       revenueCents: toCents(rollup?.revenue),
     };
   });

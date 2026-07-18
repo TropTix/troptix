@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { generateId } from '@/lib/utils';
-import { reservationColumns } from '@/lib/reservationColumns';
 import {
   TicketTypeFormValues,
   ticketTypeSchema,
@@ -55,15 +54,14 @@ export async function createTicketType(
         name: data.name,
         description: data.description ?? '', // Handle optional description
         price: data.price,
-        quantity: data.quantity,
+        priceCents: Math.round(data.price * 100),
+        capacity: data.capacity,
         maxPurchasePerUser: data.maxPurchasePerUser,
         saleStartsAt: data.saleStartsAt,
         saleEndsAt: data.saleEndsAt,
         ticketingFees: data.ticketingFees,
         ticketType: ticketTypeEnum,
         discountCode: data.discountCode || null,
-        // Reservation-era columns the new checkout reads.
-        ...reservationColumns(data),
       },
     });
     console.log('Ticket type created:', data);
@@ -133,15 +131,14 @@ export async function updateTicketType(
         name: data.name,
         description: data.description ?? '',
         price: data.price,
-        quantity: data.quantity,
+        priceCents: Math.round(data.price * 100),
+        capacity: data.capacity,
         maxPurchasePerUser: data.maxPurchasePerUser,
         saleStartsAt: data.saleStartsAt,
         saleEndsAt: data.saleEndsAt,
         ticketingFees: data.ticketingFees,
         ticketType: ticketTypeEnum,
         discountCode: data.discountCode || null,
-        // Keep the reservation-era columns in sync (see create).
-        ...reservationColumns(data),
       },
       select: { eventId: true },
     });

@@ -54,7 +54,7 @@ export async function PATCH(
             id: true,
             name: true,
             price: true,
-            quantity: true,
+            capacity: true,
             maxPurchasePerUser: true,
             saleStartsAt: true,
             saleEndsAt: true,
