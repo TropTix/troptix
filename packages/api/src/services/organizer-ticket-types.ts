@@ -23,14 +23,16 @@ import type {
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
 import { toCents } from './_shared/organizerMapping';
+import {
+  revenueCentsByTicketType,
+  ticketTypeRollupQuery,
+  toTicketTypeBreakdown,
+  type TicketTypeRollupRow,
+} from './_shared/organizerReads';
 import { getSaleState } from './_shared/saleState';
 import { resolveOrganizerScope } from './organizer-scope';
 
 /** Per-ticketType `_sum.subtotal` from the completed-ticket rollup. */
-interface TicketTypeRollup {
-  ticketTypeId: string | null;
-  _sum: { subtotal: number | null };
-}
 
 export async function listTicketTypes(
   prisma: PrismaClient,
@@ -45,7 +47,7 @@ export async function listTicketTypes(
     input.viewAsOrganizerUserId
   );
 
-  const [event, revenueRollups] = await Promise.all([
+  const [event, rollups] = await Promise.all([
     prisma.events.findFirst({
       where: { id: eventId, organizerUserId, deletedAt: null },
       select: {
@@ -67,18 +69,14 @@ export async function listTicketTypes(
       },
     }),
 
-    prisma.tickets.groupBy({
-      by: ['ticketTypeId'],
-      where: { eventId, order: { status: 'COMPLETED' } },
-      _sum: { subtotal: true },
-    }),
+    prisma.tickets.groupBy(ticketTypeRollupQuery(eventId)),
   ]);
 
   if (!event) {
     throw new NotFoundError('Event not found');
   }
 
-  const ticketTypes = buildTicketTypes(event.ticketTypes, revenueRollups, now);
+  const ticketTypes = buildTicketTypes(event.ticketTypes, rollups, now);
 
   return {
     ticketTypes,
@@ -86,6 +84,7 @@ export async function listTicketTypes(
       sold: sum(ticketTypes, (ticketType) => ticketType.sold),
       capacity: sum(ticketTypes, (ticketType) => ticketType.capacity),
       revenueCents: sum(ticketTypes, (ticketType) => ticketType.revenueCents),
+      onSale: ticketTypes.filter((t) => t.saleState === 'OnSale').length,
     },
   };
 }
@@ -101,22 +100,17 @@ function buildTicketTypes(
     saleStartsAt: Date;
     saleEndsAt: Date;
   }[],
-  rollups: TicketTypeRollup[],
+  rollups: TicketTypeRollupRow[],
   now: Date
 ): TicketTypeRow[] {
-  const revenueByType = new Map(
-    rollups.map((row) => [row.ticketTypeId, row._sum.subtotal])
-  );
+  const revenueByType = revenueCentsByTicketType(rollups);
 
   return ticketTypes.map((ticketType) => ({
-    id: ticketType.id,
-    name: ticketType.name,
-    // Prefer the integer-cents column; fall back to the legacy float for ticket types
-    // written before that cutover (roadmap 2.12).
+    // The card the event overview also renders — same shape, same basis.
+    ...toTicketTypeBreakdown(ticketType, revenueByType),
+    // Prefer the integer-cents column; fall back to the legacy float for ticket
+    // types written before that cutover (roadmap 2.12).
     priceCents: ticketType.priceCents ?? toCents(ticketType.price),
-    sold: ticketType.sold,
-    capacity: ticketType.capacity,
-    revenueCents: toCents(revenueByType.get(ticketType.id)),
     saleState: getSaleState(ticketType, now),
   }));
 }

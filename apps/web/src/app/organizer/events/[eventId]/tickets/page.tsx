@@ -53,7 +53,14 @@ export default async function EventTicketsPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Ticket types</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Ticket types</h1>
+          {ticketTypes.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {summary.onSale} of {ticketTypes.length} on sale
+            </p>
+          )}
+        </div>
         {/* Adding a ticketType is first-class here — including after go-live. */}
         <Button asChild>
           <Link href={`/organizer/events/${eventId}/tickets/new`}>

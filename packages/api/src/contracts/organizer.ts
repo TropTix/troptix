@@ -248,6 +248,8 @@ export const ticketTypesViewSchema = z.object({
     sold: z.number().int(),
     capacity: z.number().int(),
     revenueCents: z.number().int(),
+    /** How many types are selling right now — the at-a-glance "is anything live". */
+    onSale: z.number().int(),
   }),
 });
 export type TicketTypesView = z.infer<typeof ticketTypesViewSchema>;

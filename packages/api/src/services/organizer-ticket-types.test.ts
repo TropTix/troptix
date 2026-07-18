@@ -201,6 +201,7 @@ describe('listTicketTypes — shaping', () => {
       sold: 45,
       capacity: 120,
       revenueCents: 105000,
+      onSale: 2,
     });
     // The header must equal the rows it sits above.
     expect(result.summary.revenueCents).toBe(
@@ -212,6 +213,11 @@ describe('listTicketTypes — shaping', () => {
     const { prisma } = fakePrisma({ ticketTypes: [] });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
     expect(result.ticketTypes).toEqual([]);
-    expect(result.summary).toEqual({ sold: 0, capacity: 0, revenueCents: 0 });
+    expect(result.summary).toEqual({
+      sold: 0,
+      capacity: 0,
+      revenueCents: 0,
+      onSale: 0,
+    });
   });
 });

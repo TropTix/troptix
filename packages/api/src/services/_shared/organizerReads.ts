@@ -10,6 +10,7 @@ import type { Prisma } from '@troptix/db';
 import type {
   DashboardRecentOrder,
   OrganizerEventSummary,
+  TicketTypeBreakdown,
 } from '../../contracts/organizer';
 import { getEventStatus } from './eventStatus';
 import { customerDisplay, toCents } from './organizerMapping';
@@ -90,5 +91,58 @@ export function toRecentOrder(order: RecentOrderRow): DashboardRecentOrder {
     amountChargedCents: toCents(order.total),
     createdAt: order.createdAt?.toISOString() ?? null,
     status: order.status,
+  };
+}
+
+/**
+ * One event's completed tickets, grouped by ticket type. The event overview and
+ * the ticket-types screen read the same rollup so they can't drift.
+ */
+export function ticketTypeRollupQuery(eventId: string) {
+  return {
+    by: ['ticketTypeId'],
+    where: { eventId, order: { status: 'COMPLETED' } },
+    _count: { _all: true },
+    _sum: { subtotal: true },
+  } satisfies Prisma.TicketsGroupByArgs;
+}
+
+export interface TicketTypeRollupRow {
+  ticketTypeId: string | null;
+  _count: { _all: number };
+  _sum: { subtotal: number | null };
+}
+
+/** Ticket type id → its share of Ticket revenue. Deleted types key on null. */
+export function revenueCentsByTicketType(rows: TicketTypeRollupRow[]) {
+  return new Map(
+    rows.map((row) => [row.ticketTypeId, toCents(row._sum.subtotal)])
+  );
+}
+
+/**
+ * Every completed ticket **row**, including any whose ticket type was deleted —
+ * "tickets issued", the count you check people in against. Deliberately NOT the
+ * sum of the types' `sold` counters, which can't include orphans (CONTEXT.md,
+ * "Tickets issued vs sold").
+ */
+export function ticketsIssued(rows: TicketTypeRollupRow[]): number {
+  return rows.reduce((total, row) => total + row._count._all, 0);
+}
+
+/**
+ * The ticket-type card both screens render. Inventory comes from the type's own
+ * counters — the one standard (availability = capacity − reserved − sold).
+ */
+export function toTicketTypeBreakdown(
+  ticketType: { id: string; name: string; capacity: number; sold: number },
+  revenueByType: Map<string | null, number>
+): TicketTypeBreakdown {
+  return {
+    id: ticketType.id,
+    name: ticketType.name,
+    sold: ticketType.sold,
+    capacity: ticketType.capacity,
+    revenueCents: revenueByType.get(ticketType.id) ?? 0,
   };
 }

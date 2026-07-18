@@ -35,8 +35,8 @@ const defaultEvent = {
   venue: 'The Warehouse',
   createdAt: new Date('2026-07-10T00:00:00Z'),
   ticketTypes: [
-    { id: 't-ga', name: 'GA', capacity: 100 },
-    { id: 't-vip', name: 'VIP', capacity: 20 },
+    { id: 't-ga', name: 'GA', capacity: 100, sold: 40 },
+    { id: 't-vip', name: 'VIP', capacity: 20, sold: 5 },
   ],
 };
 
@@ -138,6 +138,29 @@ describe('getEventOverview — vitals & ticketTypes', () => {
       { id: 't-vip', name: 'VIP', sold: 5, capacity: 20, revenueCents: 25000 },
     ]);
     expect(result.vitals.capacity).toBe(120);
+  });
+
+  it('reports a type’s sold from its counter, and the event’s from ticket rows', async () => {
+    // The counter says 40; only 37 ticket rows exist (3 were issued against a
+    // type that has since been deleted). Per CONTEXT.md these are different
+    // questions, so the two figures are allowed to differ — and must not be
+    // "helpfully" reconciled.
+    const { prisma } = fakePrisma({
+      event: {
+        ...defaultEvent,
+        ticketTypes: [{ id: 't-ga', name: 'GA', capacity: 100, sold: 40 }],
+      },
+      rollups: [
+        ticketType('t-ga', 37, 370),
+        ticketType(null as never, 3, 30), // orphaned: type deleted
+      ],
+    });
+
+    const result = await getEventOverview(prisma, OWNER, 'e1', {}, NOW);
+
+    expect(result.ticketTypes[0].sold).toBe(40); // inventory sold (counter)
+    expect(result.vitals.sold).toBe(40); // tickets issued (37 + 3 orphans)
+    expect(result.checkIn.total).toBe(40); // check-in counts rows, not counters
   });
 
   it('counts null-ticketType tickets in sold (and the check-in total) though no ticketType shows them', async () => {

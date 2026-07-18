@@ -30,18 +30,18 @@ import type {
 import { NotFoundError } from './_shared/errors';
 import { getEventStatus } from './_shared/eventStatus';
 import { addUtcDays, startOfUtcDay, toCents } from './_shared/organizerMapping';
-import { recentOrdersQuery, toRecentOrder } from './_shared/organizerReads';
+import {
+  recentOrdersQuery,
+  revenueCentsByTicketType,
+  ticketsIssued,
+  ticketTypeRollupQuery,
+  toRecentOrder,
+  toTicketTypeBreakdown,
+} from './_shared/organizerReads';
 import { resolveOrganizerScope } from './organizer-scope';
 
 /** Chart never shows more than this many days; older events start at day −29. */
 const MAX_SERIES_DAYS = 30;
-
-/** Per-ticketType `_count` + `_sum.subtotal` from the tickets group-by. */
-interface TicketTypeRollup {
-  ticketTypeId: string | null;
-  _count: { _all: number };
-  _sum: { subtotal: number | null };
-}
 
 /** A bucketed day from the revenue-series raw query. */
 interface SeriesRow {
@@ -74,7 +74,7 @@ export async function getEventOverview(
       venue: true,
       createdAt: true,
       ticketTypes: {
-        select: { id: true, name: true, capacity: true },
+        select: { id: true, name: true, capacity: true, sold: true },
       },
     },
   });
@@ -98,13 +98,7 @@ export async function getEventOverview(
         where: { eventId, status: 'COMPLETED' },
       }),
 
-      // Per-ticketType sold (count) + revenue (Σ ticket subtotal), completed only.
-      prisma.tickets.groupBy({
-        by: ['ticketTypeId'],
-        where: { eventId, order: { status: 'COMPLETED' } },
-        _count: { _all: true },
-        _sum: { subtotal: true },
-      }),
+      prisma.tickets.groupBy(ticketTypeRollupQuery(eventId)),
 
       // Daily revenue + tickets, bucketed in SQL. Revenue is Σ ticket subtotal
       // so it reconciles with the per-ticket-type breakdown.
@@ -140,15 +134,19 @@ export async function getEventOverview(
       ),
     ]);
 
-  const ticketTypes = buildTicketTypes(event.ticketTypes, rollups);
+  const revenueByType = revenueCentsByTicketType(rollups);
+  const ticketTypes = event.ticketTypes.map((ticketType) =>
+    toTicketTypeBreakdown(ticketType, revenueByType)
+  );
   const capacity = ticketTypes.reduce(
     (total, ticketType) => total + ticketType.capacity,
     0
   );
-  // Every completed ticket — including any with a null ticketTypeId, which the
-  // per-ticket-type breakdown can't show. So `sold` matches the daily series and the
-  // check-in total, even if it exceeds the ticketTypes' visible sum.
-  const sold = rollups.reduce((total, row) => total + row._count._all, 0);
+  // Tickets *issued*, not the sum of the types' `sold` counters: it includes
+  // tickets whose type was deleted, so it matches the daily series and the
+  // check-in total (CONTEXT.md, "Tickets issued vs sold"). It can therefore
+  // exceed what the visible type rows add up to.
+  const sold = ticketsIssued(rollups);
 
   return {
     event: {
@@ -170,33 +168,6 @@ export async function getEventOverview(
     checkIn: { checkedIn, total: sold },
     recentOrders: recentOrderRows.map(toRecentOrder),
   };
-}
-
-function buildTicketTypes(
-  ticketTypes: {
-    id: string;
-    name: string;
-    capacity: number;
-  }[],
-  rollups: TicketTypeRollup[]
-): TicketTypeBreakdown[] {
-  const byType = new Map(
-    rollups.map((row) => [
-      row.ticketTypeId,
-      { sold: row._count._all, revenue: row._sum.subtotal },
-    ])
-  );
-
-  return ticketTypes.map((ticketType) => {
-    const rollup = byType.get(ticketType.id);
-    return {
-      id: ticketType.id,
-      name: ticketType.name,
-      sold: rollup?.sold ?? 0,
-      capacity: ticketType.capacity,
-      revenueCents: toCents(rollup?.revenue),
-    };
-  });
 }
 
 /** Zero-fills each day in the window, so the chart has a point per day. */
