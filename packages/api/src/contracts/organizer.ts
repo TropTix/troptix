@@ -111,3 +111,64 @@ export const organizerDashboardSchema = z.object({
   setup: organizerSetupStateSchema,
 });
 export type OrganizerDashboard = z.infer<typeof organizerDashboardSchema>;
+
+// --- Screen C — event overview (`/organizer/events/[id]`) ---
+
+/** The event's headline numbers. Money is cents; `sold` is against `capacity`. */
+export const eventVitalsSchema = z.object({
+  sold: z.number().int(),
+  capacity: z.number().int(),
+  revenueCents: z.number().int(),
+  ordersCount: z.number().int(),
+});
+export type EventVitals = z.infer<typeof eventVitalsSchema>;
+
+/** A day on the event's revenue-over-time chart. Zero-filled, so no gaps. */
+export const eventRevenuePointSchema = z.object({
+  /** Day start, ISO (UTC — same caveat as the dashboard series). */
+  at: z.string().datetime(),
+  revenueCents: z.number().int(),
+  tickets: z.number().int(),
+});
+export type EventRevenuePoint = z.infer<typeof eventRevenuePointSchema>;
+
+/** One ticket tier's inventory + its share of Ticket revenue. */
+export const eventTierBreakdownSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  sold: z.number().int(),
+  capacity: z.number().int(),
+  /**
+   * Σ of this tier's completed-ticket subtotals. Close to — but not guaranteed
+   * equal to — the event's Ticket revenue: that's Σ Order.subtotal, a different
+   * column, and each is rounded to cents at its own granularity.
+   */
+  revenueCents: z.number().int(),
+});
+export type EventTierBreakdown = z.infer<typeof eventTierBreakdownSchema>;
+
+/** Door progress: how many of the event's tickets have been checked in. */
+export const checkInSummarySchema = z.object({
+  checkedIn: z.number().int(),
+  total: z.number().int(),
+});
+export type CheckInSummary = z.infer<typeof checkInSummarySchema>;
+
+export const eventOverviewSchema = z.object({
+  event: z.object({
+    id: z.string(),
+    name: z.string(),
+    status: eventStatusSchema,
+    startsAt: z.string().datetime(),
+    endsAt: z.string().datetime().nullable(),
+    venue: z.string().nullable(),
+  }),
+  vitals: eventVitalsSchema,
+  /** Daily, from event creation through today (capped) — zero-filled. */
+  revenueSeries: z.array(eventRevenuePointSchema),
+  tiers: z.array(eventTierBreakdownSchema),
+  checkIn: checkInSummarySchema,
+  /** A short peek; the Orders tab is the full surface. NOT range-scoped. */
+  recentOrders: z.array(dashboardRecentOrderSchema),
+});
+export type EventOverview = z.infer<typeof eventOverviewSchema>;
