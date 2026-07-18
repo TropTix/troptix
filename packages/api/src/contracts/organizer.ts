@@ -223,3 +223,31 @@ export const orderDetailSchema = z.object({
   paymentMethod: z.string().nullable(),
 });
 export type OrderDetail = z.infer<typeof orderDetailSchema>;
+
+// --- Screen E — ticket types (`/organizer/events/[id]/tickets`) ---
+
+/** Where a tier sits in its sale window. */
+export const saleStateSchema = z.enum(['Scheduled', 'OnSale', 'Ended']);
+export type SaleState = z.infer<typeof saleStateSchema>;
+
+/**
+ * A tier row on the ticket-types screen: the same inventory + revenue shape the
+ * event overview shows, plus the price and sale-window state this screen manages.
+ */
+export const ticketTierRowSchema = eventTierBreakdownSchema.extend({
+  priceCents: z.number().int(),
+  saleState: saleStateSchema,
+});
+export type TicketTierRow = z.infer<typeof ticketTierRowSchema>;
+
+export const ticketTypesViewSchema = z.object({
+  /** Natural (creation) order — reordering is deferred (see the UX plan). */
+  tiers: z.array(ticketTierRowSchema),
+  /** Header summary. `revenueCents` is the sum of the rows, so they agree. */
+  summary: z.object({
+    sold: z.number().int(),
+    capacity: z.number().int(),
+    revenueCents: z.number().int(),
+  }),
+});
+export type TicketTypesView = z.infer<typeof ticketTypesViewSchema>;

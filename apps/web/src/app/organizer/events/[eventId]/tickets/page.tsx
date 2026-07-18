@@ -1,9 +1,11 @@
-import React from 'react';
-import prisma from '@/server/prisma';
-import TicketTable from './_components/TicketTable'; // Update the import path to the colocated component
-import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { redirect } from 'next/navigation';
-import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { DollarSign, Plus, Ticket } from 'lucide-react';
+import { listTicketTypes, NotFoundError } from '@troptix/api/server';
+import type { SaleState, TicketTierRow, TicketTypesView } from '@troptix/api';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -11,243 +13,162 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  MobileStatsCard,
-  MobileStatsContainer,
-} from '@/components/ui/mobile-stats-card';
-import { Ticket, DollarSign, Users, TrendingUp } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { requireOrganizerActor } from '@/server/actor';
+import prisma from '@/server/prisma';
+import { formatCents } from '@/lib/dateUtils';
 
-interface FetchedTicketType {
-  id: string;
-  name: string;
-  price: number;
-  capacity: number;
-  sold: number;
-  saleStartsAt: Date;
-  saleEndsAt: Date;
-}
+const SALE_STATE: Record<
+  SaleState,
+  { label: string; variant: 'default' | 'outline' | 'secondary' }
+> = {
+  OnSale: { label: 'On sale', variant: 'default' },
+  Scheduled: { label: 'Scheduled', variant: 'outline' },
+  Ended: { label: 'Ended', variant: 'secondary' },
+};
 
-async function fetchTicketTypes(
-  eventId: string,
-  userId: string,
-  userEmail?: string
-): Promise<FetchedTicketType[]> {
-  console.log(`Fetching ticket types for event: ${eventId}`);
+export default async function EventTicketsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ eventId: string }>;
+  searchParams: Promise<{ viewAs?: string }>;
+}) {
+  const actor = await requireOrganizerActor();
+  const { eventId } = await params;
+  const { viewAs } = await searchParams;
+
+  let view: TicketTypesView;
   try {
-    // Verify access first
-    await verifyEventAccess(userId, userEmail, eventId);
-
-    const ticketTypes = await prisma.ticketTypes.findMany({
-      where: {
-        eventId: eventId,
-        event: getEventWhereClause(userId, userEmail, eventId),
-      },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        capacity: true,
-        sold: true,
-        saleStartsAt: true,
-        saleEndsAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+    view = await listTicketTypes(prisma, actor, eventId, {
+      viewAsOrganizerUserId: viewAs,
     });
-    return ticketTypes;
   } catch (error) {
-    console.error('Failed to fetch ticket types:', error);
-    return [];
+    if (error instanceof NotFoundError) notFound();
+    throw error;
   }
-}
 
-async function fetchEventName(
-  eventId: string,
-  userId: string,
-  userEmail?: string
-): Promise<string> {
-  try {
-    const event = await prisma.events.findFirst({
-      where: getEventWhereClause(userId, userEmail, eventId),
-      select: {
-        name: true,
-      },
-    });
-    return event?.name || 'Unknown Event';
-  } catch (error) {
-    console.error('Failed to fetch event name:', error);
-    return 'Unknown Event';
-  }
-}
-
-function calculateTicketStats(ticketTypes: FetchedTicketType[]) {
-  const totalTypes = ticketTypes.length;
-  const totalCapacity = ticketTypes.reduce(
-    (sum, ticket) => sum + ticket.capacity,
-    0
-  );
-  const totalSold = ticketTypes.reduce((sum, ticket) => sum + ticket.sold, 0);
-  const totalRevenue = ticketTypes.reduce(
-    (sum, ticket) => sum + ticket.sold * ticket.price,
-    0
-  );
-  const now = new Date();
-  const activeTypes = ticketTypes.filter(
-    (ticket) => now >= ticket.saleStartsAt && now <= ticket.saleEndsAt
-  ).length;
-
-  return {
-    totalTypes,
-    totalCapacity,
-    totalSold,
-    totalRevenue,
-    activeTypes,
-  };
-}
-
-interface EventTicketsPageProps {
-  params: Promise<{
-    eventId: string;
-  }>;
-}
-
-export default async function EventTicketsPage(props: EventTicketsPageProps) {
-  const params = await props.params;
-  const { eventId } = params;
-  const user = await getUserFromIdTokenCookie();
-  if (!user) {
-    redirect('/auth/signin');
-  }
-  const initialTicketTypes = await fetchTicketTypes(
-    eventId,
-    user.uid,
-    user.email
-  );
-  const eventName = await fetchEventName(eventId, user.uid, user.email);
-  const stats = calculateTicketStats(initialTicketTypes);
+  const { tiers, summary } = view;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Manage Tickets</h1>
-        <p className="text-muted-foreground">{eventName}</p>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold tracking-tight">Ticket types</h1>
+        {/* Adding a tier is first-class here — including after go-live. */}
+        <Button asChild>
+          <Link href={`/organizer/events/${eventId}/tickets/new`}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add ticket type
+          </Link>
+        </Button>
       </div>
 
-      {/* Desktop Statistics Cards */}
-      <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ticket Types</CardTitle>
-            <Ticket className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalTypes}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.activeTypes} currently on sale
-            </p>
-          </CardContent>
-        </Card>
+      <section className="grid gap-4 sm:grid-cols-2">
+        <SummaryCard
+          label="Tickets sold"
+          value={summary.sold.toLocaleString()}
+          hint={`of ${summary.capacity.toLocaleString()} capacity`}
+          icon={<Ticket className="h-5 w-5 text-muted-foreground" />}
+        />
+        <SummaryCard
+          label="Ticket revenue"
+          value={formatCents(summary.revenueCents)}
+          hint="before fees & refunds"
+          icon={<DollarSign className="h-5 w-5 text-muted-foreground" />}
+        />
+      </section>
 
+      {tiers.length === 0 ? (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tickets Sold</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalSold}</div>
-            <p className="text-xs text-muted-foreground">
-              of {stats.totalCapacity} available
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD',
-              }).format(stats.totalRevenue)}
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <div>
+              <p className="font-medium">No ticket types yet</p>
+              <p className="text-sm text-muted-foreground">
+                Add a tier to start selling.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">From ticket sales</p>
+            <Button asChild size="sm">
+              <Link href={`/organizer/events/${eventId}/tickets/new`}>
+                Add your first ticket type
+              </Link>
+            </Button>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Capacity Used</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.totalCapacity > 0
-                ? Math.round((stats.totalSold / stats.totalCapacity) * 100)
-                : 0}
-              %
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.totalCapacity - stats.totalSold} remaining
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Mobile Statistics Cards - Horizontal Scroll */}
-      <MobileStatsContainer>
-        <MobileStatsCard
-          icon={Ticket}
-          value={stats.totalTypes}
-          label="Ticket Types"
-          secondaryInfo={`${stats.activeTypes} active`}
-        />
-        <MobileStatsCard
-          icon={Users}
-          value={stats.totalSold}
-          label="Tickets Sold"
-          secondaryInfo={`of ${stats.totalCapacity}`}
-        />
-        <MobileStatsCard
-          icon={DollarSign}
-          iconColor="text-green-600"
-          value={new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            notation: 'compact',
-          }).format(stats.totalRevenue)}
-          valueColor="text-lg font-bold text-green-600"
-          label="Revenue"
-        />
-        <MobileStatsCard
-          icon={TrendingUp}
-          value={`${
-            stats.totalCapacity > 0
-              ? Math.round((stats.totalSold / stats.totalCapacity) * 100)
-              : 0
-          }%`}
-          label="Capacity Used"
-          secondaryInfo={`${stats.totalCapacity - stats.totalSold} left`}
-        />
-      </MobileStatsContainer>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Ticket Types</CardTitle>
-          <CardDescription>
-            Manage ticket types, pricing, and availability for this event
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TicketTable
-            eventId={eventId}
-            initialTicketTypes={initialTicketTypes}
-          />
-        </CardContent>
-      </Card>
+      ) : (
+        <ul className="space-y-3">
+          {tiers.map((tier) => (
+            <li key={tier.id}>
+              <TierRow tier={tier} eventId={eventId} />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  hint,
+  icon,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4 pb-2">
+        <div>
+          <CardDescription>{label}</CardDescription>
+          <CardTitle className="text-3xl">{value}</CardTitle>
+        </div>
+        <span className="shrink-0">{icon}</span>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TierRow({ tier, eventId }: { tier: TicketTierRow; eventId: string }) {
+  const soldPercent = tier.capacity > 0 ? (tier.sold / tier.capacity) * 100 : 0;
+  const state = SALE_STATE[tier.saleState];
+
+  return (
+    <Link
+      href={`/organizer/events/${eventId}/tickets/${tier.id}`}
+      className="block rounded-lg border p-4 transition-colors hover:border-primary/50"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-medium" title={tier.name}>
+              {tier.name}
+            </span>
+            <Badge variant={state.variant} className="shrink-0">
+              {state.label}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {formatCents(tier.priceCents)}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="font-medium">{formatCents(tier.revenueCents)}</p>
+          <p className="text-xs text-muted-foreground">revenue</p>
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1">
+        <Progress value={soldPercent} className="h-1.5" />
+        <p className="text-xs text-muted-foreground">
+          {tier.sold.toLocaleString()} / {tier.capacity.toLocaleString()} sold
+        </p>
+      </div>
+    </Link>
   );
 }

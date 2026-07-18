@@ -43,6 +43,7 @@ export {
   getOrderDetail,
   ORDERS_LIST_LIMIT,
 } from './services/organizer-orders';
+export { listTicketTypes } from './services/organizer-ticket-types';
 export {
   ensureOrganizationForUser,
   backfillOrganizations,
