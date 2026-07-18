@@ -128,7 +128,7 @@ describe('getDashboard — shaping', () => {
     expect(result.stats.revenueCents).toBe(0);
   });
 
-  it('sums capacity across tiers', async () => {
+  it('sums capacity across ticket types', async () => {
     const { prisma } = fakePrisma({
       events: [
         {

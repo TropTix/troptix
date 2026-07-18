@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { DollarSign, Plus, Ticket } from 'lucide-react';
 import { listTicketTypes, NotFoundError } from '@troptix/api/server';
-import type { SaleState, TicketTierRow, TicketTypesView } from '@troptix/api';
+import type { SaleState, TicketTypeRow, TicketTypesView } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,13 +48,13 @@ export default async function EventTicketsPage({
     throw error;
   }
 
-  const { tiers, summary } = view;
+  const { ticketTypes, summary } = view;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Ticket types</h1>
-        {/* Adding a tier is first-class here — including after go-live. */}
+        {/* Adding a ticketType is first-class here — including after go-live. */}
         <Button asChild>
           <Link href={`/organizer/events/${eventId}/tickets/new`}>
             <Plus className="mr-2 h-4 w-4" />
@@ -78,13 +78,13 @@ export default async function EventTicketsPage({
         />
       </section>
 
-      {tiers.length === 0 ? (
+      {ticketTypes.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <div>
               <p className="font-medium">No ticket types yet</p>
               <p className="text-sm text-muted-foreground">
-                Add a tier to start selling.
+                Add a ticketType to start selling.
               </p>
             </div>
             <Button asChild size="sm">
@@ -96,9 +96,9 @@ export default async function EventTicketsPage({
         </Card>
       ) : (
         <ul className="space-y-3">
-          {tiers.map((tier) => (
-            <li key={tier.id}>
-              <TierRow tier={tier} eventId={eventId} />
+          {ticketTypes.map((ticketType) => (
+            <li key={ticketType.id}>
+              <TicketTypeCard ticketType={ticketType} eventId={eventId} />
             </li>
           ))}
         </ul>
@@ -134,31 +134,38 @@ function SummaryCard({
   );
 }
 
-function TierRow({ tier, eventId }: { tier: TicketTierRow; eventId: string }) {
-  const soldPercent = tier.capacity > 0 ? (tier.sold / tier.capacity) * 100 : 0;
-  const state = SALE_STATE[tier.saleState];
+function TicketTypeCard({
+  ticketType,
+  eventId,
+}: {
+  ticketType: TicketTypeRow;
+  eventId: string;
+}) {
+  const soldPercent =
+    ticketType.capacity > 0 ? (ticketType.sold / ticketType.capacity) * 100 : 0;
+  const state = SALE_STATE[ticketType.saleState];
 
   return (
     <Link
-      href={`/organizer/events/${eventId}/tickets/${tier.id}`}
+      href={`/organizer/events/${eventId}/tickets/${ticketType.id}`}
       className="block rounded-lg border p-4 transition-colors hover:border-primary/50"
     >
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="truncate font-medium" title={tier.name}>
-              {tier.name}
+            <span className="truncate font-medium" title={ticketType.name}>
+              {ticketType.name}
             </span>
             <Badge variant={state.variant} className="shrink-0">
               {state.label}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            {formatCents(tier.priceCents)}
+            {formatCents(ticketType.priceCents)}
           </p>
         </div>
         <div className="text-right">
-          <p className="font-medium">{formatCents(tier.revenueCents)}</p>
+          <p className="font-medium">{formatCents(ticketType.revenueCents)}</p>
           <p className="text-xs text-muted-foreground">revenue</p>
         </div>
       </div>
@@ -166,7 +173,8 @@ function TierRow({ tier, eventId }: { tier: TicketTierRow; eventId: string }) {
       <div className="mt-3 space-y-1">
         <Progress value={soldPercent} className="h-1.5" />
         <p className="text-xs text-muted-foreground">
-          {tier.sold.toLocaleString()} / {tier.capacity.toLocaleString()} sold
+          {ticketType.sold.toLocaleString()} /{' '}
+          {ticketType.capacity.toLocaleString()} sold
         </p>
       </div>
     </Link>

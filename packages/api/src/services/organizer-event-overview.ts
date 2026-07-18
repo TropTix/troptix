@@ -2,7 +2,7 @@
  * Screen C — the `/organizer/events/[id]` overview read.
  *
  * The event's service center: headline vitals, a revenue-over-time chart, the
- * per-tier breakdown, a door check-in summary, and a peek at recent orders.
+ * per-ticket-type breakdown, a door check-in summary, and a peek at recent orders.
  * Pure over an injected `prisma`; authorization is the shared scope seam.
  *
  * Ownership is the where clause: the event is fetched scoped to the resolved
@@ -13,18 +13,18 @@
  * Two revenue sources, each canonical for its level:
  *   - vitals.revenueCents — Σ Order.subtotal, the same "Ticket revenue" the
  *     dashboard reports.
- *   - tier / series revenue — Σ Tickets.subtotal, so a tier maps to its own
+ *   - ticketType / series revenue — Σ Tickets.subtotal, so a ticketType maps to its own
  *     tickets.
  * They track closely (an order's subtotal is the sum of its tickets') but
  * aren't guaranteed cent-equal — different columns, each rounded at its own
- * granularity — so treat the tier column as ≈ the event total, not a checksum.
+ * granularity — so treat the ticketType column as ≈ the event total, not a checksum.
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type {
   EventOverview,
   EventRevenuePoint,
-  EventTierBreakdown,
+  TicketTypeBreakdown,
   ViewAsInput,
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
@@ -36,8 +36,8 @@ import { resolveOrganizerScope } from './organizer-scope';
 /** Chart never shows more than this many days; older events start at day −29. */
 const MAX_SERIES_DAYS = 30;
 
-/** Per-tier `_count` + `_sum.subtotal` from the tickets group-by. */
-interface TierRollup {
+/** Per-ticketType `_count` + `_sum.subtotal` from the tickets group-by. */
+interface TicketTypeRollup {
   ticketTypeId: string | null;
   _count: { _all: number };
   _sum: { subtotal: number | null };
@@ -90,7 +90,7 @@ export async function getEventOverview(
   const created = startOfUtcDay(event.createdAt);
   const seriesFrom = created > earliest ? created : earliest;
 
-  const [revenue, tierRollups, seriesRows, checkedIn, recentOrderRows] =
+  const [revenue, rollups, seriesRows, checkedIn, recentOrderRows] =
     await Promise.all([
       prisma.orders.aggregate({
         _sum: { subtotal: true },
@@ -98,7 +98,7 @@ export async function getEventOverview(
         where: { eventId, status: 'COMPLETED' },
       }),
 
-      // Per-tier sold (count) + revenue (Σ ticket subtotal), completed only.
+      // Per-ticketType sold (count) + revenue (Σ ticket subtotal), completed only.
       prisma.tickets.groupBy({
         by: ['ticketTypeId'],
         where: { eventId, order: { status: 'COMPLETED' } },
@@ -107,7 +107,7 @@ export async function getEventOverview(
       }),
 
       // Daily revenue + tickets, bucketed in SQL. Revenue is Σ ticket subtotal
-      // so it reconciles with the per-tier breakdown.
+      // so it reconciles with the per-ticket-type breakdown.
       //
       // `AT TIME ZONE 'UTC'` re-tags the truncated naive `timestamp` as a
       // `timestamptz`: without it, node-postgres parses the bucket in the
@@ -140,12 +140,15 @@ export async function getEventOverview(
       ),
     ]);
 
-  const tiers = buildTiers(event.ticketTypes, tierRollups);
-  const capacity = tiers.reduce((total, tier) => total + tier.capacity, 0);
+  const ticketTypes = buildTicketTypes(event.ticketTypes, rollups);
+  const capacity = ticketTypes.reduce(
+    (total, ticketType) => total + ticketType.capacity,
+    0
+  );
   // Every completed ticket — including any with a null ticketTypeId, which the
-  // per-tier breakdown can't show. So `sold` matches the daily series and the
-  // check-in total, even if it exceeds the tiers' visible sum.
-  const sold = tierRollups.reduce((total, row) => total + row._count._all, 0);
+  // per-ticket-type breakdown can't show. So `sold` matches the daily series and the
+  // check-in total, even if it exceeds the ticketTypes' visible sum.
+  const sold = rollups.reduce((total, row) => total + row._count._all, 0);
 
   return {
     event: {
@@ -163,34 +166,34 @@ export async function getEventOverview(
       ordersCount: revenue._count,
     },
     revenueSeries: buildRevenueSeries(seriesRows, seriesFrom, startOfToday),
-    tiers,
+    ticketTypes,
     checkIn: { checkedIn, total: sold },
     recentOrders: recentOrderRows.map(toRecentOrder),
   };
 }
 
-function buildTiers(
+function buildTicketTypes(
   ticketTypes: {
     id: string;
     name: string;
     capacity: number;
   }[],
-  rollups: TierRollup[]
-): EventTierBreakdown[] {
-  const byTier = new Map(
+  rollups: TicketTypeRollup[]
+): TicketTypeBreakdown[] {
+  const byType = new Map(
     rollups.map((row) => [
       row.ticketTypeId,
       { sold: row._count._all, revenue: row._sum.subtotal },
     ])
   );
 
-  return ticketTypes.map((tier) => {
-    const rollup = byTier.get(tier.id);
+  return ticketTypes.map((ticketType) => {
+    const rollup = byType.get(ticketType.id);
     return {
-      id: tier.id,
-      name: tier.name,
+      id: ticketType.id,
+      name: ticketType.name,
       sold: rollup?.sold ?? 0,
-      capacity: tier.capacity,
+      capacity: ticketType.capacity,
       revenueCents: toCents(rollup?.revenue),
     };
   });

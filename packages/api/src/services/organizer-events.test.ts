@@ -125,7 +125,7 @@ describe('listOrganizerEvents — shaping', () => {
     ]);
   });
 
-  it('sums capacity across tiers', async () => {
+  it('sums capacity across ticket types', async () => {
     const { prisma } = fakePrisma({
       events: [
         event({

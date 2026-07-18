@@ -12,7 +12,7 @@ import {
 import { getEventOverview, NotFoundError } from '@troptix/api/server';
 import type {
   EventOverview,
-  EventTierBreakdown,
+  TicketTypeBreakdown,
   DashboardRecentOrder,
 } from '@troptix/api';
 
@@ -60,7 +60,7 @@ export default async function EventOverviewPage({
     throw error;
   }
 
-  const { event, vitals, revenueSeries, tiers, checkIn, recentOrders } =
+  const { event, vitals, revenueSeries, ticketTypes, checkIn, recentOrders } =
     overview;
 
   return (
@@ -130,7 +130,7 @@ export default async function EventOverviewPage({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="lg:col-span-2">
-          <TicketOverview tiers={tiers} />
+          <TicketOverview ticketTypes={ticketTypes} />
         </section>
         <section className="space-y-6">
           <CheckInCard
@@ -172,34 +172,40 @@ function VitalCard({
   );
 }
 
-function TicketOverview({ tiers }: { tiers: EventTierBreakdown[] }) {
+function TicketOverview({
+  ticketTypes,
+}: {
+  ticketTypes: TicketTypeBreakdown[];
+}) {
   return (
     <Card className="h-full">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Ticket types</CardTitle>
       </CardHeader>
       <CardContent>
-        {tiers.length === 0 ? (
+        {ticketTypes.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No ticket types yet.
           </p>
         ) : (
           <ul className="divide-y">
-            {tiers.map((tier) => {
+            {ticketTypes.map((ticketType) => {
               const percent =
-                tier.capacity > 0 ? (tier.sold / tier.capacity) * 100 : 0;
+                ticketType.capacity > 0
+                  ? (ticketType.sold / ticketType.capacity) * 100
+                  : 0;
               return (
-                <li key={tier.id} className="space-y-2 py-3 first:pt-0">
+                <li key={ticketType.id} className="space-y-2 py-3 first:pt-0">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium">{tier.name}</span>
+                    <span className="font-medium">{ticketType.name}</span>
                     <span className="text-sm text-muted-foreground">
-                      {formatCents(tier.revenueCents)}
+                      {formatCents(ticketType.revenueCents)}
                     </span>
                   </div>
                   <Progress value={percent} className="h-1.5" />
                   <p className="text-xs text-muted-foreground">
-                    {tier.sold.toLocaleString()} /{' '}
-                    {tier.capacity.toLocaleString()} sold
+                    {ticketType.sold.toLocaleString()} /{' '}
+                    {ticketType.capacity.toLocaleString()} sold
                   </p>
                 </li>
               );

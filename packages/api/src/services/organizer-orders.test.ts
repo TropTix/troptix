@@ -142,7 +142,7 @@ describe('getOrderDetail', () => {
     );
   });
 
-  it('groups tickets into one line item per tier', async () => {
+  it('groups tickets into one line item per ticket type', async () => {
     const { prisma } = fakePrisma({ order: order() });
     const detail = await getOrderDetail(prisma, OWNER, 'e1', 'o1');
     expect(detail.lineItems).toEqual([
@@ -151,8 +151,8 @@ describe('getOrderDetail', () => {
     ]);
   });
 
-  it('prices lines from what was paid, not the current tier price', async () => {
-    // Tier list price is 20, but these were bought at a 15 discount.
+  it('prices lines from what was paid, not the current ticket type price', async () => {
+    // Ticket type list price is 20, but these were bought at a 15 discount.
     const { prisma } = fakePrisma({
       order: order({
         tickets: [
@@ -167,7 +167,7 @@ describe('getOrderDetail', () => {
     ]);
   });
 
-  it('counts a deleted tier’s tickets at what was paid, not $0', async () => {
+  it('counts a deleted ticket type’s tickets at what was paid, not $0', async () => {
     const { prisma } = fakePrisma({
       order: order({ tickets: [{ subtotal: 25, ticketType: null }] }),
     });
@@ -182,7 +182,7 @@ describe('getOrderDetail', () => {
     ]);
   });
 
-  it('falls back to the tier price for a legacy ticket with no subtotal', async () => {
+  it('falls back to the ticket type price for a legacy ticket with no subtotal', async () => {
     const { prisma } = fakePrisma({
       order: order({
         tickets: [
@@ -220,7 +220,7 @@ describe('getOrderDetail', () => {
     });
   });
 
-  it('has no payment method for a free/legacy order and labels an unknown tier', async () => {
+  it('has no payment method for a free/legacy order and labels an unknown ticket type', async () => {
     const { prisma } = fakePrisma({
       order: order({
         cardType: null,

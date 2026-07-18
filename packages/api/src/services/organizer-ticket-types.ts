@@ -1,14 +1,14 @@
 /**
  * Screen E — the `/organizer/events/[id]/tickets` read.
  *
- * The event's tiers, sales-first: what each one costs, how it's selling, where
+ * The event's ticket types, sales-first: what each one costs, how it's selling, where
  * it sits in its sale window, and what it has earned. Pure over an injected
  * `prisma`; authorization is the shared scope seam, with ownership as the
  * event's where clause.
  *
- * `sold` / `capacity` come from the tier's own counters — the one inventory
+ * `sold` / `capacity` come from the ticket type's own counters — the one inventory
  * standard (availability = capacity - reserved - sold). Revenue is Σ of the
- * tier's completed-ticket subtotals, the same basis the event overview uses,
+ * ticket type's completed-ticket subtotals, the same basis the event overview uses,
  * so the two screens report the same number.
  *
  * Read-only: create / edit / duplicate / delete still run through the existing
@@ -17,7 +17,7 @@
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type {
-  TicketTierRow,
+  TicketTypeRow,
   TicketTypesView,
   ViewAsInput,
 } from '../contracts/organizer';
@@ -26,8 +26,8 @@ import { toCents } from './_shared/organizerMapping';
 import { getSaleState } from './_shared/saleState';
 import { resolveOrganizerScope } from './organizer-scope';
 
-/** Per-tier `_sum.subtotal` from the completed-ticket rollup. */
-interface TierRevenueRollup {
+/** Per-ticketType `_sum.subtotal` from the completed-ticket rollup. */
+interface TicketTypeRollup {
   ticketTypeId: string | null;
   _sum: { subtotal: number | null };
 }
@@ -78,19 +78,19 @@ export async function listTicketTypes(
     throw new NotFoundError('Event not found');
   }
 
-  const tiers = buildTiers(event.ticketTypes, revenueRollups, now);
+  const ticketTypes = buildTicketTypes(event.ticketTypes, revenueRollups, now);
 
   return {
-    tiers,
+    ticketTypes,
     summary: {
-      sold: sum(tiers, (tier) => tier.sold),
-      capacity: sum(tiers, (tier) => tier.capacity),
-      revenueCents: sum(tiers, (tier) => tier.revenueCents),
+      sold: sum(ticketTypes, (ticketType) => ticketType.sold),
+      capacity: sum(ticketTypes, (ticketType) => ticketType.capacity),
+      revenueCents: sum(ticketTypes, (ticketType) => ticketType.revenueCents),
     },
   };
 }
 
-function buildTiers(
+function buildTicketTypes(
   ticketTypes: {
     id: string;
     name: string;
@@ -101,23 +101,23 @@ function buildTiers(
     saleStartsAt: Date;
     saleEndsAt: Date;
   }[],
-  rollups: TierRevenueRollup[],
+  rollups: TicketTypeRollup[],
   now: Date
-): TicketTierRow[] {
-  const revenueByTier = new Map(
+): TicketTypeRow[] {
+  const revenueByType = new Map(
     rollups.map((row) => [row.ticketTypeId, row._sum.subtotal])
   );
 
-  return ticketTypes.map((tier) => ({
-    id: tier.id,
-    name: tier.name,
-    // Prefer the integer-cents column; fall back to the legacy float for tiers
+  return ticketTypes.map((ticketType) => ({
+    id: ticketType.id,
+    name: ticketType.name,
+    // Prefer the integer-cents column; fall back to the legacy float for ticket types
     // written before that cutover (roadmap 2.12).
-    priceCents: tier.priceCents ?? toCents(tier.price),
-    sold: tier.sold,
-    capacity: tier.capacity,
-    revenueCents: toCents(revenueByTier.get(tier.id)),
-    saleState: getSaleState(tier, now),
+    priceCents: ticketType.priceCents ?? toCents(ticketType.price),
+    sold: ticketType.sold,
+    capacity: ticketType.capacity,
+    revenueCents: toCents(revenueByType.get(ticketType.id)),
+    saleState: getSaleState(ticketType, now),
   }));
 }
 

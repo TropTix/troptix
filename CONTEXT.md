@@ -40,6 +40,12 @@ What an Organizer actually receives — ticket revenue net of absorbed fees and 
 
 ### Ticketing
 
+**Ticket type**:
+The **offer** an Event sells — a named, priced bucket of inventory ("General Admission, $20, 100 available, on sale Jul 1–31"). An Event has many. Distinct from the **tickets** it issues: buying 3 GA admissions references one Ticket type and creates three `Tickets` rows, each with its own QR, holder and check-in. Inventory is three counters — `capacity` (immutable total), `reserved` (held by live checkout holds), `sold` (confirmed) — where **availability = capacity − reserved − sold**; the `reserved` term is what makes concurrent checkout safe. Its **sale window** (`saleStartsAt`/`saleEndsAt`) is independent of the Event's own start/end, so a type can stop selling before doors or open after the Event is announced. _Avoid_: "tier" (a synonym that drifted in through the dashboard plan — the model, the UI and this glossary all say ticket type).
+
+**Tickets issued vs sold**:
+Two honest counts of the same thing, and they must not be conflated. A Ticket type's `sold` **counter** is inventory sold — the number availability is computed against. Counting `Tickets` **rows** is tickets _issued_ — what you check people in against, and the only one that includes tickets whose Ticket type was since deleted (`ticketTypeId` is nullable). They agree in normal operation; where a surface must pick, per-type figures use the counter and event-level figures paired with check-in use rows.
+
 **RSVP ticket**:
 A free ticket (`price = 0`). Any Organizer can create these — no approval needed. _Avoid_: "free ticket type" as a separate concept; RSVP _is_ the free ticket.
 

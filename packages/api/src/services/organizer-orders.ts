@@ -160,12 +160,12 @@ function fullName(order: {
 }
 
 /**
- * Collapse an order's tickets into one line per tier. The line subtotal is the
+ * Collapse an order's tickets into one line per ticket type. The line subtotal is the
  * sum of what was actually paid (`Tickets.subtotal`), so the line items
- * reconcile with the order's subtotal — a deleted or repriced tier can't drift
- * them apart. Falls back to the tier's list price for legacy tickets that
+ * reconcile with the order's subtotal — a deleted or repriced ticket type can't drift
+ * them apart. Falls back to the ticket type's list price for legacy tickets that
  * predate per-ticket subtotals. The unit price is the per-ticket average, which
- * equals the price when a tier's tickets all cost the same (the common case).
+ * equals the price when a ticket type's tickets all cost the same (the common case).
  */
 function toLineItems(
   tickets: {
@@ -173,7 +173,7 @@ function toLineItems(
     ticketType: { id: string; name: string; price: number } | null;
   }[]
 ): OrderLineItem[] {
-  const byTier = new Map<
+  const byType = new Map<
     string,
     { name: string; quantity: number; subtotalDollars: number }
   >();
@@ -181,12 +181,12 @@ function toLineItems(
   for (const ticket of tickets) {
     const key = ticket.ticketType?.id ?? '__none__';
     const paid = ticket.subtotal ?? ticket.ticketType?.price ?? 0;
-    const existing = byTier.get(key);
+    const existing = byType.get(key);
     if (existing) {
       existing.quantity += 1;
       existing.subtotalDollars += paid;
     } else {
-      byTier.set(key, {
+      byType.set(key, {
         name: ticket.ticketType?.name ?? 'Ticket',
         quantity: 1,
         subtotalDollars: paid,
@@ -194,12 +194,12 @@ function toLineItems(
     }
   }
 
-  return Array.from(byTier.values()).map((tier) => {
-    const subtotalCents = toCents(tier.subtotalDollars);
+  return Array.from(byType.values()).map((type) => {
+    const subtotalCents = toCents(type.subtotalDollars);
     return {
-      name: tier.name,
-      quantity: tier.quantity,
-      unitPriceCents: Math.round(subtotalCents / tier.quantity),
+      name: type.name,
+      quantity: type.quantity,
+      unitPriceCents: Math.round(subtotalCents / type.quantity),
       subtotalCents,
     };
   });

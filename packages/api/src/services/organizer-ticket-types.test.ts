@@ -1,7 +1,7 @@
 /**
  * Unit tests for the Screen E ticket-types read. Pure over an injected fake
  * `prisma` (ADR 0010). Covers the shared authorization seam, the sale-window
- * states, the priceCents fallback, per-tier revenue, and the summary totals.
+ * states, the priceCents fallback, per-ticket-type revenue, and the summary totals.
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
@@ -14,7 +14,7 @@ const NOW = new Date('2026-07-15T12:00:00Z');
 const OWNER: Actor = { kind: 'user', userId: 'owner-1', role: 'PATRON' };
 const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 
-const tier = (over: Record<string, unknown> = {}) => ({
+const ticketType = (over: Record<string, unknown> = {}) => ({
   id: 't-ga',
   name: 'GA',
   price: 20,
@@ -29,8 +29,8 @@ const tier = (over: Record<string, unknown> = {}) => ({
 function fakePrisma(
   opts: {
     email?: string;
-    event?: unknown; // undefined → owned with one tier; null → not found
-    tiers?: unknown[];
+    event?: unknown; // undefined → owned with one ticketType; null → not found
+    ticketTypes?: unknown[];
     revenue?: unknown[];
   } = {}
 ) {
@@ -38,7 +38,7 @@ function fakePrisma(
     .fn()
     .mockResolvedValue(
       opts.event === undefined
-        ? { id: 'e1', ticketTypes: opts.tiers ?? [tier()] }
+        ? { id: 'e1', ticketTypes: opts.ticketTypes ?? [ticketType()] }
         : opts.event
     );
   const ticketsGroupBy = vi.fn().mockResolvedValue(opts.revenue ?? []);
@@ -133,11 +133,11 @@ describe('listTicketTypes — authorization', () => {
 });
 
 describe('listTicketTypes — shaping', () => {
-  it('shapes a tier with its counters, price, sale state, and revenue', async () => {
+  it('shapes a ticketType with its counters, price, sale state, and revenue', async () => {
     const { prisma } = fakePrisma({ revenue: [revenue('t-ga', 800)] });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
 
-    expect(result.tiers).toEqual([
+    expect(result.ticketTypes).toEqual([
       {
         id: 't-ga',
         name: 'GA',
@@ -152,24 +152,27 @@ describe('listTicketTypes — shaping', () => {
 
   it('falls back to the legacy float price when priceCents is null', async () => {
     const { prisma } = fakePrisma({
-      tiers: [tier({ priceCents: null, price: 12.5 })],
+      ticketTypes: [ticketType({ priceCents: null, price: 12.5 })],
     });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
-    expect(result.tiers[0].priceCents).toBe(1250);
+    expect(result.ticketTypes[0].priceCents).toBe(1250);
   });
 
-  it('reports zero revenue for a tier with no completed tickets', async () => {
+  it('reports zero revenue for a ticketType with no completed tickets', async () => {
     const { prisma } = fakePrisma({ revenue: [] });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
-    expect(result.tiers[0].revenueCents).toBe(0);
+    expect(result.ticketTypes[0].revenueCents).toBe(0);
   });
 
-  it('derives each tier’s sale state independently', async () => {
+  it('derives each ticketType’s sale state independently', async () => {
     const { prisma } = fakePrisma({
-      tiers: [
-        tier({ id: 'early', saleEndsAt: new Date('2026-07-05T00:00:00Z') }),
-        tier({ id: 'now' }),
-        tier({
+      ticketTypes: [
+        ticketType({
+          id: 'early',
+          saleEndsAt: new Date('2026-07-05T00:00:00Z'),
+        }),
+        ticketType({ id: 'now' }),
+        ticketType({
           id: 'later',
           saleStartsAt: new Date('2026-08-01T00:00:00Z'),
           saleEndsAt: new Date('2026-08-10T00:00:00Z'),
@@ -177,7 +180,7 @@ describe('listTicketTypes — shaping', () => {
       ],
     });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
-    expect(result.tiers.map((t) => [t.id, t.saleState])).toEqual([
+    expect(result.ticketTypes.map((t) => [t.id, t.saleState])).toEqual([
       ['early', 'Ended'],
       ['now', 'OnSale'],
       ['later', 'Scheduled'],
@@ -186,9 +189,9 @@ describe('listTicketTypes — shaping', () => {
 
   it('summarises sold, capacity and revenue as the sum of the rows', async () => {
     const { prisma } = fakePrisma({
-      tiers: [
-        tier({ id: 't-ga', sold: 40, capacity: 100 }),
-        tier({ id: 't-vip', sold: 5, capacity: 20 }),
+      ticketTypes: [
+        ticketType({ id: 't-ga', sold: 40, capacity: 100 }),
+        ticketType({ id: 't-vip', sold: 5, capacity: 20 }),
       ],
       revenue: [revenue('t-ga', 800), revenue('t-vip', 250)],
     });
@@ -201,14 +204,14 @@ describe('listTicketTypes — shaping', () => {
     });
     // The header must equal the rows it sits above.
     expect(result.summary.revenueCents).toBe(
-      result.tiers.reduce((n, t) => n + t.revenueCents, 0)
+      result.ticketTypes.reduce((n, t) => n + t.revenueCents, 0)
     );
   });
 
-  it('returns an empty view for an event with no tiers', async () => {
-    const { prisma } = fakePrisma({ tiers: [] });
+  it('returns an empty view for an event with no ticketTypes', async () => {
+    const { prisma } = fakePrisma({ ticketTypes: [] });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
-    expect(result.tiers).toEqual([]);
+    expect(result.ticketTypes).toEqual([]);
     expect(result.summary).toEqual({ sold: 0, capacity: 0, revenueCents: 0 });
   });
 });
