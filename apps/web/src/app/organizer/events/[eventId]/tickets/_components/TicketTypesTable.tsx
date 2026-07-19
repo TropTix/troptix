@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
 import type { SaleState, TicketTypeRow } from '@troptix/api';
@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatCents, getDateFormatter } from '@/lib/dateUtils';
+import { formatPriceCents, getDateFormatter } from '@/lib/dateUtils';
 
 const SALE_STATE: Record<
   SaleState,
@@ -25,11 +25,6 @@ const SALE_STATE: Record<
   Scheduled: { label: 'Scheduled', variant: 'outline' },
   Ended: { label: 'Ended', variant: 'secondary' },
 };
-
-/** Free reads as FREE rather than $0.00 — it's a different kind of ticket. */
-function price(cents: number) {
-  return cents === 0 ? 'FREE' : formatCents(cents);
-}
 
 function saleDate(iso: string) {
   return getDateFormatter(new Date(iso), 'MMM d, yyyy');
@@ -44,12 +39,11 @@ export function TicketTypesTable({
 }) {
   const [query, setQuery] = useState('');
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q === ''
+  const q = query.trim().toLowerCase();
+  const visible =
+    q === ''
       ? ticketTypes
       : ticketTypes.filter((t) => t.name.toLowerCase().includes(q));
-  }, [ticketTypes, query]);
 
   return (
     <div className="space-y-4">
@@ -90,7 +84,7 @@ export function TicketTypesTable({
                         {ticketType.name}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {price(ticketType.displayPriceCents)}
+                        {formatPriceCents(ticketType.displayPriceCents)}
                       </span>
                     </div>
                     <SaleStateBadge state={ticketType.saleState} />
@@ -141,10 +135,10 @@ export function TicketTypesTable({
                       <SaleStateBadge state={ticketType.saleState} />
                     </TableCell>
                     <TableCell className="text-right">
-                      {price(ticketType.grossPriceCents)}
+                      {formatPriceCents(ticketType.grossPriceCents)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {price(ticketType.displayPriceCents)}
+                      {formatPriceCents(ticketType.displayPriceCents)}
                     </TableCell>
                     <TableCell>
                       {ticketType.sold.toLocaleString()} /{' '}

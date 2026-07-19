@@ -11,8 +11,9 @@
  * ticket type's completed-ticket subtotals, the same basis the event overview uses,
  * so the two screens report the same number.
  *
- * Read-only: create / edit / duplicate / delete still run through the existing
- * ticket actions; moving those behind this seam is a follow-up.
+ * Read-only: create and edit still run through the existing ticket actions;
+ * moving those behind this seam is a follow-up, as are duplicate (#452) and
+ * delete, which do not exist yet.
  */
 import type { PrismaClient, TicketFeeStructure } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -78,15 +79,19 @@ export async function listTicketTypes(
 
   const ticketTypes = buildTicketTypes(event.ticketTypes, rollups, now);
 
-  return {
-    ticketTypes,
-    summary: {
-      sold: sum(ticketTypes, (ticketType) => ticketType.sold),
-      capacity: sum(ticketTypes, (ticketType) => ticketType.capacity),
-      revenueCents: sum(ticketTypes, (ticketType) => ticketType.revenueCents),
-      onSale: ticketTypes.filter((t) => t.saleState === 'OnSale').length,
+  // The header totals are the rows summed — one pass, so they can't disagree.
+  const summary = ticketTypes.reduce(
+    (acc, ticketType) => {
+      acc.sold += ticketType.sold;
+      acc.capacity += ticketType.capacity;
+      acc.revenueCents += ticketType.revenueCents;
+      if (ticketType.saleState === 'OnSale') acc.onSale += 1;
+      return acc;
     },
-  };
+    { sold: 0, capacity: 0, revenueCents: 0, onSale: 0 }
+  );
+
+  return { ticketTypes, summary };
 }
 
 function buildTicketTypes(
@@ -138,8 +143,4 @@ function displayPriceOf(
   return fees === 'PASS_TICKET_FEES'
     ? grossPriceCents + calculateFeesCents(grossPriceCents)
     : grossPriceCents;
-}
-
-function sum<T>(items: T[], of: (item: T) => number): number {
-  return items.reduce((total, item) => total + of(item), 0);
 }

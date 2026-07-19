@@ -13,11 +13,12 @@
  * Two revenue sources, each canonical for its level:
  *   - vitals.revenueCents — Σ Order.subtotal, the same "Ticket revenue" the
  *     dashboard reports.
- *   - ticketType / series revenue — Σ Tickets.subtotal, so a ticketType maps to its own
- *     tickets.
+ *   - per-ticket-type / series revenue — Σ Tickets.subtotal, so a ticket type
+ *     maps to its own tickets.
  * They track closely (an order's subtotal is the sum of its tickets') but
  * aren't guaranteed cent-equal — different columns, each rounded at its own
- * granularity — so treat the ticketType column as ≈ the event total, not a checksum.
+ * granularity — so treat the per-type column as ≈ the event total, not a
+ * checksum.
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';

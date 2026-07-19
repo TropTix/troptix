@@ -30,7 +30,7 @@ const ticketType = (over: Record<string, unknown> = {}) => ({
 function fakePrisma(
   opts: {
     email?: string;
-    event?: unknown; // undefined → owned with one ticketType; null → not found
+    event?: unknown; // undefined → owned with one ticket type; null → not found
     ticketTypes?: unknown[];
     revenue?: unknown[];
   } = {}
@@ -134,7 +134,7 @@ describe('listTicketTypes — authorization', () => {
 });
 
 describe('listTicketTypes — shaping', () => {
-  it('shapes a ticketType with its counters, price, sale state, and revenue', async () => {
+  it('shapes a ticket type with its counters, price, sale state, and revenue', async () => {
     const { prisma } = fakePrisma({ revenue: [revenue('t-ga', 800)] });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
 
@@ -188,13 +188,13 @@ describe('listTicketTypes — shaping', () => {
     }
   });
 
-  it('reports zero revenue for a ticketType with no completed tickets', async () => {
+  it('reports zero revenue for a ticket type with no completed tickets', async () => {
     const { prisma } = fakePrisma({ revenue: [] });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
     expect(result.ticketTypes[0].revenueCents).toBe(0);
   });
 
-  it('derives each ticketType’s sale state independently', async () => {
+  it('derives each ticket type’s sale state independently', async () => {
     const { prisma } = fakePrisma({
       ticketTypes: [
         ticketType({
