@@ -23,6 +23,7 @@ const ticketType = (over: Record<string, unknown> = {}) => ({
   sold: 40,
   saleStartsAt: new Date('2026-07-01T00:00:00Z'),
   saleEndsAt: new Date('2026-07-31T00:00:00Z'),
+  ticketingFees: 'PASS_TICKET_FEES',
   ...over,
 });
 
@@ -141,11 +142,15 @@ describe('listTicketTypes — shaping', () => {
       {
         id: 't-ga',
         name: 'GA',
-        priceCents: 2000,
+        // $20.00 set; the attendee pays 8% + $0.50 on top (PASS).
+        grossPriceCents: 2000,
+        displayPriceCents: 2210,
         sold: 40,
         capacity: 100,
         revenueCents: 80000,
         saleState: 'OnSale',
+        saleStartsAt: '2026-07-01T00:00:00.000Z',
+        saleEndsAt: '2026-07-31T00:00:00.000Z',
       },
     ]);
   });
@@ -155,7 +160,32 @@ describe('listTicketTypes — shaping', () => {
       ticketTypes: [ticketType({ priceCents: null, price: 12.5 })],
     });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
-    expect(result.ticketTypes[0].priceCents).toBe(1250);
+    expect(result.ticketTypes[0].grossPriceCents).toBe(1250);
+  });
+
+  it('absorbs the fee instead of adding it when the type absorbs fees', async () => {
+    const { prisma } = fakePrisma({
+      ticketTypes: [ticketType({ ticketingFees: 'ABSORB_TICKET_FEES' })],
+    });
+    const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
+    // The attendee pays the sticker price; the organizer eats the fee.
+    expect(result.ticketTypes[0].displayPriceCents).toBe(2000);
+    expect(result.ticketTypes[0].grossPriceCents).toBe(2000);
+  });
+
+  it('charges no fee on a free type, whichever fee structure it carries', async () => {
+    for (const fees of ['PASS_TICKET_FEES', 'ABSORB_TICKET_FEES']) {
+      const { prisma } = fakePrisma({
+        ticketTypes: [
+          ticketType({ price: 0, priceCents: 0, ticketingFees: fees }),
+        ],
+      });
+      const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
+      expect(result.ticketTypes[0]).toMatchObject({
+        grossPriceCents: 0,
+        displayPriceCents: 0,
+      });
+    }
   });
 
   it('reports zero revenue for a ticketType with no completed tickets', async () => {

@@ -14,7 +14,7 @@
  * Read-only: create / edit / duplicate / delete still run through the existing
  * ticket actions; moving those behind this seam is a follow-up.
  */
-import type { PrismaClient } from '@troptix/db';
+import type { PrismaClient, TicketFeeStructure } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type {
   TicketTypeRow,
@@ -22,6 +22,7 @@ import type {
   ViewAsInput,
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
+import { calculateFeesCents } from './_shared/fees';
 import { toCents } from './_shared/organizerMapping';
 import {
   revenueCentsByTicketType,
@@ -31,8 +32,6 @@ import {
 } from './_shared/organizerReads';
 import { getSaleState } from './_shared/saleState';
 import { resolveOrganizerScope } from './organizer-scope';
-
-/** Per-ticketType `_sum.subtotal` from the completed-ticket rollup. */
 
 export async function listTicketTypes(
   prisma: PrismaClient,
@@ -62,6 +61,7 @@ export async function listTicketTypes(
             sold: true,
             saleStartsAt: true,
             saleEndsAt: true,
+            ticketingFees: true,
           },
           // Natural creation order; reordering is deferred (UX plan).
           orderBy: { createdAt: 'asc' },
@@ -99,20 +99,45 @@ function buildTicketTypes(
     sold: number;
     saleStartsAt: Date;
     saleEndsAt: Date;
+    ticketingFees: TicketFeeStructure;
   }[],
   rollups: TicketTypeRollupRow[],
   now: Date
 ): TicketTypeRow[] {
   const revenueByType = revenueCentsByTicketType(rollups);
 
-  return ticketTypes.map((ticketType) => ({
-    // The card the event overview also renders — same shape, same basis.
-    ...toTicketTypeBreakdown(ticketType, revenueByType),
+  return ticketTypes.map((ticketType) => {
     // Prefer the integer-cents column; fall back to the legacy float for ticket
     // types written before that cutover (roadmap 2.12).
-    priceCents: ticketType.priceCents ?? toCents(ticketType.price),
-    saleState: getSaleState(ticketType, now),
-  }));
+    const grossPriceCents = ticketType.priceCents ?? toCents(ticketType.price);
+
+    return {
+      // The card the event overview also renders — same shape, same basis.
+      ...toTicketTypeBreakdown(ticketType, revenueByType),
+      grossPriceCents,
+      displayPriceCents: displayPriceOf(
+        grossPriceCents,
+        ticketType.ticketingFees
+      ),
+      saleState: getSaleState(ticketType, now),
+      saleStartsAt: ticketType.saleStartsAt.toISOString(),
+      saleEndsAt: ticketType.saleEndsAt.toISOString(),
+    };
+  });
+}
+
+/**
+ * What the attendee is charged. `PASS_TICKET_FEES` adds the fee on top of the
+ * organizer's price; `ABSORB_TICKET_FEES` leaves the price alone and takes the
+ * fee out of the payout instead. A free type has no fee either way.
+ */
+function displayPriceOf(
+  grossPriceCents: number,
+  fees: TicketFeeStructure
+): number {
+  return fees === 'PASS_TICKET_FEES'
+    ? grossPriceCents + calculateFeesCents(grossPriceCents)
+    : grossPriceCents;
 }
 
 function sum<T>(items: T[], of: (item: T) => number): number {

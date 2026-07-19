@@ -2,9 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { DollarSign, Plus, Ticket } from 'lucide-react';
 import { listTicketTypes, NotFoundError } from '@troptix/api/server';
-import type { SaleState, TicketTypeRow, TicketTypesView } from '@troptix/api';
+import type { TicketTypesView } from '@troptix/api';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -13,19 +12,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { requireOrganizerActor } from '@/server/actor';
 import prisma from '@/server/prisma';
 import { formatCents } from '@/lib/dateUtils';
-
-const SALE_STATE: Record<
-  SaleState,
-  { label: string; variant: 'default' | 'outline' | 'secondary' }
-> = {
-  OnSale: { label: 'On sale', variant: 'default' },
-  Scheduled: { label: 'Scheduled', variant: 'outline' },
-  Ended: { label: 'Ended', variant: 'secondary' },
-};
+import { TicketTypesTable } from './_components/TicketTypesTable';
 
 export default async function EventTicketsPage({
   params,
@@ -91,7 +81,7 @@ export default async function EventTicketsPage({
             <div>
               <p className="font-medium">No ticket types yet</p>
               <p className="text-sm text-muted-foreground">
-                Add a ticketType to start selling.
+                Add a ticket type to start selling.
               </p>
             </div>
             <Button asChild size="sm">
@@ -102,13 +92,7 @@ export default async function EventTicketsPage({
           </CardContent>
         </Card>
       ) : (
-        <ul className="space-y-3">
-          {ticketTypes.map((ticketType) => (
-            <li key={ticketType.id}>
-              <TicketTypeCard ticketType={ticketType} eventId={eventId} />
-            </li>
-          ))}
-        </ul>
+        <TicketTypesTable ticketTypes={ticketTypes} eventId={eventId} />
       )}
     </div>
   );
@@ -138,52 +122,5 @@ function SummaryCard({
         <p className="text-xs text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
-  );
-}
-
-function TicketTypeCard({
-  ticketType,
-  eventId,
-}: {
-  ticketType: TicketTypeRow;
-  eventId: string;
-}) {
-  const soldPercent =
-    ticketType.capacity > 0 ? (ticketType.sold / ticketType.capacity) * 100 : 0;
-  const state = SALE_STATE[ticketType.saleState];
-
-  return (
-    <Link
-      href={`/organizer/events/${eventId}/tickets/${ticketType.id}`}
-      className="block rounded-lg border p-4 transition-colors hover:border-primary/50"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-medium" title={ticketType.name}>
-              {ticketType.name}
-            </span>
-            <Badge variant={state.variant} className="shrink-0">
-              {state.label}
-            </Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {formatCents(ticketType.priceCents)}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="font-medium">{formatCents(ticketType.revenueCents)}</p>
-          <p className="text-xs text-muted-foreground">revenue</p>
-        </div>
-      </div>
-
-      <div className="mt-3 space-y-1">
-        <Progress value={soldPercent} className="h-1.5" />
-        <p className="text-xs text-muted-foreground">
-          {ticketType.sold.toLocaleString()} /{' '}
-          {ticketType.capacity.toLocaleString()} sold
-        </p>
-      </div>
-    </Link>
   );
 }

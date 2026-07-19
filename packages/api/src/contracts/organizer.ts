@@ -235,8 +235,18 @@ export type SaleState = z.infer<typeof saleStateSchema>;
  * event overview shows, plus the price and sale-window state this screen manages.
  */
 export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
-  priceCents: z.number().int(),
+  /** The price the organizer set. What they earn per ticket under PASS. */
+  grossPriceCents: z.number().int(),
+  /**
+   * What the attendee is actually charged: gross + fee when the type passes
+   * fees on, gross when it absorbs them (the organizer eats the fee instead).
+   * Equal to `grossPriceCents` for free types, since a $0 ticket has no fee.
+   */
+  displayPriceCents: z.number().int(),
   saleState: saleStateSchema,
+  /** Venue-local sale window (ADR 0021). Both are always set. */
+  saleStartsAt: z.string().datetime(),
+  saleEndsAt: z.string().datetime(),
 });
 export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
 
