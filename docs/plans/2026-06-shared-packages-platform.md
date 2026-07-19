@@ -115,6 +115,8 @@ Mostly sequential (migration ordering is load-bearing). Each migration = its own
 
 ### Stage 3 — Clients _(∥ once contracts frozen)_
 
+> **Execution plan: [Stage 3 — Checkout Cutover](2026-06-stage-3-checkout-cutover.md)** (2026-06-12) — covers 3a plus the gated 1b migrations (M4–M13). 3b (organizer rewire) is deferred to the mobile rebuild.
+
 - **3a. Web checkout redesign** (first consumer; atomic cutover PR per #286): new reservation-aware checkout pages on `trpc.checkout.*` via `@trpc/react-query`; `/api/trpc/[trpc]/route.ts` App Router handler; server components call services directly or via `createCaller`. Replaces `useCheckout`/`useFetchCheckoutConfig`/`useApplyCode` and the old `CheckoutContainer`/`payment-form`.
 - **3b. Organizer rewire** ∥: add `@trpc/client` + `@trpc/react-query`, drop axios; `lib/trpc.ts` with `import type { AppRouter }`; hooks → `trpc.events.*` / `trpc.organizer.*` with the Supabase token via the client `headers` callback. **Delete `apps/organizer/hooks/types/Ticket.ts`** (enums now from `@troptix/db/types`).
 - **Delete** `apps/web/src/types/checkout.ts` (moved to `packages/api/contracts`).
