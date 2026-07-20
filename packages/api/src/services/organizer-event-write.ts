@@ -85,16 +85,22 @@ export async function updateEvent(
   const data = updateEventInputSchema.parse(input);
   const organizerUserId = await resolveOrganizerScope(prisma, actor);
 
-  const owned = await prisma.events.findFirst({
-    where: { id: eventId, organizerUserId, deletedAt: null },
-    select: { id: true },
-  });
+  // Ownership check and the org lookup are independent reads — one wave.
+  // Provisioning (a write) waits until ownership has passed, so probing a
+  // foreign event id can't leave side effects.
+  const [owned, existingOrg] = await Promise.all([
+    prisma.events.findFirst({
+      where: { id: eventId, organizerUserId, deletedAt: null },
+      select: { id: true },
+    }),
+    findOrganization(prisma, organizerUserId),
+  ]);
   if (!owned) {
     throw new NotFoundError('Event not found');
   }
-
-  // Keep the event pointed at the organizer's Organization + mirror its name.
-  const org = await resolveOrganization(prisma, organizerUserId);
+  // Keep the event pointed at the organizer's Organization + name mirror.
+  const org =
+    existingOrg ?? (await provisionOrganization(prisma, organizerUserId));
 
   await prisma.events.update({
     where: { id: eventId },
@@ -107,10 +113,27 @@ export async function updateEvent(
 }
 
 /**
- * The organizer's Organization (auto-created on first write). The signed-up
- * email seeds the display name only when the org doesn't exist yet.
+ * The organizer's Organization (auto-created on first write). The email
+ * lookup only seeds the display name at that one first creation, so it is
+ * only paid when no org exists yet — every later save is a single read.
  */
 async function resolveOrganization(
+  prisma: PrismaClient,
+  organizerUserId: string
+) {
+  const existing = await findOrganization(prisma, organizerUserId);
+  return existing ?? provisionOrganization(prisma, organizerUserId);
+}
+
+/** Read-only: same pick as ensureOrganizationForUser (oldest org wins). */
+function findOrganization(prisma: PrismaClient, organizerUserId: string) {
+  return prisma.organization.findFirst({
+    where: { ownerUserId: organizerUserId },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+async function provisionOrganization(
   prisma: PrismaClient,
   organizerUserId: string
 ) {

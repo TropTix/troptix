@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -88,6 +88,16 @@ export function AddTicketTypeDrawer({
     resolver: zodResolver(ticketTypeSchema),
     defaultValues: initialData || defaultValues,
   });
+
+  // The drawer stays mounted across opens, so the form must be re-seeded per
+  // open — otherwise editing row A shows whatever was last typed (and Save
+  // would overwrite A with it).
+  useEffect(() => {
+    if (open) {
+      form.reset(initialData?.id ? initialData : defaultValues);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialData]);
 
   const onValidSubmit = (data: TicketTypeFormValues) => {
     console.log('Submitting validated data from drawer:', data);

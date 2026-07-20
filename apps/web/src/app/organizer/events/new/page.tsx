@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation';
 export default async function CreateEventPage() {
   const user = await getUserFromIdTokenCookie();
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth/signin');
   }
   // The event's host brand (shown read-only on the form). Created on first
   // save. Paid ticketing is the Organization's approval, not a user role —

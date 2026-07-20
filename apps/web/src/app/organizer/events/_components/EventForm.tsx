@@ -66,7 +66,8 @@ interface EventFormProps {
 /** The drawer's subject: an existing ticket row, or a fresh one when index is null. */
 type DrawerState = {
   index: number | null;
-  data: Partial<TicketTypeFormValues>;
+  /** The row being edited; absent for a new ticket (drawer seeds its defaults). */
+  data?: Partial<TicketTypeFormValues>;
 };
 
 function defaultEventValues(): EventFormValues {
@@ -393,12 +394,7 @@ export default function EventForm({
                     variant="outline"
                     size="icon"
                     className="float-right mt-4 mr-4"
-                    onClick={() =>
-                      setDrawer({
-                        index: null,
-                        data: { name: '', price: 0, capacity: 1 },
-                      })
-                    }
+                    onClick={() => setDrawer({ index: null })}
                     disabled={isPending}
                   >
                     <PlusCircle className="h-4 w-4" />

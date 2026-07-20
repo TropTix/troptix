@@ -6,11 +6,13 @@ import prisma from '@/server/prisma';
 import { eventFormSchema, EventFormValues } from '@/lib/schemas/eventSchema';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
+import { ZodError } from 'zod';
 import {
   createEvent as createEventService,
   updateEvent as updateEventService,
   NotFoundError,
   PaidTicketingNotEnabledError,
+  UnauthorizedError,
 } from '@troptix/api/server';
 
 interface ActionResult {
@@ -132,6 +134,17 @@ function failure(error: unknown, fallback: string): ActionResult {
   }
   if (error instanceof NotFoundError) {
     return { success: false, error: 'Event not found or unauthorized.' };
+  }
+  if (error instanceof UnauthorizedError) {
+    return { success: false, error: 'Authentication required.' };
+  }
+  // The service re-validates against the contract schema; surface its first
+  // issue instead of the generic fallback if the two schemas ever drift.
+  if (error instanceof ZodError) {
+    return {
+      success: false,
+      error: error.errors[0]?.message || 'Invalid event data provided.',
+    };
   }
   console.error('Event write failed:', error);
   return { success: false, error: fallback };
