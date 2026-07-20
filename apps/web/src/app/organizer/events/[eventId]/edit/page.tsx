@@ -55,17 +55,6 @@ export default async function EditEventPage(props: EditEventPageProps) {
   const userEmail = user.email;
   await verifyEventAccess(userId, userEmail, eventId);
 
-  // Check user role for paid events capability
-  const userRole = await prisma.users.findUnique({
-    where: {
-      email: user?.email,
-    },
-    select: {
-      role: true,
-    },
-  });
-  const paidEventsEnabled = userRole?.role === 'ORGANIZER';
-
   const event = await getEvent(eventId, userId, userEmail);
 
   if (!event) {
@@ -87,11 +76,13 @@ export default async function EditEventPage(props: EditEventPageProps) {
     description: event?.description ?? '',
   };
 
-  // Host brand for the read-only "Hosted by" line on the form.
+  // Host brand for the read-only "Hosted by" line on the form. Paid ticketing
+  // is the Organization's approval — the same flag the write service enforces.
   const org = await prisma.organization.findFirst({
     where: { ownerUserId: userId },
-    select: { displayName: true },
+    select: { displayName: true, paidTicketingEnabled: true },
   });
+  const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
 
   return (
     <div className=" mx-auto py-8">

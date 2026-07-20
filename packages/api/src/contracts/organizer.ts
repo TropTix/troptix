@@ -250,6 +250,69 @@ export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
 });
 export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
 
+// --- Screen D — create / edit event (write inputs) ---
+//
+// Unlike the read DTOs above (ISO strings over the wire), these are inputs to
+// in-process service calls that hand Dates straight to Prisma, so timestamps
+// are `z.date()`. Money stays integer cents; the service derives the legacy
+// float during the 2.12 cutover.
+
+export const ticketTypeInputSchema = z
+  .object({
+    name: z.string().min(3),
+    description: z.string().optional(),
+    /** Gross price the organizer set. 0 = FREE/RSVP; > 0 requires the paid gate. */
+    priceCents: z.number().int().min(0),
+    capacity: z.number().int().positive(),
+    maxPurchasePerUser: z.number().int().positive(),
+    saleStartsAt: z.date(),
+    saleEndsAt: z.date(),
+    ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
+  })
+  .refine((t) => t.saleEndsAt > t.saleStartsAt, {
+    message: 'Sale end must be after sale start.',
+    path: ['saleEndsAt'],
+  });
+export type TicketTypeInput = z.infer<typeof ticketTypeInputSchema>;
+
+const eventFieldsSchema = z.object({
+  name: z.string().min(3),
+  description: z.string().optional(),
+  startsAt: z.date(),
+  endsAt: z.date(),
+  venue: z.string().min(1),
+  address: z.string().min(5),
+  country: z.string().optional(),
+  countryCode: z.string().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
+  /** Stored flyer path, not a URL (ADR 0016). Empty/null means no image. */
+  imageUrl: z.string().nullable().optional(),
+});
+
+export const createEventInputSchema = eventFieldsSchema
+  .extend({
+    ticketTypes: z.array(ticketTypeInputSchema).optional(),
+  })
+  .refine((e) => e.endsAt > e.startsAt, {
+    message: 'Event must end after it starts.',
+    path: ['endsAt'],
+  });
+export type CreateEventInput = z.infer<typeof createEventInputSchema>;
+
+/**
+ * Event fields only — ticket-type editing is Screen E's seam (#452), so
+ * `updateEvent` deliberately takes no ticket types (see #465).
+ */
+export const updateEventInputSchema = eventFieldsSchema.refine(
+  (e) => e.endsAt > e.startsAt,
+  {
+    message: 'Event must end after it starts.',
+    path: ['endsAt'],
+  }
+);
+export type UpdateEventInput = z.infer<typeof updateEventInputSchema>;
+
 export const ticketTypesViewSchema = z.object({
   /** Natural (creation) order — reordering is deferred (see the UX plan). */
   ticketTypes: z.array(ticketTypeRowSchema),
