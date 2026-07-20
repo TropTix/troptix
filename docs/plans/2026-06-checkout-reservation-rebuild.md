@@ -9,17 +9,18 @@ tracking-issue: TBD
 
 Spec and phased plan for replacing the inventory accounting model with a reservation-based design. Realizes roadmap **P4.3** (reservation checkout) and the **P2** schema corrections the checkout depends on, executed now on the current Prisma + Postgres stack. Backing decision: [ADR 0007](../adr/0007-reservation-based-checkout.md). Schema/function changes ship through the Supabase migrations pipeline ([ADR 0004](../adr/0004-supabase-migrations-as-source.md), [migrations-adoption plan](2026-06-migrations-adoption.md)). Roadmap context: [`roadmap.md`](../roadmap.md) Priority 1 (bugs 1.1–1.3), Priority 2, Priority 4.3.
 
-> **Status (2026-06): foundation merged; cutover folded into the checkout redesign.** Shipped to main: the shared Stripe client (#279), the reservation schema (#284, Phase A), and the `reserve`/`confirm`/`release`/`expire` primitives + tests (#285, B1) — the hard, UI-agnostic core. The remaining cutover (B2 server wiring + B3 client) is **deferred**: a checkout pages/flow redesign is imminent and bugs 1.1/1.2 are low-volume, so retrofitting the soon-to-be-replaced pages would be throwaway. The reservation flow will be built **into the redesigned checkout** instead — the redesign *is* the client half of this rebuild, against an API that's already built and tested. See Phase B.
+> **Status (2026-06): foundation merged; cutover folded into the checkout redesign.** Shipped to main: the shared Stripe client (#279), the reservation schema (#284, Phase A), and the `reserve`/`confirm`/`release`/`expire` primitives + tests (#285, B1) — the hard, UI-agnostic core. The remaining cutover (B2 server wiring + B3 client) is **deferred**: a checkout pages/flow redesign is imminent and bugs 1.1/1.2 are low-volume, so retrofitting the soon-to-be-replaced pages would be throwaway. The reservation flow will be built **into the redesigned checkout** instead — the redesign _is_ the client half of this rebuild, against an API that's already built and tested. See Phase B.
 
 ## Context
 
 TropTix is **live and serving real events**. The three Priority-1 bugs — overselling race (1.1), non-atomic payment confirmation (1.2), Stripe version drift (1.3) — are symptoms of **one root cause: the inventory accounting model.**
 
 Verified current state:
+
 - A mutable `quantitySold` counter is incremented in two places (free path inline in `apps/web/src/app/api/checkout/initiate/route.ts:328`, paid path in `apps/web/src/pages/api/stripe/webhook.ts:146`) and **never decremented on expiry**.
-- "Availability" is computed live as `quantity − completedTickets − pendingTickets` by counting `Tickets` rows (`validateTicketType`, `initiate/route.ts:411`), while the organizer dashboard reads the *counter* (`getEventOverview.ts`) — **two disagreeing sources of truth**.
+- "Availability" is computed live as `quantity − completedTickets − pendingTickets` by counting `Tickets` rows (`validateTicketType`, `initiate/route.ts:411`), while the organizer dashboard reads the _counter_ (`getEventOverview.ts`) — **two disagreeing sources of truth**.
 - A **PENDING `Orders` row is the implicit reservation**, so every availability read joins orders+tickets and special-cases PENDING.
-- The 5-minute expiry cron (`apps/web/src/app/api/cron/invalidate-orders/route.ts`) cancels orders but **releases no inventory**.
+- The 5-minute expiry cron (`apps/web/src/app/api/cron/invalidate-orders/route.ts`, since deleted — dead/unauthenticated once reservations shipped, see below) cancelled orders but **released no inventory**.
 
 Rather than three patches (a `FOR UPDATE` lock thrown away once reservations land, a webhook transaction, a shared client), we replace the model once. This is the forward-compatible foundation for the planned Drizzle/Supabase migration.
 
@@ -32,11 +33,13 @@ Rather than three patches (a `FOR UPDATE` lock thrown away once reservations lan
 ### 1. Inventory: counter columns + atomic conditional decrement
 
 Replace `quantitySold` with `capacity` (immutable total, rename of `quantity`), `reserved` (held by active reservations), `sold` (confirmed). **availability = `capacity − reserved − sold`**, read directly. Reserve is a single atomic statement issued inline from app code (no stored procedure):
+
 ```sql
 UPDATE "TicketTypes"
 SET reserved = reserved + :qty
 WHERE id = :id AND (capacity - reserved - sold) >= :qty;  -- 0 rows => insufficient stock
 ```
+
 Correct at READ COMMITTED — **structurally eliminates bug 1.1**, no lock or retry loop. `reserve()` clamps to available per type and returns granted quantities, preserving the "wasAdjusted" UX.
 
 ### 2. Explicit reservation, not a PENDING order
@@ -47,6 +50,7 @@ Reservation { id, eventId, status (HELD|CONVERTED|EXPIRED|RELEASED),
               email, firstName, lastName, userId?, createdAt, updatedAt }
 ReservationItem { id, reservationId, ticketTypeId, quantity, unitPriceCents, feesCents }
 ```
+
 `Order` + `OrderTicket` are materialized only on payment success. Availability reads never touch orders again.
 
 ### 3. Payment confirmation: single source of truth, atomic + idempotent
@@ -74,12 +78,12 @@ Atomic at READ COMMITTED — the `UPDATE` row-locks and re-checks the predicate 
 
 ### 7. Schema corrections the checkout depends on
 
-| Change | Why required here |
-|---|---|
-| Money → integer **cents** | Exact Stripe amounts + inventory math; removes `Math.round`/`toFixed` hacks. |
-| `startsAt`/`endsAt`, `saleStartsAt`/`saleEndsAt` | Reservation checks the sale window; split date/time today **ignores the time** (`initiate/route.ts:394`) — a real bug. |
-| Ticket statuses → `VALID`/`USED`/`CANCELLED`/`REFUNDED` + `checkinTimestamp` | `AVAILABLE`/`NOT_AVAILABLE` is overloaded (unpaid vs scanned); scan/check-in toggles the same flag. |
-| Order-level `type` (FREE/PAID/COMPLEMENTARY) | One reservation→confirm path for all order kinds. |
+| Change                                                                       | Why required here                                                                                                      |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Money → integer **cents**                                                    | Exact Stripe amounts + inventory math; removes `Math.round`/`toFixed` hacks.                                           |
+| `startsAt`/`endsAt`, `saleStartsAt`/`saleEndsAt`                             | Reservation checks the sale window; split date/time today **ignores the time** (`initiate/route.ts:394`) — a real bug. |
+| Ticket statuses → `VALID`/`USED`/`CANCELLED`/`REFUNDED` + `checkinTimestamp` | `AVAILABLE`/`NOT_AVAILABLE` is overloaded (unpaid vs scanned); scan/check-in toggles the same flag.                    |
+| Order-level `type` (FREE/PAID/COMPLEMENTARY)                                 | One reservation→confirm path for all order kinds.                                                                      |
 
 **Deferred** (companion rename sweep, no behavior change): table/field renames, dropping dead tables, `discountCode`→`password`, `organizer`→`hostName`, dropping redundant `name`.
 
@@ -90,12 +94,14 @@ Atomic at READ COMMITTED — the `UPDATE` row-locks and re-checks the predicate 
 **New:** `apps/web/src/server/lib/stripe.ts` (shipped, PR #279); `apps/web/src/server/lib/reservations.ts` — `reserve`/`confirm`/`release`/`expire` as Prisma transactions (the hold is an inline conditional `UPDATE`); Supabase migrations under `supabase/migrations/` — DDL + RLS only (additive in Phase A; the data backfill happens at cutover; drops in cleanup), no functions.
 
 **Checkout path:**
+
 - `app/api/checkout/initiate/route.ts` → "create reservation": call `reserve()`, create PaymentIntent (idempotency key = reservation id), return `reservationId` + `clientSecret` + granted quantities. Delete PENDING-order creation, `validateTicketType` stock math, `getPrismaCreateOrderPayload`. Free orders run `reserve()` → `confirm()` synchronously.
 - `app/api/checkout/config/route.ts`, `app/api/checkout/apply-code/route.ts` → availability = `capacity − reserved − sold` (drop order-counting). Response shape unchanged.
 - **New** `app/api/stripe/webhook/route.ts` (App Router; raw body via `req.text()`, drops `micro`) → `confirm()`; idempotency via `ProcessedStripeEvent`; email from outbox after commit; `payment_failed` → `release()`. **Delete** the Pages-Router `pages/api/stripe/webhook.ts` + the `orderHelper` increment helpers.
-- `app/api/cron/invalidate-orders/route.ts` → call `expire()` (releases held inventory) + drain the outbox.
+- **Shipped as** `app/api/cron/expire-reservations/route.ts` (new route, not a rewrite of the deleted `invalidate-orders`) → calls `sweepExpiredHolds()` (releases held inventory); `Authorization: Bearer $CRON_SECRET` guard (issue #358). Outbox draining is a separate future cron — see [2026-06-transactional-email-outbox.md](2026-06-transactional-email-outbox.md).
 
 **Organizer reads:**
+
 - `getEventOverview.ts` + tickets page → read `sold` (+ optionally `reserved`); revenue from completed Orders.
 - `app/api/organizer/tickets/scan/route.ts`, `check-in/route.ts` → set `USED` + `checkinTimestamp`.
 - Complementary tickets (`orderHelper.ts:113`) → reservation of `type=COMPLEMENTARY` incrementing `sold`.
@@ -108,10 +114,10 @@ Atomic at READ COMMITTED — the `UPDATE` row-locks and re-checks the predicate 
 
 - **PR 1 — Shared Stripe client (shipped, PR #279).** One `server/lib/stripe.ts` pinned to `2023-10-16`, replacing three ad-hoc clients; root fix for bug 1.3.
 - **Phase A — Schema foundation (shipped, PR #284).** Additive `schema.prisma` (new columns `capacity`/`reserved`/`sold`, `*Cents`, `startsAt`/`endsAt`/`saleStartsAt`/`saleEndsAt`, order `type`, `checkinTimestamp`, new `TicketStatus` values; new tables `Reservation`/`ReservationItem`/`OutboxMessage`/`ProcessedStripeEvent`) generated via `yarn db:new`, with RLS on the new tables hand-appended (per the #281 convention). **No stored functions, no backfill** (deferred to the cutover). Old columns retained; all new columns nullable or defaulted ⇒ behavior-neutral.
-- **Phase B — Cut over checkout (fixes 1.1 + 1.2).** The live-flow change. **Headline contract change:** the Order is materialized only on webhook `confirm`, so `/initiate` returns a `reservationId` and post-payment pages key off it (see *Client*, above). **B1 is shipped; B2–B4 are deferred and fold into the upcoming checkout redesign** (see Status) — the new pages are built against the reservation API rather than retrofitting the old ones, and B2's server wiring lands atomically with that new client.
+- **Phase B — Cut over checkout (fixes 1.1 + 1.2).** The live-flow change. **Headline contract change:** the Order is materialized only on webhook `confirm`, so `/initiate` returns a `reservationId` and post-payment pages key off it (see _Client_, above). **B1 is shipped; B2–B4 are deferred and fold into the upcoming checkout redesign** (see Status) — the new pages are built against the reservation API rather than retrofitting the old ones, and B2's server wiring lands atomically with that new client.
   - **B1 — shipped (PR #285).** `server/lib/reservations.ts` (`reserve`/`confirm`/`release`/`expire`) + jest harness + concurrency / idempotency / expire tests. Isolated; unused until wired in.
   - **B2 (deferred → redesign)** — server cutover: `/initiate` → `reserve()`; `/config` + `/apply-code` → `capacity − reserved − sold`; webhook → App Router + `confirm()`; cron → `expire()`.
-  - **B3 (deferred → redesign)** — the **new** checkout pages, built reservation-aware (reservationId URLs, processing/poll) — *replaces* the old `CheckoutContainer`/`payment-form`/receipt retrofit rather than adding to it.
+  - **B3 (deferred → redesign)** — the **new** checkout pages, built reservation-aware (reservationId URLs, processing/poll) — _replaces_ the old `CheckoutContainer`/`payment-form`/receipt retrofit rather than adding to it.
   - **B4 (deferred → redesign cutover)** — backfill `sold ← quantitySold` + the static columns; seed `reserved` from in-flight PENDING holds; the maintenance-window runbook.
 
   **Decisions:**
@@ -122,6 +128,7 @@ Atomic at READ COMMITTED — the `UPDATE` row-locks and re-checks the predicate 
   5. **Cutover runbook** — run B4's sweep in a brief checkout-pause window so there are ~no in-flight PENDING orders to migrate; then deploy + resume. `reserved` is seeded then — the one genuine risk.
   6. **Cutover strategy** — maintenance-window coordinated deploy, **not** a feature flag (simpler; avoids dual code paths on a soon-to-be-redesigned flow).
   7. **PR structure** — B2's server wiring + the new redesigned checkout client ship as **one atomic cutover PR** (neither works without the other).
+
 - **Phase C — Organizer reads.** Dashboard, scan/check-in, complementary path move to new columns/statuses.
 - **Phase D — Cleanup.** Drop `quantitySold`/`quantity`/`price`/`startDate`/`startTime`/old statuses; remove dead code. Optional deferred rename sweep.
 
