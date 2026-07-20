@@ -253,7 +253,12 @@ export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
 export const ticketTypesViewSchema = z.object({
   /** Natural (creation) order — reordering is deferred (see the UX plan). */
   ticketTypes: z.array(ticketTypeRowSchema),
-  /** Header summary. `revenueCents` is the sum of the rows, so they agree. */
+  /**
+   * Header summary — the sum of the rows, so it agrees with the table below it.
+   * Its `revenueCents` (Σ Tickets.subtotal) is the same basis as the per-type
+   * rows, but ≈ — not guaranteed cent-equal to — the "Ticket revenue" the
+   * dashboard and event overview report (Σ Order.subtotal, a different column).
+   */
   summary: z.object({
     sold: z.number().int(),
     capacity: z.number().int(),
