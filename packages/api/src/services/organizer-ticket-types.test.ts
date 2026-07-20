@@ -17,13 +17,16 @@ const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 const ticketType = (over: Record<string, unknown> = {}) => ({
   id: 't-ga',
   name: 'GA',
+  description: 'Main floor',
   price: 20,
   priceCents: 2000,
   capacity: 100,
   sold: 40,
+  maxPurchasePerUser: 10,
   saleStartsAt: new Date('2026-07-01T00:00:00Z'),
   saleEndsAt: new Date('2026-07-31T00:00:00Z'),
   ticketingFees: 'PASS_TICKET_FEES',
+  discountCode: null,
   ...over,
 });
 
@@ -151,6 +154,11 @@ describe('listTicketTypes — shaping', () => {
         saleState: 'OnSale',
         saleStartsAt: '2026-07-01T00:00:00.000Z',
         saleEndsAt: '2026-07-31T00:00:00.000Z',
+        // The editable fields the manage screen's drawer seeds from.
+        description: 'Main floor',
+        maxPurchasePerUser: 10,
+        ticketingFees: 'PASS_TICKET_FEES',
+        discountCode: null,
       },
     ]);
   });

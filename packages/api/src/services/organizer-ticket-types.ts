@@ -56,13 +56,16 @@ export async function listTicketTypes(
           select: {
             id: true,
             name: true,
+            description: true,
             price: true,
             priceCents: true,
             capacity: true,
             sold: true,
+            maxPurchasePerUser: true,
             saleStartsAt: true,
             saleEndsAt: true,
             ticketingFees: true,
+            discountCode: true,
           },
           // Natural creation order; reordering is deferred (UX plan).
           orderBy: { createdAt: 'asc' },
@@ -98,13 +101,16 @@ function buildTicketTypes(
   ticketTypes: {
     id: string;
     name: string;
+    description: string;
     price: number;
     priceCents: number | null;
     capacity: number;
     sold: number;
+    maxPurchasePerUser: number;
     saleStartsAt: Date;
     saleEndsAt: Date;
     ticketingFees: TicketFeeStructure;
+    discountCode: string | null;
   }[],
   rollups: TicketTypeRollupRow[],
   now: Date
@@ -127,6 +133,10 @@ function buildTicketTypes(
       saleState: getSaleState(ticketType, now),
       saleStartsAt: ticketType.saleStartsAt.toISOString(),
       saleEndsAt: ticketType.saleEndsAt.toISOString(),
+      description: ticketType.description,
+      maxPurchasePerUser: ticketType.maxPurchasePerUser,
+      ticketingFees: ticketType.ticketingFees,
+      discountCode: ticketType.discountCode,
     };
   });
 }

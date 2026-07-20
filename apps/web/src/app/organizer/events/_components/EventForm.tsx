@@ -514,7 +514,7 @@ export default function EventForm({
           onSubmit={handleDrawerSubmit}
           initialData={drawer?.data}
           ticketSchema={ticketTypeSchema}
-          eventStartDate={form.getValues('startsAt')}
+          defaultSaleEnd={form.getValues('endsAt')}
         />
       )}
     </div>

@@ -30,6 +30,21 @@ async function loadTakenSlugs(prisma: PrismaClient): Promise<Set<string>> {
 }
 
 /**
+ * Read-only: the user's Organization, or null before their first write.
+ * Oldest wins — the same pick `ensureOrganizationForUser` makes — so every
+ * gate and UI read resolves the same org.
+ */
+export function findOrganizationForOwner(
+  prisma: PrismaClient,
+  ownerUserId: string
+) {
+  return prisma.organization.findFirst({
+    where: { ownerUserId },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+/**
  * The user's Organization, creating it on first need. Idempotent: returns the
  * existing org if the user already owns one (v1 exposes exactly one). Called on
  * first event save so ownership can be dual-written (`organizerUserId` ==
@@ -44,10 +59,7 @@ export async function ensureOrganizationForUser(
   { ownerUserId, displayName }: { ownerUserId: string; displayName: string },
   takenSlugs?: Set<string>
 ): Promise<OrganizationRow> {
-  const existing = await prisma.organization.findFirst({
-    where: { ownerUserId },
-    orderBy: { createdAt: 'asc' },
-  });
+  const existing = await findOrganizationForOwner(prisma, ownerUserId);
   if (existing) return existing;
 
   const taken = takenSlugs ?? (await loadTakenSlugs(prisma));

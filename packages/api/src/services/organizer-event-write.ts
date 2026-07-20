@@ -21,8 +21,12 @@ import {
 import { NotFoundError } from './_shared/errors';
 import { generateId } from './_shared/ids';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
+import { ticketTypeWriteFields } from './_shared/ticket-type-fields';
 import { resolveOrganizerScope } from './organizer-scope';
-import { ensureOrganizationForUser } from './organizations';
+import {
+  ensureOrganizationForUser,
+  findOrganizationForOwner,
+} from './organizations';
 
 export async function createEvent(
   prisma: PrismaClient,
@@ -55,17 +59,7 @@ export async function createEvent(
         data: ticketTypes.map((ticketType) => ({
           id: generateId(),
           eventId,
-          name: ticketType.name,
-          description: ticketType.description ?? '',
-          ticketType: ticketType.priceCents === 0 ? 'FREE' : 'PAID',
-          priceCents: ticketType.priceCents,
-          // Legacy float mirror, until the 2.12 cutover retires it.
-          price: ticketType.priceCents / 100,
-          capacity: ticketType.capacity,
-          maxPurchasePerUser: ticketType.maxPurchasePerUser,
-          saleStartsAt: ticketType.saleStartsAt,
-          saleEndsAt: ticketType.saleEndsAt,
-          ticketingFees: ticketType.ticketingFees,
+          ...ticketTypeWriteFields(ticketType),
         })),
       });
     }
@@ -91,7 +85,7 @@ export async function updateEvent(
       where: { id: eventId, organizerUserId, deletedAt: null },
       select: { id: true },
     }),
-    findOrganization(prisma, organizerUserId),
+    findOrganizationForOwner(prisma, organizerUserId),
   ]);
   if (!owned) {
     throw new NotFoundError('Event not found');
@@ -119,16 +113,8 @@ async function resolveOrganization(
   prisma: PrismaClient,
   organizerUserId: string
 ) {
-  const existing = await findOrganization(prisma, organizerUserId);
+  const existing = await findOrganizationForOwner(prisma, organizerUserId);
   return existing ?? provisionOrganization(prisma, organizerUserId);
-}
-
-/** Read-only: same pick as ensureOrganizationForUser (oldest org wins). */
-function findOrganization(prisma: PrismaClient, organizerUserId: string) {
-  return prisma.organization.findFirst({
-    where: { ownerUserId: organizerUserId },
-    orderBy: { createdAt: 'asc' },
-  });
 }
 
 async function provisionOrganization(

@@ -1,4 +1,7 @@
-// Mock Next.js + server deps so the actions run without a DB, session, or RSC context.
+// The actions are thin adapters over @troptix/api's ticket-type write seam —
+// these tests cover the adapter's own duties: session handling (redirect
+// outside try), dollars → cents at the edge, and typed-error → message
+// mapping. Authorization and the paid gate are the service's tests' job.
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
 jest.mock('next/navigation', () => ({
   redirect: jest.fn(() => {
@@ -6,40 +9,37 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 jest.mock('@/server/authUser', () => ({
-  getUserFromIdTokenCookie: jest.fn(),
+  getServerUser: jest.fn(),
 }));
-jest.mock('@/server/accessControl', () => ({
-  canAccessEvent: jest.fn(),
-}));
-jest.mock('@/server/prisma', () => ({
-  __esModule: true,
-  default: {
-    ticketTypes: {
-      create: jest.fn(),
-      update: jest.fn(),
-      findUnique: jest.fn(),
-    },
-    events: { findUnique: jest.fn() },
-  },
-}));
+jest.mock('@/server/prisma', () => ({ __esModule: true, default: {} }));
+jest.mock('@troptix/api/server', () => {
+  class NotFoundError extends Error {}
+  class UnauthorizedError extends Error {}
+  class PaidTicketingNotEnabledError extends Error {}
+  return {
+    createTicketType: jest.fn(),
+    updateTicketType: jest.fn(),
+    toCents: (dollars: number | null | undefined) =>
+      Math.round((dollars ?? 0) * 100),
+    NotFoundError,
+    UnauthorizedError,
+    PaidTicketingNotEnabledError,
+  };
+});
 
-import prisma from '@/server/prisma';
-import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { canAccessEvent } from '@/server/accessControl';
 import { redirect } from 'next/navigation';
+import { getServerUser } from '@/server/authUser';
+import {
+  createTicketType as createService,
+  updateTicketType as updateService,
+  PaidTicketingNotEnabledError,
+} from '@troptix/api/server';
 import { createTicketType, updateTicketType } from './ticketActions';
 import type { TicketTypeFormValues } from '@/lib/schemas/ticketSchema';
 
-const db = prisma as unknown as {
-  ticketTypes: {
-    create: jest.Mock;
-    update: jest.Mock;
-    findUnique: jest.Mock;
-  };
-  events: { findUnique: jest.Mock };
-};
-const mockGetUser = getUserFromIdTokenCookie as jest.Mock;
-const mockCanAccess = canAccessEvent as jest.Mock;
+const mockGetUser = getServerUser as jest.Mock;
+const mockCreateService = createService as jest.Mock;
+const mockUpdateService = updateService as jest.Mock;
 
 const validForm: TicketTypeFormValues = {
   name: 'General Admission',
@@ -55,74 +55,62 @@ const validForm: TicketTypeFormValues = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // The actions log to console.error inside their catch blocks (e.g. the
-  // Next redirect thrown on the no-session path); keep test output clean.
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mockGetUser.mockResolvedValue({ uid: 'owner', role: 'PATRON' });
 });
 
-afterEach(() => {
-  (console.error as jest.Mock).mockRestore();
-});
-
-describe('updateTicketType authorization', () => {
-  it('redirects and does not update when there is no session', async () => {
+describe('createTicketType adapter', () => {
+  it('redirects without calling the service when there is no session', async () => {
     mockGetUser.mockResolvedValue(null);
-
-    // redirect() is resolved before the try, so its control-flow throw
-    // propagates (it is not swallowed by the catch).
-    await expect(updateTicketType('ticket_1', validForm)).rejects.toThrow(
+    await expect(createTicketType('event_1', validForm)).rejects.toThrow(
       'NEXT_REDIRECT'
     );
-
     expect(redirect).toHaveBeenCalledWith('/auth/signin');
-    expect(db.ticketTypes.update).not.toHaveBeenCalled();
+    expect(mockCreateService).not.toHaveBeenCalled();
   });
 
-  it('rejects a user who does not own the event', async () => {
-    mockGetUser.mockResolvedValue({ uid: 'attacker', email: 'a@b.com' });
-    db.ticketTypes.findUnique.mockResolvedValue({ eventId: 'event_1' });
-    mockCanAccess.mockResolvedValue(false);
-
-    const result = await updateTicketType('ticket_1', validForm);
-
-    expect(mockCanAccess).toHaveBeenCalledWith(
-      'attacker',
-      'a@b.com',
-      'event_1'
-    );
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
-    expect(db.ticketTypes.update).not.toHaveBeenCalled();
-  });
-
-  it('updates when the user owns the event', async () => {
-    mockGetUser.mockResolvedValue({ uid: 'owner', email: 'o@b.com' });
-    db.ticketTypes.findUnique.mockResolvedValue({ eventId: 'event_1' });
-    mockCanAccess.mockResolvedValue(true);
-    db.ticketTypes.update.mockResolvedValue({ eventId: 'event_1' });
-
-    const result = await updateTicketType('ticket_1', validForm);
+  it('converts dollars to cents and hands the service the actor + event', async () => {
+    mockCreateService.mockResolvedValue({ ticketTypeId: 't1' });
+    const result = await createTicketType('event_1', validForm);
 
     expect(result).toEqual({ success: true });
-    expect(db.ticketTypes.update).toHaveBeenCalledTimes(1);
-    expect(db.ticketTypes.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'ticket_1' } })
-    );
+    const [, actor, eventId, input] = mockCreateService.mock.calls[0];
+    expect(actor).toMatchObject({ kind: 'user', userId: 'owner' });
+    expect(eventId).toBe('event_1');
+    expect(input).toMatchObject({
+      priceCents: 1000,
+      name: 'General Admission',
+    });
+  });
+
+  it('maps the paid gate to a friendly message', async () => {
+    mockCreateService.mockRejectedValue(new PaidTicketingNotEnabledError());
+    const result = await createTicketType('event_1', validForm);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Paid tickets need approval');
   });
 });
 
-describe('createTicketType authorization', () => {
-  it('rejects a user who does not own the event', async () => {
-    mockGetUser.mockResolvedValue({ uid: 'attacker', email: 'a@b.com' });
-    mockCanAccess.mockResolvedValue(false);
+describe('updateTicketType adapter', () => {
+  it('passes event + ticket ids through to the service', async () => {
+    mockUpdateService.mockResolvedValue(undefined);
+    const result = await updateTicketType('event_1', 'ticket_1', validForm);
 
-    const result = await createTicketType('event_1', validForm);
+    expect(result).toEqual({ success: true });
+    const [, , eventId, ticketTypeId, input] = mockUpdateService.mock.calls[0];
+    expect(eventId).toBe('event_1');
+    expect(ticketTypeId).toBe('ticket_1');
+    expect(input).toMatchObject({ priceCents: 1000 });
+  });
 
-    expect(mockCanAccess).toHaveBeenCalledWith(
-      'attacker',
-      'a@b.com',
-      'event_1'
-    );
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
-    expect(db.ticketTypes.create).not.toHaveBeenCalled();
+  it('rejects invalid form data before touching the session or service', async () => {
+    const result = await updateTicketType('event_1', 'ticket_1', {
+      ...validForm,
+      name: 'x',
+    });
+    expect(result).toEqual({
+      success: false,
+      error: 'Invalid form data provided.',
+    });
+    expect(mockUpdateService).not.toHaveBeenCalled();
   });
 });

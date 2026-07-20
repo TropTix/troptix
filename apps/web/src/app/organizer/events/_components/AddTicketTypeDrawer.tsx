@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -56,20 +58,33 @@ import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
 interface AddTicketTypeDrawerProps {
   open: boolean;
   setOpen: (open: boolean) => void;
-  onSubmit: (data: TicketTypeFormValues) => void;
+  /**
+   * Receives the validated values (plus the row id when editing). May be
+   * sync (the create form's in-memory array) or async (Screen E's server
+   * actions) — an async result of `{ success: false }` keeps the drawer open
+   * and shows the error.
+   */
+  onSubmit: (
+    data: TicketTypeFormValues & { id?: string }
+  ) =>
+    | void
+    | { success: boolean; error?: string }
+    | Promise<void | { success: boolean; error?: string }>;
   initialData?: Partial<TicketTypeFormValues> & { id?: string };
   ticketSchema: z.ZodType<TicketTypeFormValues>;
-  eventStartDate: Date;
+  /** Default sale-window end for new tickets — the event's end, so day-of sales work untouched. */
+  defaultSaleEnd: Date;
   paidEventsEnabled: boolean;
 }
 
-// TODO: We have a CreateTicketTypeForm component that is used for the new ticket form. We should use that instead of this component or merge them.
+// The one ticket-type editor: the create-event form feeds it an in-memory
+// array; Screen E's manager feeds it the server actions.
 export function AddTicketTypeDrawer({
   open,
   setOpen,
   onSubmit: onSubmitProp,
   initialData,
-  eventStartDate,
+  defaultSaleEnd,
   paidEventsEnabled,
 }: AddTicketTypeDrawerProps) {
   const today = new Date();
@@ -82,7 +97,7 @@ export function AddTicketTypeDrawer({
     maxPurchasePerUser: 10,
     ticketingFees: 'PASS_TICKET_FEES' as const,
     saleStartsAt: today,
-    saleEndsAt: eventStartDate || tomorrow,
+    saleEndsAt: defaultSaleEnd || tomorrow,
   };
   const form = useForm<TicketTypeFormValues>({
     resolver: zodResolver(ticketTypeSchema),
@@ -91,21 +106,32 @@ export function AddTicketTypeDrawer({
 
   // The drawer stays mounted across opens, so the form must be re-seeded per
   // open — otherwise editing row A shows whatever was last typed (and Save
-  // would overwrite A with it).
+  // would overwrite A with it). Seed data without an id is a duplicate: a
+  // create pre-filled from an existing row.
   useEffect(() => {
     if (open) {
-      form.reset(initialData?.id ? initialData : defaultValues);
+      form.reset({ ...defaultValues, ...initialData });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialData]);
 
-  const onValidSubmit = (data: TicketTypeFormValues) => {
-    console.log('Submitting validated data from drawer:', data);
+  const [submitting, setSubmitting] = useState(false);
+
+  const onValidSubmit = async (data: TicketTypeFormValues) => {
     const dataToSubmit = initialData?.id
       ? { ...data, id: initialData.id }
       : data;
-    onSubmitProp(dataToSubmit);
-    setOpen(false);
+    setSubmitting(true);
+    try {
+      const result = await onSubmitProp(dataToSubmit);
+      if (result && result.success === false) {
+        toast.error(result.error || 'Failed to save ticket type.');
+        return;
+      }
+      setOpen(false);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const onInvalidSubmit = (errors: any) => {
@@ -267,7 +293,7 @@ export function AddTicketTypeDrawer({
                             {/* Separate input for time */}
                             <Input
                               type="time"
-                              defaultValue={formatTime(field.value)}
+                              value={formatTime(field.value)}
                               onChange={(e) => {
                                 const time = e.target.value;
                                 const currentDate = field.value;
@@ -406,7 +432,8 @@ export function AddTicketTypeDrawer({
         </Form>
 
         <SheetFooter className="pt-2 border-t justify-end gap-2">
-          <Button type="submit" form="drawer-ticket-form">
+          <Button type="submit" form="drawer-ticket-form" disabled={submitting}>
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {initialData?.id ? 'Save Changes' : 'Add Ticket'}
           </Button>
           <SheetClose asChild>

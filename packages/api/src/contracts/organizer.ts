@@ -247,6 +247,12 @@ export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
   /** Venue-local sale window (ADR 0021). Both are always set. */
   saleStartsAt: z.string().datetime(),
   saleEndsAt: z.string().datetime(),
+  // The remaining editable fields, so the manage screen can seed its edit
+  // drawer without a second fetch.
+  description: z.string(),
+  maxPurchasePerUser: z.number().int(),
+  ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
+  discountCode: z.string().nullable(),
 });
 export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
 
@@ -268,6 +274,7 @@ export const ticketTypeInputSchema = z
     saleStartsAt: z.date(),
     saleEndsAt: z.date(),
     ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
+    discountCode: z.string().optional(),
   })
   .refine((t) => t.saleEndsAt > t.saleStartsAt, {
     message: 'Sale end must be after sale start.',

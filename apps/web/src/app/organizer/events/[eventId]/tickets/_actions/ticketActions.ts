@@ -1,21 +1,32 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { ZodError } from 'zod';
 import prisma from '@/server/prisma';
-import { generateId } from '@/lib/utils';
 import {
   TicketTypeFormValues,
   ticketTypeSchema,
 } from '@/lib/schemas/ticketSchema';
-import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { canAccessEvent } from '@/server/accessControl';
-import { redirect } from 'next/navigation';
+import { getServerUser } from '@/server/authUser';
+import { userToActor } from '@/server/actor';
+import {
+  createTicketType as createTicketTypeService,
+  updateTicketType as updateTicketTypeService,
+  toCents,
+  NotFoundError,
+  PaidTicketingNotEnabledError,
+  UnauthorizedError,
+} from '@troptix/api/server';
 
-// Define the return type for actions
 interface ActionResult {
   success: boolean;
   error?: string;
 }
+
+// Thin adapters over the @troptix/api ticket-type write seam (#452): validate
+// the form shape for field-level messages, convert dollars → integer cents,
+// and let the service own authorization, the paid gate, and the row shape.
 
 export async function createTicketType(
   eventId: string,
@@ -23,141 +34,92 @@ export async function createTicketType(
 ): Promise<ActionResult> {
   const validationResult = ticketTypeSchema.safeParse(formData);
   if (!validationResult.success) {
-    console.error(
-      'Server-side validation failed:',
-      validationResult.error.flatten()
-    );
     return { success: false, error: 'Invalid form data provided.' };
   }
 
-  const data = validationResult.data;
-
-  // Resolve the session outside the try so redirect()'s control-flow throw
-  // isn't swallowed by the catch below.
-  const user = await getUserFromIdTokenCookie();
+  const user = await getServerUser();
   if (!user) {
     redirect('/auth/signin');
   }
 
   try {
-    // Verify the user owns this event (or is a platform owner).
-    const hasAccess = await canAccessEvent(user.uid, user.email, eventId);
-    if (!hasAccess) {
-      return { success: false, error: 'Unauthorized' };
-    }
-    const ticketTypeEnum = data.price === 0 ? 'FREE' : 'PAID';
-
-    await prisma.ticketTypes.create({
-      data: {
-        id: generateId(),
-        eventId: eventId,
-        name: data.name,
-        description: data.description ?? '', // Handle optional description
-        price: data.price,
-        priceCents: Math.round(data.price * 100),
-        capacity: data.capacity,
-        maxPurchasePerUser: data.maxPurchasePerUser,
-        saleStartsAt: data.saleStartsAt,
-        saleEndsAt: data.saleEndsAt,
-        ticketingFees: data.ticketingFees,
-        ticketType: ticketTypeEnum,
-        discountCode: data.discountCode || null,
-      },
-    });
-    console.log('Ticket type created:', data);
-
+    await createTicketTypeService(
+      prisma,
+      userToActor(user),
+      eventId,
+      toServiceInput(validationResult.data)
+    );
     revalidatePath(`/organizer/events/${eventId}/tickets`);
-
     return { success: true };
   } catch (error) {
-    console.error('Error creating ticket type:', error);
-    return {
-      success: false,
-      error: 'Failed to create ticket type. Please try again.',
-    };
+    return failure(error, 'Failed to create ticket type. Please try again.');
   }
 }
 
 export async function updateTicketType(
-  ticketId: string,
+  eventId: string,
+  ticketTypeId: string,
   formData: TicketTypeFormValues
 ): Promise<ActionResult> {
   const validationResult = ticketTypeSchema.safeParse(formData);
   if (!validationResult.success) {
-    console.error(
-      'Server-side validation failed:',
-      validationResult.error.flatten()
-    );
     return { success: false, error: 'Invalid form data provided.' };
   }
 
-  const data = validationResult.data;
-
-  let eventIdForRevalidation: string | undefined;
-
-  // Resolve the session outside the try so redirect()'s control-flow throw
-  // isn't swallowed by the catch below.
-  const user = await getUserFromIdTokenCookie();
+  const user = await getServerUser();
   if (!user) {
     redirect('/auth/signin');
   }
 
   try {
-    // Resolve the ticket's event and verify the user owns it (or is a platform
-    // owner). Without this, any authenticated user could edit any ticket type.
-    const existing = await prisma.ticketTypes.findUnique({
-      where: { id: ticketId },
-      select: { eventId: true },
-    });
-    if (!existing) {
-      return { success: false, error: 'Ticket type not found.' };
-    }
-    const hasAccess = await canAccessEvent(
-      user.uid,
-      user.email,
-      existing.eventId
+    await updateTicketTypeService(
+      prisma,
+      userToActor(user),
+      eventId,
+      ticketTypeId,
+      toServiceInput(validationResult.data)
     );
-    if (!hasAccess) {
-      return { success: false, error: 'Unauthorized' };
-    }
-
-    const ticketTypeEnum = data.price === 0 ? 'FREE' : 'PAID';
-
-    const updatedTicket = await prisma.ticketTypes.update({
-      where: {
-        id: ticketId,
-      },
-      data: {
-        name: data.name,
-        description: data.description ?? '',
-        price: data.price,
-        priceCents: Math.round(data.price * 100),
-        capacity: data.capacity,
-        maxPurchasePerUser: data.maxPurchasePerUser,
-        saleStartsAt: data.saleStartsAt,
-        saleEndsAt: data.saleEndsAt,
-        ticketingFees: data.ticketingFees,
-        ticketType: ticketTypeEnum,
-        discountCode: data.discountCode || null,
-      },
-      select: { eventId: true },
-    });
-
-    eventIdForRevalidation = updatedTicket.eventId;
-
-    if (eventIdForRevalidation) {
-      revalidatePath(`/organizer/events/${eventIdForRevalidation}/tickets`);
-      revalidatePath(
-        `/organizer/events/${eventIdForRevalidation}/tickets/${ticketId}`
-      );
-    }
-
+    revalidatePath(`/organizer/events/${eventId}/tickets`);
     return { success: true };
   } catch (error) {
-    console.error(`Error updating ticket type ${ticketId}:`, error);
+    return failure(error, 'Failed to update ticket type. Please try again.');
+  }
+}
+
+function toServiceInput(data: TicketTypeFormValues) {
+  return {
+    name: data.name,
+    description: data.description,
+    priceCents: toCents(data.price),
+    capacity: data.capacity,
+    maxPurchasePerUser: data.maxPurchasePerUser,
+    saleStartsAt: data.saleStartsAt,
+    saleEndsAt: data.saleEndsAt,
+    ticketingFees: data.ticketingFees,
+    discountCode: data.discountCode,
+  };
+}
+
+function failure(error: unknown, fallback: string): ActionResult {
+  if (error instanceof PaidTicketingNotEnabledError) {
     return {
       success: false,
-      error: 'Failed to update ticket type. Please try again.',
+      error:
+        'Paid tickets need approval first — talk to us to enable paid ticketing, or set the price to free.',
     };
   }
+  if (error instanceof NotFoundError) {
+    return { success: false, error: 'Ticket type not found or unauthorized.' };
+  }
+  if (error instanceof UnauthorizedError) {
+    return { success: false, error: 'Authentication required.' };
+  }
+  if (error instanceof ZodError) {
+    return {
+      success: false,
+      error: error.errors[0]?.message || 'Invalid form data provided.',
+    };
+  }
+  console.error('Ticket-type write failed:', error);
+  return { success: false, error: fallback };
 }
