@@ -291,10 +291,13 @@ const eventFieldsSchema = z.object({
 });
 
 // One home for the temporal rule, so create and update can't drift apart.
-const eventEndsAfterStart = [
-  (e: { startsAt: Date; endsAt: Date }) => e.endsAt > e.startsAt,
+const eventEndsAfterStart: [
+  (e: { startsAt: Date; endsAt: Date }) => boolean,
+  { message: string; path: string[] },
+] = [
+  (e) => e.endsAt > e.startsAt,
   { message: 'Event must end after it starts.', path: ['endsAt'] },
-] as const;
+];
 
 export const createEventInputSchema = eventFieldsSchema
   .extend({
