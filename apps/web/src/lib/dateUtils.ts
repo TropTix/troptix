@@ -43,6 +43,13 @@ export const formatCurrency = (amount: number | null): string => {
 export const formatCents = (cents: number | null): string =>
   formatCurrency(cents === null ? null : cents / 100);
 
+/**
+ * A ticket price for display: cents → currency, but $0 reads as FREE — a free
+ * ticket is a different kind of thing, not a $0.00 one.
+ */
+export const formatPriceCents = (cents: number): string =>
+  cents === 0 ? 'FREE' : formatCents(cents);
+
 export const combineDateTime = (
   datePart: Date | undefined,
   timePart: string

@@ -134,20 +134,20 @@ export const eventRevenuePointSchema = z.object({
 });
 export type EventRevenuePoint = z.infer<typeof eventRevenuePointSchema>;
 
-/** One ticket tier's inventory + its share of Ticket revenue. */
-export const eventTierBreakdownSchema = z.object({
+/** One ticket type's inventory + its share of Ticket revenue. */
+export const ticketTypeBreakdownSchema = z.object({
   id: z.string(),
   name: z.string(),
   sold: z.number().int(),
   capacity: z.number().int(),
   /**
-   * Σ of this tier's completed-ticket subtotals. Close to — but not guaranteed
+   * Σ of this ticket type's completed-ticket subtotals. Close to — but not guaranteed
    * equal to — the event's Ticket revenue: that's Σ Order.subtotal, a different
    * column, and each is rounded to cents at its own granularity.
    */
   revenueCents: z.number().int(),
 });
-export type EventTierBreakdown = z.infer<typeof eventTierBreakdownSchema>;
+export type TicketTypeBreakdown = z.infer<typeof ticketTypeBreakdownSchema>;
 
 /** Door progress: how many of the event's tickets have been checked in. */
 export const checkInSummarySchema = z.object({
@@ -168,7 +168,7 @@ export const eventOverviewSchema = z.object({
   vitals: eventVitalsSchema,
   /** Daily, from event creation through today (capped) — zero-filled. */
   revenueSeries: z.array(eventRevenuePointSchema),
-  tiers: z.array(eventTierBreakdownSchema),
+  ticketTypes: z.array(ticketTypeBreakdownSchema),
   checkIn: checkInSummarySchema,
   /** A short peek; the Orders tab is the full surface. NOT range-scoped. */
   recentOrders: z.array(dashboardRecentOrderSchema),
@@ -189,9 +189,9 @@ export const eventOrderRowSchema = z.object({
 });
 export type EventOrderRow = z.infer<typeof eventOrderRowSchema>;
 
-/** One tier's slice of an order — the tickets bought at a single price. */
+/** One ticket type's slice of an order — the tickets bought at a single price. */
 export const orderLineItemSchema = z.object({
-  /** Tier name, or 'Ticket' when the tier is gone/unknown. */
+  /** Ticket type name, or 'Ticket' when the ticketType is gone/unknown. */
   name: z.string(),
   quantity: z.number().int(),
   unitPriceCents: z.number().int(),
@@ -223,3 +223,48 @@ export const orderDetailSchema = z.object({
   paymentMethod: z.string().nullable(),
 });
 export type OrderDetail = z.infer<typeof orderDetailSchema>;
+
+// --- Screen E — ticket types (`/organizer/events/[id]/tickets`) ---
+
+/** Where a ticketType sits in its sale window. */
+export const saleStateSchema = z.enum(['Scheduled', 'OnSale', 'Ended']);
+export type SaleState = z.infer<typeof saleStateSchema>;
+
+/**
+ * A ticketType row on the ticket-types screen: the same inventory + revenue shape the
+ * event overview shows, plus the price and sale-window state this screen manages.
+ */
+export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
+  /** The price the organizer set. What they earn per ticket under PASS. */
+  grossPriceCents: z.number().int(),
+  /**
+   * What the attendee is actually charged: gross + fee when the type passes
+   * fees on, gross when it absorbs them (the organizer eats the fee instead).
+   * Equal to `grossPriceCents` for free types, since a $0 ticket has no fee.
+   */
+  displayPriceCents: z.number().int(),
+  saleState: saleStateSchema,
+  /** Venue-local sale window (ADR 0021). Both are always set. */
+  saleStartsAt: z.string().datetime(),
+  saleEndsAt: z.string().datetime(),
+});
+export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
+
+export const ticketTypesViewSchema = z.object({
+  /** Natural (creation) order — reordering is deferred (see the UX plan). */
+  ticketTypes: z.array(ticketTypeRowSchema),
+  /**
+   * Header summary — the sum of the rows, so it agrees with the table below it.
+   * Its `revenueCents` (Σ Tickets.subtotal) is the same basis as the per-type
+   * rows, but ≈ — not guaranteed cent-equal to — the "Ticket revenue" the
+   * dashboard and event overview report (Σ Order.subtotal, a different column).
+   */
+  summary: z.object({
+    sold: z.number().int(),
+    capacity: z.number().int(),
+    revenueCents: z.number().int(),
+    /** How many types are selling right now — the at-a-glance "is anything live". */
+    onSale: z.number().int(),
+  }),
+});
+export type TicketTypesView = z.infer<typeof ticketTypesViewSchema>;

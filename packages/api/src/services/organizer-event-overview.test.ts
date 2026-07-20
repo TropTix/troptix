@@ -1,8 +1,8 @@
 /**
  * Unit tests for the Screen C event-overview read. Pure over an injected fake
  * `prisma` (ADR 0010). Covers the shared authorization seam (anonymous, scoping,
- * View-as, not-found), the two reconciling revenue sources, the per-tier
- * breakdown with its capacity fallback, `sold` counting null-tier tickets, the
+ * View-as, not-found), the two reconciling revenue sources, the per-ticket-type
+ * breakdown with its capacity fallback, `sold` counting null-ticketType tickets, the
  * check-in summary, and the zero-filled revenue series.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -20,7 +20,7 @@ interface FakeOpts {
   email?: string;
   event?: unknown; // undefined → a default event; null → not found
   orderAgg?: { subtotal?: number | null; count?: number };
-  tierRollups?: unknown[];
+  rollups?: unknown[];
   series?: { at: Date; tickets: bigint; revenue: number | null }[];
   checkedIn?: number;
   orders?: unknown[];
@@ -35,8 +35,8 @@ const defaultEvent = {
   venue: 'The Warehouse',
   createdAt: new Date('2026-07-10T00:00:00Z'),
   ticketTypes: [
-    { id: 't-ga', name: 'GA', capacity: 100 },
-    { id: 't-vip', name: 'VIP', capacity: 20 },
+    { id: 't-ga', name: 'GA', capacity: 100, sold: 40 },
+    { id: 't-vip', name: 'VIP', capacity: 20, sold: 5 },
   ],
 };
 
@@ -48,7 +48,7 @@ function fakePrisma(opts: FakeOpts = {}) {
     _sum: { subtotal: opts.orderAgg?.subtotal ?? 0 },
     _count: opts.orderAgg?.count ?? 0,
   });
-  const ticketsGroupBy = vi.fn().mockResolvedValue(opts.tierRollups ?? []);
+  const ticketsGroupBy = vi.fn().mockResolvedValue(opts.rollups ?? []);
   const queryRaw = vi.fn().mockResolvedValue(opts.series ?? []);
   const ticketsCount = vi.fn().mockResolvedValue(opts.checkedIn ?? 0);
   const ordersFindMany = vi.fn().mockResolvedValue(opts.orders ?? []);
@@ -72,7 +72,7 @@ function fakePrisma(opts: FakeOpts = {}) {
   return { prisma, eventsFindFirst };
 }
 
-const tier = (id: string, count: number, subtotal: number | null) => ({
+const ticketType = (id: string, count: number, subtotal: number | null) => ({
   ticketTypeId: id,
   _count: { _all: count },
   _sum: { subtotal },
@@ -120,7 +120,7 @@ describe('getEventOverview — authorization', () => {
   });
 });
 
-describe('getEventOverview — vitals & tiers', () => {
+describe('getEventOverview — vitals & ticketTypes', () => {
   it('reports event revenue from Order.subtotal and order count from the aggregate', async () => {
     const { prisma } = fakePrisma({ orderAgg: { subtotal: 1234.5, count: 9 } });
     const result = await getEventOverview(prisma, OWNER, 'e1', {}, NOW);
@@ -128,27 +128,50 @@ describe('getEventOverview — vitals & tiers', () => {
     expect(result.vitals.ordersCount).toBe(9);
   });
 
-  it('breaks tiers down with subtotal revenue and per-tier capacity', async () => {
+  it('breaks ticketTypes down with subtotal revenue and per-ticket-type capacity', async () => {
     const { prisma } = fakePrisma({
-      tierRollups: [tier('t-ga', 40, 400), tier('t-vip', 5, 250)],
+      rollups: [ticketType('t-ga', 40, 400), ticketType('t-vip', 5, 250)],
     });
     const result = await getEventOverview(prisma, OWNER, 'e1', {}, NOW);
-    expect(result.tiers).toEqual([
+    expect(result.ticketTypes).toEqual([
       { id: 't-ga', name: 'GA', sold: 40, capacity: 100, revenueCents: 40000 },
       { id: 't-vip', name: 'VIP', sold: 5, capacity: 20, revenueCents: 25000 },
     ]);
     expect(result.vitals.capacity).toBe(120);
   });
 
-  it('counts null-tier tickets in sold (and the check-in total) though no tier shows them', async () => {
+  it('reports a type’s sold from its counter, and the event’s from ticket rows', async () => {
+    // The counter says 40; only 37 ticket rows exist (3 were issued against a
+    // type that has since been deleted). Per CONTEXT.md these are different
+    // questions, so the two figures are allowed to differ — and must not be
+    // "helpfully" reconciled.
     const { prisma } = fakePrisma({
-      tierRollups: [tier('t-ga', 40, 400), tier(null as never, 3, 30)],
+      event: {
+        ...defaultEvent,
+        ticketTypes: [{ id: 't-ga', name: 'GA', capacity: 100, sold: 40 }],
+      },
+      rollups: [
+        ticketType('t-ga', 37, 370),
+        ticketType(null as never, 3, 30), // orphaned: type deleted
+      ],
+    });
+
+    const result = await getEventOverview(prisma, OWNER, 'e1', {}, NOW);
+
+    expect(result.ticketTypes[0].sold).toBe(40); // inventory sold (counter)
+    expect(result.vitals.sold).toBe(40); // tickets issued (37 + 3 orphans)
+    expect(result.checkIn.total).toBe(40); // check-in counts rows, not counters
+  });
+
+  it('counts null-ticketType tickets in sold (and the check-in total) though no ticketType shows them', async () => {
+    const { prisma } = fakePrisma({
+      rollups: [ticketType('t-ga', 40, 400), ticketType(null as never, 3, 30)],
       checkedIn: 10,
     });
     const result = await getEventOverview(prisma, OWNER, 'e1', {}, NOW);
     // 40 mapped + 3 orphaned = 43, even though only GA renders a row.
     expect(result.vitals.sold).toBe(43);
-    expect(result.tiers.map((t) => t.id)).toEqual(['t-ga', 't-vip']);
+    expect(result.ticketTypes.map((t) => t.id)).toEqual(['t-ga', 't-vip']);
     expect(result.checkIn).toEqual({ checkedIn: 10, total: 43 });
   });
 });
