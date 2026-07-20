@@ -963,11 +963,6 @@
   resolved "https://registry.yarnpkg.com/@dual-bundle/import-meta-resolve/-/import-meta-resolve-4.2.1.tgz#cd0b25b3808cd9e684cd6cd549bbf8e1dcf05ee7"
   integrity sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==
 
-"@edge-runtime/cookies@^5.0.2":
-  version "5.0.2"
-  resolved "https://registry.yarnpkg.com/@edge-runtime/cookies/-/cookies-5.0.2.tgz#c1ddd8cc740bdd5fcd9b482eddb33f4c096d4d2a"
-  integrity sha512-Sd8LcWpZk/SWEeKGE8LT6gMm5MGfX/wm+GPnh1eBEtCpya3vYqn37wYknwAHw92ONoyyREl1hJwxV/Qx2DWNOg==
-
 "@edge-runtime/format@2.2.1":
   version "2.2.1"
   resolved "https://registry.yarnpkg.com/@edge-runtime/format/-/format-2.2.1.tgz#10dcedb0d7c2063c9ee360fbab23846c8720f986"
@@ -9164,14 +9159,6 @@ firebase@11.10.0:
     "@firebase/storage-compat" "0.3.24"
     "@firebase/util" "1.12.1"
 
-flags@^3.1.1:
-  version "3.2.0"
-  resolved "https://registry.yarnpkg.com/flags/-/flags-3.2.0.tgz#f76e15c826c6d3501b8a5c008fd3c653d8b865a1"
-  integrity sha512-rmJHXg4ijRgWNf/OdEGbd3FaqMwvKlcrtelKwTtPCzsNWuian9Tz+wXU+3XSO3ljqlpQYyzMgdwz3CBs/5DtZA==
-  dependencies:
-    "@edge-runtime/cookies" "^5.0.2"
-    jose "^5.2.1"
-
 flat-cache@^4.0.0:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/flat-cache/-/flat-cache-4.0.1.tgz#0ece39fcb14ee012f4b0410bd33dd9c1f011127c"
@@ -10753,11 +10740,6 @@ jiti@^2.6.0, jiti@^2.6.1:
   version "2.7.0"
   resolved "https://registry.yarnpkg.com/jiti/-/jiti-2.7.0.tgz#974228f2f4ca2bc21885a1797b45fea68e950c64"
   integrity sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==
-
-jose@^5.2.1:
-  version "5.10.0"
-  resolved "https://registry.yarnpkg.com/jose/-/jose-5.10.0.tgz#c37346a099d6467c401351a9a0c2161e0f52c4be"
-  integrity sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg==
 
 "js-tokens@^3.0.0 || ^4.0.0", js-tokens@^4.0.0:
   version "4.0.0"
