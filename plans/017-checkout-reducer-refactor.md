@@ -4,7 +4,8 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `plans/README.md`.
+> in `plans/README.md`, and post a short progress comment on the
+> tracking issue (#462) when you start and finish.
 >
 > **Drift check (run first)**: `git diff --stat abab1702..HEAD -- apps/web/src/app/e/[eventId]/_components/CheckoutSheet.tsx`
 > If the file changed since this plan was written, compare the "Current state"
@@ -20,6 +21,7 @@
   before you start, and must still pass after every step.
 - **Category**: tech-debt / maintainability
 - **Planned at**: commit `abab1702`, 2026-07-18
+- **Issue**: https://github.com/TropTix/troptix/issues/462
 
 ## Why this matters
 

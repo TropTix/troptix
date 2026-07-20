@@ -82,6 +82,8 @@ Selection note: run interactively; the operator chose the **Recommended P1+P2 se
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale) | SUPERSEDED (pointer) | PRIVATE (tracked outside this repo until fixes land)
 
+**Tracking issues** (each plan's `Issue:` field links back): [008 → #457](https://github.com/TropTix/troptix/issues/457) · [013 → #458](https://github.com/TropTix/troptix/issues/458) · [014 → #459](https://github.com/TropTix/troptix/issues/459) · [015 → #460](https://github.com/TropTix/troptix/issues/460) · [016 → #461](https://github.com/TropTix/troptix/issues/461) · [017 → #462](https://github.com/TropTix/troptix/issues/462). Executors post progress on their issue and tick the status row here. Plans 009–012 are tracked privately.
+
 ## Dependency notes
 
 - **008 first (recommended).** It restores a trustworthy `yarn test`; every other plan verifies against `yarn workspace @troptix/api test` (Vitest, unaffected by 008) and/or `yarn test` (web, fixed by 008). None hard-block on 008, but land it first so the baseline is honest.
