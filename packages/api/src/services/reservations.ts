@@ -198,37 +198,68 @@ export type PricedTierRow = {
   price: number;
   ticketingFees: string | null;
   maxPurchasePerUser: number;
+  /** The sale window. One pair — ADR 0020. */
+  saleStartsAt: Date;
+  saleEndsAt: Date;
+  /** Flattened from `event.isDraft` by the caller's row mapping. */
+  isDraft: boolean;
 };
 
 /**
  * Server-side pricing authority (pure): map a client selection onto reserve
  * items, deriving unit price + fees from the tier rows (ignoring any client
- * price), and clamping each quantity to max-per-user. Throws `NotFoundError` for
- * any requested tier that wasn't returned (missing, gated, or wrong event).
+ * price), gating on the sale window + draft status (mirrors the read path in
+ * `checkout.ts`), and clamping the aggregate quantity per tier to max-per-user.
+ * Duplicate `ticketTypeId` entries in `items` are summed before clamping, so
+ * repeating an entry can't stack past the cap. Output is one item per distinct
+ * tier, sorted ascending by `ticketTypeId` for deterministic lock ordering in
+ * `reserve()`. Throws `NotFoundError` for any requested tier that wasn't
+ * returned (missing, gated, or wrong event) or that isn't currently purchasable
+ * (off sale window or the event is a draft).
  */
 export function deriveReserveItems(
   tiers: PricedTierRow[],
-  items: CreateReservationInput['items']
+  items: CreateReservationInput['items'],
+  now: Date
 ): ReserveItemInput[] {
   const byId = new Map(tiers.map((t) => [t.id, t]));
-  return items.map((item) => {
-    const tier = byId.get(item.ticketTypeId);
-    if (!tier) {
-      throw new NotFoundError(
-        `Ticket type ${item.ticketTypeId} is not available for this event.`
-      );
-    }
-    const unitPriceCents = tier.priceCents ?? Math.round(tier.price * 100);
-    const feesCents =
-      tier.ticketingFees === 'PASS_TICKET_FEES'
-        ? calculateFeesCents(unitPriceCents)
-        : 0;
-    const quantity = Math.max(
-      0,
-      Math.min(Math.floor(item.quantity), tier.maxPurchasePerUser)
+
+  // Aggregate requested quantity per tier so duplicate entries can't each
+  // clear the per-purchase cap independently.
+  const totals = new Map<string, number>();
+  for (const item of items) {
+    totals.set(
+      item.ticketTypeId,
+      (totals.get(item.ticketTypeId) ?? 0) +
+        Math.max(0, Math.floor(item.quantity))
     );
-    return { ticketTypeId: tier.id, quantity, unitPriceCents, feesCents };
-  });
+  }
+
+  return Array.from(totals)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([ticketTypeId, requested]) => {
+      const tier = byId.get(ticketTypeId);
+      if (!tier) {
+        throw new NotFoundError(
+          `Ticket type ${ticketTypeId} is not available for this event.`
+        );
+      }
+
+      const onSale = now >= tier.saleStartsAt && now <= tier.saleEndsAt;
+      if (!onSale || tier.isDraft) {
+        throw new NotFoundError(
+          `Ticket type ${ticketTypeId} is not currently on sale.`
+        );
+      }
+
+      const unitPriceCents = tier.priceCents ?? Math.round(tier.price * 100);
+      const feesCents =
+        tier.ticketingFees === 'PASS_TICKET_FEES'
+          ? calculateFeesCents(unitPriceCents)
+          : 0;
+      const quantity = Math.min(requested, tier.maxPurchasePerUser);
+      return { ticketTypeId, quantity, unitPriceCents, feesCents };
+    });
 }
 
 /**
@@ -260,10 +291,24 @@ export async function createReservation(
       price: true,
       ticketingFees: true,
       maxPurchasePerUser: true,
+      saleStartsAt: true,
+      saleEndsAt: true,
+      event: { select: { isDraft: true } },
     },
   });
 
-  const reserveItems = deriveReserveItems(tiers, input.items);
+  const pricedTiers: PricedTierRow[] = tiers.map((t) => ({
+    id: t.id,
+    priceCents: t.priceCents,
+    price: t.price,
+    ticketingFees: t.ticketingFees,
+    maxPurchasePerUser: t.maxPurchasePerUser,
+    saleStartsAt: t.saleStartsAt,
+    saleEndsAt: t.saleEndsAt,
+    isDraft: t.event.isDraft,
+  }));
+
+  const reserveItems = deriveReserveItems(pricedTiers, input.items, new Date());
 
   const result = await reserve(prisma, {
     eventId: input.eventId,

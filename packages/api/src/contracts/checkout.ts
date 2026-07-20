@@ -107,7 +107,7 @@ export type CheckoutConfigResponse = z.infer<
 
 export const applyCodeInputSchema = z.object({
   eventId: z.string().min(1),
-  code: z.string().min(1),
+  code: z.string().min(1).max(100),
 });
 export type ApplyCodeInput = z.infer<typeof applyCodeInputSchema>;
 
