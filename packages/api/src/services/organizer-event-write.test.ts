@@ -52,7 +52,7 @@ function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
   };
 
   const eventsCreate = vi.fn().mockResolvedValue({});
-  const ticketTypesCreate = vi.fn().mockResolvedValue({});
+  const ticketTypesCreateMany = vi.fn().mockResolvedValue({ count: 0 });
   const eventsFindFirst = vi
     .fn()
     .mockResolvedValue(opts.event === undefined ? { id: 'e1' } : opts.event);
@@ -70,7 +70,7 @@ function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
       async (fn: (tx: unknown) => Promise<unknown>) =>
         await fn({
           events: { create: eventsCreate },
-          ticketTypes: { create: ticketTypesCreate },
+          ticketTypes: { createMany: ticketTypesCreateMany },
         })
     ),
   } as unknown as PrismaClient;
@@ -78,7 +78,7 @@ function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
   return {
     prisma,
     eventsCreate,
-    ticketTypesCreate,
+    ticketTypesCreateMany,
     eventsFindFirst,
     eventsUpdate,
   };
@@ -147,14 +147,14 @@ describe('createEvent', () => {
   });
 
   it('writes ticket types with both integer cents and the legacy float', async () => {
-    const { prisma, ticketTypesCreate } = fakePrisma({ paidEnabled: true });
+    const { prisma, ticketTypesCreateMany } = fakePrisma({ paidEnabled: true });
     await createEvent(
       prisma,
       OWNER,
       baseInput({ ticketTypes: [ticket(2550), ticket(0)] })
     );
 
-    const rows = ticketTypesCreate.mock.calls.map((c) => c[0].data);
+    const rows = ticketTypesCreateMany.mock.calls[0][0].data;
     expect(rows[0]).toMatchObject({
       priceCents: 2550,
       price: 25.5,

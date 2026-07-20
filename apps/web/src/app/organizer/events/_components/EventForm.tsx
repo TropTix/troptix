@@ -105,9 +105,11 @@ export default function EventForm({
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
 
   const isEditing = !!eventId;
+  // useForm only reads defaultValues on mount — compute them once, not per render.
+  const [defaults] = useState(() => initialData ?? defaultEventValues());
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
-    defaultValues: initialData ?? defaultEventValues(),
+    defaultValues: defaults,
     mode: 'onChange',
   });
 
@@ -537,40 +539,38 @@ function DateTimeField({
   placeholder: string;
 }) {
   return (
-    <div className="flex flex-col gap-4">
-      <FormField
-        control={control}
-        name={name}
-        render={({ field }) => (
-          <FormItem className="flex-1">
-            <FormLabel>{label}</FormLabel>
-            <div className="flex flex-row gap-2 items-center">
-              <FormControl>
-                <DatePicker
-                  date={field.value}
-                  onDateChange={(newDate) =>
-                    field.onChange(
-                      combineDateTime(newDate, formatTime(field.value))
-                    )
-                  }
-                  placeholder={placeholder}
-                />
-              </FormControl>
-              <FormControl>
-                <Input
-                  type="time"
-                  value={formatTime(field.value)}
-                  onChange={(e) =>
-                    field.onChange(combineDateTime(field.value, e.target.value))
-                  }
-                  className="w-full sm:w-[120px]"
-                />
-              </FormControl>
-            </div>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    </div>
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{label}</FormLabel>
+          <div className="flex flex-row gap-2 items-center">
+            <FormControl>
+              <DatePicker
+                date={field.value}
+                onDateChange={(newDate) =>
+                  field.onChange(
+                    combineDateTime(newDate, formatTime(field.value))
+                  )
+                }
+                placeholder={placeholder}
+              />
+            </FormControl>
+            <FormControl>
+              <Input
+                type="time"
+                value={formatTime(field.value)}
+                onChange={(e) =>
+                  field.onChange(combineDateTime(field.value, e.target.value))
+                }
+                className="w-full sm:w-[120px]"
+              />
+            </FormControl>
+          </div>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
   );
 }

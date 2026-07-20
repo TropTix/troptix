@@ -50,27 +50,25 @@ export async function createEvent(
       },
     });
 
-    await Promise.all(
-      ticketTypes.map((ticketType) =>
-        tx.ticketTypes.create({
-          data: {
-            id: generateId(),
-            eventId,
-            name: ticketType.name,
-            description: ticketType.description ?? '',
-            ticketType: ticketType.priceCents === 0 ? 'FREE' : 'PAID',
-            priceCents: ticketType.priceCents,
-            // Legacy float mirror, until the 2.12 cutover retires it.
-            price: ticketType.priceCents / 100,
-            capacity: ticketType.capacity,
-            maxPurchasePerUser: ticketType.maxPurchasePerUser,
-            saleStartsAt: ticketType.saleStartsAt,
-            saleEndsAt: ticketType.saleEndsAt,
-            ticketingFees: ticketType.ticketingFees,
-          },
-        })
-      )
-    );
+    if (ticketTypes.length > 0) {
+      await tx.ticketTypes.createMany({
+        data: ticketTypes.map((ticketType) => ({
+          id: generateId(),
+          eventId,
+          name: ticketType.name,
+          description: ticketType.description ?? '',
+          ticketType: ticketType.priceCents === 0 ? 'FREE' : 'PAID',
+          priceCents: ticketType.priceCents,
+          // Legacy float mirror, until the 2.12 cutover retires it.
+          price: ticketType.priceCents / 100,
+          capacity: ticketType.capacity,
+          maxPurchasePerUser: ticketType.maxPurchasePerUser,
+          saleStartsAt: ticketType.saleStartsAt,
+          saleEndsAt: ticketType.saleEndsAt,
+          ticketingFees: ticketType.ticketingFees,
+        })),
+      });
+    }
   });
 
   return { eventId };

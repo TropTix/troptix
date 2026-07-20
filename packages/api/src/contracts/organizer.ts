@@ -290,14 +290,17 @@ const eventFieldsSchema = z.object({
   imageUrl: z.string().nullable().optional(),
 });
 
+// One home for the temporal rule, so create and update can't drift apart.
+const eventEndsAfterStart = [
+  (e: { startsAt: Date; endsAt: Date }) => e.endsAt > e.startsAt,
+  { message: 'Event must end after it starts.', path: ['endsAt'] },
+] as const;
+
 export const createEventInputSchema = eventFieldsSchema
   .extend({
     ticketTypes: z.array(ticketTypeInputSchema).optional(),
   })
-  .refine((e) => e.endsAt > e.startsAt, {
-    message: 'Event must end after it starts.',
-    path: ['endsAt'],
-  });
+  .refine(...eventEndsAfterStart);
 export type CreateEventInput = z.infer<typeof createEventInputSchema>;
 
 /**
@@ -305,11 +308,7 @@ export type CreateEventInput = z.infer<typeof createEventInputSchema>;
  * `updateEvent` deliberately takes no ticket types (see #465).
  */
 export const updateEventInputSchema = eventFieldsSchema.refine(
-  (e) => e.endsAt > e.startsAt,
-  {
-    message: 'Event must end after it starts.',
-    path: ['endsAt'],
-  }
+  ...eventEndsAfterStart
 );
 export type UpdateEventInput = z.infer<typeof updateEventInputSchema>;
 

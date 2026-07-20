@@ -10,6 +10,7 @@ import { ZodError } from 'zod';
 import {
   createEvent as createEventService,
   updateEvent as updateEventService,
+  toCents,
   NotFoundError,
   PaidTicketingNotEnabledError,
   UnauthorizedError,
@@ -45,11 +46,19 @@ export async function createEvent(
   }
 
   try {
-    const { eventId } = await createEventService(
-      prisma,
-      userToActor(user),
-      toServiceInput(data)
-    );
+    const { eventId } = await createEventService(prisma, userToActor(user), {
+      ...toEventFields(data),
+      ticketTypes: (data.tickets ?? []).map((ticket) => ({
+        name: ticket.name,
+        description: ticket.description,
+        priceCents: toCents(ticket.price),
+        capacity: ticket.capacity,
+        maxPurchasePerUser: ticket.maxPurchasePerUser,
+        saleStartsAt: ticket.saleStartsAt,
+        saleEndsAt: ticket.saleEndsAt,
+        ticketingFees: ticket.ticketingFees,
+      })),
+    });
 
     revalidatePath('/organizer/events');
     return { success: true, eventId };
@@ -82,8 +91,12 @@ export async function updateEvent(
 
   try {
     // Event fields only — ticket-type editing is Screen E's seam (#465).
-    const { ticketTypes: _tickets, ...fields } = toServiceInput(data);
-    await updateEventService(prisma, userToActor(user), eventId, fields);
+    await updateEventService(
+      prisma,
+      userToActor(user),
+      eventId,
+      toEventFields(data)
+    );
 
     revalidatePath('/organizer/events');
     revalidatePath(`/organizer/events/${eventId}`);
@@ -98,10 +111,10 @@ export async function updateEvent(
   }
 }
 
-function toServiceInput(data: EventFormValues) {
+function toEventFields(data: EventFormValues) {
   return {
     name: data.eventName,
-    description: data.description ?? '',
+    description: data.description,
     startsAt: data.startsAt,
     endsAt: data.endsAt,
     venue: data.venue,
@@ -111,16 +124,6 @@ function toServiceInput(data: EventFormValues) {
     latitude: data.latitude,
     longitude: data.longitude,
     imageUrl: data.imageUrl,
-    ticketTypes: (data.tickets ?? []).map((ticket) => ({
-      name: ticket.name,
-      description: ticket.description,
-      priceCents: Math.round(ticket.price * 100),
-      capacity: ticket.capacity,
-      maxPurchasePerUser: ticket.maxPurchasePerUser,
-      saleStartsAt: ticket.saleStartsAt,
-      saleEndsAt: ticket.saleEndsAt,
-      ticketingFees: ticket.ticketingFees,
-    })),
   };
 }
 
