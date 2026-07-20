@@ -16,10 +16,11 @@ export const createReservationInputSchema = z.object({
     .array(
       z.object({
         ticketTypeId: z.string().min(1),
-        quantity: z.number().int().min(1),
+        quantity: z.number().int().min(1).max(50),
       })
     )
-    .min(1),
+    .min(1)
+    .max(20),
   contact: reservationContactSchema,
 });
 export type CreateReservationInput = z.infer<

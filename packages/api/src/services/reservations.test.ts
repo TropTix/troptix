@@ -53,7 +53,11 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-async function makeTicketType(capacity: number, priceCents = 1000) {
+async function makeTicketType(
+  capacity: number,
+  priceCents = 1000,
+  overrides: { saleStartsAt?: Date; saleEndsAt?: Date } = {}
+) {
   return prisma.ticketTypes.create({
     data: {
       id: generateId(),
@@ -63,8 +67,8 @@ async function makeTicketType(capacity: number, priceCents = 1000) {
       capacity,
       price: priceCents / 100,
       priceCents,
-      saleStartsAt: new Date(Date.now() - 86_400_000),
-      saleEndsAt: new Date(Date.now() + 86_400_000),
+      saleStartsAt: overrides.saleStartsAt ?? new Date(Date.now() - 86_400_000),
+      saleEndsAt: overrides.saleEndsAt ?? new Date(Date.now() + 86_400_000),
       event: { connect: { id: TEST_EVENT_ID } },
     },
   });
@@ -296,6 +300,25 @@ describe('createReservation — server pricing authority', () => {
 
     expect(res.items[0].granted).toBe(1);
     expect(res.wasAdjusted).toBe(true);
+  });
+
+  it('rejects a ticket type whose sale window has not opened yet', async () => {
+    const tt = await makeTicketType(5, 5000, {
+      saleStartsAt: new Date(Date.now() + 86_400_000),
+      saleEndsAt: new Date(Date.now() + 2 * 86_400_000),
+    });
+
+    await expect(
+      createReservation(
+        prisma,
+        {
+          eventId: TEST_EVENT_ID,
+          items: [{ ticketTypeId: tt.id, quantity: 1 }],
+          contact: { firstName: 'Not', lastName: 'Yet', email: 'not@yet.com' },
+        },
+        null
+      )
+    ).rejects.toThrow(/not currently on sale/);
   });
 });
 
