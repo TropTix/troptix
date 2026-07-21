@@ -1,25 +1,36 @@
 'use client';
 
+import type { CSSProperties } from 'react';
+import { CircleCheck, CircleX, Info, TriangleAlert } from 'lucide-react';
 import { Toaster as SonnerToaster } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+
 export default function Toaster() {
   const isMobile = useIsMobile();
-  const position = isMobile ? 'top-center' : 'bottom-right';
 
   return (
     <SonnerToaster
-      position={position}
+      position={isMobile ? 'top-center' : 'bottom-right'}
+      closeButton
+      style={
+        {
+          '--normal-bg': 'hsl(var(--background))',
+          '--normal-text': 'hsl(var(--foreground))',
+          '--normal-border': 'hsl(var(--border))',
+        } as CSSProperties
+      }
+      icons={{
+        success: <CircleCheck className="h-4 w-4 text-success" />,
+        error: <CircleX className="h-4 w-4 text-destructive" />,
+        warning: <TriangleAlert className="h-4 w-4 text-warning" />,
+        info: <Info className="h-4 w-4 text-primary" />,
+      }}
       toastOptions={{
         style: {
-          borderRadius: 'border-radius-lg',
+          borderRadius: 'var(--radius)',
         },
-
         classNames: {
-          success: '!bg-green-100 !text-green-700',
-          error: '!bg-red-100 !text-red-700',
-          warning: '!bg-yellow-100 !text-yellow-700',
-          info: '!bg-blue-100 !text-blue-700',
-          loading: '!bg-sky-100 !text-sky-700',
+          description: '!text-muted-foreground',
         },
       }}
     />
