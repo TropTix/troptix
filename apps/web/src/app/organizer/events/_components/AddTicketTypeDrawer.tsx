@@ -52,22 +52,39 @@ import { Switch } from '@/components/ui/switch';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
 import { calculateFeesCents, FeeConfig } from '@troptix/api';
 
-// The gross ↔ display pair, linked through the platform fee (8% + $0.50).
-// PASS puts the fee on top of gross; ABSORB leaves the sticker at gross.
-function displayCentsOf(
-  grossCents: number,
-  fees: TicketTypeFormValues['ticketingFees']
-): number {
+// The gross ↔ display pair always means what-you-EARN ↔ what-the-buyer-PAYS,
+// with the platform fee (8% + $0.50) between them in both modes. What varies
+// is the STORED price (the form's `price`, what checkout computes fees on):
+// under PASS it's the earnings (fee added on top for the buyer); under
+// ABSORB it's the sticker the buyer pays (fee comes out of the organizer).
+type Fees = TicketTypeFormValues['ticketingFees'];
+
+function grossCentsFromStored(storedCents: number, fees: Fees): number {
   return fees === 'PASS_TICKET_FEES'
-    ? grossCents + calculateFeesCents(grossCents)
-    : grossCents;
+    ? storedCents
+    : storedCents - calculateFeesCents(storedCents);
 }
 
-function grossCentsFromDisplay(
-  displayCents: number,
-  fees: TicketTypeFormValues['ticketingFees']
-): number {
+function displayCentsFromStored(storedCents: number, fees: Fees): number {
+  return fees === 'PASS_TICKET_FEES'
+    ? storedCents + calculateFeesCents(storedCents)
+    : storedCents;
+}
+
+// Inverses, rounding to the nearest cent: fee = 8% · stored + 50¢, so
+// PASS solves display = 1.08·stored + 50 and ABSORB solves
+// gross = stored − (0.08·stored + 50) = 0.92·stored − 50.
+function storedCentsFromGross(grossCents: number, fees: Fees): number {
+  if (fees === 'PASS_TICKET_FEES') return grossCents;
+  if (grossCents <= 0) return 0;
+  return Math.round(
+    (grossCents + FeeConfig.FIXED_CENTS) / (1 - FeeConfig.PERCENTAGE)
+  );
+}
+
+function storedCentsFromDisplay(displayCents: number, fees: Fees): number {
   if (fees !== 'PASS_TICKET_FEES') return displayCents;
+  if (displayCents <= 0) return 0;
   return Math.max(
     0,
     Math.round(
@@ -135,10 +152,19 @@ export function AddTicketTypeDrawer({
   });
 
   // Free is an explicit choice; paid pricing is entered from either end
-  // (gross = what you set/earn, display = what the buyer pays), linked by
-  // the fee math. Gross lives in the form (`price`); display is derived.
+  // (gross = what you earn, display = what the buyer pays), linked by the
+  // fee math. Both inputs are views over the STORED price (the form's
+  // `price`), whose meaning follows the fee structure.
   const [isFree, setIsFree] = useState(true);
+  const [grossInput, setGrossInput] = useState('');
   const [displayInput, setDisplayInput] = useState('');
+
+  const setStoredPrice = (storedCents: number) => {
+    form.setValue('price', +(storedCents / 100).toFixed(2), {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
 
   // The drawer stays mounted across opens, so the form must be re-seeded per
   // open — otherwise editing row A shows whatever was last typed (and Save
@@ -148,28 +174,31 @@ export function AddTicketTypeDrawer({
     if (open) {
       const seed = { ...defaultValues, ...initialData };
       form.reset(seed);
-      const grossCents = Math.round((seed.price ?? 0) * 100);
-      setIsFree(grossCents === 0);
+      const storedCents = Math.round((seed.price ?? 0) * 100);
+      setIsFree(storedCents === 0);
+      setGrossInput(
+        storedCents > 0
+          ? toDollars(grossCentsFromStored(storedCents, seed.ticketingFees))
+          : ''
+      );
       setDisplayInput(
-        grossCents > 0
-          ? toDollars(displayCentsOf(grossCents, seed.ticketingFees))
+        storedCents > 0
+          ? toDollars(displayCentsFromStored(storedCents, seed.ticketingFees))
           : ''
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialData]);
 
-  const syncDisplayFromGross = (
-    grossDollars: unknown,
-    fees: TicketTypeFormValues['ticketingFees'] = form.getValues(
-      'ticketingFees'
-    )
-  ) => {
-    const gross = Number(grossDollars);
+  const handleGrossChange = (raw: string) => {
+    setGrossInput(raw);
+    const gross = Number(raw);
+    if (!Number.isFinite(gross)) return;
+    const fees = form.getValues('ticketingFees');
+    const storedCents = storedCentsFromGross(Math.round(gross * 100), fees);
+    setStoredPrice(storedCents);
     setDisplayInput(
-      Number.isFinite(gross) && gross > 0
-        ? toDollars(displayCentsOf(Math.round(gross * 100), fees))
-        : ''
+      gross > 0 ? toDollars(displayCentsFromStored(storedCents, fees)) : ''
     );
   };
 
@@ -177,20 +206,28 @@ export function AddTicketTypeDrawer({
     setDisplayInput(raw);
     const display = Number(raw);
     if (!Number.isFinite(display)) return;
-    const grossCents = grossCentsFromDisplay(
-      Math.round(display * 100),
-      form.getValues('ticketingFees')
+    const fees = form.getValues('ticketingFees');
+    const storedCents = storedCentsFromDisplay(Math.round(display * 100), fees);
+    setStoredPrice(storedCents);
+    setGrossInput(
+      display > 0 ? toDollars(grossCentsFromStored(storedCents, fees)) : ''
     );
-    form.setValue('price', +(grossCents / 100).toFixed(2), {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
+  };
+
+  // Switching who eats the fee keeps the stored price and re-derives both
+  // views — what checkout would actually charge stays the anchor.
+  const handleFeesChange = (fees: Fees) => {
+    const storedCents = Math.round((form.getValues('price') ?? 0) * 100);
+    if (storedCents <= 0) return;
+    setGrossInput(toDollars(grossCentsFromStored(storedCents, fees)));
+    setDisplayInput(toDollars(displayCentsFromStored(storedCents, fees)));
   };
 
   const handleFreeToggle = (free: boolean) => {
     setIsFree(free);
     if (free) {
       form.setValue('price', 0, { shouldValidate: true, shouldDirty: true });
+      setGrossInput('');
       setDisplayInput('');
     }
   };
@@ -293,7 +330,7 @@ export function AddTicketTypeDrawer({
                 <FormField
                   control={form.control}
                   name="price"
-                  render={({ field }) => (
+                  render={() => (
                     <FormItem>
                       <FormLabel>Gross Price ($)</FormLabel>
                       <FormControl>
@@ -302,17 +339,13 @@ export function AddTicketTypeDrawer({
                           step="0.01"
                           min="0"
                           placeholder="0.00"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e.target.value);
-                            syncDisplayFromGross(e.target.value);
-                          }}
-                          value={field.value ?? ''}
+                          value={grossInput}
+                          onChange={(e) => handleGrossChange(e.target.value)}
                           disabled={!paidEventsEnabled}
                         />
                       </FormControl>
                       <FormDescription>
-                        What you earn per sale when fees are passed on.
+                        What you earn per ticket, after any absorbed fees.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -332,7 +365,7 @@ export function AddTicketTypeDrawer({
                     />
                   </FormControl>
                   <FormDescription>
-                    What the buyer sees and pays, including the TropTix fee.
+                    What the buyer sees and pays, including any passed-on fee.
                   </FormDescription>
                 </FormItem>
               </div>
@@ -545,11 +578,7 @@ export function AddTicketTypeDrawer({
                           value={field.value}
                           onValueChange={(value: string) => {
                             field.onChange(value);
-                            // Who eats the fee changes what the buyer pays.
-                            syncDisplayFromGross(
-                              form.getValues('price'),
-                              value as TicketTypeFormValues['ticketingFees']
-                            );
+                            handleFeesChange(value as Fees);
                           }}
                         >
                           <SelectTrigger>
