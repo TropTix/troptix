@@ -1,10 +1,12 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { DollarSign, Plus, Ticket } from 'lucide-react';
-import { listTicketTypes, NotFoundError } from '@troptix/api/server';
+import { DollarSign, Ticket } from 'lucide-react';
+import {
+  findOrganizationForOwner,
+  listTicketTypes,
+  NotFoundError,
+} from '@troptix/api/server';
 import type { TicketTypesView } from '@troptix/api';
 
-import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -15,7 +17,7 @@ import {
 import { requireOrganizerActor } from '@/server/actor';
 import prisma from '@/server/prisma';
 import { formatCents } from '@/lib/dateUtils';
-import { TicketTypesTable } from './_components/TicketTypesTable';
+import { TicketTypesManager } from './_components/TicketTypesManager';
 
 export default async function EventTicketsPage({
   params,
@@ -28,6 +30,17 @@ export default async function EventTicketsPage({
   const { eventId } = await params;
   const { viewAs } = await searchParams;
 
+  // Writes are always self-scoped (never View-as), so the paid gate reads the
+  // acting user's own org — the same flag the write service enforces. Kicked
+  // off alongside the view fetch; independent reads, one wave.
+  // .catch → null so a notFound() bail from the view fetch below can't leave
+  // this floating as an unhandled rejection; the write service stays the
+  // authoritative gate either way.
+  const orgPromise =
+    actor.kind === 'user'
+      ? findOrganizationForOwner(prisma, actor.userId).catch(() => null)
+      : Promise.resolve(null);
+
   let view: TicketTypesView;
   try {
     view = await listTicketTypes(prisma, actor, eventId, {
@@ -37,27 +50,20 @@ export default async function EventTicketsPage({
     if (error instanceof NotFoundError) notFound();
     throw error;
   }
+  const org = await orgPromise;
+  const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
 
   const { ticketTypes, summary } = view;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Ticket types</h1>
-          {ticketTypes.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {summary.onSale} of {ticketTypes.length} on sale
-            </p>
-          )}
-        </div>
-        {/* Adding a ticketType is first-class here — including after go-live. */}
-        <Button asChild>
-          <Link href={`/organizer/events/${eventId}/tickets/new`}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add ticket type
-          </Link>
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Ticket types</h1>
+        {ticketTypes.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {summary.onSale} of {ticketTypes.length} on sale
+          </p>
+        )}
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2">
@@ -75,25 +81,12 @@ export default async function EventTicketsPage({
         />
       </section>
 
-      {ticketTypes.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-            <div>
-              <p className="font-medium">No ticket types yet</p>
-              <p className="text-sm text-muted-foreground">
-                Add a ticket type to start selling.
-              </p>
-            </div>
-            <Button asChild size="sm">
-              <Link href={`/organizer/events/${eventId}/tickets/new`}>
-                Add your first ticket type
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <TicketTypesTable ticketTypes={ticketTypes} eventId={eventId} />
-      )}
+      <TicketTypesManager
+        ticketTypes={ticketTypes}
+        eventId={eventId}
+        eventEndsAt={new Date(view.eventEndsAt)}
+        paidEventsEnabled={paidEventsEnabled}
+      />
     </div>
   );
 }

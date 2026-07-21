@@ -46,8 +46,13 @@ export {
 export { listTicketTypes } from './services/organizer-ticket-types';
 export { createEvent, updateEvent } from './services/organizer-event-write';
 export {
+  createTicketType,
+  updateTicketType,
+} from './services/organizer-ticket-type-write';
+export {
   ensureOrganizationForUser,
   backfillOrganizations,
+  findOrganizationForOwner,
   getOrganizationBySlug,
   updateOrganizationProfile,
 } from './services/organizations';

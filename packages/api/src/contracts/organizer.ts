@@ -247,6 +247,12 @@ export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
   /** Venue-local sale window (ADR 0021). Both are always set. */
   saleStartsAt: z.string().datetime(),
   saleEndsAt: z.string().datetime(),
+  // The remaining editable fields, so the manage screen can seed its edit
+  // drawer without a second fetch.
+  description: z.string(),
+  maxPurchasePerUser: z.number().int(),
+  ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
+  discountCode: z.string().nullable(),
 });
 export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
 
@@ -268,6 +274,7 @@ export const ticketTypeInputSchema = z
     saleStartsAt: z.date(),
     saleEndsAt: z.date(),
     ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
+    discountCode: z.string().optional(),
   })
   .refine((t) => t.saleEndsAt > t.saleStartsAt, {
     message: 'Sale end must be after sale start.',
@@ -316,6 +323,12 @@ export const updateEventInputSchema = eventFieldsSchema.refine(
 export type UpdateEventInput = z.infer<typeof updateEventInputSchema>;
 
 export const ticketTypesViewSchema = z.object({
+  /**
+   * The event's end — the default sale-window end for new tickets (sell
+   * until the event ends). Carried here so the manage screen needs no
+   * second, seam-bypassing event read.
+   */
+  eventEndsAt: z.string().datetime(),
   /** Natural (creation) order — reordering is deferred (see the UX plan). */
   ticketTypes: z.array(ticketTypeRowSchema),
   /**
