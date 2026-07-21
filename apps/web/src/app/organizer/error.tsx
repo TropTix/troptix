@@ -1,29 +1,26 @@
 'use client'; // Error components must be Client Components
 
 import { useEffect } from 'react';
+import posthog from 'posthog-js';
+
+import { ErrorDisplay } from '@/components/utils/error-display';
 
 interface ErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
 }
 
+/** Segment-scoped error boundary for the organizer dashboard. */
 export default function Error({ error, reset }: ErrorProps) {
   useEffect(() => {
-    // Optionally log the error to an error reporting service
+    posthog.captureException(error);
     console.error(error);
   }, [error]);
 
   return (
-    <div>
-      <h2>Something went wrong in the organizer section!</h2>
-      <button
-        onClick={
-          // Attempt to recover by trying to re-render the segment
-          () => reset()
-        }
-      >
-        Try again
-      </button>
-    </div>
+    <ErrorDisplay
+      message="Something went wrong in the organizer section."
+      onReset={reset}
+    />
   );
 }

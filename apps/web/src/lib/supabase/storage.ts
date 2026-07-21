@@ -45,6 +45,60 @@ export function eventFlyerUrl(value: string | null | undefined): string | null {
   return `${PUBLIC_BASE}/${EVENT_FLYERS_BUCKET}/${path}`;
 }
 
+export const ORGANIZATION_LOGOS_BUCKET = 'organization-logos';
+
+/**
+ * Resolve a stored `Organization.logoUrl` to a renderable URL — same
+ * path-not-URL contract as `eventFlyerUrl` (ADR 0016), for the org-logos bucket.
+ * Falsy → `null` (callers fall back to a monogram). The upload counterpart lands
+ * with the logo editor; until then every logoUrl is null and this returns null.
+ */
+export function organizationLogoUrl(
+  value: string | null | undefined
+): string | null {
+  if (!value) return null;
+  if (isAbsoluteUrl(value)) return value;
+  const path = value.replace(/^\/+/, '');
+  return `${PUBLIC_BASE}/${ORGANIZATION_LOGOS_BUCKET}/${path}`;
+}
+
+/**
+ * Upload an org logo to the `organization-logos` bucket; returns the stored PATH
+ * (what goes into `Organization.logoUrl`). Governed by the bucket's authenticated
+ * RLS policy — the caller must be signed in. Throws on failure.
+ */
+export async function uploadOrganizationLogo(file: File): Promise<string> {
+  const supabase = createClient();
+  const ext = file.name.includes('.')
+    ? file.name.split('.').pop()!.toLowerCase()
+    : 'bin';
+  const path = `${crypto.randomUUID()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(ORGANIZATION_LOGOS_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type || undefined,
+      upsert: false,
+    });
+
+  if (error) throw error;
+  return path;
+}
+
+/** Delete an org logo by its stored path. No-ops on falsy / absolute values. */
+export async function deleteOrganizationLogo(
+  value: string | null | undefined
+): Promise<void> {
+  if (!value || isAbsoluteUrl(value)) return;
+  const supabase = createClient();
+  const path = value.replace(/^\/+/, '');
+  const { error } = await supabase.storage
+    .from(ORGANIZATION_LOGOS_BUCKET)
+    .remove([path]);
+  if (error && !/not\s*found/i.test(error.message)) throw error;
+}
+
 /**
  * Upload a flyer to the `event-flyers` bucket and return the stored PATH (what
  * goes into `Events.imageUrl`). Writes are governed by the bucket's

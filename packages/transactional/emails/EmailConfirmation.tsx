@@ -44,8 +44,8 @@ export interface EmailOrder {
     id: string;
     name: string;
     imageUrl: string | null;
-    startDate: Date;
-    endDate: Date | null;
+    startsAt: Date;
+    endsAt: Date | null;
     address: string | null;
     description: string | null;
   };
@@ -116,9 +116,9 @@ export default function EmailConfirmationTemplate({
                   label="Date & Time"
                   value={
                     <>
-                      {formatDate(event.startDate, DATE_TIME)}{' '}
-                      {event.endDate
-                        ? `– ${formatDate(event.endDate, TIME)}`
+                      {formatDate(event.startsAt, DATE_TIME)}{' '}
+                      {event.endsAt
+                        ? `– ${formatDate(event.endsAt, TIME)}`
                         : ''}
                     </>
                   }
@@ -298,8 +298,8 @@ EmailConfirmationTemplate.PreviewProps = {
       name: 'Caribbean Music Festival 2024',
       imageUrl:
         'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800',
-      startDate: new Date('2024-03-15T19:00:00'),
-      endDate: new Date('2024-03-15T23:00:00'),
+      startsAt: new Date('2024-03-15T19:00:00'),
+      endsAt: new Date('2024-03-15T23:00:00'),
       address: "Queen's Park Savannah, Port of Spain",
       description: 'An amazing Caribbean music festival',
     },

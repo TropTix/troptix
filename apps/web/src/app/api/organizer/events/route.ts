@@ -1,3 +1,6 @@
+// DEPRECATED: legacy REST route for the old `apps/organizer` app; slated for
+// deletion with that app once v2 fully covers it via tRPC.
+// See docs/plans/2026-07-organizer-dashboard-migration.md. Don't build on this.
 import { isPlatformOwner } from '@/server/accessControl';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
@@ -26,14 +29,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const whereClause = isPlatformOwner(organizerId.email) ? {} : { organizerUserId: organizerId.uid };
+    const whereClause = isPlatformOwner(organizerId.email)
+      ? {}
+      : { organizerUserId: organizerId.uid };
 
     const events = await prisma.events.findMany({
       select: {
         id: true,
         imageUrl: true,
         name: true,
-        startDate: true,
+        startsAt: true,
         organizer: true,
         venue: true,
         address: true,
@@ -41,7 +46,7 @@ export async function GET(request: NextRequest) {
       },
       where: whereClause,
       orderBy: {
-        startDate: 'desc', // Optional: order events by start date
+        startsAt: 'desc', // Optional: order events by start date
       },
     });
 

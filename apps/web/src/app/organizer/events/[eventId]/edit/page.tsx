@@ -24,11 +24,11 @@ async function getEvent(eventId: string, userId: string, userEmail?: string) {
           select: {
             name: true,
             price: true,
-            quantity: true,
+            capacity: true,
             description: true,
             maxPurchasePerUser: true,
-            saleStartDate: true,
-            saleEndDate: true,
+            saleStartsAt: true,
+            saleEndsAt: true,
             ticketingFees: true,
             discountCode: true,
           },
@@ -55,17 +55,6 @@ export default async function EditEventPage(props: EditEventPageProps) {
   const userEmail = user.email;
   await verifyEventAccess(userId, userEmail, eventId);
 
-  // Check user role for paid events capability
-  const userRole = await prisma.users.findUnique({
-    where: {
-      email: user?.email,
-    },
-    select: {
-      role: true,
-    },
-  });
-  const paidEventsEnabled = userRole?.role === 'ORGANIZER';
-
   const event = await getEvent(eventId, userId, userEmail);
 
   if (!event) {
@@ -75,18 +64,25 @@ export default async function EditEventPage(props: EditEventPageProps) {
   const initialData = {
     ...event,
     eventName: event?.name,
-    startDate: event?.startDate,
-    endDate: event?.endDate,
+    startsAt: event?.startsAt,
+    endsAt: event?.endsAt,
     venue: event?.venue ?? '',
     address: event?.address ?? '',
     country: event?.country ?? '',
     countryCode: event?.countryCode ?? '',
-    latitude: event?.latitude ?? 0,
-    longitude: event?.longitude ?? 0,
+    latitude: event?.latitude ?? null,
+    longitude: event?.longitude ?? null,
     imageUrl: event?.imageUrl ?? '',
     description: event?.description ?? '',
-    organizer: event?.organizer ?? '',
   };
+
+  // Host brand for the read-only "Hosted by" line on the form. Paid ticketing
+  // is the Organization's approval — the same flag the write service enforces.
+  const org = await prisma.organization.findFirst({
+    where: { ownerUserId: userId },
+    select: { displayName: true, paidTicketingEnabled: true },
+  });
+  const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
 
   return (
     <div className=" mx-auto py-8">
@@ -108,6 +104,7 @@ export default async function EditEventPage(props: EditEventPageProps) {
         }
         isDraft={event.isDraft}
         paidEventsEnabled={paidEventsEnabled}
+        organizationName={org?.displayName}
       />
     </div>
   );

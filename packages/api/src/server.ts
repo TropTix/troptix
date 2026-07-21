@@ -8,20 +8,61 @@
 
 export {
   reserve,
+  createReservation,
   confirm,
+  settle,
+  completeFree,
   release,
   expire,
+  expireHold,
   type ReserveInput,
   type ReserveResult,
   type ReserveItemInput,
   type ReserveGrantedItem,
   type ConfirmInput,
   type ConfirmResult,
+  type SettleInput,
+  type SettleResult,
 } from './services/reservations';
 
+export {
+  beginPayment,
+  confirmPaid,
+  getCheckoutState,
+  sweepExpiredHolds,
+  type SweepResult,
+} from './services/payments';
+
 export { getCheckoutConfig, applyCode } from './services/checkout';
+export { getEventDetail, listPublicEvents } from './services/events';
+export { getDashboard } from './services/organizer-dashboard';
+export { listOrganizerEvents } from './services/organizer-events';
+export { getEventOverview } from './services/organizer-event-overview';
+export {
+  listEventOrders,
+  getOrderDetail,
+  ORDERS_LIST_LIMIT,
+} from './services/organizer-orders';
+export { listTicketTypes } from './services/organizer-ticket-types';
+export { createEvent, updateEvent } from './services/organizer-event-write';
+export {
+  createTicketType,
+  updateTicketType,
+} from './services/organizer-ticket-type-write';
+export {
+  ensureOrganizationForUser,
+  backfillOrganizations,
+  findOrganizationForOwner,
+  getOrganizationBySlug,
+  updateOrganizationProfile,
+} from './services/organizations';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
-export { NotFoundError } from './services/_shared/errors';
+export { toCents } from './services/_shared/organizerMapping';
+export {
+  NotFoundError,
+  UnauthorizedError,
+  PaidTicketingNotEnabledError,
+} from './services/_shared/errors';
 
 // tRPC adapter — router value, server-side caller, and per-request context.
 export { appRouter, createCaller } from './trpc/routers';

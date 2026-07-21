@@ -9,5 +9,5 @@ import Stripe from 'stripe';
  * with ad-hoc versions — divergent versions are the root of roadmap bug 1.3.
  */
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
+  apiVersion: '2026-06-24.dahlia',
 });

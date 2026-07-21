@@ -10,6 +10,17 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+/**
+ * Hybrid fulfillment sends the same email from two places (the Stripe webhook
+ * and the client success/poll), so two requests can hit Resend with the same
+ * idempotency key concurrently. Resend 409s the loser with
+ * `concurrent_idempotent_requests` while the winner sends it — benign, not a
+ * failure (Resend docs: "safe to retry later"). Treat it as success.
+ */
+function isConcurrentIdempotencyConflict(error: { name?: string } | null) {
+  return error?.name === 'concurrent_idempotent_requests';
+}
+
 async function sendEmail(
   to: string,
   subject: string,
@@ -33,6 +44,12 @@ async function sendEmail(
   );
   // Resend reports failures via `error`, not by throwing.
   if (error) {
+    if (isConcurrentIdempotencyConflict(error)) {
+      console.log(
+        `Confirmation email for ${orderId} already in progress (idempotent) — skipping duplicate.`
+      );
+      return null;
+    }
     throw new Error(`Resend failed to send email: ${error.message}`);
   }
   console.log('Email sent successfully:', data);
@@ -70,6 +87,55 @@ export async function sendEmailConfirmationEmailToUser(orderId: string) {
     await sendEmail(orderDetails.email, subject, html, orderId, attachments);
   } catch (error) {
     console.error('Failed to send order confirmation email:', error);
+  }
+}
+
+/**
+ * Notify a buyer that their payment was auto-refunded because the tickets sold
+ * out while it was processing (the expiry race, ADR 0018). Minimal inline HTML —
+ * there's no order to render. Deduped by `refund-<reservationId>` so a retried
+ * webhook never double-sends. Never throws (fired from the webhook).
+ */
+export async function sendRefundNoticeEmail(reservationId: string) {
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: {
+        email: true,
+        firstName: true,
+        totalCents: true,
+        event: { select: { name: true } },
+      },
+    });
+    if (!reservation?.email) {
+      console.error(`[Refund] No email for reservation ${reservationId}`);
+      return;
+    }
+
+    const eventName = reservation.event?.name ?? 'the event';
+    const amount = `$${(reservation.totalCents / 100).toFixed(2)}`;
+    const html = `
+    <p>Hi ${reservation.firstName ?? 'there'},</p>
+    <p>Unfortunately, tickets to <strong>${eventName}</strong> sold out while
+    your payment was processing, so we&rsquo;ve refunded your ${amount} in full.</p>
+    <p>The refund may take a few days to appear on your statement. You were not
+    charged for any tickets.</p>
+    <p>— TropTix</p>`;
+
+    const { error } = await resend.emails.send(
+      {
+        from: 'TropTix <info@usetroptix.com>',
+        to: reservation.email,
+        subject: `Your ${eventName} payment was refunded`,
+        html,
+      },
+      { idempotencyKey: `refund-${reservationId}` }
+    );
+    if (error && !isConcurrentIdempotencyConflict(error)) {
+      console.error('[Refund] Resend failed to send refund notice:', error);
+    }
+  } catch (error) {
+    console.error('[Refund] Failed to send refund notice email:', error);
   }
 }
 
@@ -113,8 +179,8 @@ const OrderDetailsSelect = {
       id: true,
       name: true,
       imageUrl: true,
-      startDate: true,
-      endDate: true,
+      startsAt: true,
+      endsAt: true,
       address: true,
       description: true,
     },

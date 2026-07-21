@@ -7,12 +7,11 @@ export const eventFormSchema = z
       message: 'Event name must be at least 3 characters.',
     }),
     description: z.string().min(1, { message: 'Description is required.' }),
-    startDate: z.date({
+    startsAt: z.date({
       required_error: 'Start date is required.',
       invalid_type_error: 'Start date must be a valid date.', // Added invalid type error
     }),
-    organizer: z.string().min(1, { message: 'Name of organizer is required.' }),
-    endDate: z.date({
+    endsAt: z.date({
       required_error: 'End date is required.',
       invalid_type_error: 'End date must be a valid date.', // Added invalid type error
     }),
@@ -30,20 +29,11 @@ export const eventFormSchema = z
     // means "no image". Render via eventFlyerUrl().
     imageUrl: z.string().nullable().optional(),
   })
-  .refine(
-    (data) => {
-      if (data.endDate > data.startDate) {
-        return true;
-      }
-      if (data.startDate > data.endDate) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: 'Event must end after it starts.',
-      path: ['endDate'], // Keep error attached to endDate
-    }
-  );
+  // Strictly after — must match the service's createEventInputSchema, or input
+  // that passes here dies deeper in the stack with a generic error.
+  .refine((data) => data.endsAt > data.startsAt, {
+    message: 'Event must end after it starts.',
+    path: ['endsAt'],
+  });
 
 export type EventFormValues = z.infer<typeof eventFormSchema>;

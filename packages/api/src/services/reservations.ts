@@ -20,9 +20,24 @@ import {
   TicketType,
 } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
+import type {
+  CreateReservationInput,
+  CreateReservationResponse,
+  CompleteFreeInput,
+  CompleteFreeResponse,
+} from '../contracts/reservations';
 import { generateId } from './_shared/ids';
+import { calculateFeesCents } from './_shared/fees';
+import { NotFoundError } from './_shared/errors';
 
-const DEFAULT_TTL_MINUTES = 10;
+/**
+ * Server-side hold lifetime. The client shows a shorter deadline (10 min) than
+ * this so payments submitted right at the buyer's countdown still have a buffer
+ * to settle + have their webhook delivered before the server releases the hold —
+ * shrinking the paid-after-expiry refund race (ADR 0018).
+ */
+export const HOLD_TTL_MINUTES = 12;
+const DEFAULT_TTL_MINUTES = HOLD_TTL_MINUTES;
 
 export interface ReserveItemInput {
   ticketTypeId: string;
@@ -62,6 +77,36 @@ export interface ReserveResult {
 }
 
 /**
+ * Atomically hold `requested` units of one ticket type, returning the granted
+ * count (clamped to live availability). One race-safe statement: the `FOR
+ * UPDATE` in the CTE serializes concurrent buyers of the same ticket type, so
+ * the last ticket can never be granted twice; `GREATEST/LEAST` keep the grant
+ * within `[0, capacity - reserved - sold]` (a NULL capacity pre-cutover yields
+ * availability 0, so it simply can't oversell). Shared by the initial hold
+ * (`reserve`) and the paid-after-expiry re-acquire (`settle`).
+ */
+async function holdInventoryInTx(
+  tx: Prisma.TransactionClient,
+  ticketTypeId: string,
+  requested: number
+): Promise<number> {
+  const rows = await tx.$queryRaw<Array<{ granted: number }>>(Prisma.sql`
+    WITH locked AS (
+      SELECT id, GREATEST("capacity" - "reserved" - "sold", 0) AS avail
+      FROM "TicketTypes"
+      WHERE id = ${ticketTypeId}
+      FOR UPDATE
+    )
+    UPDATE "TicketTypes" t
+    SET "reserved" = t."reserved" + LEAST(${requested}::int, locked.avail)
+    FROM locked
+    WHERE t.id = locked.id
+    RETURNING LEAST(${requested}::int, locked.avail)::int AS granted
+  `);
+  return rows[0]?.granted ?? 0;
+}
+
+/**
  * Atomically hold inventory for a set of ticket types.
  *
  * Per item, one race-safe statement clamps the grant to availability
@@ -92,24 +137,7 @@ export async function reserve(
       let granted = 0;
 
       if (requested > 0) {
-        // Lock the ticket-type row, clamp the grant to current availability,
-        // and increment reserved — all in one statement. GREATEST/LEAST keep
-        // the grant within [0, available]; a NULL capacity (pre-cutover) yields
-        // availability 0, so it simply can't oversell.
-        const rows = await tx.$queryRaw<Array<{ granted: number }>>(Prisma.sql`
-          WITH locked AS (
-            SELECT id, GREATEST("capacity" - "reserved" - "sold", 0) AS avail
-            FROM "TicketTypes"
-            WHERE id = ${item.ticketTypeId}
-            FOR UPDATE
-          )
-          UPDATE "TicketTypes" t
-          SET "reserved" = t."reserved" + LEAST(${requested}::int, locked.avail)
-          FROM locked
-          WHERE t.id = locked.id
-          RETURNING LEAST(${requested}::int, locked.avail)::int AS granted
-        `);
-        granted = rows[0]?.granted ?? 0;
+        granted = await holdInventoryInTx(tx, item.ticketTypeId, requested);
       }
 
       if (granted > 0) {
@@ -163,6 +191,141 @@ export async function reserve(
   });
 }
 
+/** The tier columns the pricing authority needs. */
+export type PricedTierRow = {
+  id: string;
+  priceCents: number | null;
+  price: number;
+  ticketingFees: string | null;
+  maxPurchasePerUser: number;
+  /** The sale window. One pair — ADR 0020. */
+  saleStartsAt: Date;
+  saleEndsAt: Date;
+  /** Flattened from `event.isDraft` by the caller's row mapping. */
+  isDraft: boolean;
+};
+
+/**
+ * Server-side pricing authority (pure): map a client selection onto reserve
+ * items, deriving unit price + fees from the tier rows (ignoring any client
+ * price), gating on the sale window + draft status (mirrors the read path in
+ * `checkout.ts`), and clamping the aggregate quantity per tier to max-per-user.
+ * Duplicate `ticketTypeId` entries in `items` are summed before clamping, so
+ * repeating an entry can't stack past the cap. Output is one item per distinct
+ * tier, sorted ascending by `ticketTypeId` for deterministic lock ordering in
+ * `reserve()`. Throws `NotFoundError` for any requested tier that wasn't
+ * returned (missing, gated, or wrong event) or that isn't currently purchasable
+ * (off sale window or the event is a draft).
+ */
+export function deriveReserveItems(
+  tiers: PricedTierRow[],
+  items: CreateReservationInput['items'],
+  now: Date
+): ReserveItemInput[] {
+  const byId = new Map(tiers.map((t) => [t.id, t]));
+
+  // Aggregate requested quantity per tier so duplicate entries can't each
+  // clear the per-purchase cap independently.
+  const totals = new Map<string, number>();
+  for (const item of items) {
+    totals.set(
+      item.ticketTypeId,
+      (totals.get(item.ticketTypeId) ?? 0) +
+        Math.max(0, Math.floor(item.quantity))
+    );
+  }
+
+  return Array.from(totals)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([ticketTypeId, requested]) => {
+      const tier = byId.get(ticketTypeId);
+      if (!tier) {
+        throw new NotFoundError(
+          `Ticket type ${ticketTypeId} is not available for this event.`
+        );
+      }
+
+      const onSale = now >= tier.saleStartsAt && now <= tier.saleEndsAt;
+      if (!onSale || tier.isDraft) {
+        throw new NotFoundError(
+          `Ticket type ${ticketTypeId} is not currently on sale.`
+        );
+      }
+
+      const unitPriceCents = tier.priceCents ?? Math.round(tier.price * 100);
+      const feesCents =
+        tier.ticketingFees === 'PASS_TICKET_FEES'
+          ? calculateFeesCents(unitPriceCents)
+          : 0;
+      const quantity = Math.min(requested, tier.maxPurchasePerUser);
+      return { ticketTypeId, quantity, unitPriceCents, feesCents };
+    });
+}
+
+/**
+ * Create a hold from a client selection. The server is the pricing authority: it
+ * ignores any client-sent price and derives unit price + fees from `TicketTypes`,
+ * validates each tier is public and belongs to the event, clamps to max-per-user,
+ * then calls `reserve()` (which clamps to live availability). `userId` comes from
+ * the actor, never the client.
+ */
+export async function createReservation(
+  prisma: PrismaClient,
+  input: CreateReservationInput,
+  userId: string | null
+): Promise<CreateReservationResponse> {
+  const tierIds = input.items.map((i) => i.ticketTypeId);
+  const tiers = await prisma.ticketTypes.findMany({
+    where: {
+      id: { in: tierIds },
+      eventId: input.eventId,
+      // Public tiers only — gated tiers must be unlocked via a code first.
+      OR: [
+        { discountCode: { equals: null } },
+        { discountCode: { equals: '' } },
+      ],
+    },
+    select: {
+      id: true,
+      priceCents: true,
+      price: true,
+      ticketingFees: true,
+      maxPurchasePerUser: true,
+      saleStartsAt: true,
+      saleEndsAt: true,
+      event: { select: { isDraft: true } },
+    },
+  });
+
+  const pricedTiers: PricedTierRow[] = tiers.map((t) => ({
+    id: t.id,
+    priceCents: t.priceCents,
+    price: t.price,
+    ticketingFees: t.ticketingFees,
+    maxPurchasePerUser: t.maxPurchasePerUser,
+    saleStartsAt: t.saleStartsAt,
+    saleEndsAt: t.saleEndsAt,
+    isDraft: t.event.isDraft,
+  }));
+
+  const reserveItems = deriveReserveItems(pricedTiers, input.items, new Date());
+
+  const result = await reserve(prisma, {
+    eventId: input.eventId,
+    items: reserveItems,
+    contact: input.contact,
+    userId,
+  });
+
+  return {
+    reservationId: result.reservationId,
+    items: result.items,
+    totalCents: result.totalCents,
+    expiresAt: result.expiresAt.toISOString(),
+    wasAdjusted: result.items.some((g) => g.granted < g.requested),
+  };
+}
+
 export interface ConfirmInput {
   paymentIntentId: string;
   cardType?: string | null;
@@ -177,13 +340,109 @@ export interface ConfirmResult {
 
 /**
  * Materialize a paid (or free) order from a held reservation, atomically:
- * move `reserved → sold`, create the Order + one Ticket per unit (VALID), mark
- * the reservation CONVERTED, and enqueue the confirmation email in the outbox
- * (sent after commit — never inside this transaction).
+ * move `reserved → sold`, create the Order + one Ticket per unit (VALID), and
+ * mark the reservation CONVERTED. The confirmation email is sent by the caller
+ * after commit (never inside this transaction).
  *
  * Idempotent: Stripe delivers webhooks at-least-once, so a second call for an
  * already-CONVERTED reservation is a no-op returning the existing order id.
  */
+type ReservationWithItems = Prisma.ReservationGetPayload<{
+  include: { items: true };
+}>;
+
+/**
+ * Shared order materialization: move reserved → sold, create the Order + one
+ * VALID Ticket per unit, mark the reservation CONVERTED, and enqueue the
+ * confirmation email. Used by both the paid webhook path (`confirm`) and the
+ * free path (`completeFree`). Assumes the caller has already loaded the
+ * reservation and checked it is HELD.
+ */
+async function materializeOrder(
+  tx: Prisma.TransactionClient,
+  reservation: ReservationWithItems,
+  opts: {
+    paymentIntentId?: string | null;
+    cardType?: string | null;
+    cardLast4?: string | null;
+  } = {}
+): Promise<string> {
+  const isFree = reservation.totalCents === 0;
+  const orderType = isFree ? OrderType.FREE : OrderType.PAID;
+  const ticketsType = isFree ? TicketType.FREE : TicketType.PAID;
+
+  // In one pass per item: move reserved → sold, and build one VALID ticket row
+  // per reserved unit.
+  const ticketRows: Prisma.TicketsCreateManyOrderInput[] = [];
+  for (const item of reservation.items) {
+    await tx.ticketTypes.update({
+      where: { id: item.ticketTypeId },
+      data: {
+        reserved: { decrement: item.quantity },
+        sold: { increment: item.quantity },
+      },
+    });
+
+    for (let i = 0; i < item.quantity; i++) {
+      ticketRows.push({
+        id: generateId(),
+        status: TicketStatus.VALID,
+        ticketsType,
+        subtotal: item.unitPriceCents / 100,
+        fees: item.feesCents / 100,
+        total: (item.unitPriceCents + item.feesCents) / 100,
+        firstName: reservation.firstName,
+        lastName: reservation.lastName,
+        email: reservation.email,
+        eventId: reservation.eventId,
+        ticketTypeId: item.ticketTypeId,
+        ...(reservation.userId ? { userId: reservation.userId } : {}),
+      });
+    }
+  }
+
+  const orderId = generateId();
+  await tx.orders.create({
+    data: {
+      id: orderId,
+      status: OrderStatus.COMPLETED,
+      type: orderType,
+      stripePaymentId: opts.paymentIntentId ?? null,
+      total: reservation.totalCents / 100,
+      subtotal: reservation.subtotalCents / 100,
+      fees: reservation.feesCents / 100,
+      totalCents: reservation.totalCents,
+      subtotalCents: reservation.subtotalCents,
+      feesCents: reservation.feesCents,
+      firstName: reservation.firstName,
+      lastName: reservation.lastName,
+      email: reservation.email,
+      cardType: opts.cardType ?? null,
+      cardLast4: opts.cardLast4 ?? null,
+      event: { connect: { id: reservation.eventId } },
+      ...(reservation.userId
+        ? { user: { connect: { id: reservation.userId } } }
+        : {}),
+      tickets: { createMany: { data: ticketRows } },
+    },
+  });
+
+  await tx.reservation.update({
+    where: { id: reservation.id },
+    data: {
+      status: ReservationStatus.CONVERTED,
+      orderId,
+      // Backfill the PaymentIntent id for refund traceability (paid path); the
+      // paid flow keys off the Checkout Session, so this is set here at confirm.
+      ...(opts.paymentIntentId
+        ? { stripePaymentIntentId: opts.paymentIntentId }
+        : {}),
+    },
+  });
+
+  return orderId;
+}
+
 export async function confirm(
   prisma: PrismaClient,
   input: ConfirmInput
@@ -215,83 +474,178 @@ export async function confirm(
       );
     }
 
-    const isFree = reservation.totalCents === 0;
-    const orderType = isFree ? OrderType.FREE : OrderType.PAID;
-    const ticketsType = isFree ? TicketType.FREE : TicketType.PAID;
-
-    // In one pass per item: move reserved → sold (dual-writing the legacy
-    // `quantitySold` until Phase C swaps the dashboard read to `sold`), and
-    // build one VALID ticket row per reserved unit.
-    const ticketRows: Prisma.TicketsCreateManyOrderInput[] = [];
-    for (const item of reservation.items) {
-      await tx.ticketTypes.update({
-        where: { id: item.ticketTypeId },
-        data: {
-          reserved: { decrement: item.quantity },
-          sold: { increment: item.quantity },
-          quantitySold: { increment: item.quantity },
-        },
-      });
-
-      for (let i = 0; i < item.quantity; i++) {
-        ticketRows.push({
-          id: generateId(),
-          status: TicketStatus.VALID,
-          ticketsType,
-          subtotal: item.unitPriceCents / 100,
-          fees: item.feesCents / 100,
-          total: (item.unitPriceCents + item.feesCents) / 100,
-          firstName: reservation.firstName,
-          lastName: reservation.lastName,
-          email: reservation.email,
-          eventId: reservation.eventId,
-          ticketTypeId: item.ticketTypeId,
-          ...(reservation.userId ? { userId: reservation.userId } : {}),
-        });
-      }
-    }
-
-    const orderId = generateId();
-    await tx.orders.create({
-      data: {
-        id: orderId,
-        status: OrderStatus.COMPLETED,
-        type: orderType,
-        stripePaymentId: input.paymentIntentId,
-        total: reservation.totalCents / 100,
-        subtotal: reservation.subtotalCents / 100,
-        fees: reservation.feesCents / 100,
-        totalCents: reservation.totalCents,
-        subtotalCents: reservation.subtotalCents,
-        feesCents: reservation.feesCents,
-        firstName: reservation.firstName,
-        lastName: reservation.lastName,
-        email: reservation.email,
-        cardType: input.cardType ?? null,
-        cardLast4: input.cardLast4 ?? null,
-        event: { connect: { id: reservation.eventId } },
-        ...(reservation.userId
-          ? { user: { connect: { id: reservation.userId } } }
-          : {}),
-        tickets: { createMany: { data: ticketRows } },
-      },
+    const orderId = await materializeOrder(tx, reservation, {
+      paymentIntentId: input.paymentIntentId,
+      cardType: input.cardType,
+      cardLast4: input.cardLast4,
     });
-
-    await tx.reservation.update({
-      where: { id: reservation.id },
-      data: { status: ReservationStatus.CONVERTED, orderId },
-    });
-
-    await tx.outboxMessage.create({
-      data: {
-        id: generateId(),
-        type: 'order_confirmation',
-        payload: { orderId },
-      },
-    });
-
     return { orderId, alreadyProcessed: false };
   });
+}
+
+export interface SettleInput {
+  reservationId: string;
+  paymentIntentId: string;
+  cardType?: string | null;
+  cardLast4?: string | null;
+}
+
+export type SettleResult =
+  | { kind: 'converted'; orderId: string; alreadyProcessed: boolean }
+  /** Paid after the hold expired and the tickets could not be re-acquired. */
+  | { kind: 'needs_refund' }
+  /** Already auto-refunded on a prior attempt (idempotent). */
+  | { kind: 'already_refunded' };
+
+/** Thrown inside `settle`'s transaction to roll back a partial re-acquire. */
+class NeedsRefundError extends Error {}
+
+/**
+ * Settle a paid reservation whose payment has succeeded — the Stripe-free core
+ * of the paid path, shared by the webhook and the confirmation poll (ADR 0018).
+ * The Stripe orchestration (session retrieval, `refunds.create`) lives in
+ * `services/payments.ts`; this only touches the database and is fully testable
+ * against Postgres alone.
+ *
+ * - HELD → materialize the order (move `reserved → sold`, create Order +
+ *   VALID tickets, mark CONVERTED).
+ * - CONVERTED / REFUNDED → idempotent no-op (duplicate webhook / poll race).
+ * - EXPIRED or RELEASED → the hold was already released. Re-acquire the exact
+ *   quantities atomically; if all are re-granted, materialize as normal, else
+ *   roll back and return `needs_refund` so the caller refunds the whole charge.
+ */
+export async function settle(
+  prisma: PrismaClient,
+  input: SettleInput
+): Promise<SettleResult> {
+  const opts = {
+    paymentIntentId: input.paymentIntentId,
+    cardType: input.cardType,
+    cardLast4: input.cardLast4,
+  };
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Serialize concurrent settles of the same reservation (the webhook and
+      // the sync-fulfillment poll can race). Without this row lock, both could
+      // read HELD under READ COMMITTED and both materialize — a double order /
+      // oversell. FOR UPDATE makes the loser block, then re-read CONVERTED.
+      await tx.$queryRaw`SELECT id FROM "Reservation" WHERE id = ${input.reservationId} FOR UPDATE`;
+
+      const reservation = await tx.reservation.findUnique({
+        where: { id: input.reservationId },
+        include: { items: true },
+      });
+
+      if (!reservation) {
+        throw new NotFoundError(
+          `Reservation ${input.reservationId} not found.`
+        );
+      }
+
+      if (reservation.status === ReservationStatus.CONVERTED) {
+        if (!reservation.orderId) {
+          throw new Error(
+            `Reservation ${reservation.id} is CONVERTED but has no orderId`
+          );
+        }
+        return {
+          kind: 'converted' as const,
+          orderId: reservation.orderId,
+          alreadyProcessed: true,
+        };
+      }
+
+      if (reservation.status === ReservationStatus.REFUNDED) {
+        return { kind: 'already_refunded' as const };
+      }
+
+      if (reservation.status !== ReservationStatus.HELD) {
+        // EXPIRED / RELEASED — the hold was handed back. Try to re-acquire the
+        // exact quantities; any shortfall rolls back the whole re-acquire (the
+        // throw aborts the transaction) and signals a refund.
+        for (const item of reservation.items) {
+          const granted = await holdInventoryInTx(
+            tx,
+            item.ticketTypeId,
+            item.quantity
+          );
+          if (granted < item.quantity) {
+            throw new NeedsRefundError();
+          }
+        }
+      }
+
+      const orderId = await materializeOrder(tx, reservation, opts);
+      return {
+        kind: 'converted' as const,
+        orderId,
+        alreadyProcessed: false,
+      };
+    });
+  } catch (err) {
+    if (err instanceof NeedsRefundError) {
+      return { kind: 'needs_refund' };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Finalize a FREE reservation (no PaymentIntent) by id. Guards that it is HELD
+ * and actually free, then materializes the order. Idempotent — a second call for
+ * an already-CONVERTED reservation returns the existing order. Returns enough to
+ * render the confirmation without a second round-trip.
+ */
+export async function completeFree(
+  prisma: PrismaClient,
+  input: CompleteFreeInput
+): Promise<CompleteFreeResponse> {
+  const orderId = await prisma.$transaction(async (tx) => {
+    const reservation = await tx.reservation.findUnique({
+      where: { id: input.reservationId },
+      include: { items: true },
+    });
+
+    if (!reservation) {
+      throw new NotFoundError(`Reservation ${input.reservationId} not found.`);
+    }
+
+    if (reservation.status === ReservationStatus.CONVERTED) {
+      if (!reservation.orderId) {
+        throw new Error(
+          `Reservation ${reservation.id} is CONVERTED but has no orderId`
+        );
+      }
+      return reservation.orderId;
+    }
+
+    if (reservation.status !== ReservationStatus.HELD) {
+      throw new Error(
+        `Reservation ${reservation.id} is ${reservation.status}; cannot complete`
+      );
+    }
+
+    if (reservation.totalCents !== 0) {
+      throw new Error(
+        `Reservation ${reservation.id} is not free; use the paid checkout flow.`
+      );
+    }
+
+    return materializeOrder(tx, reservation);
+  });
+
+  const tickets = await prisma.tickets.findMany({
+    where: { orderId },
+    select: { id: true, ticketType: { select: { name: true } } },
+  });
+
+  return {
+    orderId,
+    tickets: tickets.map((t) => ({
+      id: t.id,
+      ticketTypeName: t.ticketType?.name ?? null,
+    })),
+  };
 }
 
 /**
@@ -331,6 +685,20 @@ export async function release(
 ): Promise<boolean> {
   return prisma.$transaction((tx) =>
     releaseHeldInTx(tx, reservationId, ReservationStatus.RELEASED)
+  );
+}
+
+/**
+ * Release one HELD reservation's inventory and mark it EXPIRED. The Stripe-free
+ * primitive behind the expiry sweep (payments.sweepExpiredHolds). Idempotent —
+ * returns false if it wasn't HELD.
+ */
+export async function expireHold(
+  prisma: PrismaClient,
+  reservationId: string
+): Promise<boolean> {
+  return prisma.$transaction((tx) =>
+    releaseHeldInTx(tx, reservationId, ReservationStatus.EXPIRED)
   );
 }
 

@@ -262,10 +262,7 @@ export default async function OrderReceiptPage(props: {
                         size={14}
                         className="mr-1.5 flex-shrink-0"
                       />{' '}
-                      {getDateFormatter(new Date(order.event.startDate))}{' '}
-                      {order.event.startTime
-                        ? `at ${new Date(order.event.startTime).toLocaleTimeString()}`
-                        : ''}
+                      {getDateFormatter(new Date(order.event.startsAt))}
                     </p>
                     <p className="flex items-center justify-center sm:justify-start">
                       <MapPin size={14} className="mr-1.5 flex-shrink-0" />{' '}

@@ -1,5 +1,10 @@
+// DEPRECATED: legacy REST route for the old `apps/organizer` app; slated for
+// deletion with that app once v2's check-in is wired to a tRPC mutation.
+// See docs/plans/2026-07-organizer-dashboard-migration.md. Don't build on this.
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { isPlatformOwner } from '@/server/accessControl';
 import prisma from '@/server/prisma';
+import { checkInTicketSchema } from '@/lib/schemas/organizerApiSchemas';
 import { TicketStatus } from '@troptix/db';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,14 +24,15 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 403 });
   }
 
-  // 2. Get and validate the request body
-  const { ticketId } = await request.json();
-  if (!ticketId) {
+  // 2. Validate the request body
+  const parsed = checkInTicketSchema.safeParse(await request.json());
+  if (!parsed.success) {
     return NextResponse.json(
       { error: 'ticketId is required' },
       { status: 400 }
     );
   }
+  const { ticketId } = parsed.data;
 
   try {
     // 3. Find the ticket and verify organizer ownership
@@ -39,8 +45,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
     }
 
-    // Security Check: Ensure the authenticated user is the organizer for this ticket's event.
-    if (ticket.event.organizerUserId !== organizerId.uid) {
+    // Security Check: the caller must own this ticket's event, or be a platform
+    // owner (consistent with the events/orders routes).
+    if (
+      !isPlatformOwner(organizerId.email) &&
+      ticket.event.organizerUserId !== organizerId.uid
+    ) {
       return NextResponse.json(
         {
           error: 'Forbidden: You do not have permission to modify this ticket.',
@@ -49,16 +59,15 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // 4. Determine the new status and update the ticket
-    const newStatus: TicketStatus =
-      ticket.status === 'AVAILABLE' ? 'NOT_AVAILABLE' : 'AVAILABLE';
-
+    // 4. Toggle check-in: flip status and record/clear the check-in time.
+    const checkingIn = ticket.status === 'AVAILABLE';
     const updatedTicket = await prisma.tickets.update({
       where: {
         id: ticketId,
       },
       data: {
-        status: newStatus,
+        status: checkingIn ? 'NOT_AVAILABLE' : 'AVAILABLE',
+        checkinTimestamp: checkingIn ? new Date() : null,
       },
     });
 

@@ -1,4 +1,5 @@
 import type { PrismaClient, Role } from '@troptix/db';
+import type Stripe from 'stripe';
 
 /**
  * Who is making the request (ADR 0013). Authorization is enforced in the
@@ -14,6 +15,14 @@ export type Actor =
 export interface Context {
   prisma: PrismaClient;
   actor: Actor;
+  /**
+   * Injected Stripe client + app origin, needed only by the paid-checkout
+   * procedures (`beginPayment`/`getCheckoutState`, ADR 0018). Optional so that
+   * reads/free-flow callers and unit tests can build a context without Stripe;
+   * the paid procedures assert their presence.
+   */
+  stripe?: Stripe;
+  siteUrl?: string;
 }
 
 /**
@@ -25,6 +34,13 @@ export interface Context {
 export function createContext(opts: {
   prisma: PrismaClient;
   actor?: Actor;
+  stripe?: Stripe;
+  siteUrl?: string;
 }): Context {
-  return { prisma: opts.prisma, actor: opts.actor ?? { kind: 'anonymous' } };
+  return {
+    prisma: opts.prisma,
+    actor: opts.actor ?? { kind: 'anonymous' },
+    stripe: opts.stripe,
+    siteUrl: opts.siteUrl,
+  };
 }

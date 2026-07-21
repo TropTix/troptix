@@ -9,17 +9,16 @@ import { redirect } from 'next/navigation';
 export default async function CreateEventPage() {
   const user = await getUserFromIdTokenCookie();
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth/signin');
   }
-  const userRole = await prisma.users.findUnique({
-    where: {
-      id: user.uid,
-    },
-    select: {
-      role: true,
-    },
+  // The event's host brand (shown read-only on the form). Created on first
+  // save. Paid ticketing is the Organization's approval, not a user role —
+  // the same flag the write service's gate enforces.
+  const org = await prisma.organization.findFirst({
+    where: { ownerUserId: user.uid },
+    select: { displayName: true, paidTicketingEnabled: true },
   });
-  const paidEventsEnabled = userRole?.role === 'ORGANIZER';
+  const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
 
   return (
     <div className="py-8">
@@ -30,7 +29,11 @@ export default async function CreateEventPage() {
       <p className="text-muted-foreground mb-6">
         Define the details for a new event.
       </p>
-      <EventForm initialData={null} paidEventsEnabled={paidEventsEnabled} />
+      <EventForm
+        initialData={null}
+        paidEventsEnabled={paidEventsEnabled}
+        organizationName={org?.displayName}
+      />
     </div>
   );
 }

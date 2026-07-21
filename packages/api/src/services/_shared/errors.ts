@@ -18,3 +18,26 @@ export class NotFoundError extends Error {
     this.name = 'NotFoundError';
   }
 }
+
+/**
+ * The actor may not perform this operation — no user session, or not the owner
+ * of the resource. → HTTP 401/403; the tRPC adapter maps it to `UNAUTHORIZED`.
+ */
+export class UnauthorizedError extends Error {
+  constructor(message = 'Unauthorized') {
+    super(message);
+    this.name = 'UnauthorizedError';
+  }
+}
+
+/**
+ * A write asked for a PAID ticket type (price > 0) but the owning Organization
+ * isn't approved for paid ticketing (`Organization.paidTicketingEnabled`).
+ * The gate lives in the write services (CONTEXT.md), not the DB. → HTTP 403.
+ */
+export class PaidTicketingNotEnabledError extends Error {
+  constructor(message = 'Paid ticketing is not enabled for this organization') {
+    super(message);
+    this.name = 'PaidTicketingNotEnabledError';
+  }
+}

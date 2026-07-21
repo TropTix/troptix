@@ -23,12 +23,9 @@ const gaRow = {
   reserved: 0,
   sold: 0,
   priceCents: 5000,
+  price: 50,
   saleStartsAt: PAST,
   saleEndsAt: FUTURE,
-  quantity: 100,
-  price: 50,
-  saleStartDate: PAST,
-  saleEndDate: FUTURE,
   event: { isDraft: false },
 };
 

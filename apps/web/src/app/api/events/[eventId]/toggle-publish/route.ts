@@ -25,15 +25,13 @@ export async function PATCH(
       );
     }
 
-    const userRole = await prisma.users.findUnique({
-      where: {
-        id: user.uid,
-      },
-      select: {
-        role: true,
-      },
+    // Paid ticketing is the Organization's approval, not a user role — the
+    // same flag the @troptix/api write services enforce.
+    const org = await prisma.organization.findFirst({
+      where: { ownerUserId: user.uid },
+      select: { paidTicketingEnabled: true },
     });
-    const paidEventsEnabled = userRole?.role === 'ORGANIZER';
+    const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
 
     const event = await prisma.events.findUnique({
       where: { id: eventId, organizerUserId: user.uid },
@@ -43,20 +41,21 @@ export async function PATCH(
         name: true,
         description: true,
         organizer: true,
-        startDate: true,
-        endDate: true,
+        startsAt: true,
+        endsAt: true,
         venue: true,
         address: true,
         imageUrl: true,
+        organization: { select: { slug: true } },
         ticketTypes: {
           select: {
             id: true,
             name: true,
             price: true,
-            quantity: true,
+            capacity: true,
             maxPurchasePerUser: true,
-            saleStartDate: true,
-            saleEndDate: true,
+            saleStartsAt: true,
+            saleEndsAt: true,
           },
         },
       },
@@ -96,8 +95,12 @@ export async function PATCH(
     });
 
     revalidatePath(`/organizer/events/${eventId}`);
-    revalidatePath(`/events/${eventId}`);
-    revalidatePath(`/events`);
+    revalidatePath(`/e/${eventId}`);
+    revalidatePath('/discover');
+    // Publishing/unpublishing changes the org's public event list.
+    if (event.organization?.slug) {
+      revalidatePath(`/o/${event.organization.slug}`);
+    }
 
     return NextResponse.json(
       {
