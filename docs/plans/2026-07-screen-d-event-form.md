@@ -1,8 +1,8 @@
 ---
 title: Screen D — Create / edit event on the service layer
-status: proposed
+status: active
 created: 2026-07-18
-tracking-issue: TBD
+tracking-issue: '#465'
 ---
 
 # Screen D — Create / edit event
@@ -124,10 +124,44 @@ form is reshaped:
   requirements, stubbed customization rail. Pure presentation on top of Phase 1's
   services.
 
+### Phase 2 UX spec (locked 2026-07-20, Posh/Luma-inspired)
+
+One-page create form, two columns on desktop; single column on mobile
+(title → flyer → dates → details → tickets → checklist, sticky Create).
+
+- **Left column:** read-only "Hosted by" org chip (no selector — one org per
+  organizer) and the Sell Tickets / RSVP segmented toggle above a **giant
+  borderless inline event-name input**; Start/End as date + time chip rows —
+  **no timezone label** until #441 lands (the layout reserves the spot);
+  Description, Location, Venue as **tappable rows that expand in place**
+  (location opens the existing address autocomplete; description stays a plain
+  textarea).
+- **Tickets as cards, not an embedded editor.** The form seeds one card
+  ("General Admission — Free"); a card exposes name, price, capacity
+  (default 100). Everything else is defaulted: sale window **now → event end**
+  (day-of sales work untouched), fees `PASS_TICKET_FEES`, max 10/person.
+  Deep management is Screen E's. On **edit**, cards render read-only with a
+  "Manage tickets" link — `updateEvent` is event-fields-only.
+- **Sell/RSVP toggle** is derived, never stored: edit derives it from any
+  ticket priced > 0. RSVP hides prices and seeds a free card. An unapproved
+  org **can** select Sell — the paid-warning affordance appears inline and
+  price inputs stay locked at Free (the approval funnel stays visible).
+  Flipping Sell → RSVP zeroes prices in the unsaved form with an inline note.
+- **Right rail:** flyer upload → **live publish-requirements checklist**
+  (reusing `publishValidation`) → Create/Save anchored beneath it. No disabled
+  theming teasers; theming rows slot in above the checklist when that
+  initiative lands.
+- **Create = save draft → land on the event overview**, where the existing
+  nav Publish button (backed by `validateEventForPublish`) takes over.
+
 Splitting also means the paid-gate fix (a real correctness gap) isn't held behind
 a UI redesign.
 
 ## Risks / open questions
+
+Resolved at Phase 1 kickoff (see #465): `updateEvent` is event-fields-only;
+the date round-trip keeps the current matched pair; the paid gate applies to
+new writes only; ids stay app-minted via `generateId()`.
 
 - **`updateEvent` semantics for ticket types.** Editing an event with existing
   ticket types: does `updateEvent` diff (create/update/delete tiers), or is

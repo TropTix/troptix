@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useForm, useFieldArray, FieldErrors } from 'react-hook-form';
+import { useForm, useFieldArray, FieldErrors, Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Edit, Loader2, PlusCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -44,18 +44,18 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'; // Added shadcn Form components
+} from '@/components/ui/form';
 
 import { usePlacesWidget } from 'react-google-autocomplete';
 import { EventImageUploader } from '../_components/EventImageUpload';
 import { PublishRequirements } from '@/components/PublishRequirements';
-import { createEvent, updateEvent } from '../_actions/eventActions'; // Import server actions
+import { createEvent, updateEvent } from '../_actions/eventActions';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
 
-// Adjusted props to explicitly include eventId for updates
 interface EventFormProps {
-  initialData?: EventFormValues | null; // Keep initialData for form population
-  eventId?: string; // Add optional eventId for edit mode identification
+  initialData?: EventFormValues | null;
+  /** Present in edit mode — its absence is what makes this a create form. */
+  eventId?: string;
   ticketTypes?: TicketTypeFormValues[];
   isDraft?: boolean;
   paidEventsEnabled: boolean;
@@ -63,47 +63,53 @@ interface EventFormProps {
   organizationName?: string;
 }
 
+/** The drawer's subject: an existing ticket row, or a fresh one when index is null. */
+type DrawerState = {
+  index: number | null;
+  /** The row being edited; absent for a new ticket (drawer seeds its defaults). */
+  data?: Partial<TicketTypeFormValues>;
+};
+
+function defaultEventValues(): EventFormValues {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const nextDay = new Date(tomorrow);
+  nextDay.setDate(nextDay.getDate() + 1);
+  return {
+    eventName: '',
+    description: '',
+    startsAt: tomorrow,
+    endsAt: nextDay,
+    venue: '',
+    address: '',
+    country: '',
+    countryCode: '',
+    latitude: null,
+    longitude: null,
+    tickets: [],
+    imageUrl: null,
+  };
+}
+
 export default function EventForm({
   initialData,
   eventId,
-  // Pass the ticketTypes and draft status from the server for publish validation
+  // Server-provided ticket types + draft status feed publish validation on edit.
   ticketTypes,
   isDraft,
   paidEventsEnabled,
   organizationName,
 }: EventFormProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition(); // Loading state hook
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [editingTicketIndex, setEditingTicketIndex] = useState<number | null>(
-    null
-  );
-  const [currentTicketData, setCurrentTicketData] = useState<
-    Partial<TicketTypeFormValues> | undefined
-  >(undefined);
+  const [isPending, startTransition] = useTransition();
+  const [drawer, setDrawer] = useState<DrawerState | null>(null);
 
-  const isEditing = !!initialData; // Determine mode based on eventId presence
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const nextDay = new Date(tomorrow);
-  nextDay.setDate(nextDay.getDate() + 1);
+  const isEditing = !!eventId;
+  // useForm only reads defaultValues on mount — compute them once, not per render.
+  const [defaults] = useState(() => initialData ?? defaultEventValues());
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
-    defaultValues: initialData ?? {
-      // Use initialData if provided, otherwise default
-      eventName: '',
-      description: '',
-      startsAt: tomorrow,
-      endsAt: nextDay,
-      venue: '',
-      address: '',
-      country: '',
-      countryCode: '',
-      latitude: null,
-      longitude: null,
-      tickets: [],
-      imageUrl: null,
-    },
+    defaultValues: defaults,
     mode: 'onChange',
   });
 
@@ -112,90 +118,54 @@ export default function EventForm({
     name: 'tickets',
   });
 
-  const handleOpenDrawerForNew = () => {
-    setEditingTicketIndex(null);
-    setCurrentTicketData({ name: '', price: 0, capacity: 1 });
-    setIsDrawerOpen(true);
-  };
-
-  const handleOpenDrawerForEdit = (index: number) => {
-    setEditingTicketIndex(index);
-    const ticketToEdit = fields[index];
-    setCurrentTicketData({
-      ...ticketToEdit,
-    });
-    setIsDrawerOpen(true);
-  };
-
-  // Needed to handle the id field from the RHF array
-  type TicketTypeFormValuesWithId = TicketTypeFormValues & { id?: string };
-
-  const handleDrawerSubmit = (ticketData: TicketTypeFormValuesWithId) => {
-    const { id: rhfId, ...dataToSave } = ticketData;
-
-    if (editingTicketIndex !== null) {
-      update(editingTicketIndex, dataToSave);
-      console.log('Updated ticket at index', editingTicketIndex, dataToSave);
+  const handleDrawerSubmit = (
+    ticketData: TicketTypeFormValues & { id?: string }
+  ) => {
+    // Strip the RHF-array id so it never masquerades as a DB id.
+    const { id: _rhfId, ...dataToSave } = ticketData;
+    if (drawer?.index != null) {
+      update(drawer.index, dataToSave);
     } else {
       append(dataToSave);
-      console.log('Appended new ticket:', dataToSave);
     }
-  };
-
-  const handleImageUploadComplete = (url: string | null) => {
-    form.setValue('imageUrl', url, {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
-    console.log('Image URL set in form:', url);
   };
 
   const handlePlaceSelected = (
     place: google.maps.places.PlaceResult | null
   ) => {
-    if (!place) {
-      console.warn('Autocomplete returned no place data.');
-      return;
-    }
+    if (!place) return;
 
-    console.log('Place selected:', place);
-
-    let country = '';
-    let countryCode = '';
+    const countryComponent = place.address_components?.find((c) =>
+      c.types.includes('country')
+    );
     // Null (not 0) when geometry is missing — 0,0 is the Gulf-of-Guinea "null
     // island" that the map guard would otherwise center on.
-    let lat: number | null = null;
-    let lng: number | null = null;
-
-    place.address_components?.forEach((component) => {
-      if (component.types.includes('country')) {
-        country = component.long_name;
-        countryCode = component.short_name;
-      }
-    });
-
-    if (place.geometry?.location) {
-      lat = place.geometry.location.lat();
-      lng = place.geometry.location.lng();
-    }
-
+    const location = place.geometry?.location;
     const formattedAddress = place.formatted_address ?? place.name ?? '';
 
     form.setValue('address', formattedAddress, {
       shouldValidate: true,
       shouldDirty: true,
     });
-    form.setValue('country', country || undefined, { shouldDirty: true }); // Set to undefined if empty
-    form.setValue('countryCode', countryCode || undefined, {
+    form.setValue('country', countryComponent?.long_name || undefined, {
       shouldDirty: true,
     });
-    form.setValue('latitude', lat, { shouldDirty: true }); // null when no geometry
-    form.setValue('longitude', lng, { shouldDirty: true });
+    form.setValue('countryCode', countryComponent?.short_name || undefined, {
+      shouldDirty: true,
+    });
+    form.setValue('latitude', location ? location.lat() : null, {
+      shouldDirty: true,
+    });
+    form.setValue('longitude', location ? location.lng() : null, {
+      shouldDirty: true,
+    });
 
-    if (place.name && place.name !== formattedAddress.split(',')[0]) {
-      if (!form.getValues('venue')) {
-        form.setValue('venue', place.name, { shouldDirty: true });
-      }
+    if (
+      place.name &&
+      place.name !== formattedAddress.split(',')[0] &&
+      !form.getValues('venue')
+    ) {
+      form.setValue('venue', place.name, { shouldDirty: true });
     }
   };
 
@@ -214,16 +184,12 @@ export default function EventForm({
     },
   });
 
-  // Updated onSubmit handler
   const onSubmit = (data: EventFormValues) => {
     startTransition(async () => {
       try {
-        let result;
-        if (isEditing && eventId) {
-          result = await updateEvent(eventId, data);
-        } else {
-          result = await createEvent(data);
-        }
+        const result = eventId
+          ? await updateEvent(eventId, data)
+          : await createEvent(data);
 
         if (result.success && result.eventId) {
           toast.success(
@@ -244,20 +210,10 @@ export default function EventForm({
   };
 
   const onError = (errors: FieldErrors<EventFormValues>) => {
-    console.error('Form validation errors:', errors);
-    const errorFields = Object.keys(errors).map((key) => {
-      return {
-        field: key,
-        error: errors[key as keyof EventFormValues]?.message,
-      };
-    });
-
-    // Display the first error message for a concise toast
-    const errorMessage = `Form validation failed. Please check the fields: ${errorFields.map((field) => field.field).join(', ')}`;
-    toast.error(errorMessage);
+    toast.error(
+      `Form validation failed. Please check the fields: ${Object.keys(errors).join(', ')}`
+    );
   };
-
-  const currentImageUrlValue = form.watch('imageUrl');
 
   return (
     <div className="space-y-8">
@@ -273,8 +229,13 @@ export default function EventForm({
 
             <CardContent>
               <EventImageUploader
-                currentImageUrl={currentImageUrlValue}
-                onUploadComplete={handleImageUploadComplete}
+                currentImageUrl={form.watch('imageUrl')}
+                onUploadComplete={(url) =>
+                  form.setValue('imageUrl', url, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
               />
             </CardContent>
           </Card>
@@ -291,15 +252,7 @@ export default function EventForm({
                 venue: form.watch('venue'),
                 address: form.watch('address'),
                 imageUrl: form.watch('imageUrl'),
-                ticketTypes:
-                  ticketTypes?.map((ticket) => ({
-                    name: ticket.name,
-                    price: ticket.price,
-                    capacity: ticket.capacity,
-                    maxPurchasePerUser: ticket.maxPurchasePerUser,
-                    saleStartsAt: ticket.saleStartsAt,
-                    saleEndsAt: ticket.saleEndsAt,
-                  })) || [],
+                ticketTypes: ticketTypes ?? [],
               }}
             />
           ) : null}
@@ -319,8 +272,6 @@ export default function EventForm({
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  {/* Event Name */}
-
                   <FormField
                     control={form.control}
                     name="eventName"
@@ -379,95 +330,18 @@ export default function EventForm({
                   </FormItem>
 
                   <div className="grid md:grid-cols-2 gap-4">
-                    {/* Start Date */}
-                    <div className="flex flex-col gap-4">
-                      <FormField
-                        control={form.control}
-                        name="startsAt"
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormLabel>Start Date</FormLabel>
-                            <div className="flex flex-row gap-2 items-center">
-                              <FormControl>
-                                <DatePicker
-                                  date={field.value}
-                                  onDateChange={(newDate) => {
-                                    const currentTime = formatTime(field.value);
-                                    const combined = combineDateTime(
-                                      newDate,
-                                      currentTime
-                                    );
-                                    field.onChange(combined);
-                                  }}
-                                  placeholder="Select start date"
-                                />
-                              </FormControl>
-                              <FormControl>
-                                <Input
-                                  type="time"
-                                  value={formatTime(field.value)}
-                                  onChange={(e) => {
-                                    const time = e.target.value;
-                                    const combined = combineDateTime(
-                                      field.value,
-                                      time
-                                    );
-                                    field.onChange(combined);
-                                  }}
-                                  className="w-full sm:w-[120px]"
-                                />
-                              </FormControl>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    {/* End Date */}
-                    <div className="flex flex-col gap-4">
-                      <FormField
-                        control={form.control}
-                        name="endsAt"
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormLabel>End Date</FormLabel>
-                            <div className="flex flex-row gap-2 items-center">
-                              <FormControl>
-                                <DatePicker
-                                  date={field.value}
-                                  onDateChange={(newDate) => {
-                                    const currentTime = formatTime(field.value);
-                                    const combined = combineDateTime(
-                                      newDate,
-                                      currentTime
-                                    );
-                                    field.onChange(combined);
-                                  }}
-                                  placeholder="Select end date"
-                                />
-                              </FormControl>
-                              <FormControl>
-                                <Input
-                                  type="time"
-                                  value={formatTime(field.value)}
-                                  onChange={(e) => {
-                                    const time = e.target.value;
-                                    const combined = combineDateTime(
-                                      field.value,
-                                      time
-                                    );
-                                    field.onChange(combined);
-                                  }}
-                                  className="w-full sm:w-[120px]"
-                                />
-                              </FormControl>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    <DateTimeField
+                      control={form.control}
+                      name="startsAt"
+                      label="Start Date"
+                      placeholder="Select start date"
+                    />
+                    <DateTimeField
+                      control={form.control}
+                      name="endsAt"
+                      label="End Date"
+                      placeholder="Select end date"
+                    />
                   </div>
 
                   <FormField
@@ -493,8 +367,6 @@ export default function EventForm({
                       </FormItem>
                     )}
                   />
-
-                  {/* Venue */}
 
                   <FormField
                     control={form.control}
@@ -524,8 +396,8 @@ export default function EventForm({
                     variant="outline"
                     size="icon"
                     className="float-right mt-4 mr-4"
-                    onClick={handleOpenDrawerForNew}
-                    disabled={isPending} // Disable add button while submitting main form
+                    onClick={() => setDrawer({ index: null })}
+                    disabled={isPending}
                   >
                     <PlusCircle className="h-4 w-4" />
                   </Button>
@@ -565,27 +437,28 @@ export default function EventForm({
                                 </TableCell>
                                 <TableCell>{field.capacity}</TableCell>
                                 <TableCell className="text-right space-x-1">
-                                  {/* Edit Button -> Opens drawer */}
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7"
                                     onClick={() =>
-                                      handleOpenDrawerForEdit(index)
+                                      setDrawer({
+                                        index,
+                                        data: { ...fields[index] },
+                                      })
                                     }
-                                    disabled={isPending} // Disable while submitting
+                                    disabled={isPending}
                                   >
                                     <Edit className="h-4 w-4" />
                                     <span className="sr-only">Edit</span>
                                   </Button>
-                                  {/* Remove Button -> RHF remove */}
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 text-destructive hover:text-destructive"
                                     onClick={() => remove(index)}
                                     type="button"
-                                    disabled={isPending} // Disable while submitting
+                                    disabled={isPending}
                                   >
                                     <X className="h-4 w-4" />
                                     <span className="sr-only">Remove</span>
@@ -601,7 +474,6 @@ export default function EventForm({
                         No ticket types added yet. Add one to publish.
                       </p>
                     )}
-                    {/* RHF Array Error Message */}
                     {form.formState.errors.tickets &&
                       !Array.isArray(form.formState.errors.tickets) && (
                         <p className="text-sm font-medium text-destructive mt-2">
@@ -633,18 +505,72 @@ export default function EventForm({
             </form>
           </Form>
         </div>
-      </div>{' '}
+      </div>
       {!isEditing && (
         <AddTicketTypeDrawer
           paidEventsEnabled={paidEventsEnabled}
-          open={isDrawerOpen}
-          setOpen={setIsDrawerOpen}
-          onSubmit={handleDrawerSubmit} // Parent function to update RHF state
-          initialData={currentTicketData} // Pass data for editing/defaults for new
-          ticketSchema={ticketTypeSchema} // Pass schema for validation within drawer
+          open={drawer !== null}
+          setOpen={(open) => !open && setDrawer(null)}
+          onSubmit={handleDrawerSubmit}
+          initialData={drawer?.data}
+          ticketSchema={ticketTypeSchema}
           eventStartDate={form.getValues('startsAt')}
         />
       )}
     </div>
+  );
+}
+
+/**
+ * One date+time control writing a single Date field. Reading the time out
+ * (`formatTime`) and folding it back in (`combineDateTime`) is a matched pair
+ * (CLAUDE.md "Dates and times") — keeping both halves here, used by start and
+ * end alike, is what stops the pair from drifting apart per-field.
+ */
+function DateTimeField({
+  control,
+  name,
+  label,
+  placeholder,
+}: {
+  control: Control<EventFormValues>;
+  name: 'startsAt' | 'endsAt';
+  label: string;
+  placeholder: string;
+}) {
+  return (
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{label}</FormLabel>
+          <div className="flex flex-row gap-2 items-center">
+            <FormControl>
+              <DatePicker
+                date={field.value}
+                onDateChange={(newDate) =>
+                  field.onChange(
+                    combineDateTime(newDate, formatTime(field.value))
+                  )
+                }
+                placeholder={placeholder}
+              />
+            </FormControl>
+            <FormControl>
+              <Input
+                type="time"
+                value={formatTime(field.value)}
+                onChange={(e) =>
+                  field.onChange(combineDateTime(field.value, e.target.value))
+                }
+                className="w-full sm:w-[120px]"
+              />
+            </FormControl>
+          </div>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
   );
 }

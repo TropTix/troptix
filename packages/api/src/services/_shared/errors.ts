@@ -29,3 +29,15 @@ export class UnauthorizedError extends Error {
     this.name = 'UnauthorizedError';
   }
 }
+
+/**
+ * A write asked for a PAID ticket type (price > 0) but the owning Organization
+ * isn't approved for paid ticketing (`Organization.paidTicketingEnabled`).
+ * The gate lives in the write services (CONTEXT.md), not the DB. → HTTP 403.
+ */
+export class PaidTicketingNotEnabledError extends Error {
+  constructor(message = 'Paid ticketing is not enabled for this organization') {
+    super(message);
+    this.name = 'PaidTicketingNotEnabledError';
+  }
+}

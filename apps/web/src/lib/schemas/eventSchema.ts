@@ -29,20 +29,11 @@ export const eventFormSchema = z
     // means "no image". Render via eventFlyerUrl().
     imageUrl: z.string().nullable().optional(),
   })
-  .refine(
-    (data) => {
-      if (data.endsAt > data.startsAt) {
-        return true;
-      }
-      if (data.startsAt > data.endsAt) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: 'Event must end after it starts.',
-      path: ['endsAt'], // Keep error attached to endsAt
-    }
-  );
+  // Strictly after — must match the service's createEventInputSchema, or input
+  // that passes here dies deeper in the stack with a generic error.
+  .refine((data) => data.endsAt > data.startsAt, {
+    message: 'Event must end after it starts.',
+    path: ['endsAt'],
+  });
 
 export type EventFormValues = z.infer<typeof eventFormSchema>;
