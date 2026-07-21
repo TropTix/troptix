@@ -48,7 +48,35 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
+import { calculateFeesCents, FeeConfig } from '@troptix/api';
+
+// The gross ↔ display pair, linked through the platform fee (8% + $0.50).
+// PASS puts the fee on top of gross; ABSORB leaves the sticker at gross.
+function displayCentsOf(
+  grossCents: number,
+  fees: TicketTypeFormValues['ticketingFees']
+): number {
+  return fees === 'PASS_TICKET_FEES'
+    ? grossCents + calculateFeesCents(grossCents)
+    : grossCents;
+}
+
+function grossCentsFromDisplay(
+  displayCents: number,
+  fees: TicketTypeFormValues['ticketingFees']
+): number {
+  if (fees !== 'PASS_TICKET_FEES') return displayCents;
+  return Math.max(
+    0,
+    Math.round(
+      (displayCents - FeeConfig.FIXED_CENTS) / (1 + FeeConfig.PERCENTAGE)
+    )
+  );
+}
+
+const toDollars = (cents: number) => (cents / 100).toFixed(2);
 
 interface AddTicketTypeDrawerProps {
   open: boolean;
@@ -85,11 +113,16 @@ export function AddTicketTypeDrawer({
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
+  // Complete on purpose: the per-open reset seeds {...defaultValues,
+  // ...initialData}, so any field missing here would leak the previous
+  // open's value into a fresh drawer.
   const defaultValues = {
     name: 'Default Ticket',
+    description: '',
     price: 0,
     capacity: 100,
     maxPurchasePerUser: 10,
+    discountCode: undefined,
     ticketingFees: 'PASS_TICKET_FEES' as const,
     saleStartsAt: today,
     // Clamped: on an already-ended event the raw event end would seed a
@@ -101,16 +134,66 @@ export function AddTicketTypeDrawer({
     defaultValues: initialData || defaultValues,
   });
 
+  // Free is an explicit choice; paid pricing is entered from either end
+  // (gross = what you set/earn, display = what the buyer pays), linked by
+  // the fee math. Gross lives in the form (`price`); display is derived.
+  const [isFree, setIsFree] = useState(true);
+  const [displayInput, setDisplayInput] = useState('');
+
   // The drawer stays mounted across opens, so the form must be re-seeded per
   // open — otherwise editing row A shows whatever was last typed (and Save
   // would overwrite A with it). Seed data without an id is a duplicate: a
   // create pre-filled from an existing row.
   useEffect(() => {
     if (open) {
-      form.reset({ ...defaultValues, ...initialData });
+      const seed = { ...defaultValues, ...initialData };
+      form.reset(seed);
+      const grossCents = Math.round((seed.price ?? 0) * 100);
+      setIsFree(grossCents === 0);
+      setDisplayInput(
+        grossCents > 0
+          ? toDollars(displayCentsOf(grossCents, seed.ticketingFees))
+          : ''
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialData]);
+
+  const syncDisplayFromGross = (
+    grossDollars: unknown,
+    fees: TicketTypeFormValues['ticketingFees'] = form.getValues(
+      'ticketingFees'
+    )
+  ) => {
+    const gross = Number(grossDollars);
+    setDisplayInput(
+      Number.isFinite(gross) && gross > 0
+        ? toDollars(displayCentsOf(Math.round(gross * 100), fees))
+        : ''
+    );
+  };
+
+  const handleDisplayChange = (raw: string) => {
+    setDisplayInput(raw);
+    const display = Number(raw);
+    if (!Number.isFinite(display)) return;
+    const grossCents = grossCentsFromDisplay(
+      Math.round(display * 100),
+      form.getValues('ticketingFees')
+    );
+    form.setValue('price', +(grossCents / 100).toFixed(2), {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
+  const handleFreeToggle = (free: boolean) => {
+    setIsFree(free);
+    if (free) {
+      form.setValue('price', 0, { shouldValidate: true, shouldDirty: true });
+      setDisplayInput('');
+    }
+  };
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -176,71 +259,105 @@ export function AddTicketTypeDrawer({
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      <div className="flex items-center gap-2">
-                        Price ($)
-                        {!paidEventsEnabled && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent className="bg-background">
-                                <p>
-                                  Paid events are only available to verified
-                                  organizers.
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </div>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.value)}
-                        value={field.value ?? ''}
-                        disabled={!paidEventsEnabled}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+            <div className="flex items-center gap-3 rounded-md border px-3 py-3">
+              <div className="flex flex-1 items-center gap-2">
+                <span className="text-sm font-medium">
+                  Make this a free ticket
+                </span>
+                {!paidEventsEnabled && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-background">
+                        <p>
+                          Paid tickets are only available to approved
+                          organizers.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
-              />
-              <FormField
-                control={form.control}
-                name="capacity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      <div className="flex items-center gap-2">Quantity *</div>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="1"
-                        placeholder="100"
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.value)}
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+              </div>
+              <Switch
+                checked={isFree}
+                onCheckedChange={handleFreeToggle}
+                disabled={!paidEventsEnabled}
+                aria-label="Make this a free ticket"
               />
             </div>
+
+            {!isFree && (
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gross Price ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e.target.value);
+                            syncDisplayFromGross(e.target.value);
+                          }}
+                          value={field.value ?? ''}
+                          disabled={!paidEventsEnabled}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        What you earn per sale when fees are passed on.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormItem>
+                  <FormLabel>Display Price ($)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={displayInput}
+                      onChange={(e) => handleDisplayChange(e.target.value)}
+                      disabled={!paidEventsEnabled}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    What the buyer sees and pays, including the TropTix fee.
+                  </FormDescription>
+                </FormItem>
+              </div>
+            )}
+
+            <FormField
+              control={form.control}
+              name="capacity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Quantity *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="100"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -416,7 +533,7 @@ export function AddTicketTypeDrawer({
                   </FormItem>
                 )}
               />
-              {(form.watch('price') ?? 0) > 0 && (
+              {!isFree && (
                 <FormField
                   control={form.control}
                   name="ticketingFees"
@@ -426,9 +543,14 @@ export function AddTicketTypeDrawer({
                       <FormControl>
                         <Select
                           value={field.value}
-                          onValueChange={(value: string) =>
-                            field.onChange(value)
-                          }
+                          onValueChange={(value: string) => {
+                            field.onChange(value);
+                            // Who eats the fee changes what the buyer pays.
+                            syncDisplayFromGross(
+                              form.getValues('price'),
+                              value as TicketTypeFormValues['ticketingFees']
+                            );
+                          }}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select fee handling" />
