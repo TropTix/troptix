@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -97,7 +97,9 @@ export function AddTicketTypeDrawer({
     maxPurchasePerUser: 10,
     ticketingFees: 'PASS_TICKET_FEES' as const,
     saleStartsAt: today,
-    saleEndsAt: defaultSaleEnd || tomorrow,
+    // Clamped: on an already-ended event the raw event end would seed a
+    // window that can never pass the ends-after-starts refine.
+    saleEndsAt: defaultSaleEnd > tomorrow ? defaultSaleEnd : tomorrow,
   };
   const form = useForm<TicketTypeFormValues>({
     resolver: zodResolver(ticketTypeSchema),
@@ -129,13 +131,22 @@ export function AddTicketTypeDrawer({
         return;
       }
       setOpen(false);
+    } catch {
+      // A thrown (not returned) failure — e.g. the action invocation itself
+      // died on the network. Without this the rejection escapes silently.
+      toast.error(
+        'Something went wrong saving the ticket — check your connection and try again.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const onInvalidSubmit = (errors: any) => {
-    console.error('Drawer form validation errors:', errors);
+  // Sale-window fields live inside the collapsed Advanced Options, so their
+  // inline errors can be invisible — surface the first one where it's seen.
+  const onInvalidSubmit = (errors: FieldErrors<TicketTypeFormValues>) => {
+    const first = Object.values(errors)[0];
+    toast.error(first?.message || 'Please fix the highlighted fields.');
   };
 
   return (
@@ -341,7 +352,7 @@ export function AddTicketTypeDrawer({
                           {/* Separate input for time */}
                           <Input
                             type="time"
-                            defaultValue={formatTime(field.value)}
+                            value={formatTime(field.value)}
                             onChange={(e) => {
                               const time = e.target.value;
                               const currentDate = field.value;
@@ -387,6 +398,35 @@ export function AddTicketTypeDrawer({
                           value={field.value ?? ''}
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="discountCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Access code{' '}
+                        <span className="text-xs text-muted-foreground">
+                          (Optional)
+                        </span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., VIPLIST"
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(e.target.value || undefined)
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Buyers must enter this code at checkout to unlock this
+                        ticket. Leave blank for a public ticket.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

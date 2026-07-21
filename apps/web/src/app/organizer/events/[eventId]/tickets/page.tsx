@@ -30,6 +30,17 @@ export default async function EventTicketsPage({
   const { eventId } = await params;
   const { viewAs } = await searchParams;
 
+  // Writes are always self-scoped (never View-as), so the paid gate reads the
+  // acting user's own org — the same flag the write service enforces. Kicked
+  // off alongside the view fetch; independent reads, one wave.
+  // .catch → null so a notFound() bail from the view fetch below can't leave
+  // this floating as an unhandled rejection; the write service stays the
+  // authoritative gate either way.
+  const orgPromise =
+    actor.kind === 'user'
+      ? findOrganizationForOwner(prisma, actor.userId).catch(() => null)
+      : Promise.resolve(null);
+
   let view: TicketTypesView;
   try {
     view = await listTicketTypes(prisma, actor, eventId, {
@@ -39,19 +50,7 @@ export default async function EventTicketsPage({
     if (error instanceof NotFoundError) notFound();
     throw error;
   }
-
-  // Writes are always self-scoped (never View-as), so the paid gate reads the
-  // acting user's own org — the same flag the write service enforces. The
-  // event's end seeds the drawer's default sale window (sell until it ends).
-  const [org, event] = await Promise.all([
-    actor.kind === 'user'
-      ? findOrganizationForOwner(prisma, actor.userId)
-      : null,
-    prisma.events.findUnique({
-      where: { id: eventId },
-      select: { endsAt: true },
-    }),
-  ]);
+  const org = await orgPromise;
   const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
 
   const { ticketTypes, summary } = view;
@@ -85,7 +84,7 @@ export default async function EventTicketsPage({
       <TicketTypesManager
         ticketTypes={ticketTypes}
         eventId={eventId}
-        eventEndsAt={event?.endsAt ?? new Date()}
+        eventEndsAt={new Date(view.eventEndsAt)}
         paidEventsEnabled={paidEventsEnabled}
       />
     </div>

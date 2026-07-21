@@ -323,6 +323,12 @@ export const updateEventInputSchema = eventFieldsSchema.refine(
 export type UpdateEventInput = z.infer<typeof updateEventInputSchema>;
 
 export const ticketTypesViewSchema = z.object({
+  /**
+   * The event's end — the default sale-window end for new tickets (sell
+   * until the event ends). Carried here so the manage screen needs no
+   * second, seam-bypassing event read.
+   */
+  eventEndsAt: z.string().datetime(),
   /** Natural (creation) order — reordering is deferred (see the UX plan). */
   ticketTypes: z.array(ticketTypeRowSchema),
   /**

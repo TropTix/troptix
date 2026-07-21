@@ -52,6 +52,7 @@ export async function listTicketTypes(
       where: { id: eventId, organizerUserId, deletedAt: null },
       select: {
         id: true,
+        endsAt: true,
         ticketTypes: {
           select: {
             id: true,
@@ -94,7 +95,7 @@ export async function listTicketTypes(
     { sold: 0, capacity: 0, revenueCents: 0, onSale: 0 }
   );
 
-  return { ticketTypes, summary };
+  return { eventEndsAt: event.endsAt.toISOString(), ticketTypes, summary };
 }
 
 function buildTicketTypes(

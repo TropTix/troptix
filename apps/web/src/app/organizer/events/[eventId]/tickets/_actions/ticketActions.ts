@@ -52,7 +52,11 @@ export async function createTicketType(
     revalidatePath(`/organizer/events/${eventId}/tickets`);
     return { success: true };
   } catch (error) {
-    return failure(error, 'Failed to create ticket type. Please try again.');
+    return failure(error, {
+      // The create path's NotFound means the EVENT wasn't found/owned.
+      notFound: 'Event not found or unauthorized.',
+      fallback: 'Failed to create ticket type. Please try again.',
+    });
   }
 }
 
@@ -82,7 +86,10 @@ export async function updateTicketType(
     revalidatePath(`/organizer/events/${eventId}/tickets`);
     return { success: true };
   } catch (error) {
-    return failure(error, 'Failed to update ticket type. Please try again.');
+    return failure(error, {
+      notFound: 'Ticket type not found or unauthorized.',
+      fallback: 'Failed to update ticket type. Please try again.',
+    });
   }
 }
 
@@ -100,7 +107,10 @@ function toServiceInput(data: TicketTypeFormValues) {
   };
 }
 
-function failure(error: unknown, fallback: string): ActionResult {
+function failure(
+  error: unknown,
+  messages: { notFound: string; fallback: string }
+): ActionResult {
   if (error instanceof PaidTicketingNotEnabledError) {
     return {
       success: false,
@@ -109,7 +119,7 @@ function failure(error: unknown, fallback: string): ActionResult {
     };
   }
   if (error instanceof NotFoundError) {
-    return { success: false, error: 'Ticket type not found or unauthorized.' };
+    return { success: false, error: messages.notFound };
   }
   if (error instanceof UnauthorizedError) {
     return { success: false, error: 'Authentication required.' };
@@ -121,5 +131,5 @@ function failure(error: unknown, fallback: string): ActionResult {
     };
   }
   console.error('Ticket-type write failed:', error);
-  return { success: false, error: fallback };
+  return { success: false, error: messages.fallback };
 }

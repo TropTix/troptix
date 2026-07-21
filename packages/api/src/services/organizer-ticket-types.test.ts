@@ -38,13 +38,15 @@ function fakePrisma(
     revenue?: unknown[];
   } = {}
 ) {
-  const eventsFindFirst = vi
-    .fn()
-    .mockResolvedValue(
-      opts.event === undefined
-        ? { id: 'e1', ticketTypes: opts.ticketTypes ?? [ticketType()] }
-        : opts.event
-    );
+  const eventsFindFirst = vi.fn().mockResolvedValue(
+    opts.event === undefined
+      ? {
+          id: 'e1',
+          endsAt: new Date('2026-08-01T04:00:00Z'),
+          ticketTypes: opts.ticketTypes ?? [ticketType()],
+        }
+      : opts.event
+  );
   const ticketsGroupBy = vi.fn().mockResolvedValue(opts.revenue ?? []);
 
   const prisma = {

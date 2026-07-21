@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TicketTypeRow } from '@troptix/api';
@@ -34,7 +33,6 @@ export function TicketTypesManager({
   eventEndsAt: Date;
   paidEventsEnabled: boolean;
 }) {
-  const router = useRouter();
   const [drawer, setDrawer] = useState<{
     data?: Partial<TicketTypeFormValues> & { id?: string };
   } | null>(null);
@@ -45,8 +43,9 @@ export function TicketTypesManager({
       ? await updateTicketType(eventId, id, values)
       : await createTicketType(eventId, values);
     if (result.success) {
+      // No router.refresh(): the action's revalidatePath already re-renders
+      // this route and streams the fresh UI back in the same response.
       toast.success(id ? 'Ticket type updated.' : 'Ticket type added.');
-      router.refresh();
     }
     return result;
   };
@@ -84,6 +83,9 @@ export function TicketTypesManager({
                 ...toFormValues(row),
                 id: undefined,
                 name: `${row.name} (copy)`,
+                // Never inherited: a copy silently gated behind the source's
+                // access code is unsellable with no visible reason.
+                discountCode: undefined,
               },
             })
           }

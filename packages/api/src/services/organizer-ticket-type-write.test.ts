@@ -45,7 +45,9 @@ function fakePrisma(
   const ticketTypesFindFirst = vi
     .fn()
     .mockResolvedValue(
-      opts.ticketType === undefined ? { id: 't1' } : opts.ticketType
+      opts.ticketType === undefined
+        ? { id: 't1', price: 0, priceCents: 0 }
+        : opts.ticketType
     );
   const ticketTypesCreate = vi.fn().mockResolvedValue({});
   const ticketTypesUpdate = vi.fn().mockResolvedValue({});
@@ -153,12 +155,45 @@ describe('updateTicketType', () => {
     expect(ticketTypesUpdate).not.toHaveBeenCalled();
   });
 
-  it('gates a paid edit for an unapproved org', async () => {
+  it('gates the free → paid transition for an unapproved org', async () => {
     const { prisma, ticketTypesUpdate } = fakePrisma({ paidEnabled: false });
     await expect(
       updateTicketType(prisma, OWNER, 'e1', 't1', input({ priceCents: 100 }))
     ).rejects.toThrow(PaidTicketingNotEnabledError);
     expect(ticketTypesUpdate).not.toHaveBeenCalled();
+  });
+
+  it('leaves an already-paid row editable for an unapproved org (grandfathering)', async () => {
+    const { prisma, ticketTypesUpdate } = fakePrisma({
+      paidEnabled: false,
+      ticketType: { id: 't1', price: 25, priceCents: 2500 },
+    });
+    await updateTicketType(
+      prisma,
+      OWNER,
+      'e1',
+      't1',
+      input({ priceCents: 2500, capacity: 200 })
+    );
+    expect(ticketTypesUpdate.mock.calls[0][0].data).toMatchObject({
+      capacity: 200,
+      priceCents: 2500,
+    });
+  });
+
+  it('grandfathers a legacy paid row that has only the float price', async () => {
+    const { prisma, ticketTypesUpdate } = fakePrisma({
+      paidEnabled: false,
+      ticketType: { id: 't1', price: 25, priceCents: null },
+    });
+    await updateTicketType(
+      prisma,
+      OWNER,
+      'e1',
+      't1',
+      input({ priceCents: 2500 })
+    );
+    expect(ticketTypesUpdate).toHaveBeenCalled();
   });
 
   it('updates the row fields, FREE when repriced to zero', async () => {

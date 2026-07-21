@@ -6,8 +6,11 @@
  *
  * The paid gate reads the actor's Organization (unapproved or missing org ⇒
  * free tickets only) through the same `assertPaidTicketingAllowed` the event
- * writes use. Deliberately unguarded, matching today: capacity may be edited
- * below `sold` (stops further sales, corrupts nothing — availability is
+ * writes use. It gates NEW paid inventory: every create, and the free → paid
+ * transition on update — a row that is already paid stays editable even if
+ * the org lost (or never had) approval, per the gate's grandfathering rule.
+ * Deliberately unguarded, matching today: capacity may be edited below
+ * `sold` (stops further sales, corrupts nothing — availability is
  * capacity − reserved − sold).
  */
 import type { PrismaClient } from '@troptix/db';
@@ -18,6 +21,7 @@ import {
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
 import { generateId } from './_shared/ids';
+import { toCents } from './_shared/organizerMapping';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
 import { ticketTypeWriteFields } from './_shared/ticket-type-fields';
 import { resolveOrganizerScope } from './organizer-scope';
@@ -72,17 +76,23 @@ export async function updateTicketType(
         eventId,
         event: { organizerUserId, deletedAt: null },
       },
-      select: { id: true },
+      select: { id: true, price: true, priceCents: true },
     }),
     findOrganizationForOwner(prisma, organizerUserId),
   ]);
   if (!owned) {
     throw new NotFoundError('Ticket type not found');
   }
-  assertPaidTicketingAllowed(
-    { paidTicketingEnabled: org?.paidTicketingEnabled ?? false },
-    [data]
-  );
+  // The gate is on NEW paid inventory. A row that is already paid stays
+  // editable (name, capacity, window) even if the org lost — or never had —
+  // approval; only the free → paid transition is a gated act.
+  const storedPriceCents = owned.priceCents ?? toCents(owned.price);
+  if (storedPriceCents === 0) {
+    assertPaidTicketingAllowed(
+      { paidTicketingEnabled: org?.paidTicketingEnabled ?? false },
+      [data]
+    );
+  }
 
   await prisma.ticketTypes.update({
     where: { id: ticketTypeId },
