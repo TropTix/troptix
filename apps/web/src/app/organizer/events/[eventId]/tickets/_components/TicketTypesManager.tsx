@@ -45,7 +45,7 @@ export function TicketTypesManager({
     if (result.success) {
       // No router.refresh(): the action's revalidatePath already re-renders
       // this route and streams the fresh UI back in the same response.
-      toast.success(id ? 'Ticket type updated.' : 'Ticket type added.');
+      toast.success(id ? 'Ticket updated.' : 'Ticket added.');
     }
     return result;
   };

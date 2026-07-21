@@ -134,7 +134,7 @@ export function AddTicketTypeDrawer({
   // ...initialData}, so any field missing here would leak the previous
   // open's value into a fresh drawer.
   const defaultValues = {
-    name: 'Default Ticket',
+    name: 'General Admission',
     description: '',
     price: 0,
     capacity: 100,
@@ -242,16 +242,14 @@ export function AddTicketTypeDrawer({
     try {
       const result = await onSubmitProp(dataToSubmit);
       if (result && result.success === false) {
-        toast.error(result.error || 'Failed to save ticket type.');
+        toast.error(result.error || "Couldn't save the ticket.");
         return;
       }
       setOpen(false);
     } catch {
       // A thrown (not returned) failure — e.g. the action invocation itself
       // died on the network. Without this the rejection escapes silently.
-      toast.error(
-        'Something went wrong saving the ticket — check your connection and try again.'
-      );
+      toast.error("Couldn't save — check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -269,10 +267,10 @@ export function AddTicketTypeDrawer({
       <SheetContent className="fit-content flex flex-col h-full">
         <SheetHeader className="text-left">
           <SheetTitle>
-            {initialData?.id ? 'Edit Ticket' : 'Add New Ticket'}
+            {initialData?.id ? 'Edit ticket' : 'Add ticket'}
           </SheetTitle>
           <SheetDescription>
-            Configure ticket details. Click save when done.
+            Buyers see the name, price, and description at checkout.
           </SheetDescription>
           {!paidEventsEnabled && <PaidWarningBannerForm />}
         </SheetHeader>
@@ -288,7 +286,7 @@ export function AddTicketTypeDrawer({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Ticket Name *</FormLabel>
+                  <FormLabel>Name *</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g., General Admission" {...field} />
                   </FormControl>
@@ -308,10 +306,7 @@ export function AddTicketTypeDrawer({
                         <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="bg-background">
-                        <p>
-                          Paid tickets are only available to approved
-                          organizers.
-                        </p>
+                        <p>Only approved organizers can sell paid tickets.</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -345,7 +340,7 @@ export function AddTicketTypeDrawer({
                         />
                       </FormControl>
                       <FormDescription>
-                        What you earn per ticket, after any absorbed fees.
+                        What you earn per ticket sold.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -365,7 +360,7 @@ export function AddTicketTypeDrawer({
                     />
                   </FormControl>
                   <FormDescription>
-                    What the buyer sees and pays, including any passed-on fee.
+                    What the buyer pays at checkout.
                   </FormDescription>
                 </FormItem>
               </div>
@@ -397,7 +392,7 @@ export function AddTicketTypeDrawer({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Ticket Description *</FormLabel>
+                  <FormLabel>Description *</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="e.g., Includes access to main stage"
@@ -456,9 +451,6 @@ export function AddTicketTypeDrawer({
                           />
                         </FormControl>
                       </div>
-                      <FormDescription className="pt-1">
-                        When tickets become available.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -501,9 +493,6 @@ export function AddTicketTypeDrawer({
                         />
                       </FormControl>
                     </div>
-                    <FormDescription className="pt-1">
-                      When ticket sales stop.
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -514,7 +503,7 @@ export function AddTicketTypeDrawer({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Max Tickets Per Order{' '}
+                      Max per order{' '}
                       <span className="text-xs text-muted-foreground">
                         (Optional)
                       </span>
@@ -559,8 +548,8 @@ export function AddTicketTypeDrawer({
                       />
                     </FormControl>
                     <FormDescription>
-                      Buyers must enter this code at checkout to unlock this
-                      ticket. Leave blank for a public ticket.
+                      Buyers need this code to see and buy this ticket. Leave
+                      blank to sell to everyone.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -572,7 +561,7 @@ export function AddTicketTypeDrawer({
                   name="ticketingFees"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Ticketing Fee Structure</FormLabel>
+                      <FormLabel>Who pays the TropTix fee?</FormLabel>
                       <FormControl>
                         <Select
                           value={field.value}
@@ -586,17 +575,14 @@ export function AddTicketTypeDrawer({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="PASS_TICKET_FEES">
-                              Pass fees on to buyer (Recommended)
+                              The buyer — added at checkout (Recommended)
                             </SelectItem>
                             <SelectItem value="ABSORB_TICKET_FEES">
-                              Absorb fees into ticket price
+                              You — taken out of the ticket price
                             </SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>
-                      <FormDescription>
-                        Choose how ticketing platform fees are handled.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -609,7 +595,7 @@ export function AddTicketTypeDrawer({
         <SheetFooter className="pt-2 border-t justify-end gap-2">
           <Button type="submit" form="drawer-ticket-form" disabled={submitting}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {initialData?.id ? 'Save Changes' : 'Add Ticket'}
+            {initialData?.id ? 'Save changes' : 'Add ticket'}
           </Button>
           <SheetClose asChild>
             <Button type="button" variant="outline">

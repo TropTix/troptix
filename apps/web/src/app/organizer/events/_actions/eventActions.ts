@@ -132,7 +132,7 @@ function failure(error: unknown, fallback: string): ActionResult {
     return {
       success: false,
       error:
-        'Paid tickets need approval first — talk to us to enable paid ticketing, or set the price to free.',
+        'Paid tickets need approval — contact us to enable them, or make this ticket free.',
     };
   }
   if (error instanceof NotFoundError) {
