@@ -321,49 +321,83 @@ export function AddTicketTypeDrawer({
             </div>
 
             {!isFree && (
-              <div className="grid grid-cols-2 gap-4">
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={() => (
+                      <FormItem>
+                        <FormLabel>Gross Price ($)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={grossInput}
+                            onChange={(e) => handleGrossChange(e.target.value)}
+                            disabled={!paidEventsEnabled}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          What you earn per ticket sold.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormItem>
+                    <FormLabel>Display Price ($)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={displayInput}
+                        onChange={(e) => handleDisplayChange(e.target.value)}
+                        disabled={!paidEventsEnabled}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      What the buyer pays at checkout.
+                    </FormDescription>
+                  </FormItem>
+                </div>
+
                 <FormField
                   control={form.control}
-                  name="price"
-                  render={() => (
+                  name="ticketingFees"
+                  render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Gross Price ($)</FormLabel>
+                      <FormLabel>Who pays the TropTix fee?</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={grossInput}
-                          onChange={(e) => handleGrossChange(e.target.value)}
-                          disabled={!paidEventsEnabled}
-                        />
+                        <Select
+                          value={field.value}
+                          onValueChange={(value: string) => {
+                            field.onChange(value);
+                            handleFeesChange(value as Fees);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select fee handling" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PASS_TICKET_FEES">
+                              The buyer — added at checkout (Recommended)
+                            </SelectItem>
+                            <SelectItem value="ABSORB_TICKET_FEES">
+                              You — taken out of the ticket price
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </FormControl>
-                      <FormDescription>
-                        What you earn per ticket sold.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormItem>
-                  <FormLabel>Display Price ($)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={displayInput}
-                      onChange={(e) => handleDisplayChange(e.target.value)}
-                      disabled={!paidEventsEnabled}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    What the buyer pays at checkout.
-                  </FormDescription>
-                </FormItem>
-              </div>
+              </>
             )}
 
             <FormField
@@ -555,39 +589,6 @@ export function AddTicketTypeDrawer({
                   </FormItem>
                 )}
               />
-              {!isFree && (
-                <FormField
-                  control={form.control}
-                  name="ticketingFees"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Who pays the TropTix fee?</FormLabel>
-                      <FormControl>
-                        <Select
-                          value={field.value}
-                          onValueChange={(value: string) => {
-                            field.onChange(value);
-                            handleFeesChange(value as Fees);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select fee handling" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="PASS_TICKET_FEES">
-                              The buyer — added at checkout (Recommended)
-                            </SelectItem>
-                            <SelectItem value="ABSORB_TICKET_FEES">
-                              You — taken out of the ticket price
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
             </div>
           </form>
         </Form>
