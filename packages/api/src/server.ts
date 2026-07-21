@@ -56,6 +56,10 @@ export {
   getOrganizationBySlug,
   updateOrganizationProfile,
 } from './services/organizations';
+export {
+  saveEventSpotlight,
+  type SaveEventSpotlightArgs,
+} from './services/spotlight';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
 export { toCents } from './services/_shared/organizerMapping';
 export {

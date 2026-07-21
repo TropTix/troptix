@@ -44,6 +44,45 @@ export const eventSummarySchema = z.object({
 });
 export type EventSummary = z.infer<typeof eventSummarySchema>;
 
+// --- Spotlight ----------------------------------------------------------------
+// A curated per-event card (DJ, artist, speaker, sponsor, …). Links out; `link`
+// may lack a scheme (the web layer prepends https), `imageUrl` is a stored path.
+export const spotlightItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  link: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  description: z.string().nullable(),
+});
+export type SpotlightItem = z.infer<typeof spotlightItemSchema>;
+
+// Authoring input: one card as the organizer submits it. `title` is required;
+// everything else is optional. Order is positional — the array index becomes the
+// stored `order`, so the client sends cards in display order. Empty strings from
+// the form are normalized to null.
+const emptyToNull = z.preprocess(
+  (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+  z.string().trim().max(2000).nullable()
+);
+export const spotlightInputItemSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(120),
+  link: emptyToNull,
+  imageUrl: emptyToNull,
+  description: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+    z.string().trim().max(350).nullable()
+  ),
+});
+export type SpotlightInputItem = z.infer<typeof spotlightInputItemSchema>;
+
+export const saveEventSpotlightInputSchema = z.object({
+  eventId: z.string().min(1),
+  items: z.array(spotlightInputItemSchema).max(50),
+});
+export type SaveEventSpotlightInput = z.infer<
+  typeof saveEventSpotlightInputSchema
+>;
+
 export const eventDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -79,5 +118,7 @@ export const eventDetailSchema = z.object({
   fromPriceCents: z.number().int().nullable(),
   /** Public (non-code-gated) tiers, available first then by price. */
   tickets: z.array(eventTicketSchema),
+  /** Curated spotlight cards (DJs, sponsors, …), in display order. */
+  spotlight: z.array(spotlightItemSchema),
 });
 export type EventDetail = z.infer<typeof eventDetailSchema>;

@@ -62,6 +62,59 @@ export function organizationLogoUrl(
   return `${PUBLIC_BASE}/${ORGANIZATION_LOGOS_BUCKET}/${path}`;
 }
 
+export const SPOTLIGHT_IMAGES_BUCKET = 'spotlight-images';
+
+/**
+ * Resolve a stored `Spotlight.imageUrl` to a renderable URL — same path-not-URL
+ * contract as `eventFlyerUrl` (ADR 0016), for the spotlight-images bucket. Falsy
+ * → `null` (callers fall back to a monogram).
+ */
+export function spotlightImageUrl(
+  value: string | null | undefined
+): string | null {
+  if (!value) return null;
+  if (isAbsoluteUrl(value)) return value;
+  const path = value.replace(/^\/+/, '');
+  return `${PUBLIC_BASE}/${SPOTLIGHT_IMAGES_BUCKET}/${path}`;
+}
+
+/**
+ * Upload a spotlight card image to the `spotlight-images` bucket; returns the
+ * stored PATH (what goes into `Spotlight.imageUrl`). Governed by the bucket's
+ * authenticated RLS policy — the caller must be signed in. Throws on failure.
+ */
+export async function uploadSpotlightImage(file: File): Promise<string> {
+  const supabase = createClient();
+  const ext = file.name.includes('.')
+    ? file.name.split('.').pop()!.toLowerCase()
+    : 'bin';
+  const path = `${crypto.randomUUID()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(SPOTLIGHT_IMAGES_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type || undefined,
+      upsert: false,
+    });
+
+  if (error) throw error;
+  return path;
+}
+
+/** Delete a spotlight image by its stored path. No-ops on falsy / absolute values. */
+export async function deleteSpotlightImage(
+  value: string | null | undefined
+): Promise<void> {
+  if (!value || isAbsoluteUrl(value)) return;
+  const supabase = createClient();
+  const path = value.replace(/^\/+/, '');
+  const { error } = await supabase.storage
+    .from(SPOTLIGHT_IMAGES_BUCKET)
+    .remove([path]);
+  if (error && !/not\s*found/i.test(error.message)) throw error;
+}
+
 /**
  * Upload an org logo to the `organization-logos` bucket; returns the stored PATH
  * (what goes into `Organization.logoUrl`). Governed by the bucket's authenticated

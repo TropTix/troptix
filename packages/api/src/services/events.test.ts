@@ -56,8 +56,20 @@ type OrgRel = {
   website: string | null;
 } | null;
 
+type SpotlightRow = {
+  id: string;
+  title: string;
+  link: string | null;
+  imageUrl: string | null;
+  description: string | null;
+};
+
 function fakeEvent(
-  overrides: { ticketTypes?: TierRow[]; organization?: OrgRel } = {}
+  overrides: {
+    ticketTypes?: TierRow[];
+    organization?: OrgRel;
+    spotlight?: SpotlightRow[];
+  } = {}
 ) {
   return {
     id: 'ev-1',
@@ -76,6 +88,7 @@ function fakeEvent(
     latitude: 40.72,
     longitude: -73.98,
     ticketTypes: overrides.ticketTypes ?? [],
+    spotlight: overrides.spotlight ?? [],
   };
 }
 
@@ -266,5 +279,53 @@ describe('getEventDetail — hostedBy', () => {
     const prisma = fakePrisma(fakeEvent());
     const result = await getEventDetail(prisma, { eventId: 'ev-1' });
     expect(result.hostedBy).toBeNull();
+  });
+});
+
+describe('getEventDetail — spotlight', () => {
+  it('returns spotlight cards as provided (already ordered by the query)', async () => {
+    const prisma = fakePrisma(
+      fakeEvent({
+        spotlight: [
+          {
+            id: 's1',
+            title: 'DJ Kala',
+            link: 'instagram.com/djkala',
+            imageUrl: 'spotlight/kala.jpg',
+            description: 'Headliner',
+          },
+          {
+            id: 's2',
+            title: 'Rum Sponsor',
+            link: null,
+            imageUrl: null,
+            description: null,
+          },
+        ],
+      })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.spotlight).toEqual([
+      {
+        id: 's1',
+        title: 'DJ Kala',
+        link: 'instagram.com/djkala',
+        imageUrl: 'spotlight/kala.jpg',
+        description: 'Headliner',
+      },
+      {
+        id: 's2',
+        title: 'Rum Sponsor',
+        link: null,
+        imageUrl: null,
+        description: null,
+      },
+    ]);
+  });
+
+  it('is an empty array when the event has no spotlight cards', async () => {
+    const prisma = fakePrisma(fakeEvent());
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.spotlight).toEqual([]);
   });
 });
