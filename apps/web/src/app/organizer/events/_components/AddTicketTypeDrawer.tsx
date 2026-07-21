@@ -18,13 +18,8 @@ import {
   SheetClose,
   SheetFooter,
 } from '@/components/ui/sheet';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import { DatePicker } from '@/components/DatePicker';
-import { ChevronsUpDown, HelpCircle } from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
 import {
   Form,
   FormControl,
@@ -142,8 +137,8 @@ export function AddTicketTypeDrawer({
     }
   };
 
-  // Sale-window fields live inside the collapsed Advanced Options, so their
-  // inline errors can be invisible — surface the first one where it's seen.
+  // A field error can sit below the drawer's scroll fold — surface the first
+  // one where it's seen.
   const onInvalidSubmit = (errors: FieldErrors<TicketTypeFormValues>) => {
     const first = Object.values(errors)[0];
     toast.error(first?.message || 'Please fix the highlighted fields.');
@@ -266,72 +261,17 @@ export function AddTicketTypeDrawer({
               )}
             />
 
-            <Collapsible>
-              <CollapsibleTrigger asChild>
-                <Button
-                  type="button"
-                  variant="link"
-                  className="p-0 h-auto text-sm -ml-1"
-                >
-                  <ChevronsUpDown className="h-4 w-4 mr-1" /> Advanced Options
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-4 space-y-4 pt-4 border-t">
-                <div>
-                  <FormField
-                    control={form.control}
-                    name="saleStartsAt"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Sale Starts *</FormLabel>
-                        <div className="flex items-center gap-2">
-                          <FormControl>
-                            {/* DatePicker handles the date part */}
-                            <DatePicker
-                              date={field.value}
-                              onDateChange={(newDate) => {
-                                const currentTime = formatTime(field.value);
-                                const combined = combineDateTime(
-                                  newDate,
-                                  currentTime
-                                );
-                                field.onChange(combined);
-                              }}
-                              placeholder="Select start date"
-                            />
-                          </FormControl>
-                          <FormControl>
-                            {/* Separate input for time */}
-                            <Input
-                              type="time"
-                              value={formatTime(field.value)}
-                              onChange={(e) => {
-                                const time = e.target.value;
-                                const currentDate = field.value;
-                                const combined = combineDateTime(
-                                  currentDate,
-                                  time
-                                );
-                                field.onChange(combined);
-                              }}
-                              className="w-[120px]"
-                            />
-                          </FormControl>
-                        </div>
-                        <FormDescription className="pt-1">
-                          When tickets become available.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+            <div className="mt-4 space-y-4 border-t pt-4">
+              <p className="text-sm font-medium text-muted-foreground">
+                Advanced options
+              </p>
+              <div>
                 <FormField
                   control={form.control}
-                  name="saleEndsAt"
+                  name="saleStartsAt"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Sale Ends *</FormLabel>
+                      <FormLabel>Sale Starts *</FormLabel>
                       <div className="flex items-center gap-2">
                         <FormControl>
                           {/* DatePicker handles the date part */}
@@ -345,7 +285,7 @@ export function AddTicketTypeDrawer({
                               );
                               field.onChange(combined);
                             }}
-                            placeholder="Select end date"
+                            placeholder="Select start date"
                           />
                         </FormControl>
                         <FormControl>
@@ -367,107 +307,151 @@ export function AddTicketTypeDrawer({
                         </FormControl>
                       </div>
                       <FormDescription className="pt-1">
-                        When ticket sales stop.
+                        When tickets become available.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="maxPurchasePerUser"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Max Tickets Per Order{' '}
-                        <span className="text-xs text-muted-foreground">
-                          (Optional)
-                        </span>
-                      </FormLabel>
+              </div>
+              <FormField
+                control={form.control}
+                name="saleEndsAt"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Sale Ends *</FormLabel>
+                    <div className="flex items-center gap-2">
                       <FormControl>
-                        <Input
-                          type="number"
-                          min="1"
-                          placeholder="e.g., 4"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value === '' ? undefined : e.target.value
-                            )
-                          }
-                          value={field.value ?? ''}
+                        {/* DatePicker handles the date part */}
+                        <DatePicker
+                          date={field.value}
+                          onDateChange={(newDate) => {
+                            const currentTime = formatTime(field.value);
+                            const combined = combineDateTime(
+                              newDate,
+                              currentTime
+                            );
+                            field.onChange(combined);
+                          }}
+                          placeholder="Select end date"
                         />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                      <FormControl>
+                        {/* Separate input for time */}
+                        <Input
+                          type="time"
+                          value={formatTime(field.value)}
+                          onChange={(e) => {
+                            const time = e.target.value;
+                            const currentDate = field.value;
+                            const combined = combineDateTime(currentDate, time);
+                            field.onChange(combined);
+                          }}
+                          className="w-[120px]"
+                        />
+                      </FormControl>
+                    </div>
+                    <FormDescription className="pt-1">
+                      When ticket sales stop.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="maxPurchasePerUser"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Max Tickets Per Order{' '}
+                      <span className="text-xs text-muted-foreground">
+                        (Optional)
+                      </span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="e.g., 4"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value === '' ? undefined : e.target.value
+                          )
+                        }
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="discountCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Access code{' '}
+                      <span className="text-xs text-muted-foreground">
+                        (Optional)
+                      </span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., VIPLIST"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value || undefined)
+                        }
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Buyers must enter this code at checkout to unlock this
+                      ticket. Leave blank for a public ticket.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {(form.watch('price') ?? 0) > 0 && (
                 <FormField
                   control={form.control}
-                  name="discountCode"
+                  name="ticketingFees"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>
-                        Access code{' '}
-                        <span className="text-xs text-muted-foreground">
-                          (Optional)
-                        </span>
-                      </FormLabel>
+                      <FormLabel>Ticketing Fee Structure</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="e.g., VIPLIST"
-                          {...field}
-                          value={field.value ?? ''}
-                          onChange={(e) =>
-                            field.onChange(e.target.value || undefined)
+                        <Select
+                          value={field.value}
+                          onValueChange={(value: string) =>
+                            field.onChange(value)
                           }
-                        />
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select fee handling" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PASS_TICKET_FEES">
+                              Pass fees on to buyer (Recommended)
+                            </SelectItem>
+                            <SelectItem value="ABSORB_TICKET_FEES">
+                              Absorb fees into ticket price
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </FormControl>
                       <FormDescription>
-                        Buyers must enter this code at checkout to unlock this
-                        ticket. Leave blank for a public ticket.
+                        Choose how ticketing platform fees are handled.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {(form.watch('price') ?? 0) > 0 && (
-                  <FormField
-                    control={form.control}
-                    name="ticketingFees"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Ticketing Fee Structure</FormLabel>
-                        <FormControl>
-                          <Select
-                            value={field.value}
-                            onValueChange={(value: string) =>
-                              field.onChange(value)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select fee handling" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="PASS_TICKET_FEES">
-                                Pass fees on to buyer (Recommended)
-                              </SelectItem>
-                              <SelectItem value="ABSORB_TICKET_FEES">
-                                Absorb fees into ticket price
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormDescription>
-                          Choose how ticketing platform fees are handled.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </CollapsibleContent>
-            </Collapsible>
+              )}
+            </div>
           </form>
         </Form>
 
