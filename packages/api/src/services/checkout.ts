@@ -8,12 +8,11 @@
  * with a fake). These are reads keyed off `eventId` / `code`, so — like the
  * reservation primitives — they carry no authorization (ADR 0013).
  *
- * Availability = `capacity - reserved - sold` (the new counters), so active
- * holds are already netted out via `reserved`; no separate pending-order query.
- * The new columns (`capacity`/`priceCents`/`saleStartsAt`/`saleEndsAt`) are
- * nullable until the Stage 3 backfill, so each read falls back to its legacy
- * source during the transition — the fallback becomes dead code (removed with
- * the M4–M12 legacy-column drops) once backfill lands.
+ * Availability = `capacity - reserved - sold` (the inventory counters), so
+ * active holds are already netted out via `reserved`; no separate pending-order
+ * query. `priceCents` is nullable and falls back to `price * 100`;
+ * `saleStartsAt`/`saleEndsAt` are the one sale-window pair, full timestamps
+ * (ADR 0020).
  */
 import type { PrismaClient, Prisma } from '@troptix/db';
 import {
@@ -27,7 +26,7 @@ import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
 
 // Exactly the columns the mapper needs — shared by both queries so they read
-// the same data. New reservation-rebuild columns first, legacy fallbacks next.
+// the same data.
 const TICKET_TYPE_SELECT = {
   id: true,
   name: true,
@@ -35,18 +34,16 @@ const TICKET_TYPE_SELECT = {
   maxPurchasePerUser: true,
   ticketingFees: true,
   ticketType: true,
-  // New counters / cents / single-DateTime window (← backfilled).
+  // Inventory counters.
   capacity: true,
   reserved: true,
   sold: true,
+  // Price. priceCents is authoritative; price is the legacy dollars fallback.
   priceCents: true,
+  price: true,
+  // The sale window. One pair — ADR 0020.
   saleStartsAt: true,
   saleEndsAt: true,
-  // Legacy fallbacks (read until backfill; dropped in M4–M12).
-  quantity: true,
-  price: true,
-  saleStartDate: true,
-  saleEndDate: true,
   event: { select: { isDraft: true } },
 } as const;
 
@@ -65,12 +62,8 @@ function toCheckoutTicket(
   opts: { isPasswordProtected?: boolean } = {}
 ): CheckoutTicket {
   const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
-  const capacity = tt.capacity ?? tt.quantity;
-  const saleStartsAt = tt.saleStartsAt ?? tt.saleStartDate;
-  const saleEndsAt = tt.saleEndsAt ?? tt.saleEndDate;
-
-  const availability = Math.max(0, capacity - tt.reserved - tt.sold);
-  const saleIsActive = now >= saleStartsAt && now <= saleEndsAt;
+  const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
+  const saleIsActive = now >= tt.saleStartsAt && now <= tt.saleEndsAt;
   const maxAllowedToAdd =
     saleIsActive && !tt.event.isDraft
       ? Math.max(0, Math.min(availability, tt.maxPurchasePerUser))
@@ -85,8 +78,8 @@ function toCheckoutTicket(
     name: tt.name,
     description: tt.description,
     priceCents,
-    saleStartsAt: saleStartsAt.toISOString(),
-    saleEndsAt: saleEndsAt.toISOString(),
+    saleStartsAt: tt.saleStartsAt.toISOString(),
+    saleEndsAt: tt.saleEndsAt.toISOString(),
     maxAllowedToAdd,
     feesCents,
     feeStructure: tt.ticketingFees,

@@ -32,7 +32,7 @@ import {
 } from '@/lib/schemas/ticketSchema';
 import { formatCurrency, combineDateTime, formatTime } from '@/lib/dateUtils';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
-import { FeeConfig, getFeeBreakdown } from '@/lib/fees';
+import { calculateFeesCents, FeeConfig } from '@troptix/api';
 const today = new Date();
 today.setHours(0, 0, 0, 0);
 const tomorrow = new Date(today);
@@ -42,10 +42,10 @@ const defaultFormValues: TicketTypeFormValues = {
   name: '',
   description: '',
   price: 0,
-  quantity: 100,
+  capacity: 100,
   maxPurchasePerUser: 10,
-  saleStartDate: today,
-  saleEndDate: tomorrow,
+  saleStartsAt: today,
+  saleEndsAt: tomorrow,
   ticketingFees: 'PASS_TICKET_FEES',
   discountCode: undefined,
 };
@@ -75,12 +75,12 @@ export function CreateTicketTypeForm({
     defaultValues: {
       ...defaultFormValues,
       ...initialData,
-      saleStartDate: initialData?.saleStartDate
-        ? new Date(initialData.saleStartDate)
-        : defaultFormValues.saleStartDate,
-      saleEndDate: initialData?.saleEndDate
-        ? new Date(initialData.saleEndDate)
-        : defaultFormValues.saleEndDate,
+      saleStartsAt: initialData?.saleStartsAt
+        ? new Date(initialData.saleStartsAt)
+        : defaultFormValues.saleStartsAt,
+      saleEndsAt: initialData?.saleEndsAt
+        ? new Date(initialData.saleEndsAt)
+        : defaultFormValues.saleEndsAt,
     },
     mode: 'onChange',
   });
@@ -95,8 +95,7 @@ export function CreateTicketTypeForm({
   const currentPrice = Number(watchedPrice) || 0;
 
   if (currentPrice > 0) {
-    // TODO: Should we use the total fee (including tax) or the base fee (excluding tax)?
-    const { baseFee } = getFeeBreakdown(currentPrice);
+    const baseFee = calculateFeesCents(Math.round(currentPrice * 100)) / 100;
 
     if (watchedTicketingFees === 'PASS_TICKET_FEES') {
       calculatedBuyerPrice = currentPrice + baseFee;
@@ -211,7 +210,7 @@ export function CreateTicketTypeForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
-            name="quantity"
+            name="capacity"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Quantity Available</FormLabel>
@@ -256,7 +255,7 @@ export function CreateTicketTypeForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
-            name="saleStartDate"
+            name="saleStartsAt"
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Sale Starts</FormLabel>
@@ -280,7 +279,7 @@ export function CreateTicketTypeForm({
                         const time = e.target.value;
                         const currentDate = field.value;
                         const combined = combineDateTime(currentDate, time);
-                        form.setValue('saleStartDate', combined as Date, {
+                        form.setValue('saleStartsAt', combined as Date, {
                           shouldValidate: true,
                         });
                       }}
@@ -298,7 +297,7 @@ export function CreateTicketTypeForm({
 
           <FormField
             control={form.control}
-            name="saleEndDate"
+            name="saleEndsAt"
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Sale Ends</FormLabel>
@@ -322,7 +321,7 @@ export function CreateTicketTypeForm({
                         const time = e.target.value;
                         const currentDate = field.value;
                         const combined = combineDateTime(currentDate, time);
-                        form.setValue('saleEndDate', combined as Date, {
+                        form.setValue('saleEndsAt', combined as Date, {
                           shouldValidate: true,
                         });
                       }}
@@ -436,7 +435,7 @@ export function CreateTicketTypeForm({
             </div>
             <p className="text-xs text-muted-foreground pt-1">
               *Based on an estimated {FeeConfig.PERCENTAGE * 100}% +{' '}
-              {formatCurrency(FeeConfig.FIXED)} fee.
+              {formatCurrency(FeeConfig.FIXED_CENTS / 100)} fee.
             </p>
           </div>
         )}

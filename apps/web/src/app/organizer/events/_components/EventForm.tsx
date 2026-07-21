@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useForm, useFieldArray, FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Edit, Loader2, PlusCircle, X } from 'lucide-react';
@@ -58,6 +59,8 @@ interface EventFormProps {
   ticketTypes?: TicketTypeFormValues[];
   isDraft?: boolean;
   paidEventsEnabled: boolean;
+  /** The organizer's brand — this event's host. Editable at /organizer/profile. */
+  organizationName?: string;
 }
 
 export default function EventForm({
@@ -67,6 +70,7 @@ export default function EventForm({
   ticketTypes,
   isDraft,
   paidEventsEnabled,
+  organizationName,
 }: EventFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition(); // Loading state hook
@@ -89,9 +93,8 @@ export default function EventForm({
       // Use initialData if provided, otherwise default
       eventName: '',
       description: '',
-      organizer: '',
-      startDate: tomorrow,
-      endDate: nextDay,
+      startsAt: tomorrow,
+      endsAt: nextDay,
       venue: '',
       address: '',
       country: '',
@@ -111,7 +114,7 @@ export default function EventForm({
 
   const handleOpenDrawerForNew = () => {
     setEditingTicketIndex(null);
-    setCurrentTicketData({ name: '', price: 0, quantity: 1 });
+    setCurrentTicketData({ name: '', price: 0, capacity: 1 });
     setIsDrawerOpen(true);
   };
 
@@ -159,8 +162,10 @@ export default function EventForm({
 
     let country = '';
     let countryCode = '';
-    let lat = 0;
-    let lng = 0;
+    // Null (not 0) when geometry is missing — 0,0 is the Gulf-of-Guinea "null
+    // island" that the map guard would otherwise center on.
+    let lat: number | null = null;
+    let lng: number | null = null;
 
     place.address_components?.forEach((component) => {
       if (component.types.includes('country')) {
@@ -184,7 +189,7 @@ export default function EventForm({
     form.setValue('countryCode', countryCode || undefined, {
       shouldDirty: true,
     });
-    form.setValue('latitude', lat, { shouldDirty: true }); // lat/lng can be null
+    form.setValue('latitude', lat, { shouldDirty: true }); // null when no geometry
     form.setValue('longitude', lng, { shouldDirty: true });
 
     if (place.name && place.name !== formattedAddress.split(',')[0]) {
@@ -280,9 +285,9 @@ export default function EventForm({
                 id: eventId || '',
                 name: form.watch('eventName'),
                 description: form.watch('description'),
-                organizer: form.watch('organizer'),
-                startDate: form.watch('startDate'),
-                endDate: form.watch('endDate'),
+                organizer: organizationName ?? '',
+                startsAt: form.watch('startsAt'),
+                endsAt: form.watch('endsAt'),
                 venue: form.watch('venue'),
                 address: form.watch('address'),
                 imageUrl: form.watch('imageUrl'),
@@ -290,10 +295,10 @@ export default function EventForm({
                   ticketTypes?.map((ticket) => ({
                     name: ticket.name,
                     price: ticket.price,
-                    quantity: ticket.quantity,
+                    capacity: ticket.capacity,
                     maxPurchasePerUser: ticket.maxPurchasePerUser,
-                    saleStartDate: ticket.saleStartDate,
-                    saleEndDate: ticket.saleEndDate,
+                    saleStartsAt: ticket.saleStartsAt,
+                    saleEndsAt: ticket.saleEndsAt,
                   })) || [],
               }}
             />
@@ -356,33 +361,29 @@ export default function EventForm({
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="organizer"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Organizer</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., Troptix Events"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                        <FormDescription>
-                          Name of the person or organization organizing the
-                          event.
-                        </FormDescription>
-                      </FormItem>
-                    )}
-                  />
+                  <FormItem>
+                    <FormLabel>Hosted by</FormLabel>
+                    <div className="flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-medium">
+                      {organizationName ?? 'Your organizer profile'}
+                    </div>
+                    <FormDescription>
+                      Events are hosted by your organization.{' '}
+                      <Link
+                        href="/organizer/profile"
+                        className="underline underline-offset-2 hover:text-primary"
+                      >
+                        Edit your profile
+                      </Link>
+                      .
+                    </FormDescription>
+                  </FormItem>
 
                   <div className="grid md:grid-cols-2 gap-4">
                     {/* Start Date */}
                     <div className="flex flex-col gap-4">
                       <FormField
                         control={form.control}
-                        name="startDate"
+                        name="startsAt"
                         render={({ field }) => (
                           <FormItem className="flex-1">
                             <FormLabel>Start Date</FormLabel>
@@ -427,7 +428,7 @@ export default function EventForm({
                     <div className="flex flex-col gap-4">
                       <FormField
                         control={form.control}
-                        name="endDate"
+                        name="endsAt"
                         render={({ field }) => (
                           <FormItem className="flex-1">
                             <FormLabel>End Date</FormLabel>
@@ -562,7 +563,7 @@ export default function EventForm({
                                 <TableCell>
                                   ${field.price?.toFixed(2)}
                                 </TableCell>
-                                <TableCell>{field.quantity}</TableCell>
+                                <TableCell>{field.capacity}</TableCell>
                                 <TableCell className="text-right space-x-1">
                                   {/* Edit Button -> Opens drawer */}
                                   <Button
@@ -641,7 +642,7 @@ export default function EventForm({
           onSubmit={handleDrawerSubmit} // Parent function to update RHF state
           initialData={currentTicketData} // Pass data for editing/defaults for new
           ticketSchema={ticketTypeSchema} // Pass schema for validation within drawer
-          eventStartDate={form.getValues('startDate')}
+          eventStartDate={form.getValues('startsAt')}
         />
       )}
     </div>

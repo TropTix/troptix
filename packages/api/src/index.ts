@@ -12,3 +12,7 @@
 // value.
 export * from './contracts';
 export type { AppRouter } from './trpc/routers';
+
+// Fee math is a pure module (no imports, no DB) — safe to expose on the RN-safe
+// entry so clients can render fee estimates from the one authoritative source.
+export { calculateFeesCents, FeeConfig } from './services/_shared/fees';

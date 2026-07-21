@@ -1,0 +1,61 @@
+import { cache } from 'react';
+import prisma from '@/server/prisma';
+import { getEventDetail, NotFoundError } from '@troptix/api/server';
+import { notFound } from 'next/navigation';
+import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { eventFlyerUrl } from '@/lib/supabase/storage';
+import EventPageClean from './_components/EventPageClean';
+
+// Parallel `/e/[eventId]` route (legacy `/events/[eventId]` stays live). See
+// docs/plans/2026-06-event-page-redesign.md.
+
+// Deduped per request so generateMetadata + the page share one DB read.
+const loadEvent = cache((eventId: string) =>
+  getEventDetail(prisma, { eventId })
+);
+
+export async function generateMetadata(props: {
+  params: Promise<{ eventId: string }>;
+}) {
+  const { eventId } = await props.params;
+  try {
+    const event = await loadEvent(eventId);
+    // OG images must be absolute URLs; resolve the stored path (ADR 0016).
+    const ogImage = eventFlyerUrl(event.imageUrl);
+    return {
+      title: event.name,
+      description: event.description,
+      openGraph: {
+        title: event.name,
+        description: event.description,
+        images: ogImage ? [ogImage] : [],
+      },
+    };
+  } catch (err) {
+    if (err instanceof NotFoundError) return {};
+    throw err;
+  }
+}
+
+export default async function EventDetailPage({
+  params,
+}: {
+  params: Promise<{ eventId: string }>;
+}) {
+  const user = await getUserFromIdTokenCookie();
+  const { eventId } = await params;
+
+  let event;
+  try {
+    event = await loadEvent(eventId);
+  } catch (err) {
+    if (err instanceof NotFoundError) notFound();
+    throw err;
+  }
+
+  if (event.isDraft && user?.uid !== event.organizerUserId) {
+    notFound();
+  }
+
+  return <EventPageClean event={event} />;
+}

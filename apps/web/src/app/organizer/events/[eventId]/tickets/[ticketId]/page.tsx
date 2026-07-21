@@ -36,10 +36,10 @@ async function getTicketTypeData(
         discountCode: true,
         description: true,
         price: true,
-        quantity: true,
+        capacity: true,
         maxPurchasePerUser: true,
-        saleStartDate: true,
-        saleEndDate: true,
+        saleStartsAt: true,
+        saleEndsAt: true,
         ticketingFees: true,
       },
     });
@@ -51,7 +51,9 @@ async function getTicketTypeData(
 }
 
 // Server component to render the edit form
-export default async function EditEventTicketPage(props: EditEventTicketPageProps) {
+export default async function EditEventTicketPage(
+  props: EditEventTicketPageProps
+) {
   const params = await props.params;
   const { eventId, ticketId } = params;
 
@@ -80,8 +82,8 @@ export default async function EditEventTicketPage(props: EditEventTicketPageProp
 
   const initialFormData = {
     ...ticketData,
-    saleStartDate: ticketData.saleStartDate,
-    saleEndDate: ticketData.saleEndDate,
+    saleStartsAt: ticketData.saleStartsAt,
+    saleEndsAt: ticketData.saleEndsAt,
     description: ticketData.description ?? undefined,
     discountCode: ticketData.discountCode ?? undefined,
   };

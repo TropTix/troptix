@@ -74,7 +74,7 @@ The reservation primitives are already written **and tested** (#285) — highest
 
 - `trpc/` — `initTRPC`, `context.ts` builds `{ db, session, actor }`, procedure tiers (`public`/`protected`/`organizer`), `routers/{checkout,events,organizer}.ts` thin pass-throughs. `confirm`/`expire` are **not** procedures (webhook/cron drive them).
 - `app/api/trpc/[trpc]/route.ts` App Router handler.
-- Webhook (`pages/api/stripe/webhook.ts`, stays REST for raw-body signature verify) → `confirm(prisma, …)`; `cron/invalidate-orders` → `expire(prisma, now)`. Supersedes `orderHelper`/`updateOrderAfterPaymentSucceeds`.
+- Webhook (`pages/api/stripe/webhook.ts`, stays REST for raw-body signature verify) → `confirm(prisma, …)`; `cron/expire-reservations` (shipped, see below) → `sweepExpiredHolds(prisma, stripe)`. Supersedes `orderHelper`/`updateOrderAfterPaymentSucceeds`.
 
 ### Then → Stage 3
 

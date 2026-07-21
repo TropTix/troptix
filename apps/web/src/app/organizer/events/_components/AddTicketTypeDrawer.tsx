@@ -78,11 +78,11 @@ export function AddTicketTypeDrawer({
   const defaultValues = {
     name: 'Default Ticket',
     price: 0,
-    quantity: 100,
+    capacity: 100,
     maxPurchasePerUser: 10,
     ticketingFees: 'PASS_TICKET_FEES' as const,
-    saleStartDate: today,
-    saleEndDate: eventStartDate || tomorrow,
+    saleStartsAt: today,
+    saleEndsAt: eventStartDate || tomorrow,
   };
   const form = useForm<TicketTypeFormValues>({
     resolver: zodResolver(ticketTypeSchema),
@@ -178,7 +178,7 @@ export function AddTicketTypeDrawer({
               />
               <FormField
                 control={form.control}
-                name="quantity"
+                name="capacity"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
@@ -233,7 +233,7 @@ export function AddTicketTypeDrawer({
                 <div>
                   <FormField
                     control={form.control}
-                    name="saleStartDate"
+                    name="saleStartsAt"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>Sale Starts *</FormLabel>
@@ -281,7 +281,7 @@ export function AddTicketTypeDrawer({
                 </div>
                 <FormField
                   control={form.control}
-                  name="saleEndDate"
+                  name="saleEndsAt"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Sale Ends *</FormLabel>

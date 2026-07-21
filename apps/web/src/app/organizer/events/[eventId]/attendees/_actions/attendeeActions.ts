@@ -40,13 +40,15 @@ export async function toggleTicketStatus(ticketId: string, eventId: string) {
         ? TicketStatus.NOT_AVAILABLE
         : TicketStatus.AVAILABLE;
 
-    // Update the ticket status
+    // Update the ticket status and record/clear the check-in time.
     const updatedTicket = await prisma.tickets.update({
       where: {
         id: ticketId,
       },
       data: {
         status: newStatus,
+        checkinTimestamp:
+          newStatus === TicketStatus.NOT_AVAILABLE ? new Date() : null,
         updatedAt: new Date(),
       },
       select: {

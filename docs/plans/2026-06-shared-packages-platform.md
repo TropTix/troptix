@@ -1,6 +1,6 @@
 ---
 title: Shared DB+API Packages, Prisma 7, Supabase Auth & Checkout Service Extraction
-status: proposed
+status: active
 created: 2026-06-07
 tracking-issue: TBD
 ---
@@ -111,7 +111,7 @@ Mostly sequential (migration ordering is load-bearing). Each migration = its own
 - **`contracts/` (zod)** — port `apps/web/src/types/checkout.ts` (`ValidationResponse`, `CheckoutTicket`, `ApplyCodeResponse`, message enums) to zod schemas; one definition consumed by services (`.parse`), tRPC (`.input()`), and clients (`z.infer`). **This is the contract-freeze point that unlocks Stage 3 ∥ work.**
 - **`services/`** — move `apps/web/src/server/lib/reservations.ts` near-as-is (it's already Prisma `$transaction`; the race-safe `reserve` conditional `UPDATE` stays raw SQL via `$queryRaw`); refactor each fn to take the `prisma`/`tx` handle as its first arg so services are injectable/unit-testable. Port `getCheckoutConfig` (from `config/route.ts`), `applyCode`, `events`, `organizer` reads, `_shared/fees`. (Keeping Prisma per ADR 0012 makes this a move + signature change, not an ORM rewrite.)
 - **`trpc/`** — `initTRPC`, `publicProcedure`/`protectedProcedure` (auth middleware over `ctx.session`); `context.ts` builds `{ db, session }` from the request (Supabase JWT, Bearer for RN); `routers/{checkout,events,organizer}.ts` are thin pass-throughs. `confirm`/`expire` are **not** procedures — webhook/cron drive them.
-- **Webhook + cron rewrite** — `src/pages/api/stripe/webhook.ts` stays REST (needs raw body for signature verify), rewritten to call `confirm(db, …)`; `cron/invalidate-orders` calls `expire(db, now)`. Supersedes `orderHelper`/`updateOrderAfterPaymentSucceeds`.
+- **Webhook + cron rewrite** — `src/pages/api/stripe/webhook.ts` stays REST (needs raw body for signature verify), rewritten to call `confirm(db, …)`; `cron/expire-reservations` (shipped as a new route, not a rewrite of the deleted `invalidate-orders`) calls `sweepExpiredHolds(db, stripe)`. Supersedes `orderHelper`/`updateOrderAfterPaymentSucceeds`.
 
 ### Stage 3 — Clients _(∥ once contracts frozen)_
 

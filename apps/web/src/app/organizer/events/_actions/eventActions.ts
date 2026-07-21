@@ -5,6 +5,7 @@ import prisma from '@/server/prisma';
 import { generateId } from '@/lib/utils';
 import { eventFormSchema, EventFormValues } from '@/lib/schemas/eventSchema';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { ensureOrganizationForUser } from '@troptix/api/server';
 import { redirect } from 'next/navigation';
 interface ActionResult {
   success: boolean;
@@ -39,17 +40,26 @@ export async function createEvent(
 
     const newEventId = generateId();
 
+    // The event is hosted by the organizer's Organization (auto-created on their
+    // first event). `organizer` is a denormalized mirror of the brand name; the
+    // per-event organizer field was retired.
+    const org = await ensureOrganizationForUser(prisma, {
+      ownerUserId: user.uid,
+      displayName: user.email ?? '',
+    });
+
     await prisma.$transaction(async (tx) => {
       await tx.events.create({
         data: {
           id: newEventId,
           organizerUserId: user.uid,
+          organizationId: org.id,
           isDraft: true,
           name: data.eventName,
           description: data.description ?? '',
-          organizer: data.organizer,
-          startDate: data.startDate,
-          endDate: data.endDate,
+          organizer: org.displayName,
+          startsAt: data.startsAt,
+          endsAt: data.endsAt,
           venue: data.venue,
           address: data.address,
           country: data.country,
@@ -71,10 +81,11 @@ export async function createEvent(
                 name: ticket.name,
                 description: ticket.description ?? '',
                 price: ticket.price,
-                quantity: ticket.quantity,
+                priceCents: Math.round(ticket.price * 100),
+                capacity: ticket.capacity,
                 maxPurchasePerUser: ticket.maxPurchasePerUser,
-                saleStartDate: ticket.saleStartDate,
-                saleEndDate: ticket.saleEndDate,
+                saleStartsAt: ticket.saleStartsAt,
+                saleEndsAt: ticket.saleEndsAt,
                 ticketingFees: ticket.ticketingFees,
                 ticketType: ticketTypeEnum,
               },
@@ -139,15 +150,22 @@ export async function updateEvent(
       return { success: false, error: 'Event not found or unauthorized.' };
     }
 
+    // Keep the event pointed at the organizer's Organization + mirror its name.
+    const org = await ensureOrganizationForUser(prisma, {
+      ownerUserId: user.uid,
+      displayName: user.email ?? '',
+    });
+
     // Update the Event
     await prisma.events.update({
       where: { id: eventId },
       data: {
         name: data.eventName,
         description: data.description ?? '',
-        organizer: data.organizer,
-        startDate: data.startDate,
-        endDate: data.endDate,
+        organizationId: org.id,
+        organizer: org.displayName,
+        startsAt: data.startsAt,
+        endsAt: data.endsAt,
         venue: data.venue,
         address: data.address,
         country: data.country,
@@ -162,8 +180,10 @@ export async function updateEvent(
 
     revalidatePath('/organizer/events');
     revalidatePath(`/organizer/events/${eventId}`);
-    // TODO: revalidating the public event page if it exists, e.g.:
-    // revalidatePath(/events/${eventId})
+    // Public listing is ISR-cached (revalidate = 86400) — bust it on edit so
+    // organizer changes aren't stale for up to 24h.
+    revalidatePath('/discover');
+    revalidatePath(`/e/${eventId}`);
 
     return { success: true, eventId: eventId };
   } catch (error) {

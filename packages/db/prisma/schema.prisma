@@ -35,6 +35,7 @@ model Users {
   orders              Orders[]
   socialMediaAccounts SocialMediaAccounts[]
   reservations        Reservation[]
+  organizations       Organization[]
 
   telephoneNumber String?
   billingAddress1 String?
@@ -61,6 +62,58 @@ model SocialMediaAccounts {
   userId                 String?
 
   @@index([userId])
+}
+
+// The organizer's brand: a real, linkable entity that powers "Hosted by" and a
+// public page at /o/[slug]. A user may OWN many (one-to-many via ownerUserId),
+// but v1 exposes exactly one — "model for multi, expose one". Events carry
+// `organizationId`, but ownership/auth still keys on `Events.organizerUserId`
+// (dual-written == ownerUserId). See docs/plans/2026-06-event-spotlight-and-organizer-brand.md.
+//
+// Socials are a fixed, small set → plain columns, not the SocialMediaAccounts
+// join table (custom links are out of scope; the table's dormant + dual-FK).
+// `instagram`/`twitter` store usernames; `linkedin`/`website` store full URLs.
+model Organization {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  slug        String   @unique
+  displayName String
+  logoUrl     String?  @db.VarChar(2000)
+  bio         String?
+  website     String?
+  instagram   String?
+  twitter     String?
+  linkedin    String?
+  ownerUserId String
+  verified    Boolean  @default(false)
+
+  paidTicketingEnabled     Boolean   @default(false)
+  paidTicketingRequestedAt DateTime?
+
+  owner  Users    @relation(fields: [ownerUserId], references: [id])
+  events Events[]
+
+  @@index([ownerUserId])
+}
+
+// A per-event spotlight card (DJ, artist, speaker, sponsor, collaborator): just
+// a title + optional external link / image / description that renders as a card
+// linking out. Generic — no role/type/category. Flat, ordered by `order`.
+model Spotlight {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  eventId     String
+  title       String
+  link        String?
+  imageUrl    String?  @db.VarChar(2000)
+  description String?  @db.VarChar(350)
+  order       Int      @default(0)
+
+  event Events @relation(fields: [eventId], references: [id])
+
+  @@index([eventId])
 }
 
 enum TicketStatus {
@@ -95,6 +148,9 @@ enum ReservationStatus {
   CONVERTED
   EXPIRED
   RELEASED
+  // Paid after the hold expired and the tickets could not be re-acquired: the
+  // PaymentIntent was auto-refunded (ADR 0018). Terminal, like CONVERTED.
+  REFUNDED
 }
 
 // Transactional-outbox row state — deferred side effects (e.g. confirmation
@@ -130,7 +186,10 @@ model Tickets {
   user         Users?       @relation(fields: [userId], references: [id])
   userId       String?
 
-  @@index([eventId])
+  // createdAt trails eventId so the dashboard's sales trend range-scans its
+  // window instead of reading every ticket the event ever sold. Supersedes a
+  // bare [eventId] — Postgres serves that from this index's leading column.
+  @@index([eventId, createdAt])
   @@index([orderId])
   @@index([ticketTypeId])
   @@index([userId])
@@ -166,6 +225,11 @@ model Orders {
   billingState     String?
   tickets          Tickets[]
   ticketsLink      String?
+  // Guest ticket-access capability minted at order creation. Distinct from the
+  // PK (`id`) and any user-facing public code: this is the unguessable secret
+  // behind the email's `?t=` link and gates the order/tickets/receipt pages for
+  // non-authenticated viewers. Revocable (null it to kill outstanding links).
+  accessToken      String?     @unique
   status           OrderStatus @default(PENDING)
 
   // Reservation rebuild (Phase A — additive). Nullable until backfilled +
@@ -182,14 +246,19 @@ model Orders {
   eventId String
 
   @@index([eventId])
+  // Serves both dashboard reads off one index: the revenue aggregate seeks
+  // straight to a status + date range, and recent-orders gets an ordered path
+  // instead of top-N sorting every completed order.
+  @@index([eventId, status, createdAt])
   @@index([userId])
 }
 
 model Events {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDraft   Boolean  @default(true)
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDraft   Boolean   @default(true)
+  deletedAt DateTime?
 
   // Event Details
   imageUrl        String? @db.VarChar(2000)
@@ -198,18 +267,15 @@ model Events {
   summary         String?
   organizer       String
   organizerUserId String
+  // The owning Organization (brand). Nullable + backfilled; ownership/auth still
+  // keys on organizerUserId (dual-written == organization.ownerUserId).
+  organizationId  String?
 
-  // Date and Time Details
-  startDate DateTime
-  startTime DateTime?
-  endDate   DateTime
-  endTime   DateTime?
-
-  // Reservation rebuild (Phase A — additive). Single DateTime fields (roadmap
-  // 2.10) that fix the sale-window-ignores-time bug; backfilled from the split
-  // columns, replace them in cleanup.
-  startsAt DateTime?
-  endsAt   DateTime?
+  // Date and Time Details. Full timestamps — the event form folds the time
+  // input into these before submitting, so there is no separate time column
+  // and no separate atomic column (ADR 0020).
+  startsAt DateTime
+  endsAt   DateTime
 
   // Location Details
   venue       String?
@@ -224,6 +290,12 @@ model Events {
   ticketTypes  TicketTypes[]
   orders       Orders[]
   reservations Reservation[]
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  spotlight    Spotlight[]
+
+  @@index([organizationId])
+  @@index([organizerUserId])
 }
 
 enum TicketFeeStructure {
@@ -245,27 +317,17 @@ model TicketTypes {
   name               String
   description        String
   maxPurchasePerUser Int
-  quantity           Int
-  quantitySold       Int?   @default(0)
 
-  // Reservation rebuild (Phase A — additive). Counter inventory: availability
-  // = capacity - reserved - sold. `capacity` backfills from `quantity`,
-  // `sold` from `quantitySold`; these replace `quantity`/`quantitySold` in
-  // cleanup. reserved/sold are NOT NULL with a default (safe additive).
-  capacity Int? // immutable total (← quantity)
-  reserved Int  @default(0) // held by active, unexpired reservations
-  sold     Int  @default(0) // confirmed/paid (← quantitySold)
+  // Counter inventory — one standard: availability = capacity - reserved - sold.
+  capacity Int // immutable total for this tier
+  reserved Int @default(0) // held by active, unexpired reservations
+  sold     Int @default(0) // confirmed/paid
 
-  // Sale Date Details
-  saleStartDate DateTime
-  saleStartTime DateTime?
-  saleEndDate   DateTime
-  saleEndTime   DateTime?
-
-  // Single DateTime sale-window fields (roadmap 2.10), backfilled from the
-  // split columns; fix the sale-window-ignores-time bug. Replace them in cleanup.
-  saleStartsAt DateTime?
-  saleEndsAt   DateTime?
+  // Sale Date Details. Full timestamps — the ticket form folds the time input
+  // into these before submitting, so there is no separate time column and no
+  // separate atomic column (ADR 0020).
+  saleStartsAt DateTime
+  saleEndsAt   DateTime
 
   // Price Details
   price         Float
@@ -290,12 +352,17 @@ model TicketTypes {
 // An explicit, time-boxed hold on inventory. Replaces "a PENDING Orders row is
 // the reservation". The Order is materialized only when the hold is confirmed.
 model Reservation {
-  id                    String            @id @default(uuid())
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
-  status                ReservationStatus @default(HELD)
-  expiresAt             DateTime
-  stripePaymentIntentId String?           @unique
+  id                      String            @id @default(uuid())
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  status                  ReservationStatus @default(HELD)
+  expiresAt               DateTime
+  stripePaymentIntentId   String?           @unique
+  // Checkout Sessions API (ADR 0018): the Session drives the paid flow; its
+  // PaymentIntent id is backfilled into `stripePaymentIntentId` at confirm time
+  // for refund traceability. `stripeRefundId` is set on the expiry-race refund.
+  stripeCheckoutSessionId String?           @unique
+  stripeRefundId          String?
 
   // buyer contact captured at hold time
   email     String?

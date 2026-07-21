@@ -19,16 +19,13 @@ type Row = {
   maxPurchasePerUser: number;
   ticketingFees: 'PASS_TICKET_FEES' | 'ABSORB_TICKET_FEES';
   ticketType: 'FREE' | 'PAID' | 'COMPLEMENTARY' | null;
-  capacity: number | null;
+  capacity: number;
   reserved: number;
   sold: number;
   priceCents: number | null;
-  saleStartsAt: Date | null;
-  saleEndsAt: Date | null;
-  quantity: number;
   price: number;
-  saleStartDate: Date;
-  saleEndDate: Date;
+  saleStartsAt: Date;
+  saleEndsAt: Date;
   event: { isDraft: boolean };
 };
 
@@ -44,12 +41,9 @@ function row(overrides: Partial<Row> = {}): Row {
     reserved: 0,
     sold: 0,
     priceCents: 5000,
+    price: 50,
     saleStartsAt: PAST,
     saleEndsAt: FUTURE,
-    quantity: 100,
-    price: 50,
-    saleStartDate: PAST,
-    saleEndDate: FUTURE,
     event: { isDraft: false },
     ...overrides,
   };
@@ -148,15 +142,12 @@ describe('getCheckoutConfig', () => {
     ]);
   });
 
-  it('falls back to legacy columns before backfill', async () => {
+  it('falls back to price * 100 when priceCents is null', async () => {
     const ticket = await firstTicket(
       row({
         priceCents: null,
         price: 42,
-        capacity: null,
-        quantity: 7, // → availability 7, low
-        saleStartsAt: null,
-        saleEndsAt: null,
+        capacity: 7, // → availability 7, low
       })
     );
     expect(ticket.priceCents).toBe(4200);

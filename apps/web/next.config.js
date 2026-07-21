@@ -1,11 +1,28 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
+  async redirects() {
     return [
       {
-        source: '/.well-known/vercel/flags',
-        destination: '/api/vercel/flags',
+        // Checkout consolidation: the legacy /events/[id] checkout is superseded
+        // by the reservation flow at /e/[id] (ADR 0018). Redirect all event
+        // links — including share links already out in the wild — to the new
+        // flow. Permanent (308) now that the legacy /events pages are removed.
+        source: '/events/:eventId',
+        destination: '/e/:eventId',
+        permanent: true,
       },
+      {
+        // The public /events listing was replaced by /discover. Point stale
+        // bookmarks and old inbound links at the new listing.
+        source: '/events',
+        destination: '/discover',
+        permanent: true,
+      },
+    ];
+  },
+
+  async rewrites() {
+    return [
       {
         source: '/ingest/static/:path*',
         destination: 'https://us-assets.i.posthog.com/static/:path*',

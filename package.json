@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest",
+    "test": "yarn workspace web test",
     "next": "yarn --cwd apps/web dev",
     "dev": "npm-run-all --parallel next",
     "typecheck": "yarn workspace web typecheck && yarn workspace @troptix/db typecheck && yarn workspace @troptix/api typecheck && yarn workspace @troptix/transactional typecheck",
@@ -37,6 +37,9 @@
     "lint-staged": "^17.0.7",
     "prettier": "^3.2.4",
     "ts-node": "^10.9.1"
+  },
+  "resolutions": {
+    "stripe": "22.3.0"
   },
   "private": true
 }

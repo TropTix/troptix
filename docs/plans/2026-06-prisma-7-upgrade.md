@@ -1,6 +1,6 @@
 ---
 title: Prisma 7 Upgrade (Rust-free client) + relocation into packages/db
-status: proposed
+status: done
 created: 2026-06-08
 tracking-issue: TBD
 ---

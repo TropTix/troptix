@@ -13,8 +13,8 @@ import type { EmailOrder } from '../emails/EmailConfirmation';
 const DEFAULT_DURATION_MS = 2 * 60 * 60 * 1000;
 
 function eventEnd(event: EmailOrder['event']): Date {
-  if (event.endDate) return new Date(event.endDate);
-  return new Date(new Date(event.startDate).getTime() + DEFAULT_DURATION_MS);
+  if (event.endsAt) return new Date(event.endsAt);
+  return new Date(new Date(event.startsAt).getTime() + DEFAULT_DURATION_MS);
 }
 
 /** `YYYYMMDDTHHMMSSZ` — the UTC "form 2" date-time of RFC 5545. */
@@ -67,7 +67,7 @@ export function buildCalendarLinks(
   ticketUrl: string
 ): CalendarLinks {
   const { event } = order;
-  const start = new Date(event.startDate);
+  const start = new Date(event.startsAt);
   const end = eventEnd(event);
   const details = calendarDescription(order, ticketUrl);
 
@@ -109,7 +109,7 @@ export function buildEventIcs(order: EmailOrder, ticketUrl: string): string {
   const { event } = order;
   const stamp = order.createdAt
     ? new Date(order.createdAt)
-    : new Date(event.startDate);
+    : new Date(event.startsAt);
   const description = calendarDescription(order, ticketUrl);
 
   const lines = [
@@ -121,7 +121,7 @@ export function buildEventIcs(order: EmailOrder, ticketUrl: string): string {
     'BEGIN:VEVENT',
     `UID:${order.id}@usetroptix.com`,
     `DTSTAMP:${toIcsUtc(stamp)}`,
-    `DTSTART:${toIcsUtc(event.startDate)}`,
+    `DTSTART:${toIcsUtc(event.startsAt)}`,
     `DTEND:${toIcsUtc(eventEnd(event))}`,
     `SUMMARY:${escapeIcsText(event.name)}`,
     event.address ? `LOCATION:${escapeIcsText(event.address)}` : null,

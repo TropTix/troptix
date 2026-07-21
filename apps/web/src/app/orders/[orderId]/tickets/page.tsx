@@ -1,9 +1,8 @@
-// app/order/[orderId]/tickets/page.tsx
-import prisma from '@/server/prisma'; // Adjust to your Prisma client path
-import TicketDisplayManager, { TicketInfo } from './_components/TicketDisplay'; // We'll create this client component
+// app/orders/[orderId]/tickets/page.tsx
+import prisma from '@/server/prisma';
+import TicketDisplayManager from './_components/TicketDisplay';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { BackButton } from '@/components/ui/back-button';
 
 async function getOrderWithTicketsData(orderId: string) {
   const orderData = await prisma.orders.findUnique({
@@ -13,12 +12,17 @@ async function getOrderWithTicketsData(orderId: string) {
       eventId: true,
       tickets: {
         orderBy: { createdAt: 'asc' },
-        include: {
+        select: {
+          id: true,
+          status: true,
+          firstName: true,
+          lastName: true,
+          email: true,
           event: {
             select: {
               name: true,
-              startDate: true,
-              endDate: true,
+              startsAt: true,
+              endsAt: true,
               venue: true,
               address: true,
               imageUrl: true,
@@ -48,7 +52,7 @@ async function getOrderWithTicketsData(orderId: string) {
 
 interface OrderTicketsPageProps {
   params: Promise<{ orderId: string }>;
-  searchParams: Promise<{ ticketId: string | undefined }>;
+  searchParams: Promise<{ ticketId?: string }>;
 }
 
 export default async function OrderTicketsPage(props: OrderTicketsPageProps) {
@@ -60,56 +64,45 @@ export default async function OrderTicketsPage(props: OrderTicketsPageProps) {
   if (!orderId) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
-        <p className="text-red-500">Order ID is missing.</p>
+        <p className="text-destructive">Order ID is missing.</p>
       </div>
     );
   }
 
-  const { order, tickets } = await getOrderWithTicketsData(orderId);
+  const { tickets } = await getOrderWithTicketsData(orderId);
 
   const ticketsWithInfo = tickets.map((ticket) => ({
-    ...ticket,
+    id: ticket.id,
+    status: ticket.status,
     firstName: ticket.firstName || '',
     lastName: ticket.lastName || '',
     email: ticket.email || '',
+    ticketType: { name: ticket.ticketType?.name ?? 'General Admission' },
+    event: {
+      name: ticket.event.name,
+      imageUrl: ticket.event.imageUrl ?? '',
+      startsAt: ticket.event.startsAt,
+      venue: ticket.event.venue ?? '',
+      address: ticket.event.address ?? '',
+    },
   }));
 
-  if (!order) {
+  if (ticketsWithInfo.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl font-semibold mb-4">Order Not Found</h1>
-        <p className="text-muted-foreground">
-          The order with ID <span className="font-mono">{orderId}</span> could
-          not be found.
-        </p>
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-semibold">No tickets in this order</h1>
         <Button asChild variant="outline" className="mt-6">
-          <Link href="/orders">Back to Orders</Link>{' '}
+          <Link href={`/orders/${orderId}`}>Back to order</Link>
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8 flex items-center gap-4">
-        <BackButton href={`/orders/${orderId}`} />
-        <div className="flex flex-col">
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-            Tickets for Order
-          </h1>
-          <p className="text-xl text-gray-500 dark:text-gray-400 mt-1">
-            Order ID: <span className="font-mono text-lg">{orderId}</span>
-          </p>
-        </div>
-      </div>
-
-      {tickets.length === 0 ? (
-        <p className="text-center text-lg text-gray-500 dark:text-gray-400 py-10">
-          No tickets found for this order.
-        </p>
-      ) : (
-        <TicketDisplayManager tickets={ticketsWithInfo} ticketId={ticketId} />
-      )}
-    </div>
+    <TicketDisplayManager
+      tickets={ticketsWithInfo}
+      ticketId={ticketId}
+      orderId={orderId}
+    />
   );
 }

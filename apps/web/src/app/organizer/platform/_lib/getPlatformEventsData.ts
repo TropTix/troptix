@@ -6,9 +6,8 @@ import { notFound } from 'next/navigation';
 export type PlatformEventData = {
   id: string;
   name: string;
-  startDate: Date;
-  startTime: Date | null;
-  endDate: Date;
+  startsAt: Date;
+  endsAt: Date;
   venue: string | null;
   description: string | null;
   imageUrl: string | null;
@@ -43,9 +42,8 @@ export async function getAllPlatformEvents(
     select: {
       id: true,
       name: true,
-      startDate: true,
-      startTime: true,
-      endDate: true,
+      startsAt: true,
+      endsAt: true,
       venue: true,
       description: true,
       imageUrl: true,
@@ -63,7 +61,7 @@ export async function getAllPlatformEvents(
     },
     orderBy: [
       { isDraft: 'asc' }, // Non-drafts first
-      { startDate: 'desc' },
+      { startsAt: 'desc' },
     ],
   });
 
@@ -95,9 +93,9 @@ export async function getAllPlatformEvents(
     let status: PlatformEventData['status'];
     if (event.isDraft) {
       status = 'Draft';
-    } else if (new Date(event.endDate) < today) {
+    } else if (new Date(event.endsAt) < today) {
       status = 'Past';
-    } else if (new Date(event.startDate) <= today) {
+    } else if (new Date(event.startsAt) <= today) {
       status = 'Active';
     } else {
       status = 'Upcoming';
@@ -129,9 +127,8 @@ export async function getAllPlatformEvents(
     return {
       id: event.id,
       name: event.name,
-      startDate: event.startDate,
-      startTime: event.startTime,
-      endDate: event.endDate,
+      startsAt: event.startsAt,
+      endsAt: event.endsAt,
       venue: event.venue,
       description: event.description,
       imageUrl: event.imageUrl,

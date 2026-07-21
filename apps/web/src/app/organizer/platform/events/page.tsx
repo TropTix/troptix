@@ -1,7 +1,13 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -22,7 +28,10 @@ import {
   ShoppingCart,
   Shield,
 } from 'lucide-react';
-import { getAllPlatformEvents, type PlatformEventData } from '../_lib/getPlatformEventsData';
+import {
+  getAllPlatformEvents,
+  type PlatformEventData,
+} from '../_lib/getPlatformEventsData';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import { format } from 'date-fns';
@@ -70,10 +79,13 @@ export default async function PlatformEventsPage() {
     { totalEvents: 0, totalRevenue: 0, totalTickets: 0, totalOrders: 0 }
   );
 
-  const statusGroups = events.reduce((acc, event) => {
-    acc[event.status] = (acc[event.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const statusGroups = events.reduce(
+    (acc, event) => {
+      acc[event.status] = (acc[event.status] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
 
   return (
     <div className="space-y-6">
@@ -81,8 +93,12 @@ export default async function PlatformEventsPage() {
         <div className="flex items-center gap-3">
           <Shield className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Platform Events</h1>
-            <p className="text-muted-foreground">All events across the platform</p>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Platform Events
+            </h1>
+            <p className="text-muted-foreground">
+              All events across the platform
+            </p>
           </div>
         </div>
         <Badge variant="secondary" className="text-sm">
@@ -98,9 +114,12 @@ export default async function PlatformEventsPage() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{platformStats.totalEvents}</div>
+            <div className="text-2xl font-bold">
+              {platformStats.totalEvents}
+            </div>
             <p className="text-xs text-muted-foreground">
-              {statusGroups.Active || 0} active, {statusGroups.Upcoming || 0} upcoming
+              {statusGroups.Active || 0} active, {statusGroups.Upcoming || 0}{' '}
+              upcoming
             </p>
           </CardContent>
         </Card>
@@ -111,7 +130,9 @@ export default async function PlatformEventsPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(platformStats.totalRevenue)}</div>
+            <div className="text-2xl font-bold">
+              {formatCurrency(platformStats.totalRevenue)}
+            </div>
             <p className="text-xs text-muted-foreground">
               From {platformStats.totalOrders} orders
             </p>
@@ -124,10 +145,10 @@ export default async function PlatformEventsPage() {
             <Ticket className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{platformStats.totalTickets.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              Across all events
-            </p>
+            <div className="text-2xl font-bold">
+              {platformStats.totalTickets.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">Across all events</p>
           </CardContent>
         </Card>
 
@@ -139,8 +160,8 @@ export default async function PlatformEventsPage() {
           <CardContent>
             <div className="text-2xl font-bold">
               {formatCurrency(
-                platformStats.totalEvents > 0 
-                  ? platformStats.totalRevenue / platformStats.totalEvents 
+                platformStats.totalEvents > 0
+                  ? platformStats.totalRevenue / platformStats.totalEvents
                   : 0
               )}
             </div>
@@ -154,7 +175,8 @@ export default async function PlatformEventsPage() {
         <CardHeader>
           <CardTitle>All Platform Events</CardTitle>
           <CardDescription>
-            Complete list of events across the platform with organizer and performance data
+            Complete list of events across the platform with organizer and
+            performance data
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -186,7 +208,7 @@ export default async function PlatformEventsPage() {
                           )}
                         </div>
                       </TableCell>
-                      
+
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex items-center gap-1 text-sm">
@@ -198,26 +220,24 @@ export default async function PlatformEventsPage() {
                           </div>
                         </div>
                       </TableCell>
-                      
+
                       <TableCell>
                         <Badge variant={getStatusBadgeVariant(event.status)}>
                           {event.status}
                         </Badge>
                       </TableCell>
-                      
+
                       <TableCell>
                         <div className="space-y-1">
                           <div className="text-sm">
-                            {format(event.startDate, 'MMM d, yyyy')}
+                            {format(event.startsAt, 'MMM d, yyyy')}
                           </div>
-                          {event.startTime && (
-                            <div className="text-xs text-muted-foreground">
-                              {format(event.startTime, 'h:mm a')}
-                            </div>
-                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {format(event.startsAt, 'h:mm a')}
+                          </div>
                         </div>
                       </TableCell>
-                      
+
                       <TableCell className="text-right">
                         <div className="space-y-1">
                           <div className="font-medium">
@@ -228,13 +248,13 @@ export default async function PlatformEventsPage() {
                           </div>
                         </div>
                       </TableCell>
-                      
+
                       <TableCell className="text-right">
                         <div className="font-medium">
                           {event.stats.ticketsSold.toLocaleString()}
                         </div>
                       </TableCell>
-                      
+
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="sm" asChild>
@@ -248,8 +268,8 @@ export default async function PlatformEventsPage() {
                             </Link>
                           </Button>
                           <Button variant="ghost" size="sm" asChild>
-                            <Link 
-                              href={`/events/${event.id}`}
+                            <Link
+                              href={`/e/${event.id}`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >
@@ -262,7 +282,10 @@ export default async function PlatformEventsPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={7}
+                      className="h-24 text-center text-muted-foreground"
+                    >
                       No events found on the platform.
                     </TableCell>
                   </TableRow>
