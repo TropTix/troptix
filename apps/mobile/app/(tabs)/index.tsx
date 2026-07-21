@@ -178,7 +178,7 @@ export default function EventsScreen() {
             style={styles.retryButton}
             onPress={() => {
               setLoading(true);
-              fetchEvents().finally(() => setLoading(false));
+              fetchData().finally(() => setLoading(false));
             }}
           >
             <Text style={styles.retryText}>Retry</Text>

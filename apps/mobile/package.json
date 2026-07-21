@@ -1,0 +1,47 @@
+{
+  "name": "troptix-organizer-v2",
+  "main": "index.js",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo-google-fonts/inter": "^0.3.0",
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/bottom-tabs": "^7.18.2",
+    "@react-navigation/native": "^7.3.3",
+    "@react-navigation/native-stack": "^7.17.5",
+    "@supabase/supabase-js": "^2.108.1",
+    "@trpc/client": "^11.17.0",
+    "expo": "~54.0.0",
+    "expo-asset": "~12.0.13",
+    "expo-camera": "~17.0.10",
+    "expo-constants": "~18.0.13",
+    "expo-font": "~14.0.12",
+    "expo-haptics": "~15.0.8",
+    "expo-linking": "~8.0.12",
+    "expo-router": "~6.0.24",
+    "expo-splash-screen": "~31.0.13",
+    "expo-status-bar": "~3.0.9",
+    "expo-system-ui": "~6.0.9",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-web": "^0.21.0",
+    "react-native-worklets": "^0.9.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
