@@ -1,5 +1,4 @@
 import { clsx, type ClassValue } from 'clsx';
-import ShortUniqueId from 'short-unique-id';
 import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
@@ -36,11 +35,27 @@ export function initials(name: string): string {
   return result || '?';
 }
 
-export function generateId() {
-  const uid = new ShortUniqueId({
-    dictionary: 'alphanum_upper',
-    length: 12,
-  });
+const ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  return uid.rnd();
+/**
+ * CSPRNG id — 12 chars over a 36-symbol uppercase-alphanumeric alphabet (same
+ * format as before). Web Crypto is available in Node 18+, the browser, the edge
+ * runtime, and the jsdom test env. Rejection sampling keeps the distribution
+ * uniform (256 % 36 != 0, so a naive modulo would bias toward earlier symbols).
+ * The reservation id is the checkout's authorization token — it must not be
+ * predictable from prior ids. Mirrors `@troptix/api`'s `generateId`.
+ */
+export function generateId(): string {
+  const len = 12;
+  const max = 256 - (256 % ID_ALPHABET.length); // reject bytes >= 252 (avoid modulo bias)
+  const out: string[] = [];
+  while (out.length < len) {
+    const bytes = new Uint8Array(len - out.length);
+    globalThis.crypto.getRandomValues(bytes);
+    for (let i = 0; i < bytes.length; i++) {
+      const b = bytes[i];
+      if (b < max) out.push(ID_ALPHABET[b % ID_ALPHABET.length]);
+    }
+  }
+  return out.join('');
 }
