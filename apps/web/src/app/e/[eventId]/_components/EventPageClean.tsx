@@ -33,6 +33,32 @@ function priceLabelFor(fromPriceCents: number | null): string {
   return `From ${getFormattedCurrency(fromPriceCents / 100)} USD`;
 }
 
+// The bottom-bar CTA. One live state, else a disabled label that says *why*
+// nothing is buyable. Priority: a past event trumps everything; a tier still
+// opening trumps "Sold out" (more tickets are coming); "Sold out" trumps
+// "Sales ended". Drafts keep an active button (statuses ignore draft) so the
+// organizer can preview the sheet.
+function ctaFor(
+  event: EventDetail,
+  eventEnded: boolean,
+  hasPaidTickets: boolean
+): { label: string; disabled: boolean } {
+  if (eventEnded) return { label: 'Event ended', disabled: true };
+  const statuses = event.tickets.map((t) => t.saleStatus);
+  if (statuses.includes('onSale')) {
+    return { label: hasPaidTickets ? 'Get Tickets' : 'RSVP', disabled: false };
+  }
+  if (statuses.includes('notYetOnSale')) {
+    return { label: 'On sale soon', disabled: true };
+  }
+  if (statuses.includes('soldOut'))
+    return { label: 'Sold out', disabled: true };
+  if (statuses.includes('saleEnded')) {
+    return { label: 'Sales ended', disabled: true };
+  }
+  return { label: 'No tickets available', disabled: true };
+}
+
 const SECTION_LABEL =
   'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
@@ -225,6 +251,8 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
     minute: '2-digit',
   })}`;
   const priceLabel = priceLabelFor(event.fromPriceCents);
+  const eventEnded = Date.now() > end.getTime();
+  const cta = ctaFor(event, eventEnded, hasPaidTickets);
 
   async function onShare() {
     const url = typeof window !== 'undefined' ? window.location.href : '';
@@ -293,7 +321,12 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
               </button>
             </div>
             <span className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full',
+                  eventEnded ? 'bg-white/50' : 'bg-emerald-400'
+                )}
+              />
               {heroChip}
             </span>
           </div>
@@ -400,7 +433,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-5 py-3.5">
           <div className="min-w-0 flex-1">
             <div className="text-lg font-extrabold">{priceLabel}</div>
-            {!isFree && (
+            {!isFree && !cta.disabled && (
               <div className="text-xs text-muted-foreground">
                 fees calculated at checkout
               </div>
@@ -408,11 +441,12 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
           </div>
           <button
             type="button"
+            disabled={cta.disabled}
             onClick={() => setSheetOpen(true)}
-            className="flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+            className="flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
           >
-            {hasPaidTickets ? 'Get Tickets' : 'RSVP'}
-            <ArrowRight className="h-5 w-5" />
+            {cta.label}
+            {!cta.disabled && <ArrowRight className="h-5 w-5" />}
           </button>
         </div>
       </div>

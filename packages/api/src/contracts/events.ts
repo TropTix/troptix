@@ -12,7 +12,7 @@ export type EventDetailInput = z.infer<typeof eventDetailInputSchema>;
 
 // A public ticket tier, shaped for the event page's selection sheet. No
 // discount codes or raw inventory counts — `maxAllowedToAdd` (0 when sold out /
-// off-sale / draft) is all the client needs.
+// off-sale / draft) plus a coarse `saleStatus` is all the client needs.
 export const eventTicketSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -23,6 +23,12 @@ export const eventTicketSchema = z.object({
   feesCents: z.number().int(),
   /** Quantity the buyer may add now — clamped to availability, max-per-user, sale window, draft. */
   maxAllowedToAdd: z.number().int(),
+  /**
+   * Why the tier is (un)buyable. Sold-out wins over the window, so a tier that
+   * sells out mid-sale reads "sold out", not "sales ended", after the window
+   * closes. Ignores draft — drafts zero out `maxAllowedToAdd` instead.
+   */
+  saleStatus: z.enum(['onSale', 'notYetOnSale', 'saleEnded', 'soldOut']),
 });
 export type EventTicket = z.infer<typeof eventTicketSchema>;
 
