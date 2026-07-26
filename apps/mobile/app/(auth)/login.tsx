@@ -16,11 +16,18 @@ import { useAuth } from '../../context/AuthContext';
 
 const RESEND_COOLDOWN = 45;
 
+// App Store review signs in with this fixed account. Apple's reviewers can't
+// receive email, so this account skips the passwordless flow entirely and
+// signs in with a password instead.
+const REVIEW_ACCOUNT_EMAIL = 'test@usetroptix.com';
+
 export default function LoginScreen() {
-  const { sendOtp, verifyOtp } = useAuth();
+  const { sendOtp, verifyOtp, signInWithPassword } = useAuth();
 
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [isPasswordLogin, setIsPasswordLogin] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(0);
@@ -39,6 +46,14 @@ export default function LoginScreen() {
       Alert.alert('Email required', 'Please enter your email address.');
       return;
     }
+
+    // App Store review can't receive the passwordless email, so this account
+    // signs in with a password instead of triggering the OTP flow.
+    if (trimmed === REVIEW_ACCOUNT_EMAIL) {
+      setIsPasswordLogin(true);
+      return;
+    }
+
     setLoading(true);
     const { error } = await sendOtp(trimmed);
     setLoading(false);
@@ -49,6 +64,24 @@ export default function LoginScreen() {
     setSentTo(trimmed);
     setResendIn(RESEND_COOLDOWN);
     setTimeout(() => codeRef.current?.focus(), 400);
+  };
+
+  const handlePasswordLogin = async () => {
+    if (!password) {
+      Alert.alert('Password required', 'Please enter the password.');
+      return;
+    }
+    setLoading(true);
+    const { error } = await signInWithPassword(
+      email.trim().toLowerCase(),
+      password
+    );
+    setLoading(false);
+    if (error) {
+      Alert.alert('Sign-in failed', error);
+      return;
+    }
+    // AuthGuard in _layout.tsx reacts to the session change and redirects.
   };
 
   const handleResend = async () => {
@@ -98,7 +131,61 @@ export default function LoginScreen() {
           <Text style={styles.role}>Organizer</Text>
         </View>
 
-        {!sentTo ? (
+        {isPasswordLogin ? (
+          <View style={styles.form}>
+            <Text style={styles.formHeading}>Welcome back.</Text>
+            <Text style={styles.formSubheading}>
+              {'Enter the password for\n'}
+              <Text style={styles.emailHighlight}>{email.trim()}</Text>
+            </Text>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password"
+                value={password}
+                onChangeText={setPassword}
+                returnKeyType="done"
+                onSubmitEditing={handlePasswordLogin}
+                selectionColor={colors.accent}
+                keyboardAppearance="light"
+                autoFocus
+              />
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.buttonPressed,
+                loading && styles.buttonDisabled,
+              ]}
+              onPress={handlePasswordLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.bg} />
+              ) : (
+                <Text style={styles.buttonText}>Log in</Text>
+              )}
+            </Pressable>
+
+            <View style={styles.resendRow}>
+              <Pressable
+                onPress={() => {
+                  setIsPasswordLogin(false);
+                  setPassword('');
+                }}
+              >
+                <Text style={styles.resendLink}>Use a different email</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : !sentTo ? (
           <View style={styles.form}>
             <Text style={styles.formHeading}>Welcome back.</Text>
 
@@ -133,7 +220,7 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator color={colors.bg} />
               ) : (
-                <Text style={styles.buttonText}>Email me a sign-in code</Text>
+                <Text style={styles.buttonText}>Continue</Text>
               )}
             </Pressable>
           </View>

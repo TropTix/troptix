@@ -110,6 +110,7 @@ export async function getEvent(
       ticketId: t.id,
       checkedIn: !!t.checkinTimestamp,
       checkedInAt: t.checkinTimestamp?.toISOString(),
+      email: t.email ?? undefined,
     })),
   };
 }

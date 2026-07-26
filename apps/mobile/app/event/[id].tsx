@@ -24,6 +24,7 @@ type Guest = {
   ticketId: string;
   checkedIn: boolean;
   checkedInAt?: string;
+  email?: string;
 };
 
 type Tab = 'scanner' | 'guests';
@@ -244,6 +245,11 @@ function GuestRow({
         <Text style={styles.guestName} numberOfLines={1}>
           {guest.name}
         </Text>
+        {guest.email ? (
+          <Text style={styles.guestEmail} numberOfLines={1}>
+            {guest.email}
+          </Text>
+        ) : null}
         <Text
           style={[
             styles.ticketPillText,
@@ -280,7 +286,8 @@ function GuestListTab({
     ? guests.filter(
         (g) =>
           g.name.toLowerCase().includes(query.toLowerCase()) ||
-          g.ticketId.toLowerCase().includes(query.toLowerCase())
+          g.ticketId.toLowerCase().includes(query.toLowerCase()) ||
+          (g.email && g.email.toLowerCase().includes(query.toLowerCase()))
       )
     : guests;
 
@@ -293,7 +300,7 @@ function GuestListTab({
           <Ionicons name="search-outline" size={15} color={colors.textMuted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Name or ticket ID…"
+            placeholder="Name, email, or ticket ID…"
             placeholderTextColor={colors.textMuted}
             value={query}
             onChangeText={setQuery}
@@ -878,9 +885,12 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: fonts.regular,
     fontSize: 14,
     color: colors.text,
+    letterSpacing: 0,
   },
   guestCount: {},
   guestCountNum: {
@@ -937,9 +947,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
+  guestEmail: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textSub,
+  },
   ticketPillText: {
     fontFamily: fonts.regular,
     fontSize: 13,
+    marginTop: 2,
   },
   checkCircle: {
     width: 28,
