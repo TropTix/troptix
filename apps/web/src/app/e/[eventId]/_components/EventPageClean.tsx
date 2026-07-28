@@ -145,7 +145,6 @@ export default function EventPageClean({
   const router = useRouter();
   const searchParams = useSearchParams();
   const resumeReservationId = searchParams?.get('reservation') ?? null;
-  const [accent, setAccent] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
 
@@ -172,55 +171,6 @@ export default function EventPageClean({
   const hasPaidTickets = event.tickets.some((t) => t.priceCents > 0);
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
-
-  // Saturation-weighted average so a vibrant subject wins over a dark
-  // background; falls back to null (no halo) if the canvas is CORS-tainted.
-  // The halo is desktop-only, so skip the extra image fetch on mobile.
-  useEffect(() => {
-    if (!window.matchMedia('(min-width: 768px)').matches) return;
-    let cancelled = false;
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        const size = 24;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, size, size);
-        const { data } = ctx.getImageData(0, 0, size, size);
-        let r = 0;
-        let g = 0;
-        let b = 0;
-        let wSum = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          const R = data[i];
-          const G = data[i + 1];
-          const B = data[i + 2];
-          const max = Math.max(R, G, B);
-          const min = Math.min(R, G, B);
-          const sat = max === 0 ? 0 : (max - min) / max;
-          const w = sat * sat + 0.05;
-          r += R * w;
-          g += G * w;
-          b += B * w;
-          wSum += w;
-        }
-        if (!cancelled && wSum > 0) {
-          const round = (n: number) => Math.round(n / wSum);
-          setAccent(`${round(r)}, ${round(g)}, ${round(b)}`);
-        }
-      } catch {
-        /* tainted canvas (CORS) — no halo */
-      }
-    };
-    img.src = imageUrl;
-    return () => {
-      cancelled = true;
-    };
-  }, [imageUrl]);
 
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
@@ -313,27 +263,15 @@ export default function EventPageClean({
 
         <div className="mx-auto w-full max-w-5xl px-5 py-6 md:px-8 md:py-14">
           <div className="md:grid md:grid-cols-[minmax(0,380px)_1fr] md:items-start md:gap-12">
-            {/* Desktop: poster aside with a soft flyer-coloured halo. */}
             <aside className="hidden md:block md:sticky md:top-20">
-              <div className="relative">
-                {accent && (
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute -inset-4 rounded-[2rem] opacity-70 blur-3xl"
-                    style={{
-                      background: `radial-gradient(circle, rgba(${accent}, 0.4), transparent 70%)`,
-                    }}
-                  />
-                )}
-                <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-xl">
-                  <Image
-                    src={imageUrl}
-                    alt={event.name}
-                    fill
-                    sizes="380px"
-                    className="object-cover"
-                  />
-                </div>
+              <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-xl">
+                <Image
+                  src={imageUrl}
+                  alt={event.name}
+                  fill
+                  sizes="380px"
+                  className="object-cover"
+                />
               </div>
               <div className="mt-5 border-t border-border pt-5">
                 <p className={SECTION_LABEL}>Presented by</p>
