@@ -10,6 +10,28 @@ export const eventDetailInputSchema = z.object({
 });
 export type EventDetailInput = z.infer<typeof eventDetailInputSchema>;
 
+// --- Flyer theming ------------------------------------------------------------
+// The organizer-chosen page treatment plus the colors extracted once from the
+// flyer at upload. Stored raw (hex) so the derivation — which lives in the web
+// layer — can evolve without a data backfill.
+
+export const eventPageThemeSchema = z.enum(['off', 'wash', 'dark']);
+export type EventPageTheme = z.infer<typeof eventPageThemeSchema>;
+
+const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
+
+export const flyerPaletteSchema = z.object({
+  /** Most frequent color — often the poster's background. */
+  dominant: hexColor,
+  /** Most saturated mid-lightness color; null when nothing qualifies. */
+  vibrant: hexColor.nullable(),
+  /** Second vivid color at least 40° of hue away; null when none. */
+  vibrant2: hexColor.nullable(),
+  /** True when the flyer has no usable color (mono/grayscale art). */
+  isGray: z.boolean(),
+});
+export type FlyerPalette = z.infer<typeof flyerPaletteSchema>;
+
 // A public ticket tier, shaped for the event page's selection sheet. No
 // discount codes or raw inventory counts — `maxAllowedToAdd` (0 when sold out /
 // off-sale / draft) plus a coarse `saleStatus` is all the client needs.
@@ -79,6 +101,10 @@ export const eventDetailSchema = z.object({
   longitude: z.number().nullable(),
   /** Cheapest public tier, integer cents. Null = no public tiers. */
   fromPriceCents: z.number().int().nullable(),
+  /** Organizer-chosen page treatment; 'off' renders the brand theme. */
+  pageTheme: eventPageThemeSchema,
+  /** Colors extracted from the flyer at upload; null when never extracted. */
+  flyerPalette: flyerPaletteSchema.nullable(),
   /** Public (non-code-gated) tiers, available first then by price. */
   tickets: z.array(eventTicketSchema),
 });
