@@ -1,13 +1,11 @@
 import LandingHero from './_components/hero';
-import Features from './_components/features';
-import CTA from './_components/cta';
+// import SocialProof from './_components/social-proof';
 
 export default function Home() {
   return (
     <main>
       <LandingHero />
-      {/* <Features /> */}
-      <CTA />
+      {/* <SocialProof /> */}
     </main>
   );
 }
