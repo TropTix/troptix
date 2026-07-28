@@ -23,6 +23,7 @@ import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import type { EventDetail } from '@troptix/api';
 import CheckoutSheet from './CheckoutSheet';
 import VenueMap from './VenueMap';
+import FlyerThemePrototype from './FlyerThemePrototype';
 
 // Public event page (Luma-light). Immersive poster hero on mobile, two-column
 // on desktop. See docs/plans/2026-06-event-page-redesign.md.
@@ -423,6 +424,11 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         event={event}
         resumeReservationId={resumeReservationId}
       />
+
+      {/* PROTOTYPE — flyer-derived theme switcher (?theme=), dev-only. */}
+      {process.env.NODE_ENV !== 'production' && (
+        <FlyerThemePrototype imageUrl={imageUrl} />
+      )}
     </>
   );
 }
