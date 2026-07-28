@@ -57,5 +57,10 @@ export default async function EventDetailPage({
     notFound();
   }
 
-  return <EventPageClean event={event} />;
+  return (
+    <EventPageClean
+      event={event}
+      initialEventEnded={Date.now() > Date.parse(event.endsAt)}
+    />
+  );
 }
