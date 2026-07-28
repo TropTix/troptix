@@ -60,7 +60,7 @@ export default async function EventDetailPage({
   return (
     <EventPageClean
       event={event}
-      initialEventEnded={Date.now() > Date.parse(event.endsAt)}
+      eventEnded={Date.now() > Date.parse(event.endsAt)}
     />
   );
 }

@@ -136,31 +136,23 @@ function HostedByInline({ event }: { event: EventDetail }) {
 
 export default function EventPageClean({
   event,
-  initialEventEnded,
+  eventEnded,
 }: {
   event: EventDetail;
-  /** Server-computed so SSR and hydration agree; a timer keeps it fresh. */
-  initialEventEnded: boolean;
+  /**
+   * The one hard-disabled CTA state: the event is over. Server-computed so SSR
+   * and hydration agree. Everything else (sold out, off-sale, draft preview)
+   * keeps the button live — the sheet's per-tier labels explain what's
+   * unavailable and why, and the server re-validates any actual reservation.
+   */
+  eventEnded: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const resumeReservationId = searchParams?.get('reservation') ?? null;
   const [accent, setAccent] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [eventEnded, setEventEnded] = useState(initialEventEnded);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
-
-  // The one hard-disabled state: the event is over. Everything else (sold out,
-  // off-sale, draft preview) keeps the button live — the sheet's per-tier
-  // labels explain what's unavailable and why. Re-checked on a timer so a tab
-  // left open across the boundary flips without a reload.
-  useEffect(() => {
-    const endMs = Date.parse(event.endsAt);
-    const update = () => setEventEnded(Date.now() > endMs);
-    update();
-    const id = setInterval(update, 60_000);
-    return () => clearInterval(id);
-  }, [event.endsAt]);
 
   // Resume an in-flight checkout after the Stripe redirect / a refresh
   // (?reservation=…): open the sheet so it can finalize (ADR 0018).
