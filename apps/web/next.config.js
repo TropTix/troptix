@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    // Baked in at build time so client code can tell preview deploys from
+    // production without relying on the dashboard's system-env exposure
+    // setting. Used by the flyer-theme prototype gate.
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? '',
+  },
+
   async redirects() {
     return [
       {

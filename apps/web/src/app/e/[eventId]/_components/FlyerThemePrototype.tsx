@@ -10,6 +10,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 // contrast guardrails and applied as overrides to the shadcn CSS variables.
 // Dev-only; delete or fold the winning treatment into the page when decided.
 
+// Dev and Vercel preview deploys only — never the production site.
+export const FLYER_THEME_PROTOTYPE_ENABLED =
+  process.env.NODE_ENV !== 'production' ||
+  process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview';
+
 type HSL = { h: number; s: number; l: number };
 type Extraction = {
   dominant: HSL;
@@ -299,7 +304,7 @@ export default function FlyerThemePrototype({
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  if (process.env.NODE_ENV === 'production') return null;
+  if (!FLYER_THEME_PROTOTYPE_ENABLED) return null;
 
   const washUnavailable = ex !== null && (ex.isGray || !ex.vibrant);
 
