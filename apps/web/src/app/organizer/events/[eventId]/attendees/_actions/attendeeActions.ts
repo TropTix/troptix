@@ -9,7 +9,7 @@ import { toggleTicketCheckIn, NotFoundError } from '@troptix/api/server';
 // Thin adapter over the check-in seam (ADR 0013): the service owns
 // authorization (event ownership; no platform-owner bypass on writes) and the
 // status/timestamp flip. The action maps errors and revalidates.
-export async function toggleTicketStatus(ticketId: string, eventId: string) {
+export async function toggleTicketStatus(ticketId: string) {
   try {
     const user = await getUserFromIdTokenCookie();
     if (!user) {
@@ -20,8 +20,10 @@ export async function toggleTicketStatus(ticketId: string, eventId: string) {
       ticketId,
     });
 
-    // Revalidate the attendees page to reflect the changes
-    revalidatePath(`/organizer/events/${eventId}/attendees`);
+    // Revalidate the attendees page of the event the ticket actually belongs
+    // to — derived from the mutation's own result, so the invalidation can
+    // never point at a different event than the flip.
+    revalidatePath(`/organizer/events/${updatedTicket.eventId}/attendees`);
 
     return {
       success: true,

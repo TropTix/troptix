@@ -33,10 +33,14 @@ beforeEach(() => {
 });
 
 describe('toggleTicketStatus', () => {
-  it('calls the seam as the caller and revalidates the attendees page', async () => {
-    mockToggle.mockResolvedValue({ id: 't1', status: 'NOT_AVAILABLE' });
+  it('calls the seam as the caller and revalidates the ticket’s own event page', async () => {
+    mockToggle.mockResolvedValue({
+      id: 't1',
+      status: 'NOT_AVAILABLE',
+      eventId: 'e1',
+    });
 
-    const result = await toggleTicketStatus('t1', 'e1');
+    const result = await toggleTicketStatus('t1');
 
     expect(result).toEqual({
       success: true,
@@ -48,6 +52,7 @@ describe('toggleTicketStatus', () => {
       role: 'PATRON',
     });
     expect(mockToggle.mock.calls[0][2]).toEqual({ ticketId: 't1' });
+    // The path comes from the mutation's result, never from client input.
     expect(revalidatePath).toHaveBeenCalledWith(
       '/organizer/events/e1/attendees'
     );
@@ -56,7 +61,7 @@ describe('toggleTicketStatus', () => {
   it('maps a service NotFound to a friendly error', async () => {
     mockToggle.mockRejectedValue(new FakeNotFoundError('Ticket not found'));
 
-    const result = await toggleTicketStatus('t1', 'e1');
+    const result = await toggleTicketStatus('t1');
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Ticket not found or unauthorized');
@@ -65,7 +70,7 @@ describe('toggleTicketStatus', () => {
   it('fails without an authenticated user', async () => {
     mockGetUser.mockResolvedValue(null);
 
-    const result = await toggleTicketStatus('t1', 'e1');
+    const result = await toggleTicketStatus('t1');
 
     expect(result.success).toBe(false);
     expect(mockToggle).not.toHaveBeenCalled();

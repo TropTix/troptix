@@ -2,7 +2,7 @@
 title: Team membership — Owner and Admin
 status: active
 created: 2026-07-27
-tracking-issue: TBD
+tracking-issue: '#481'
 ---
 
 ## What this is
