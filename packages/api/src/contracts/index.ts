@@ -3,6 +3,7 @@
 // type-only default entry (src/index.ts).
 export * from './checkout';
 export * from './events';
+export * from './featureFlags';
 export * from './organizations';
 export * from './organizer';
 export * from './payments';

@@ -1,8 +1,8 @@
 ---
 title: PostHog feature flags for safe trunk merges
-status: proposed
+status: active
 created: 2026-07-28
-tracking-issue: TBD
+tracking-issue: '#485'
 ---
 
 # PostHog feature flags for safe trunk merges
@@ -96,7 +96,7 @@ export async function isFlagEnabled(
 
 ## SOP — feature flag lifecycle
 
-This section is the deliverable the team (and agents) follow. Phase 1 copies it verbatim to `docs/runbooks/feature-flags.md`; this plan holds the reviewed draft.
+This section was the reviewed draft; the live copy the team (and agents) follow is [docs/runbooks/feature-flags.md](../runbooks/feature-flags.md).
 
 ### 1. When to use a flag
 
