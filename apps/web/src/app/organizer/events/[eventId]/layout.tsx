@@ -7,11 +7,17 @@ import { redirect } from 'next/navigation';
 import type { ServerUser } from '@/server/authUser';
 
 // Ownership IS the access check (ADR 0013/0019): the scoped read returns null
-// for an event the caller doesn't own, and null is a 404. No separate guard,
-// no platform-owner bypass — staff observe via View-as on the seam pages.
+// for an event the caller doesn't own, and null is a 404. Platform Owners pass
+// this shell — a layout cannot read ?viewAs (layouts get no searchParams), and
+// blocking here would kill View-as on every page below; the pages themselves
+// authorize (seam reads honor viewAs, the rest are self-scoped and 404).
+// All this shell exposes to staff is the nav's name/isDraft.
 async function getEvent(eventId: string, user: ServerUser) {
   const event = await prisma.events.findUnique({
-    where: { id: eventId, organizerUserId: user.uid },
+    where: {
+      id: eventId,
+      ...(user.isPlatformOwner ? {} : { organizerUserId: user.uid }),
+    },
     select: { name: true, isDraft: true },
   });
   if (!event) {

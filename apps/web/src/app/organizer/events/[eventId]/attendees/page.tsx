@@ -2,7 +2,7 @@ import React from 'react';
 import prisma from '@/server/prisma';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import type { ServerUser } from '@/server/authUser';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
 import { TicketStatus, TicketTypes, Orders } from '@troptix/db';
 import {
@@ -30,60 +30,55 @@ export interface FetchedTicketData {
   order: Pick<Orders, 'id'> | null;
 }
 
-// Ownership scoping in the query is the access check; the segment layout has
-// already 404'd foreign events before these run.
+// Ownership scoping in each query is the access check. Layout and page fetch
+// in PARALLEL in the App Router — the layout's 404 wins the render but does
+// not stop these from executing, so every read here must carry its own
+// organizerUserId scope. Errors propagate to the error boundary: a DB failure
+// must not render as an empty attendee list.
 async function fetchTickets(eventId: string, user: ServerUser) {
-  try {
-    const tickets = await prisma.tickets.findMany({
-      where: {
-        eventId: eventId,
-        event: { organizerUserId: user.uid },
-        order: {
-          status: 'COMPLETED',
+  return prisma.tickets.findMany({
+    where: {
+      eventId: eventId,
+      event: { organizerUserId: user.uid },
+      order: {
+        status: 'COMPLETED',
+      },
+    },
+    select: {
+      id: true,
+      createdAt: true,
+      status: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      ticketType: {
+        select: {
+          name: true,
         },
       },
-      select: {
-        id: true,
-        createdAt: true,
-        status: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        ticketType: {
-          select: {
-            name: true,
-          },
-        },
-        order: {
-          select: {
-            id: true,
-          },
+      order: {
+        select: {
+          id: true,
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-    return tickets;
-  } catch (error) {
-    console.error('Failed to fetch tickets:', error);
-    return [];
-  }
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
 }
 
 async function fetchEventName(eventId: string, user: ServerUser) {
-  try {
-    const event = await prisma.events.findUnique({
-      where: { id: eventId, organizerUserId: user.uid },
-      select: {
-        name: true,
-      },
-    });
-    return event?.name || 'Unknown Event';
-  } catch (error) {
-    console.error('Failed to fetch event name:', error);
-    return 'Unknown Event';
+  const event = await prisma.events.findUnique({
+    where: { id: eventId, organizerUserId: user.uid },
+    select: {
+      name: true,
+    },
+  });
+  if (!event) {
+    notFound();
   }
+  return event.name;
 }
 
 interface EventAttendeesPageProps {

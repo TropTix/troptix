@@ -10,7 +10,12 @@
 import { TicketStatus, type PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { NotFoundError } from './_shared/errors';
+import { requireOwnedEvent } from './_shared/owned-event';
 import { resolveOrganizerScope } from './organizer-scope';
+
+// Un-checked-in is two statuses mid-cutover: legacy AVAILABLE and the
+// canonical VALID the reservation checkout mints.
+const UNCHECKED_STATUSES = [TicketStatus.AVAILABLE, TicketStatus.VALID];
 
 export type ScanTicketResult = {
   ticketName: string | undefined;
@@ -31,14 +36,7 @@ export async function scanTicket(
   input: { ticketId: string; eventId: string }
 ): Promise<ScanTicketResult> {
   const organizerUserId = await resolveOrganizerScope(prisma, actor);
-
-  const event = await prisma.events.findFirst({
-    where: { id: input.eventId, organizerUserId, deletedAt: null },
-    select: { id: true },
-  });
-  if (!event) {
-    throw new NotFoundError('Event not found');
-  }
+  await requireOwnedEvent(prisma, organizerUserId, input.eventId);
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: input.ticketId, eventId: input.eventId },
@@ -56,7 +54,8 @@ export async function scanTicket(
     where: {
       id: input.ticketId,
       eventId: input.eventId,
-      status: TicketStatus.AVAILABLE,
+      status: { in: UNCHECKED_STATUSES },
+      checkinTimestamp: null,
     },
     data: { status: TicketStatus.NOT_AVAILABLE, checkinTimestamp: new Date() },
   });
@@ -92,7 +91,9 @@ export async function toggleTicketCheckIn(
     throw new NotFoundError('Ticket not found');
   }
 
-  const checkingIn = ticket.status === TicketStatus.AVAILABLE;
+  // VALID counts as un-checked (never rewritten to AVAILABLE by mistake);
+  // undo restores AVAILABLE, the legacy un-checked state, as it always has.
+  const checkingIn = (UNCHECKED_STATUSES as string[]).includes(ticket.status);
   return prisma.tickets.update({
     where: { id: ticket.id },
     data: {

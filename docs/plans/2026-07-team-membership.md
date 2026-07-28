@@ -37,6 +37,7 @@ None of this is optional, and all of it is cheap next to fixing it afterwards. T
 - The organizer scope stops meaning "the actor" and starts meaning "the acting Organization" — defaulted when a person has only one, remembered across requests, and offered as a choice only to the handful of people who own one Organization and belong to others.
 - Reads and writes resolve through that scope. An Admin sees exactly what the Owner sees.
 - The two owner-only areas refuse Admins: member management, and payouts / Stripe / paid-ticketing approval.
+- Split the profile save before Admins get the form: `updateOrganizationProfile`'s create branch keys on the caller's own id, so an Admin's first save would mint them a phantom Organization. Admin saves must scope to the acting Organization; only an ownerless first save may create.
 - Record who checked each ticket in, at all four paths that currently write `checkinTimestamp`.
 
 ## Phase 2 — Invites

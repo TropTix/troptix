@@ -143,6 +143,10 @@ export async function updateOrganizationProfile(
     if (org) {
       await prisma.organization.update({ where: { id: org.id }, data });
     } else {
+      // Owner-only today: creating keys on the caller's own id. Phase 1 gives
+      // Admins this form — the save must then scope to the acting Organization
+      // (or split create from update), or an Admin's first save mints them a
+      // phantom org of their own. See docs/plans/2026-07-team-membership.md.
       await prisma.organization.create({
         data: { ownerUserId: input.ownerUserId, ...data },
       });

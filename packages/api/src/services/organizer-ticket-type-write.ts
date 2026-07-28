@@ -20,6 +20,7 @@ import {
   type TicketTypeInput,
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
+import { requireOwnedEvent } from './_shared/owned-event';
 import { generateId } from './_shared/ids';
 import { toCents } from './_shared/organizerMapping';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
@@ -36,16 +37,10 @@ export async function createTicketType(
   const data = ticketTypeInputSchema.parse(input);
   const organizerUserId = await resolveOrganizerScope(prisma, actor);
 
-  const [event, org] = await Promise.all([
-    prisma.events.findFirst({
-      where: { id: eventId, organizerUserId, deletedAt: null },
-      select: { id: true },
-    }),
+  const [, org] = await Promise.all([
+    requireOwnedEvent(prisma, organizerUserId, eventId),
     findOrganizationForOwner(prisma, organizerUserId),
   ]);
-  if (!event) {
-    throw new NotFoundError('Event not found');
-  }
   assertPaidTicketingAllowed(
     { paidTicketingEnabled: org?.paidTicketingEnabled ?? false },
     [data]

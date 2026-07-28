@@ -15,7 +15,7 @@ const owner: Actor = { kind: 'user', userId: 'org-1', role: 'PATRON' };
 type TicketRow = {
   id: string;
   eventId: string;
-  status: 'AVAILABLE' | 'NOT_AVAILABLE';
+  status: 'AVAILABLE' | 'VALID' | 'NOT_AVAILABLE';
   checkinTimestamp: Date | null;
   ticketType: { name: string; description: string } | null;
 };
@@ -56,7 +56,8 @@ function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
           if (
             t.id === where.id &&
             t.eventId === where.eventId &&
-            t.status === where.status
+            where.status.in.includes(t.status) &&
+            !t.checkinTimestamp
           ) {
             Object.assign(t, data);
             count++;
@@ -153,6 +154,26 @@ describe('scanTicket', () => {
     expect(result.ticketName).toBeUndefined();
   });
 
+  it('checks in a VALID ticket (the status the checkout mints)', async () => {
+    const events = [{ id: 'e1', organizerUserId: 'org-1', deletedAt: null }];
+    const tickets: TicketRow[] = [
+      {
+        id: 't1',
+        eventId: 'e1',
+        status: 'VALID',
+        checkinTimestamp: null,
+        ticketType: { name: 'GA', description: 'desc' },
+      },
+    ];
+    const prisma = makeFakePrisma(events, tickets);
+    const result = await scanTicket(prisma, owner, {
+      ticketId: 't1',
+      eventId: 'e1',
+    });
+    expect(result.scanSucceeded).toBe(true);
+    expect(tickets[0].status).toBe('NOT_AVAILABLE');
+  });
+
   it("names a typeless ticket 'Complementary'", async () => {
     const events = [{ id: 'e1', organizerUserId: 'org-1', deletedAt: null }];
     const tickets: TicketRow[] = [
@@ -185,6 +206,17 @@ describe('toggleTicketCheckIn', () => {
 
   it('stamps checkinTimestamp when checking in', async () => {
     const { events, tickets } = seed();
+    const prisma = makeFakePrisma(events, tickets);
+    const updated = await toggleTicketCheckIn(prisma, owner, {
+      ticketId: 't1',
+    });
+    expect(updated.status).toBe('NOT_AVAILABLE');
+    expect(updated.checkinTimestamp).toBeInstanceOf(Date);
+  });
+
+  it('checks a VALID ticket IN (never downgrades it to AVAILABLE)', async () => {
+    const { events, tickets } = seed();
+    tickets[0].status = 'VALID';
     const prisma = makeFakePrisma(events, tickets);
     const updated = await toggleTicketCheckIn(prisma, owner, {
       ticketId: 't1',
