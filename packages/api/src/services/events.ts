@@ -18,7 +18,16 @@ import type {
 } from '../contracts/events';
 import { calculateFeesCents } from './_shared/fees';
 import { toEventSummary } from './_shared/eventSummary';
+import { getSaleState } from './_shared/saleState';
 import { NotFoundError } from './_shared/errors';
+
+// The public DTO's sale-window vocabulary, mapped from the canonical
+// `getSaleState` so the event page and organizer reads can't drift.
+const SALE_STATUS = {
+  Scheduled: 'notYetOnSale',
+  OnSale: 'onSale',
+  Ended: 'saleEnded',
+} as const;
 
 /**
  * Public discovery listing: upcoming, non-draft events shaped for the cards on
@@ -132,13 +141,7 @@ export async function getEventDetail(
       const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
       const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
       const saleStatus: EventTicket['saleStatus'] =
-        availability === 0
-          ? 'soldOut'
-          : now < tt.saleStartsAt
-            ? 'notYetOnSale'
-            : now > tt.saleEndsAt
-              ? 'saleEnded'
-              : 'onSale';
+        availability === 0 ? 'soldOut' : SALE_STATUS[getSaleState(tt, now)];
       const maxAllowedToAdd =
         saleStatus === 'onSale' && !event.isDraft
           ? Math.max(0, Math.min(availability, tt.maxPurchasePerUser))
