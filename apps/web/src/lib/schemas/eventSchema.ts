@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { eventPageThemeSchema, flyerPaletteSchema } from '@troptix/api';
 import { ticketTypeSchema } from './ticketSchema';
 
 export const eventFormSchema = z
@@ -28,6 +29,10 @@ export const eventFormSchema = z
     // plain string — not `.url()`, which would reject the path. Empty string
     // means "no image". Render via eventFlyerUrl().
     imageUrl: z.string().nullable().optional(),
+    // Page treatment + colors extracted from the flyer at upload
+    // (see @/lib/flyerTheme).
+    pageTheme: eventPageThemeSchema.optional(),
+    flyerPalette: flyerPaletteSchema.nullable().optional(),
   })
   // Strictly after — must match the service's createEventInputSchema, or input
   // that passes here dies deeper in the stack with a generic error.

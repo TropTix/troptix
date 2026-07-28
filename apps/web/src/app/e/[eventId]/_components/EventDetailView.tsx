@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -21,6 +21,7 @@ import { Banner } from '@/components/ui/banner';
 import { OrgAvatar } from '@/components/OrgAvatar';
 import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import type { EventDetail } from '@troptix/api';
+import { deriveThemeVars } from '@/lib/flyerTheme';
 import CheckoutSheet from './CheckoutSheet';
 import VenueMap from './VenueMap';
 
@@ -203,8 +204,15 @@ export default function EventDetailView({
     <Share2 className="h-5 w-5" />
   );
 
+  // The organizer's flyer theme, derived from the stored palette — pure math,
+  // computed during SSR so the page arrives themed (no flash, no extraction).
+  // The wrapper scopes the CSS-variable overrides to the page: the checkout
+  // sheet (a portal) and the global nav deliberately stay on brand tokens.
+  const themeVars = (deriveThemeVars(event.pageTheme, event.flyerPalette) ??
+    undefined) as CSSProperties | undefined;
+
   return (
-    <>
+    <div style={themeVars}>
       {event.isDraft && (
         <Banner
           title="Draft Mode: Event Not Published"
@@ -347,7 +355,7 @@ export default function EventDetailView({
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 animate-in border-t border-border bg-background/95 backdrop-blur-xl duration-300 slide-in-from-bottom">
+      <div className="fixed inset-x-0 bottom-0 z-40 animate-in border-t border-border bg-background/95 text-foreground backdrop-blur-xl duration-300 slide-in-from-bottom">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-5 py-3.5">
           <div className="min-w-0 flex-1">
             <div className="text-lg font-extrabold">{priceLabel}</div>
@@ -379,6 +387,6 @@ export default function EventDetailView({
         event={event}
         resumeReservationId={resumeReservationId}
       />
-    </>
+    </div>
   );
 }

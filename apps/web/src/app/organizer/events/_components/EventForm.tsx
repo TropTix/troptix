@@ -48,9 +48,12 @@ import {
 
 import { usePlacesWidget } from 'react-google-autocomplete';
 import { EventImageUploader } from '../_components/EventImageUpload';
+import { PageThemePicker } from '../_components/PageThemePicker';
 import { PublishRequirements } from '@/components/PublishRequirements';
 import { createEvent, updateEvent } from '../_actions/eventActions';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
+import { eventFlyerUrl } from '@/lib/supabase/storage';
+import { extractFlyerPaletteFromUrl } from '@/lib/flyerTheme';
 
 interface EventFormProps {
   initialData?: EventFormValues | null;
@@ -88,6 +91,8 @@ function defaultEventValues(): EventFormValues {
     longitude: null,
     tickets: [],
     imageUrl: null,
+    pageTheme: 'off',
+    flyerPalette: null,
   };
 }
 
@@ -117,6 +122,23 @@ export default function EventForm({
     control: form.control,
     name: 'tickets',
   });
+
+  // Extraction runs once per flyer, here at upload — the palette is stored on
+  // the event, so the public page never re-extracts. Removing the flyer clears
+  // the palette and drops the treatment back to Classic.
+  const refreshPalette = async (path: string | null) => {
+    const url = eventFlyerUrl(path);
+    if (!url) {
+      form.setValue('flyerPalette', null, { shouldDirty: true });
+      form.setValue('pageTheme', 'off', { shouldDirty: true });
+      return;
+    }
+    const palette = await extractFlyerPaletteFromUrl(url);
+    form.setValue('flyerPalette', palette, { shouldDirty: true });
+    if (!palette || palette.isGray || !palette.vibrant) {
+      form.setValue('pageTheme', 'off', { shouldDirty: true });
+    }
+  };
 
   const handleDrawerSubmit = (
     ticketData: TicketTypeFormValues & { id?: string }
@@ -230,12 +252,39 @@ export default function EventForm({
             <CardContent>
               <EventImageUploader
                 currentImageUrl={form.watch('imageUrl')}
-                onUploadComplete={(url) =>
+                onUploadComplete={(url) => {
                   form.setValue('imageUrl', url, {
                     shouldValidate: true,
                     shouldDirty: true,
-                  })
-                }
+                  });
+                  void refreshPalette(url);
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Page Theme</CardTitle>
+              <CardDescription>
+                Color your event page from your flyer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FormField
+                control={form.control}
+                name="pageTheme"
+                render={({ field }) => (
+                  <PageThemePicker
+                    value={field.value ?? 'off'}
+                    onChange={(theme) =>
+                      form.setValue('pageTheme', theme, { shouldDirty: true })
+                    }
+                    palette={form.watch('flyerPalette') ?? null}
+                    hasFlyer={!!form.watch('imageUrl')}
+                    disabled={isPending}
+                  />
+                )}
               />
             </CardContent>
           </Card>

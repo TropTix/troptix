@@ -124,6 +124,8 @@ function toEventFields(data: EventFormValues) {
     latitude: data.latitude,
     longitude: data.longitude,
     imageUrl: data.imageUrl,
+    pageTheme: data.pageTheme,
+    flyerPalette: data.flyerPalette,
   };
 }
 
