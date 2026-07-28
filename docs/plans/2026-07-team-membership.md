@@ -27,7 +27,7 @@ Not in v1: the Scanner role (waits for the organizer mobile-app rebuild), owners
 None of this is optional, and all of it is cheap next to fixing it afterwards. The design assumes things the database does not currently guarantee.
 
 - **One Organization per owner.** Add the unique index on `Organization.ownerUserId`, and stop [organizer/profile/page.tsx](../../apps/web/src/app/organizer/profile/page.tsx) provisioning an Organization when someone merely opens it. Today an Admin who clicks Profile silently gets an Organization of their own.
-- **Every event belongs to an Organization.** Confirm the backfill script has actually run in production, then make `Events.organizationId` non-null and stop the foreign key nulling it when an Organization is deleted.
+- **Every event belongs to an Organization.** Make `Events.organizationId` non-null and stop the foreign key nulling it when an Organization is deleted. Confirmed against production and the dev branch on 2026-07-28: zero null rows, zero duplicates, zero violations — the in-migration backfill is replay-safety, not data repair ([audit](../audits/2026-07-28-teams-phase0-data-audit.md)).
 - **One way to authorize.** Eleven organizer write paths authorize five different ways, across `resolveOrganizerScope`, the `accessControl.ts` helpers, the frozen legacy service, and inline checks. Bring them onto one seam before teaching any of them about membership. Row-level security is not a safety net here — it is on for twelve tables with no policies, and the app bypasses it.
 - **Name the platform staff explicitly.** Platform-owner status is read off an email suffix. Replace it with a real grant before anyone outside the company can be invited.
 
