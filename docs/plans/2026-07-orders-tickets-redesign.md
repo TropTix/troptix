@@ -19,6 +19,38 @@ tracking-issue: TBD
 > order pages keep their existing behavior. Everything below the fold describes the **full** target
 > design (the follow-up's spec), not what this first PR ships.
 
+> **Update (2026-07-27) — shipped state + consolidation pass.** The wallet-first UI shipped
+> (swipeable QR **User Ticket page**, order-detail money summary with free suppression,
+> Upcoming/Past list). The **access foundation never landed** beyond the migration: `Orders.accessToken`
+> exists as a column but is not minted, read, or threaded anywhere; there is no `accessMode` resolver,
+> no `?t=`, and no `publicCode` on `Orders`/`Tickets` (the `TT-XXXXXX` short code is derived from the
+> raw UUID). So the order/tickets/receipt pages are still **open to anyone with the URL** — the exact
+> gap Phase 1 was meant to close.
+>
+> A separate **cleanup pass** (this session) was scoped explicitly as _simplify before adding_ — it
+> ships **no new capability** and leaves the access model deferred. Its decisions, which **supersede**
+> the routing/receipt/billing parts of the target spec below:
+>
+> - **Routes 5 → 3.** Delete the dead `/orders/[orderId]/confirmation` page (unreachable — the paid
+>   `return_url` goes to `/e/…`, nothing links in, its own CTA points at a nonexistent `/checkout`).
+>   **Merge** the thin order-detail and the receipt into one **Order page** at `/orders/[orderId]`
+>   (summary on top, itemized receipt inline); drop the `/orders/[orderId]/receipt` route. Surviving
+>   routes: `/orders` (list), `/orders/[orderId]/tickets` (User Ticket page), `/orders/[orderId]`
+>   (Order page). The User Ticket page's receipt icon points at the Order page.
+> - **Drop the billing address** from the Order page for now — it is PII we cannot gate until the
+>   deferred `accessMode` guard exists; removing it _reduces_ the open-page exposure. Card last-4
+>   stays. Billing returns owner-gated when Phase 1 lands.
+> - **Money from `*Cents`** as the authoritative order total (kills the receipt's legacy-`Float`
+>   read); **light-only** (kills the receipt page's `dark:` classes, per ADR 0002); one set of
+>   not-found/PENDING/CANCELLED states; dedupe the duplicated `shortCode()` helper.
+> - **`accessToken` column kept** as the documented placeholder for the deferred work (avoids a
+>   second migration if token access is built).
+> - **Out of scope:** removing the legacy `Float` columns (data migration), the door-scan race bug.
+>
+> Everything below is the **original target spec**. The access-model sections (Phase 1/2, `?t=`,
+> owner/guest resolver) remain the future direction; the routing/receipt/billing specifics are
+> superseded by the bullets above.
+
 A redesign of how attendees view the tickets and orders they've purchased, aligned with the
 new design language and the `/e/[eventId]` checkout. The guiding frame is **wallet-first**: the
 primary job of these pages is _getting into the event_ — a big, scannable QR on a phone at the

@@ -1,6 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Keep in sync with EventPageClean's layout.
+// Keep in sync with EventDetailView's layout.
 export default function EventDetailPageLoading() {
   return (
     <main className="min-h-screen bg-background">

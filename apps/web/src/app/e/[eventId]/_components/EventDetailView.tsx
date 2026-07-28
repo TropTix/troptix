@@ -134,7 +134,7 @@ function HostedByInline({ event }: { event: EventDetail }) {
   );
 }
 
-export default function EventPageClean({
+export default function EventDetailView({
   event,
   eventEnded,
 }: {
@@ -148,8 +148,9 @@ export default function EventPageClean({
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
 
-  // Resume an in-flight checkout after the Stripe redirect / a refresh
-  // (?reservation=…): open the sheet so it can finalize (ADR 0018).
+  // Resume an in-flight checkout after the Stripe redirect / a refresh (ADR
+  // 0018). The param stays in the URL on purpose — scrubbing it would break
+  // refresh-resume; the PostHog sanitizer keeps it out of analytics instead.
   useEffect(() => {
     if (resumeReservationId) setSheetOpen(true);
   }, [resumeReservationId]);

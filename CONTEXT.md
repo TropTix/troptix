@@ -73,3 +73,9 @@ A separate, Platform-Owner-only surface for observing organizers across the plat
 
 **View-as** (act-as):
 A Platform Owner viewing the Organizer Dashboard scoped to a chosen Organizer — the same pages and data an Organizer sees, not a parallel admin dashboard. **Read-only**: the scope target is honored by read-services only (and only when the actor is a Platform Owner); write-services never accept it, so an admin can observe but not mutate on an Organizer's behalf. _Avoid_: impersonation (implies acting/writing as the user; View-as is see-only).\_
+
+**User Ticket page**:
+The attendee's ticket surface (`/orders/[orderId]/tickets`) — one scannable QR per screen, swipeable across the order, built for getting through the door. Its job is _entry_, not purchase management. _Avoid_: "wallet" (that is the design philosophy behind it, not the surface's name), "ticket page" (ambiguous with Ticket type).
+
+**Order page**:
+The attendee's money surface (`/orders/[orderId]`) — order summary plus the itemized receipt in one page. The receipt is a **section** of this page, not a separate surface. _Avoid_: "receipt page" (no longer its own route), "confirmation page" (deleted — the live post-checkout confirmation is the in-checkout success screen plus the email, not a page).
