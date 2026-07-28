@@ -164,11 +164,17 @@ type Overrides = Record<string, string>;
 
 function deriveWash(ex: Extraction): Overrides {
   if (ex.isGray || !ex.vibrant) return {};
-  const H = ex.dominant.h;
-  const S = Math.min(0.28, Math.max(0.06, ex.dominant.s * 0.4));
-  const bg: HSL = { h: H, s: S, l: 0.965 };
+  // A dark or washed-out dominant (poster backgrounds are usually near-black
+  // or near-white) carries no usable hue — tint from the vibrant color, which
+  // is the flyer's actual identity.
+  const domDull =
+    ex.dominant.s < 0.25 || ex.dominant.l < 0.2 || ex.dominant.l > 0.85;
+  const src = domDull ? ex.vibrant : ex.dominant;
+  const H = src.h;
+  const S = Math.min(0.5, Math.max(0.22, src.s * 0.5));
+  const bg: HSL = { h: H, s: S, l: 0.94 };
   const ink = solveL({ h: H, s: 0.3, l: 0.14 }, bg, 12, -1);
-  const muted = solveL({ h: H, s: 0.14, l: 0.5 }, bg, 4.6, -1);
+  const muted = solveL({ h: H, s: 0.18, l: 0.5 }, bg, 4.6, -1);
   const cta = solveCta(ex.vibrant);
   const acc = ex.vibrant2 ?? ex.vibrant;
   return {
@@ -180,14 +186,14 @@ function deriveWash(ex: Extraction): Overrides {
     '--popover-foreground': t(ink),
     '--primary': t(cta.fill),
     '--primary-foreground': t(cta.ink),
-    '--secondary': t({ h: H, s: Math.min(0.3, S + 0.05), l: 0.91 }),
+    '--secondary': t({ h: H, s: S, l: 0.88 }),
     '--secondary-foreground': t(ink),
-    '--muted': t({ h: H, s: S, l: 0.94 }),
+    '--muted': t({ h: H, s: S, l: 0.91 }),
     '--muted-foreground': t(muted),
-    '--accent': t({ h: acc.h, s: Math.min(0.5, acc.s), l: 0.9 }),
+    '--accent': t({ h: acc.h, s: Math.min(0.5, acc.s), l: 0.88 }),
     '--accent-foreground': t(ink),
-    '--border': t({ h: H, s: Math.min(0.3, S + 0.05), l: 0.885 }),
-    '--input': t({ h: H, s: Math.min(0.3, S + 0.05), l: 0.885 }),
+    '--border': t({ h: H, s: S, l: 0.85 }),
+    '--input': t({ h: H, s: S, l: 0.85 }),
     '--ring': t(cta.fill),
   };
 }
