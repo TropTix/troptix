@@ -24,7 +24,9 @@
         {
           "cameraPermission": "Allow TropTix to access your camera to scan ticket QR codes."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ],
     "scheme": "troptix-organizer",
     "experiments": {

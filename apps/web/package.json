@@ -62,7 +62,6 @@
     "date-fns-tz": "^3.2.0",
     "embla-carousel-react": "^8.6.0",
     "eslint": "^9",
-    "flags": "^3.1.1",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.503.0",
     "motion": "^12.23.25",

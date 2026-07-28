@@ -113,3 +113,38 @@ export async function getEvent(
     })),
   };
 }
+
+export async function checkInTicket(
+  prisma: PrismaClient,
+  actor: Actor,
+  ticketId: string
+) {
+  const { userId, isPlatformOwner } = await authorizeOrganizer(prisma, actor);
+
+  const ticket = await prisma.tickets.findUnique({
+    where: { id: ticketId },
+    include: { event: true },
+  });
+
+  if (!ticket) {
+    throw new Error('NOT_FOUND');
+  }
+
+  if (!isPlatformOwner && ticket.event.organizerUserId !== userId) {
+    throw new Error('UNAUTHORIZED');
+  }
+
+  if (ticket.status === 'NOT_AVAILABLE' || ticket.checkinTimestamp) {
+    throw new Error('ALREADY_CHECKED_IN');
+  }
+
+  await prisma.tickets.update({
+    where: { id: ticketId },
+    data: {
+      status: 'NOT_AVAILABLE',
+      checkinTimestamp: new Date(),
+    },
+  });
+
+  return { success: true };
+}

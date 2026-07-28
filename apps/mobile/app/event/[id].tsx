@@ -59,7 +59,13 @@ function initials(name: string) {
 
 // ─── Scanner ──────────────────────────────────────────────────────────────────
 
-function ScanResultBanner({ result }: { result: ScanResult }) {
+function ScanResultBanner({
+  result,
+  onDismiss,
+}: {
+  result: ScanResult;
+  onDismiss: () => void;
+}) {
   const config =
     result.status === 'success'
       ? {
@@ -99,6 +105,9 @@ function ScanResultBanner({ result }: { result: ScanResult }) {
           <Text style={styles.resultBadgeText}>{config.badge}</Text>
         </View>
       ) : null}
+      <Pressable onPress={onDismiss} hitSlop={12} style={{ paddingLeft: 8 }}>
+        <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
+      </Pressable>
     </View>
   );
 }
@@ -184,7 +193,12 @@ function ScannerTab({
           <Text style={styles.scanHint}>Point camera at a ticket QR code</Text>
         </View>
       </View>
-      {lastResult ? <ScanResultBanner result={lastResult} /> : null}
+      {lastResult ? (
+        <ScanResultBanner
+          result={lastResult}
+          onDismiss={() => setLastResult(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -227,26 +241,17 @@ function GuestRow({
       </View>
 
       <View style={styles.guestInfo}>
-        <Text style={styles.guestName}>{guest.name}</Text>
-        <View style={styles.guestMeta}>
-          <View
-            style={[
-              styles.ticketPill,
-              {
-                backgroundColor: `${TICKET_COLORS[guest.ticketType] ?? '#888'}18`,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.ticketPillText,
-                { color: TICKET_COLORS[guest.ticketType] ?? '#888' },
-              ]}
-            >
-              {guest.ticketType}
-            </Text>
-          </View>
-        </View>
+        <Text style={styles.guestName} numberOfLines={1}>
+          {guest.name}
+        </Text>
+        <Text
+          style={[
+            styles.ticketPillText,
+            { color: TICKET_COLORS[guest.ticketType] ?? colors.textMuted },
+          ]}
+        >
+          {guest.ticketType}
+        </Text>
       </View>
 
       <View
@@ -340,31 +345,55 @@ export default function EventDetailScreen() {
   const [event, setEvent] = useState<any>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showRefreshToast, setShowRefreshToast] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    trpc.organizer.event
-      .query({ id })
-      .then((data) => {
-        setEvent(data);
-        setGuests(data.guests);
-        setLoading(false);
-      })
-      .catch((e) => {
-        setError(e.message ?? 'Failed to load event');
-        setLoading(false);
-      });
+  const fetchEventData = useCallback(async () => {
+    try {
+      const data = await trpc.organizer.event.query({ id });
+      setEvent(data);
+      setGuests(data.guests);
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to load event');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  const handleCheckInByScan = useCallback((guestId: string) => {
-    setGuests((prev) =>
-      prev.map((g) =>
-        g.id === guestId
-          ? { ...g, checkedIn: true, checkedInAt: new Date().toISOString() }
-          : g
-      )
-    );
-  }, []);
+  React.useEffect(() => {
+    fetchEventData();
+  }, [fetchEventData]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchEventData();
+    setRefreshing(false);
+
+    setShowRefreshToast(true);
+    setTimeout(() => {
+      setShowRefreshToast(false);
+    }, 2500);
+  };
+
+  const handleCheckInByScan = useCallback(
+    (guestId: string) => {
+      setGuests((prev) =>
+        prev.map((g) =>
+          g.id === guestId
+            ? { ...g, checkedIn: true, checkedInAt: new Date().toISOString() }
+            : g
+        )
+      );
+      trpc.organizer.checkInTicket.mutate({ ticketId: guestId }).catch(() => {
+        // Revert on error by refetching the full event state
+        trpc.organizer.event.query({ id }).then((data) => {
+          setGuests(data.guests);
+        });
+      });
+    },
+    [id]
+  );
 
   if (loading) {
     return (
@@ -402,14 +431,17 @@ export default function EventDetailScreen() {
           {
             text: 'Remove',
             style: 'destructive',
-            onPress: () =>
+            onPress: () => {
+              // Wait, the backend doesn't have an undo-checkin mutation yet.
+              // We'll just update local state for now until the undo backend is implemented.
               setGuests((prev) =>
                 prev.map((g) =>
                   g.id === guestId
                     ? { ...g, checkedIn: false, checkedInAt: undefined }
                     : g
                 )
-              ),
+              );
+            },
           },
         ]
       );
@@ -422,11 +454,23 @@ export default function EventDetailScreen() {
             : g
         )
       );
+      trpc.organizer.checkInTicket.mutate({ ticketId: guestId }).catch(() => {
+        trpc.organizer.event.query({ id }).then((data) => {
+          setGuests(data.guests);
+        });
+      });
     }
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {showRefreshToast && (
+        <View style={styles.refreshToast}>
+          <Ionicons name="checkmark-circle" size={16} color="#fff" />
+          <Text style={styles.refreshToastText}>Data refreshed</Text>
+        </View>
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
@@ -435,7 +479,17 @@ export default function EventDetailScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {event.name}
         </Text>
-        <View style={{ width: 36 }} />
+        <Pressable
+          style={styles.backBtn}
+          onPress={handleRefresh}
+          disabled={refreshing}
+        >
+          <Ionicons
+            name="refresh"
+            size={20}
+            color={refreshing ? colors.textMuted : colors.text}
+          />
+        </Pressable>
       </View>
 
       {/* Event info */}
@@ -794,6 +848,34 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'ios' ? 9 : 5,
     gap: 6,
   },
+  scanBannerCloseText: {
+    color: '#fff',
+    fontFamily: fonts.medium,
+    fontSize: 13,
+  },
+  refreshToast: {
+    position: 'absolute',
+    top: 60,
+    alignSelf: 'center',
+    backgroundColor: colors.success,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  refreshToastText: {
+    color: '#fff',
+    fontFamily: fonts.medium,
+    fontSize: 14,
+  },
   searchInput: {
     flex: 1,
     fontFamily: fonts.regular,
@@ -844,21 +926,20 @@ const styles = StyleSheet.create({
   guestAvatarTextIn: {
     color: colors.success,
   },
-  guestInfo: { flex: 1, gap: 4 },
+  guestInfo: {
+    flex: 1,
+    gap: 3,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
   guestName: {
     fontFamily: fonts.medium,
     fontSize: 15,
     color: colors.text,
   },
-  guestMeta: { flexDirection: 'row' },
-  ticketPill: {
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
   ticketPillText: {
-    fontFamily: fonts.semiBold,
-    fontSize: 11,
+    fontFamily: fonts.regular,
+    fontSize: 13,
   },
   checkCircle: {
     width: 28,

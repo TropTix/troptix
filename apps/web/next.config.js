@@ -24,10 +24,6 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/.well-known/vercel/flags',
-        destination: '/api/vercel/flags',
-      },
-      {
         source: '/ingest/static/:path*',
         destination: 'https://us-assets.i.posthog.com/static/:path*',
       },

@@ -25,15 +25,13 @@ export async function PATCH(
       );
     }
 
-    const userRole = await prisma.users.findUnique({
-      where: {
-        id: user.uid,
-      },
-      select: {
-        role: true,
-      },
+    // Paid ticketing is the Organization's approval, not a user role — the
+    // same flag the @troptix/api write services enforce.
+    const org = await prisma.organization.findFirst({
+      where: { ownerUserId: user.uid },
+      select: { paidTicketingEnabled: true },
     });
-    const paidEventsEnabled = userRole?.role === 'ORGANIZER';
+    const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
 
     const event = await prisma.events.findUnique({
       where: { id: eventId, organizerUserId: user.uid },

@@ -44,14 +44,25 @@ export {
   ORDERS_LIST_LIMIT,
 } from './services/organizer-orders';
 export { listTicketTypes } from './services/organizer-ticket-types';
+export { createEvent, updateEvent } from './services/organizer-event-write';
+export {
+  createTicketType,
+  updateTicketType,
+} from './services/organizer-ticket-type-write';
 export {
   ensureOrganizationForUser,
   backfillOrganizations,
+  findOrganizationForOwner,
   getOrganizationBySlug,
   updateOrganizationProfile,
 } from './services/organizations';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
-export { NotFoundError, UnauthorizedError } from './services/_shared/errors';
+export { toCents } from './services/_shared/organizerMapping';
+export {
+  NotFoundError,
+  UnauthorizedError,
+  PaidTicketingNotEnabledError,
+} from './services/_shared/errors';
 
 // tRPC adapter — router value, server-side caller, and per-request context.
 export { appRouter, createCaller } from './trpc/routers';
