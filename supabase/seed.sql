@@ -41,28 +41,32 @@ insert into public."Organization" (
 insert into public."Events" (
   id, "createdAt", "updatedAt", "isDraft", name, description, summary,
   organizer, "organizerUserId", "startsAt", "endsAt",
-  venue, address, country, "countryCode", "organizationId"
+  venue, address, country, "countryCode", "organizationId",
+  "pageTheme", "flyerPalette"
 ) values
   (
     'seed_event_1', now(), now(), false,
     'TropTix Demo Festival', 'A sample paid event seeded for preview branches.', 'Happy-path paid checkout',
     'Demo Organizer', 'seed_org_1',
     '2026-08-15 18:00:00', '2026-08-15 23:00:00',
-    'Demo Arena', '123 Demo Street, Kingston', 'Jamaica', 'JM', 'seed_organization_1'
+    'Demo Arena', '123 Demo Street, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
+    'wash', '{"dominant": "#7A1E2B", "vibrant": "#FF4757", "vibrant2": "#FFD23F", "isGray": false}'
   ),
   (
     'seed_event_2', now(), now(), false,
     'TropTix Free Community Day', 'A free RSVP event seeded for preview branches.', 'Free RSVP path',
     'Demo Organizer', 'seed_org_1',
     '2026-09-05 12:00:00', '2026-09-05 18:00:00',
-    'Demo Park', '45 Community Ave, Kingston', 'Jamaica', 'JM', 'seed_organization_1'
+    'Demo Park', '45 Community Ave, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
+    'dark', '{"dominant": "#131020", "vibrant": "#FF4D97", "vibrant2": "#FFB454", "isGray": false}'
   ),
   (
     'seed_event_3', now(), now(), false,
     'TropTix Edge-Case Showcase', 'Tiers in unusual states for testing the checkout UI.', 'Near-capacity, sold-out, upcoming, gated',
     'Demo Organizer', 'seed_org_1',
     '2026-09-20 19:00:00', '2026-09-21 01:00:00',
-    'Demo Hall', '9 Edge Lane, Kingston', 'Jamaica', 'JM', 'seed_organization_1'
+    'Demo Hall', '9 Edge Lane, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
+    'off', null
   );
 
 -- Ticket types across the three events, one row per state we want to test.
