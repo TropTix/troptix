@@ -19,10 +19,28 @@ An Organization-level capability (`Organization.paidTicketingEnabled`) that perm
 An Organization-level **trust tick** (`Organization.verified`), admin-granted, attendee-facing — signals an established/trusted brand. **Orthogonal to `paidTicketingEnabled`**: a brand can be verified through a track record of free events without being approved to sell paid, and vice versa. _Avoid_: conflating with paid-ticketing approval.
 
 **Platform Owner**:
-A member of the TropTix team with cross-organizer visibility, used to debug and observe what any Organizer sees. An **Admin** capability, distinct from Organizer — a Platform Owner is not "an Organizer with extra rights." Currently identified by an `@usetroptix.com` email suffix; this is a stopgap until a real admin role/grant lands (ADR 0013 successor). _Avoid_: super-user, staff.
+A member of the TropTix team with cross-organizer visibility, used to debug and observe what any Organizer sees. A platform capability, distinct from Organizer — a Platform Owner is not "an Organizer with extra rights." Currently identified by an `@usetroptix.com` email suffix; this is a stopgap until a real platform role/grant lands (ADR 0013 successor). _Avoid_: super-user, staff, **admin** (unqualified "Admin" always means the Organization role, never platform staff).
 
 **Promoter**:
 A `Role` that exists in the enum but is currently unmodeled (no granted scopes yet). Deferred to the role×permission matrix (ADR 0013 successor).
+
+**Membership**:
+A grant tying a User to an **Organization** with a role (Owner, Admin, or Scanner). Org-level only — a member's role applies to every event the Organization owns; there are no per-event grants. The Organization is the home for teams (per the spotlight plan); the deleted per-event `DelegatedUsers` model is not coming back. _Avoid_: "delegated access", per-event grants, team roles on the `Role` enum (that enum is being retired, not extended).
+
+**Acting organization**:
+The one Organization a person's dashboard session is scoped to — what "my events" means for them right now. Everyone with a single Organization has it chosen for them and never sees the concept; only someone who owns one Organization and holds Memberships in others chooses. Every organizer read and write resolves through it. _Avoid_: assuming a person maps to exactly one Organization (they may own one and be a member of several), and confusing this with View-as (platform-only, read-only, and about watching someone else's scope rather than choosing your own).
+
+**Invite**:
+An Owner's offer of a Membership, naming an **email address** and a role. Email-bound: only someone signed in as that address can accept (passwordless sign-in is the verification), so forwarding the email transfers nothing. Pending invites are visible to the Owner, revocable, and expire. An Invite is not a Membership — nothing is granted until accept. _Avoid_: bearer/shareable invite links (that's the `Orders.accessToken` pattern, for viewing tickets — never for granting roles).
+
+**Owner** (Organization role):
+The Organization's one owner — `ownerUserId`, not a Membership row. Exactly one per Organization; cannot leave or be demoted; ownership transfer does not exist yet. Holds everything an Admin holds **plus the two owner-only areas: members and money** — managing Membership (invite, remove, change roles) and anything payout/Stripe/paid-ticketing-approval. _Avoid_: conflating with Platform Owner (unrelated concepts), an `OWNER` value in the Membership role (the scalar is the single source of truth).
+
+**Admin** (Organization role):
+A member with full Organizer Dashboard parity — events, ticket types, orders, refunds, attendees, check-in, and the Organization's brand profile — **except members and money** (owner-only). "Admins run the show; the Owner controls who's in the room and where money goes." Unqualified "Admin" always means this role. _Avoid_: using "admin" for platform staff (that's Platform Owner).
+
+**Scanner** (Organization role):
+A member who can only check attendees in at the door, across all the Organization's events. Sees the **check-in slice** and nothing else: the event list, then per-event attendee **name, ticket type, check-in status** and the scan/check-in action — including manual lookup by name. Never sees emails, phone numbers, order amounts, or revenue; the slice is a distinct trimmed read, not the Owner's view with columns hidden. **Deferred**: ships with the organizer mobile-app rebuild, not with Membership v1 (which is Owner + Admin only); the role exists in the vocabulary and is reserved in the model now. Until then door staff scan on someone else's login. _Avoid_: "ticket scanner" as a distinct concept (same thing), door staff, per-event scanner codes or PINs (weighed against the rest of the market and turned down — door access is a Membership role here, not a shareable credential).
 
 ### Money
 
@@ -68,8 +86,8 @@ A moment something happened — order placed, check-in, created/updated. Rendere
 **Organizer Dashboard**:
 The `/organizer` surface — an Organizer's own view of their events, tickets, orders, and attendees.
 
-**Admin View**:
-A separate, Platform-Owner-only surface for observing organizers across the platform (debugging / support). Distinct from the Organizer Dashboard; not something an Organizer can reach. Consists of a cheap global event **index** (event, owner, status — no heavy stats) whose rows deep-link into the Organizer Dashboard scoped to the row's owner via View-as.
+**Platform View**:
+A separate, Platform-Owner-only surface for observing organizers across the platform (debugging / support). Distinct from the Organizer Dashboard; not something an Organizer can reach. Consists of a cheap global event **index** (event, owner, status — no heavy stats) whose rows deep-link into the Organizer Dashboard scoped to the row's owner via View-as. _Avoid_: "Admin View" (renamed — "Admin" now names the Organization role; the `/admin` route group is an implementation detail, not vocabulary).
 
 **View-as** (act-as):
 A Platform Owner viewing the Organizer Dashboard scoped to a chosen Organizer — the same pages and data an Organizer sees, not a parallel admin dashboard. **Read-only**: the scope target is honored by read-services only (and only when the actor is a Platform Owner); write-services never accept it, so an admin can observe but not mutate on an Organizer's behalf. _Avoid_: impersonation (implies acting/writing as the user; View-as is see-only).\_
