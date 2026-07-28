@@ -23,11 +23,7 @@ export const eventTicketSchema = z.object({
   feesCents: z.number().int(),
   /** Quantity the buyer may add now — clamped to availability, max-per-user, sale window, draft. */
   maxAllowedToAdd: z.number().int(),
-  /**
-   * Why the tier is (un)buyable. Sold-out wins over the window, so a tier that
-   * sells out mid-sale reads "sold out", not "sales ended", after the window
-   * closes. Ignores draft — drafts zero out `maxAllowedToAdd` instead.
-   */
+  /** Sold-out wins over the window; ignores draft (that only zeroes `maxAllowedToAdd`). */
   saleStatus: z.enum(['onSale', 'notYetOnSale', 'saleEnded', 'soldOut']),
 });
 export type EventTicket = z.infer<typeof eventTicketSchema>;

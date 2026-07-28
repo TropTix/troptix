@@ -21,8 +21,6 @@ import { toEventSummary } from './_shared/eventSummary';
 import { getSaleState } from './_shared/saleState';
 import { NotFoundError } from './_shared/errors';
 
-// The public DTO's sale-window vocabulary, mapped from the canonical
-// `getSaleState` so the event page and organizer reads can't drift.
 const SALE_STATUS = {
   Scheduled: 'notYetOnSale',
   OnSale: 'onSale',

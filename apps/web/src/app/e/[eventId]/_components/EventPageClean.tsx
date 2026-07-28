@@ -139,12 +139,7 @@ export default function EventPageClean({
   eventEnded,
 }: {
   event: EventDetail;
-  /**
-   * The one hard-disabled CTA state: the event is over. Server-computed so SSR
-   * and hydration agree. Everything else (sold out, off-sale, draft preview)
-   * keeps the button live — the sheet's per-tier labels explain what's
-   * unavailable and why, and the server re-validates any actual reservation.
-   */
+  /** Server-computed so SSR and hydration agree. */
   eventEnded: boolean;
 }) {
   const router = useRouter();
