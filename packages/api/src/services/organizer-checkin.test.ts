@@ -43,7 +43,6 @@ function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
       findFirst: async ({ where }: any) =>
         tickets.find((t) => {
           if (t.id !== where.id) return false;
-          if (where.eventId && t.eventId !== where.eventId) return false;
           const event = events.find((e) => e.id === t.eventId);
           return (
             !!event &&
@@ -189,7 +188,6 @@ describe('toggleTicketCheckIn', () => {
     const prisma = makeFakePrisma(events, tickets);
     const updated = await toggleTicketCheckIn(prisma, owner, {
       ticketId: 't1',
-      eventId: 'e1',
     });
     expect(updated.status).toBe('NOT_AVAILABLE');
     expect(updated.checkinTimestamp).toBeInstanceOf(Date);

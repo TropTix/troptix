@@ -4,7 +4,6 @@ import { getUserFromIdTokenCookie } from '@/server/authUser';
 import type { ServerUser } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
-import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 import { TicketStatus, TicketTypes, Orders } from '@troptix/db';
 import {
   Card,
@@ -31,15 +30,14 @@ export interface FetchedTicketData {
   order: Pick<Orders, 'id'> | null;
 }
 
+// Ownership scoping in the query is the access check; the segment layout has
+// already 404'd foreign events before these run.
 async function fetchTickets(eventId: string, user: ServerUser) {
   try {
-    // Verify access first
-    await verifyEventAccess(user, eventId);
-
     const tickets = await prisma.tickets.findMany({
       where: {
         eventId: eventId,
-        event: getEventWhereClause(user, eventId),
+        event: { organizerUserId: user.uid },
         order: {
           status: 'COMPLETED',
         },
@@ -76,7 +74,7 @@ async function fetchTickets(eventId: string, user: ServerUser) {
 async function fetchEventName(eventId: string, user: ServerUser) {
   try {
     const event = await prisma.events.findUnique({
-      where: getEventWhereClause(user, eventId),
+      where: { id: eventId, organizerUserId: user.uid },
       select: {
         name: true,
       },

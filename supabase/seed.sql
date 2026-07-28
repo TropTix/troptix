@@ -26,6 +26,12 @@
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
 values ('seed_org_1', now(), now(), 'demo-organizer@troptix.test', 'Demo Organizer', 'Demo', 'Organizer', 'ORGANIZER');
 
+-- Platform Owner (explicit grant, ADR 0022) so a reviewer can exercise the
+-- Platform View / View-as surfaces on a fresh preview branch. Synthetic email;
+-- sign in with it via the branch's auth to link authUserId.
+insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", "isPlatformOwner")
+values ('seed_staff_1', now(), now(), 'demo-staff@troptix.test', 'Demo Staff', 'Demo', 'Staff', true);
+
 -- Demo organizer's Organization (brand). Approved for paid ticketing to match
 -- the paid festival below (seed_event_1); not verified.
 insert into public."Organization" (

@@ -47,10 +47,7 @@ describe('toggleTicketStatus', () => {
       userId: 'owner',
       role: 'PATRON',
     });
-    expect(mockToggle.mock.calls[0][2]).toEqual({
-      ticketId: 't1',
-      eventId: 'e1',
-    });
+    expect(mockToggle.mock.calls[0][2]).toEqual({ ticketId: 't1' });
     expect(revalidatePath).toHaveBeenCalledWith(
       '/organizer/events/e1/attendees'
     );

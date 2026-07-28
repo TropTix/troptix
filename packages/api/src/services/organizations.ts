@@ -45,31 +45,27 @@ export function findOrganizationForOwner(
 }
 
 /**
- * The user's Organization, creating it on first need. Idempotent: returns the
- * existing org if the user already owns one (v1 exposes exactly one). Called on
- * first event save so ownership can be dual-written (`organizerUserId` ==
- * `ownerUserId`).
- *
- * Pass `takenSlugs` when creating many orgs in a loop (the backfill) to avoid a
- * per-call full-table slug read; the new slug is added to it so later calls stay
- * unique. The DB `slug` unique constraint is the real concurrency backstop.
+ * The user's Organization, creating it on first need (with a slug generated
+ * from the display name). Idempotent: returns the existing org if the user
+ * already owns one. Called on event save so ownership can be dual-written
+ * (`organizerUserId` == `ownerUserId`); the profile save has its own
+ * create-or-update path (`updateOrganizationProfile`), which takes the user's
+ * chosen slug instead of generating one.
  */
 export async function ensureOrganizationForUser(
   prisma: PrismaClient,
-  { ownerUserId, displayName }: { ownerUserId: string; displayName: string },
-  takenSlugs?: Set<string>
+  { ownerUserId, displayName }: { ownerUserId: string; displayName: string }
 ): Promise<OrganizationRow> {
   const existing = await findOrganizationForOwner(prisma, ownerUserId);
   if (existing) return existing;
 
-  const taken = takenSlugs ?? (await loadTakenSlugs(prisma));
+  const taken = await loadTakenSlugs(prisma);
   // trim() so a padded name is cleaned and a whitespace-only one falls back
   // (a bare `|| FALLBACK_NAME` treats "   " as a valid display name).
   const name = displayName.trim() || FALLBACK_NAME;
   const slug = generateUniqueSlug(name, (s) => taken.has(s));
-  let org: OrganizationRow;
   try {
-    org = await prisma.organization.create({
+    return await prisma.organization.create({
       data: { ownerUserId, displayName: name, slug },
     });
   } catch (err) {
@@ -81,8 +77,6 @@ export async function ensureOrganizationForUser(
     }
     throw err;
   }
-  taken.add(slug);
-  return org;
 }
 
 export type UpdateOrganizationProfileInput = {
@@ -99,7 +93,7 @@ export type UpdateOrganizationProfileInput = {
 
 export type UpdateOrganizationProfileResult =
   | { ok: true; slug: string }
-  | { ok: false; reason: 'not_found' | 'slug_invalid' | 'slug_taken' };
+  | { ok: false; reason: 'slug_invalid' | 'slug_taken' };
 
 const blankToNull = (value: string | null): string | null => {
   const trimmed = value?.trim() ?? '';
@@ -107,50 +101,64 @@ const blankToNull = (value: string | null): string | null => {
 };
 
 /**
- * Update the caller's Organization brand (the Profile Info editor, F6). Slug is
- * only re-validated when it changes: format/reserved via `isValidSlug`, then a
- * uniqueness check excluding the org itself. Returns a discriminated result for
- * the expected slug failures (the caller maps them to form errors); the DB
- * `slug` unique index is the final backstop. `ownerUserId` scopes the write.
+ * Save the caller's Organization brand (the Profile Info editor, F6) —
+ * create-or-update in one call. Validation runs before any write, so a
+ * rejected slug never leaves a half-created Organization behind, and the
+ * created org carries the user's chosen slug rather than a generated one.
+ * Slug is only re-validated when it differs from the existing one:
+ * format/reserved via `isValidSlug`, then a uniqueness check excluding the org
+ * itself. The DB unique indexes are the final backstop: a slug race maps to
+ * `slug_taken`; losing the one-org-per-owner race on create retries as an
+ * update of the winner's row.
  */
 export async function updateOrganizationProfile(
   prisma: PrismaClient,
   input: UpdateOrganizationProfileInput
 ): Promise<UpdateOrganizationProfileResult> {
-  const org = await prisma.organization.findFirst({
-    where: { ownerUserId: input.ownerUserId },
-    orderBy: { createdAt: 'asc' },
-  });
-  if (!org) return { ok: false, reason: 'not_found' };
+  const org = await findOrganizationForOwner(prisma, input.ownerUserId);
 
   const nextSlug = input.slug.trim().toLowerCase();
-  if (nextSlug !== org.slug) {
+  if (nextSlug !== org?.slug) {
     if (!isValidSlug(nextSlug)) return { ok: false, reason: 'slug_invalid' };
     const taken = await prisma.organization.findUnique({
       where: { slug: nextSlug },
     });
-    if (taken && taken.id !== org.id)
+    if (taken && taken.id !== org?.id)
       return { ok: false, reason: 'slug_taken' };
   }
 
+  const data = {
+    displayName:
+      input.displayName.trim() || (org?.displayName ?? FALLBACK_NAME),
+    slug: nextSlug,
+    logoUrl: blankToNull(input.logoUrl),
+    bio: blankToNull(input.bio),
+    website: blankToNull(input.website),
+    instagram: blankToNull(input.instagram),
+    twitter: blankToNull(input.twitter),
+    linkedin: blankToNull(input.linkedin),
+  };
+
   try {
-    await prisma.organization.update({
-      where: { id: org.id },
-      data: {
-        displayName: input.displayName.trim() || org.displayName,
-        slug: nextSlug,
-        logoUrl: blankToNull(input.logoUrl),
-        bio: blankToNull(input.bio),
-        website: blankToNull(input.website),
-        instagram: blankToNull(input.instagram),
-        twitter: blankToNull(input.twitter),
-        linkedin: blankToNull(input.linkedin),
-      },
-    });
+    if (org) {
+      await prisma.organization.update({ where: { id: org.id }, data });
+    } else {
+      await prisma.organization.create({
+        data: { ownerUserId: input.ownerUserId, ...data },
+      });
+    }
   } catch (err) {
-    // Lost a race for the slug between the check above and this write — the DB
-    // unique index is the real arbiter; map it back to the discriminated result.
     if ((err as { code?: string }).code === 'P2002') {
+      // Two uniques can fire. Losing the one-org-per-owner race means a
+      // concurrent first save won — its row exists now, so retry as an update.
+      // Otherwise it's the slug race, and the index is the arbiter.
+      if (!org) {
+        const winner = await findOrganizationForOwner(
+          prisma,
+          input.ownerUserId
+        );
+        if (winner) return updateOrganizationProfile(prisma, input);
+      }
       return { ok: false, reason: 'slug_taken' };
     }
     throw err;

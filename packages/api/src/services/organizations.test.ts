@@ -250,6 +250,22 @@ describe('updateOrganizationProfile', () => {
           Object.assign(o, data);
           return o;
         },
+        create: async ({ data }: any) => {
+          if (
+            orgs.some(
+              (o) => o.ownerUserId === data.ownerUserId || o.slug === data.slug
+            )
+          ) {
+            throw { code: 'P2002' };
+          }
+          const row = {
+            id: `org-${orgs.length}`,
+            createdAt: orgs.length,
+            ...data,
+          };
+          orgs.push(row);
+          return row;
+        },
       },
     } as unknown as PrismaClient;
     return { prisma, orgs };
@@ -323,13 +339,36 @@ describe('updateOrganizationProfile', () => {
     expect(result).toEqual({ ok: false, reason: 'slug_invalid' });
   });
 
-  it('returns not_found when the user has no org', async () => {
-    const { prisma } = makeFake(seed());
+  it('creates the Organization on a first save, with the validated slug', async () => {
+    const { prisma, orgs } = makeFake(seed());
     const result = await updateOrganizationProfile(prisma, {
       ...base,
-      ownerUserId: 'nobody',
+      ownerUserId: 'newbie',
+      slug: 'fresh-crew',
+      displayName: 'Fresh Crew',
     });
-    expect(result).toEqual({ ok: false, reason: 'not_found' });
+    expect(result).toEqual({ ok: true, slug: 'fresh-crew' });
+    const created = orgs.find((o) => o.ownerUserId === 'newbie')!;
+    expect(created.slug).toBe('fresh-crew');
+    expect(created.displayName).toBe('Fresh Crew');
+  });
+
+  it('writes nothing when a first save fails slug validation (no phantom org)', async () => {
+    const { prisma, orgs } = makeFake(seed());
+    const before = orgs.length;
+    const invalid = await updateOrganizationProfile(prisma, {
+      ...base,
+      ownerUserId: 'newbie',
+      slug: 'ab',
+    });
+    const taken = await updateOrganizationProfile(prisma, {
+      ...base,
+      ownerUserId: 'newbie',
+      slug: 'sunset',
+    });
+    expect(invalid).toEqual({ ok: false, reason: 'slug_invalid' });
+    expect(taken).toEqual({ ok: false, reason: 'slug_taken' });
+    expect(orgs).toHaveLength(before);
   });
 
   it('maps a slug unique-constraint violation (race) to slug_taken', async () => {

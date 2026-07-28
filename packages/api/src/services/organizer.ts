@@ -126,13 +126,19 @@ export async function checkInTicket(
     throw new Error('ALREADY_CHECKED_IN');
   }
 
-  await prisma.tickets.update({
-    where: { id: ticketId },
+  // Atomic check-then-flip (same guard as the seam's scanTicket): only the
+  // request that finds the ticket still un-checked flips it, so two
+  // simultaneous scans of one ticket can't both succeed.
+  const result = await prisma.tickets.updateMany({
+    where: { id: ticketId, status: 'AVAILABLE', checkinTimestamp: null },
     data: {
       status: 'NOT_AVAILABLE',
       checkinTimestamp: new Date(),
     },
   });
+  if (result.count === 0) {
+    throw new Error('ALREADY_CHECKED_IN');
+  }
 
   return { success: true };
 }

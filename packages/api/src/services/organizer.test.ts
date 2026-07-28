@@ -11,7 +11,14 @@ function fakePrisma(opts: MockPrismaOptions): PrismaClient {
   return {
     tickets: {
       findUnique: async () => opts.ticket ?? null,
-      update: async (args: any) => ({ ...opts.ticket, ...args.data }),
+      updateMany: async ({ where }: any) => ({
+        count:
+          opts.ticket &&
+          opts.ticket.status === where.status &&
+          !opts.ticket.checkinTimestamp
+            ? 1
+            : 0,
+      }),
     },
   } as unknown as PrismaClient;
 }

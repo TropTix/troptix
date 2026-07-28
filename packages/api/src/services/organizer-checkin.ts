@@ -1,10 +1,11 @@
 /**
  * Check-in writes on the authorization seam (ADR 0013, teams Phase 0).
  *
- * Every path that flips a ticket's check-in state authorizes here: ownership
- * via `resolveOrganizerScope`, no View-as target (writes never take one,
- * ADR 0018), no platform-owner bypass. When Membership lands (ADR 0022) this
- * is the one place check-in learns about it.
+ * Ownership via `resolveOrganizerScope`, no View-as target (writes never take
+ * one, ADR 0018), no platform-owner bypass. One exception remains outside this
+ * file: the frozen legacy `checkInTicket` in organizer.ts (the mobile tRPC
+ * path, same guards, string errors) — it dies with the app rebuild, and until
+ * then Membership (ADR 0022) must land in both places.
  */
 import { TicketStatus, type PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -76,14 +77,13 @@ export async function scanTicket(
 export async function toggleTicketCheckIn(
   prisma: PrismaClient,
   actor: Actor,
-  input: { ticketId: string; eventId?: string }
+  input: { ticketId: string }
 ) {
   const organizerUserId = await resolveOrganizerScope(prisma, actor);
 
   const ticket = await prisma.tickets.findFirst({
     where: {
       id: input.ticketId,
-      ...(input.eventId ? { eventId: input.eventId } : {}),
       event: { organizerUserId, deletedAt: null },
     },
     select: { id: true, status: true },

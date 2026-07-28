@@ -5,7 +5,6 @@ import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import type { ServerUser } from '@/server/authUser';
 import { redirect } from 'next/navigation';
-import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 
 interface EditEventPageProps {
   params: Promise<{
@@ -13,13 +12,11 @@ interface EditEventPageProps {
   }>;
 }
 
+// Ownership scoping in the query is the access check — null means 404.
 async function getEvent(eventId: string, user: ServerUser) {
   try {
-    // Verify access first
-    await verifyEventAccess(user, eventId);
-
     const event = await prisma.events.findUnique({
-      where: getEventWhereClause(user, eventId),
+      where: { id: eventId, organizerUserId: user.uid },
       include: {
         ticketTypes: {
           select: {
@@ -52,7 +49,6 @@ export default async function EditEventPage(props: EditEventPageProps) {
   if (!user) {
     redirect('/auth/signin');
   }
-  await verifyEventAccess(user, eventId);
 
   const event = await getEvent(eventId, user);
 

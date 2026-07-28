@@ -6,12 +6,9 @@
 // `toggleTicketCheckIn` service (ownership-only, ADR 0013; no platform-owner
 // bypass on writes, ADR 0018).
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
-import {
-  toggleTicketCheckIn,
-  NotFoundError,
-  type Actor,
-} from '@troptix/api/server';
+import { toggleTicketCheckIn, NotFoundError } from '@troptix/api/server';
 import { checkInTicketSchema } from '@/lib/schemas/organizerApiSchemas';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
@@ -42,13 +39,8 @@ export async function PUT(request: NextRequest) {
   const { ticketId } = parsed.data;
 
   // 3. The service authorizes (ticket -> event ownership) and toggles.
-  const actor: Actor = {
-    kind: 'user',
-    userId: user.uid,
-    role: user.role ?? 'PATRON',
-  };
   try {
-    const updatedTicket = await toggleTicketCheckIn(prisma, actor, {
+    const updatedTicket = await toggleTicketCheckIn(prisma, userToActor(user), {
       ticketId,
     });
     return NextResponse.json(updatedTicket);

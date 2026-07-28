@@ -1,5 +1,4 @@
 import prisma from '@/server/prisma';
-import { isPlatformOwner } from '@/server/accessControl';
 import type { ServerUser } from '@/server/authUser';
 import { notFound } from 'next/navigation';
 
@@ -32,8 +31,9 @@ export type PlatformEventData = {
 export async function getAllPlatformEvents(
   user: ServerUser
 ): Promise<PlatformEventData[]> {
-  // Verify user has platform access (the explicit grant, ADR 0022)
-  if (!isPlatformOwner(user)) {
+  // The Platform View gate — one of the two doors the explicit grant opens
+  // (the other is View-as in the service seam, ADR 0018/0022).
+  if (!user.isPlatformOwner) {
     notFound();
   }
 

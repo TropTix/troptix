@@ -6,8 +6,9 @@
 // `scanTicket` service (ownership-only, ADR 0013; no platform-owner bypass on
 // writes, ADR 0018).
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
-import { scanTicket, NotFoundError, type Actor } from '@troptix/api/server';
+import { scanTicket, NotFoundError } from '@troptix/api/server';
 import { scanTicketSchema } from '@/lib/schemas/organizerApiSchemas';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
@@ -38,13 +39,11 @@ export async function PUT(request: NextRequest) {
   const { ticketId, eventId } = parsed.data;
 
   // 3. The service authorizes (event ownership) and performs the atomic flip.
-  const actor: Actor = {
-    kind: 'user',
-    userId: user.uid,
-    role: user.role ?? 'PATRON',
-  };
   try {
-    const result = await scanTicket(prisma, actor, { ticketId, eventId });
+    const result = await scanTicket(prisma, userToActor(user), {
+      ticketId,
+      eventId,
+    });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof NotFoundError) {

@@ -4,15 +4,14 @@ import prisma from '@/server/prisma';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
-import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 import type { ServerUser } from '@/server/authUser';
 
+// Ownership IS the access check (ADR 0013/0019): the scoped read returns null
+// for an event the caller doesn't own, and null is a 404. No separate guard,
+// no platform-owner bypass — staff observe via View-as on the seam pages.
 async function getEvent(eventId: string, user: ServerUser) {
-  // Verify access first
-  await verifyEventAccess(user, eventId);
-
   const event = await prisma.events.findUnique({
-    where: getEventWhereClause(user, eventId),
+    where: { id: eventId, organizerUserId: user.uid },
     select: { name: true, isDraft: true },
   });
   if (!event) {

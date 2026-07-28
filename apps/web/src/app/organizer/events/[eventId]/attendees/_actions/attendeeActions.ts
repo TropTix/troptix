@@ -3,11 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
-import {
-  toggleTicketCheckIn,
-  NotFoundError,
-  type Actor,
-} from '@troptix/api/server';
+import { userToActor } from '@/server/actor';
+import { toggleTicketCheckIn, NotFoundError } from '@troptix/api/server';
 
 // Thin adapter over the check-in seam (ADR 0013): the service owns
 // authorization (event ownership; no platform-owner bypass on writes) and the
@@ -19,14 +16,8 @@ export async function toggleTicketStatus(ticketId: string, eventId: string) {
       throw new Error('User not authenticated');
     }
 
-    const actor: Actor = {
-      kind: 'user',
-      userId: user.uid,
-      role: user.role ?? 'PATRON',
-    };
-    const updatedTicket = await toggleTicketCheckIn(prisma, actor, {
+    const updatedTicket = await toggleTicketCheckIn(prisma, userToActor(user), {
       ticketId,
-      eventId,
     });
 
     // Revalidate the attendees page to reflect the changes
