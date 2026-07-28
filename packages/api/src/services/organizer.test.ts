@@ -14,7 +14,7 @@ function fakePrisma(opts: MockPrismaOptions): PrismaClient {
       updateMany: async ({ where }: any) => ({
         count:
           opts.ticket &&
-          opts.ticket.status === where.status &&
+          where.status.in.includes(opts.ticket.status) &&
           !opts.ticket.checkinTimestamp
             ? 1
             : 0,
@@ -91,6 +91,18 @@ describe('checkInTicket', () => {
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
+        event: { organizerUserId: 'org-1' },
+      },
+    });
+    const res = await checkInTicket(prisma, mockActor, 't-1');
+    expect(res).toEqual({ success: true });
+  });
+
+  it('successfully checks in a VALID ticket (the status the checkout mints)', async () => {
+    const prisma = fakePrisma({
+      ticket: {
+        id: 't-1',
+        status: 'VALID',
         event: { organizerUserId: 'org-1' },
       },
     });

@@ -126,11 +126,16 @@ export async function checkInTicket(
     throw new Error('ALREADY_CHECKED_IN');
   }
 
-  // Atomic check-then-flip (same guard as the seam's scanTicket): only the
-  // request that finds the ticket still un-checked flips it, so two
-  // simultaneous scans of one ticket can't both succeed.
+  // Atomic check-then-flip: only the request that finds the ticket still
+  // un-checked flips it, so two simultaneous scans of one ticket can't both
+  // succeed. Un-checked means legacy AVAILABLE or the canonical VALID the
+  // reservation checkout mints (the lifecycle enums are mid-cutover).
   const result = await prisma.tickets.updateMany({
-    where: { id: ticketId, status: 'AVAILABLE', checkinTimestamp: null },
+    where: {
+      id: ticketId,
+      status: { in: ['AVAILABLE', 'VALID'] },
+      checkinTimestamp: null,
+    },
     data: {
       status: 'NOT_AVAILABLE',
       checkinTimestamp: new Date(),

@@ -15,7 +15,7 @@ function fakePrisma(opts: MockPrismaOptions): PrismaClient {
       updateMany: async ({ where }: any) => ({
         count:
           opts.ticket &&
-          opts.ticket.status === where.status &&
+          where.status.in.includes(opts.ticket.status) &&
           !opts.ticket.checkinTimestamp
             ? 1
             : 0,
