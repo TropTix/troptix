@@ -18,8 +18,23 @@ import {
 } from './payments';
 
 const TEST_EVENT_ID = `test-pay-${generateId()}`;
+// Events.organizationId is NOT NULL (ADR 0022) — the fixture needs the full
+// owner chain: Users -> Organization -> Events.
+const TEST_OWNER_ID = `test-pay-owner-${generateId()}`;
+const TEST_ORG_ID = `test-pay-org-${generateId()}`;
 
 beforeAll(async () => {
+  await prisma.users.create({
+    data: { id: TEST_OWNER_ID, email: `${TEST_OWNER_ID}@troptix.test` },
+  });
+  await prisma.organization.create({
+    data: {
+      id: TEST_ORG_ID,
+      slug: TEST_ORG_ID,
+      displayName: 'Test Org',
+      ownerUserId: TEST_OWNER_ID,
+    },
+  });
   await prisma.events.create({
     data: {
       id: TEST_EVENT_ID,
@@ -27,7 +42,8 @@ beforeAll(async () => {
       name: 'Payments Test Event',
       description: 'Fixture for payments.test.ts',
       organizer: 'Test Org',
-      organizerUserId: 'test-organizer',
+      organizerUserId: TEST_OWNER_ID,
+      organizationId: TEST_ORG_ID,
       startsAt: new Date(),
       endsAt: new Date(Date.now() + 86_400_000),
       address: '123 Test St',
@@ -41,6 +57,8 @@ afterAll(async () => {
   await prisma.reservation.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.ticketTypes.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.events.delete({ where: { id: TEST_EVENT_ID } });
+  await prisma.organization.delete({ where: { id: TEST_ORG_ID } });
+  await prisma.users.delete({ where: { id: TEST_OWNER_ID } });
   await prisma.$disconnect();
 });
 

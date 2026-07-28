@@ -1,10 +1,10 @@
 /**
- * Organization provisioning: lazy-create on first event, and the one-time
- * backfill that gives every existing organizer a brand.
+ * Organization provisioning: lazy-create on first explicit write (event save or
+ * profile save — never on a page view).
  *
- * Prisma is injected (unit-testable, ADR 0013 — no authorization here). v1 is
- * "model for multi, expose one": each user owns exactly one Organization, keyed
- * by `ownerUserId` (== `Events.organizerUserId`). See
+ * Prisma is injected (unit-testable, ADR 0013 — no authorization here). Each
+ * user owns exactly one Organization, keyed by `ownerUserId`
+ * (== `Events.organizerUserId`) and enforced by a unique index (ADR 0022). See
  * docs/plans/2026-06-event-spotlight-and-organizer-brand.md (2, 2b).
  */
 import type { PrismaClient } from '@troptix/db';
@@ -67,59 +67,22 @@ export async function ensureOrganizationForUser(
   // (a bare `|| FALLBACK_NAME` treats "   " as a valid display name).
   const name = displayName.trim() || FALLBACK_NAME;
   const slug = generateUniqueSlug(name, (s) => taken.has(s));
-  const org = await prisma.organization.create({
-    data: { ownerUserId, displayName: name, slug },
-  });
+  let org: OrganizationRow;
+  try {
+    org = await prisma.organization.create({
+      data: { ownerUserId, displayName: name, slug },
+    });
+  } catch (err) {
+    // ownerUserId is unique (one org per owner): a concurrent ensure lost the
+    // race — the winner's row is the org. Slug collisions rethrow.
+    if ((err as { code?: string }).code === 'P2002') {
+      const winner = await findOrganizationForOwner(prisma, ownerUserId);
+      if (winner) return winner;
+    }
+    throw err;
+  }
   taken.add(slug);
   return org;
-}
-
-/**
- * One-time backfill: give every organizer of an existing event an Organization
- * and point their events at it. Idempotent — only touches events with a null
- * `organizationId` and reuses an org the user already owns. The display name is
- * taken from the user's most-recent event's `organizer` string.
- */
-export async function backfillOrganizations(
-  prisma: PrismaClient
-): Promise<{ organizationsEnsured: number; eventsLinked: number }> {
-  const events = await prisma.events.findMany({
-    where: { organizationId: null },
-    select: { organizerUserId: true, organizer: true },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  // Most-recent-first, so the first string seen per user is their newest.
-  const nameByUser = new Map<string, string>();
-  for (const e of events) {
-    if (!nameByUser.has(e.organizerUserId)) {
-      nameByUser.set(e.organizerUserId, e.organizer);
-    }
-  }
-
-  // One slug read for the whole backfill; ensureOrganizationForUser adds each
-  // created slug to the set, keeping later iterations unique without re-reading.
-  const takenSlugs = await loadTakenSlugs(prisma);
-
-  let organizationsEnsured = 0;
-  let eventsLinked = 0;
-  // Array.from(...) so the for-of is over an array (apps/web compiles at es5,
-  // where iterating a Map directly needs --downlevelIteration).
-  for (const [ownerUserId, displayName] of Array.from(nameByUser.entries())) {
-    const org = await ensureOrganizationForUser(
-      prisma,
-      { ownerUserId, displayName },
-      takenSlugs
-    );
-    const { count } = await prisma.events.updateMany({
-      where: { organizerUserId: ownerUserId, organizationId: null },
-      data: { organizationId: org.id },
-    });
-    organizationsEnsured += 1;
-    eventsLinked += count;
-  }
-
-  return { organizationsEnsured, eventsLinked };
 }
 
 export type UpdateOrganizationProfileInput = {

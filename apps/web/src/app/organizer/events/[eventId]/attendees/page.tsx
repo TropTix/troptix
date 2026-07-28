@@ -1,6 +1,7 @@
 import React from 'react';
 import prisma from '@/server/prisma';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import type { ServerUser } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
@@ -30,19 +31,15 @@ export interface FetchedTicketData {
   order: Pick<Orders, 'id'> | null;
 }
 
-async function fetchTickets(
-  eventId: string,
-  userId: string,
-  userEmail?: string
-) {
+async function fetchTickets(eventId: string, user: ServerUser) {
   try {
     // Verify access first
-    await verifyEventAccess(userId, userEmail, eventId);
+    await verifyEventAccess(user, eventId);
 
     const tickets = await prisma.tickets.findMany({
       where: {
         eventId: eventId,
-        event: getEventWhereClause(userId, userEmail, eventId),
+        event: getEventWhereClause(user, eventId),
         order: {
           status: 'COMPLETED',
         },
@@ -76,14 +73,10 @@ async function fetchTickets(
   }
 }
 
-async function fetchEventName(
-  eventId: string,
-  userId: string,
-  userEmail?: string
-) {
+async function fetchEventName(eventId: string, user: ServerUser) {
   try {
     const event = await prisma.events.findUnique({
-      where: getEventWhereClause(userId, userEmail, eventId),
+      where: getEventWhereClause(user, eventId),
       select: {
         name: true,
       },
@@ -115,8 +108,8 @@ export default async function EventAttendeesPage(
 
   // Fetch the initial list of attendees (tickets) and event info
   const [initialAttendees, eventName] = await Promise.all([
-    fetchTickets(eventId, user.uid, user.email),
-    fetchEventName(eventId, user.uid, user.email),
+    fetchTickets(eventId, user),
+    fetchEventName(eventId, user),
   ]);
 
   // Calculate statistics

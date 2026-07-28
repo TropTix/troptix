@@ -3,9 +3,11 @@
  */
 // next/server (NextRequest/NextResponse) requires the Node runtime's web APIs,
 // not jsdom.
-jest.mock('@troptix/db', () => ({
-  TicketStatus: { AVAILABLE: 'AVAILABLE', NOT_AVAILABLE: 'NOT_AVAILABLE' },
-}));
+//
+// The routes are thin adapters over the check-in seam — these tests cover the
+// adapter contract (auth, validation, error mapping, response pass-through);
+// the authorization and flip behavior lives in
+// packages/api/src/services/organizer-checkin.test.ts.
 jest.mock('next/headers', () => ({
   headers: jest.fn(async () => ({
     get: (k: string) => (k === 'authorization' ? 'Bearer tok' : null),
@@ -14,133 +16,126 @@ jest.mock('next/headers', () => ({
 jest.mock('@/server/authUser', () => ({
   getUserFromIdTokenCookie: jest.fn(),
 }));
-jest.mock('@/server/accessControl', () => ({
-  canAccessEvent: jest.fn(),
-  isPlatformOwner: jest.fn(),
-}));
-jest.mock('@/server/prisma', () => ({
-  __esModule: true,
-  default: {
-    tickets: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
-    },
-  },
-}));
+jest.mock('@/server/prisma', () => ({ __esModule: true, default: {} }));
+jest.mock('@troptix/api/server', () => {
+  class NotFoundError extends Error {}
+  return {
+    scanTicket: jest.fn(),
+    toggleTicketCheckIn: jest.fn(),
+    NotFoundError,
+  };
+});
 
-import prisma from '@/server/prisma';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { canAccessEvent, isPlatformOwner } from '@/server/accessControl';
+import {
+  scanTicket,
+  toggleTicketCheckIn,
+  NotFoundError as FakeNotFoundError,
+} from '@troptix/api/server';
 import { PUT as scanPUT } from '../tickets/scan/route';
 import { PUT as checkInPUT } from '../tickets/check-in/route';
 
-const db = prisma as unknown as {
-  tickets: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
-};
 const mockGetUser = getUserFromIdTokenCookie as jest.Mock;
-const mockCanAccess = canAccessEvent as jest.Mock;
-const mockIsPlatformOwner = isPlatformOwner as jest.Mock;
+const mockScan = scanTicket as unknown as jest.Mock;
+const mockToggle = toggleTicketCheckIn as unknown as jest.Mock;
 
 const req = (body: unknown) => ({ json: async () => body }) as any;
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(console, 'error').mockImplementation(() => {});
-  mockGetUser.mockResolvedValue({ uid: 'owner', email: 'o@usetroptix.com' });
+  mockGetUser.mockResolvedValue({
+    uid: 'owner',
+    email: 'o@example.com',
+    role: 'PATRON',
+    isPlatformOwner: false,
+  });
 });
 
-describe('scan route authorization + atomicity', () => {
-  it('returns 404 and never touches the ticket for a non-owner', async () => {
-    mockCanAccess.mockResolvedValue(false);
+describe('scan route', () => {
+  it('maps the service NotFound (foreign event) to 404', async () => {
+    mockScan.mockRejectedValue(new FakeNotFoundError('Event not found'));
 
     const res = await scanPUT(req({ ticketId: 't1', eventId: 'e1' }));
 
     expect(res.status).toBe(404);
-    expect(db.tickets.updateMany).not.toHaveBeenCalled();
-    expect(db.tickets.findUnique).not.toHaveBeenCalled();
   });
 
-  it('succeeds once then reports already-scanned on the second scan', async () => {
-    mockCanAccess.mockResolvedValue(true);
-    db.tickets.findUnique.mockResolvedValue({
-      ticketType: { name: 'GA', description: 'desc' },
-    });
-    db.tickets.updateMany
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 0 });
-
-    const first = await (
-      await scanPUT(req({ ticketId: 't1', eventId: 'e1' }))
-    ).json();
-    const second = await (
-      await scanPUT(req({ ticketId: 't1', eventId: 'e1' }))
-    ).json();
-
-    expect(first).toEqual({
+  it('passes the scan result through and acts as the caller', async () => {
+    mockScan.mockResolvedValue({
       ticketName: 'GA',
       ticketDescription: 'desc',
       scanSucceeded: true,
     });
-    expect(second.scanSucceeded).toBe(false);
-    // Records the check-in time on the flip (roadmap 2.11).
-    expect(
-      db.tickets.updateMany.mock.calls[0][0].data.checkinTimestamp
-    ).toBeInstanceOf(Date);
+
+    const res = await scanPUT(req({ ticketId: 't1', eventId: 'e1' }));
+    const body = await res.json();
+
+    expect(body).toEqual({
+      ticketName: 'GA',
+      ticketDescription: 'desc',
+      scanSucceeded: true,
+    });
+    // The actor is the caller themself — no impersonation, no bypass.
+    expect(mockScan.mock.calls[0][1]).toEqual({
+      kind: 'user',
+      userId: 'owner',
+      role: 'PATRON',
+    });
+    expect(mockScan.mock.calls[0][2]).toEqual({
+      ticketId: 't1',
+      eventId: 'e1',
+    });
   });
 
-  it('handles a ticket with no ticket type without throwing', async () => {
-    mockCanAccess.mockResolvedValue(true);
-    db.tickets.findUnique.mockResolvedValue({ ticketType: null });
-    db.tickets.updateMany.mockResolvedValue({ count: 1 });
-
-    const body = await (
-      await scanPUT(req({ ticketId: 't1', eventId: 'e1' }))
-    ).json();
-
-    expect(body.ticketName).toBe('Complementary');
-    expect(body.scanSucceeded).toBe(true);
-  });
-
-  it('rejects a malformed body with 400', async () => {
-    mockCanAccess.mockResolvedValue(true);
-
+  it('rejects a malformed body with 400 before touching the service', async () => {
     const res = await scanPUT(req({ ticketId: 't1' })); // missing eventId
 
     expect(res.status).toBe(400);
-    expect(mockCanAccess).not.toHaveBeenCalled();
+    expect(mockScan).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing token with 401', async () => {
+    const { headers } = jest.requireMock('next/headers');
+    headers.mockResolvedValueOnce({ get: () => null });
+
+    const res = await scanPUT(req({ ticketId: 't1', eventId: 'e1' }));
+
+    expect(res.status).toBe(401);
+    expect(mockScan).not.toHaveBeenCalled();
   });
 });
 
-describe('check-in route platform-owner policy', () => {
-  it('allows a platform owner on an event they do not own', async () => {
-    mockIsPlatformOwner.mockReturnValue(true);
-    db.tickets.findUnique.mockResolvedValue({
-      status: 'AVAILABLE',
-      event: { organizerUserId: 'someone-else' },
-    });
-    db.tickets.update.mockResolvedValue({ id: 't1', status: 'NOT_AVAILABLE' });
+describe('check-in route', () => {
+  it('maps the service NotFound (foreign or missing ticket) to 404', async () => {
+    mockToggle.mockRejectedValue(new FakeNotFoundError('Ticket not found'));
 
     const res = await checkInPUT(req({ ticketId: 't1' }));
 
-    expect(res.status).toBe(200);
-    expect(db.tickets.update).toHaveBeenCalledTimes(1);
-    // Checking in (AVAILABLE -> NOT_AVAILABLE) stamps the time.
-    expect(
-      db.tickets.update.mock.calls[0][0].data.checkinTimestamp
-    ).toBeInstanceOf(Date);
+    expect(res.status).toBe(404);
   });
 
-  it('rejects a non-owner who is not a platform owner with 403', async () => {
-    mockIsPlatformOwner.mockReturnValue(false);
-    db.tickets.findUnique.mockResolvedValue({
-      status: 'AVAILABLE',
-      event: { organizerUserId: 'someone-else' },
-    });
+  it('returns the updated ticket from the service', async () => {
+    const updated = {
+      id: 't1',
+      status: 'NOT_AVAILABLE',
+      checkinTimestamp: new Date().toISOString(),
+    };
+    mockToggle.mockResolvedValue(updated);
 
     const res = await checkInPUT(req({ ticketId: 't1' }));
+    const body = await res.json();
 
-    expect(res.status).toBe(403);
-    expect(db.tickets.update).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(body.id).toBe('t1');
+    expect(body.status).toBe('NOT_AVAILABLE');
+    expect(mockToggle.mock.calls[0][2]).toEqual({ ticketId: 't1' });
+  });
+
+  it('rejects a malformed body with 400', async () => {
+    const res = await checkInPUT(req({}));
+
+    expect(res.status).toBe(400);
+    expect(mockToggle).not.toHaveBeenCalled();
   });
 });

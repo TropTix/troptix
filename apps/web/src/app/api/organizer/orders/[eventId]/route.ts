@@ -41,11 +41,7 @@ export async function GET(
     );
   }
 
-  const hasAccess = await canAccessEvent(
-    organizerId.uid,
-    organizerId.email,
-    eventId
-  );
+  const hasAccess = await canAccessEvent(organizerId, eventId);
   if (!hasAccess) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }

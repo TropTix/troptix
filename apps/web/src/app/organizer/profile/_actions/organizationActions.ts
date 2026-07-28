@@ -3,7 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import prisma from '@/server/prisma';
-import { updateOrganizationProfile } from '@troptix/api/server';
+import {
+  ensureOrganizationForUser,
+  updateOrganizationProfile,
+} from '@troptix/api/server';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import {
   organizationProfileSchema,
@@ -34,6 +37,12 @@ export async function saveOrganizationProfile(
   }
 
   const d = parsed.data;
+  // First save creates the Organization (the page no longer provisions on GET);
+  // every later save finds the existing one — ensure is idempotent.
+  await ensureOrganizationForUser(prisma, {
+    ownerUserId: user.uid,
+    displayName: d.displayName,
+  });
   const result = await updateOrganizationProfile(prisma, {
     ownerUserId: user.uid,
     displayName: d.displayName,

@@ -15,7 +15,7 @@ const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 
 function fakePrisma(
   opts: {
-    email?: string;
+    platformOwner?: boolean;
     event?: unknown; // undefined → owned; null → not found
     orders?: unknown[];
     order?: unknown; // for getOrderDetail; null → not found
@@ -31,11 +31,7 @@ function fakePrisma(
     users: {
       findUnique: vi
         .fn()
-        .mockResolvedValue(
-          opts.email === undefined
-            ? { email: 'o@b.com' }
-            : { email: opts.email }
-        ),
+        .mockResolvedValue({ isPlatformOwner: opts.platformOwner ?? false }),
     },
     events: { findFirst: eventsFindFirst },
     orders: { findMany: ordersFindMany, findFirst: ordersFindFirst },
@@ -73,7 +69,7 @@ describe('listEventOrders', () => {
 
   it('honors View-as for a platform owner', async () => {
     const { prisma, ordersFindMany } = fakePrisma({
-      email: 'staff@usetroptix.com',
+      platformOwner: true,
     });
     await listEventOrders(prisma, ADMIN, 'e1', {
       viewAsOrganizerUserId: 'target',

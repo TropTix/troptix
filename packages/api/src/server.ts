@@ -50,8 +50,12 @@ export {
   updateTicketType,
 } from './services/organizer-ticket-type-write';
 export {
+  scanTicket,
+  toggleTicketCheckIn,
+  type ScanTicketResult,
+} from './services/organizer-checkin';
+export {
   ensureOrganizationForUser,
-  backfillOrganizations,
   findOrganizationForOwner,
   getOrganizationBySlug,
   updateOrganizationProfile,

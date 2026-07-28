@@ -3,6 +3,7 @@ import prisma from '@/server/prisma';
 import EventForm from '../../_components/EventForm';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import type { ServerUser } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 
@@ -12,13 +13,13 @@ interface EditEventPageProps {
   }>;
 }
 
-async function getEvent(eventId: string, userId: string, userEmail?: string) {
+async function getEvent(eventId: string, user: ServerUser) {
   try {
     // Verify access first
-    await verifyEventAccess(userId, userEmail, eventId);
+    await verifyEventAccess(user, eventId);
 
     const event = await prisma.events.findUnique({
-      where: getEventWhereClause(userId, userEmail, eventId),
+      where: getEventWhereClause(user, eventId),
       include: {
         ticketTypes: {
           select: {
@@ -51,11 +52,9 @@ export default async function EditEventPage(props: EditEventPageProps) {
   if (!user) {
     redirect('/auth/signin');
   }
-  const userId = user.uid;
-  const userEmail = user.email;
-  await verifyEventAccess(userId, userEmail, eventId);
+  await verifyEventAccess(user, eventId);
 
-  const event = await getEvent(eventId, userId, userEmail);
+  const event = await getEvent(eventId, user);
 
   if (!event) {
     notFound();
@@ -79,7 +78,7 @@ export default async function EditEventPage(props: EditEventPageProps) {
   // Host brand for the read-only "Hosted by" line on the form. Paid ticketing
   // is the Organization's approval — the same flag the write service enforces.
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: userId },
+    where: { ownerUserId: user.uid },
     select: { displayName: true, paidTicketingEnabled: true },
   });
   const paidEventsEnabled = org?.paidTicketingEnabled ?? false;

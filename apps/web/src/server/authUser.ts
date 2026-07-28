@@ -11,6 +11,8 @@ export interface ServerUser {
   uid: string;
   email?: string;
   role?: Role;
+  /** The explicit Platform Owner grant (`Users.isPlatformOwner`, ADR 0022). */
+  isPlatformOwner: boolean;
 }
 
 /**
@@ -43,14 +45,19 @@ async function resolveByAuthUserId(
 ): Promise<ServerUser | null> {
   const appUser = await prisma.users.findUnique({
     where: { authUserId },
-    select: { id: true, email: true, role: true },
+    select: { id: true, email: true, role: true, isPlatformOwner: true },
   });
   if (!appUser) {
     // Authenticated with Supabase but no linked Users row (e.g. an email the
     // provisioning trigger couldn't match). Treat as unauthenticated.
     return null;
   }
-  return { uid: appUser.id, email: appUser.email, role: appUser.role };
+  return {
+    uid: appUser.id,
+    email: appUser.email,
+    role: appUser.role,
+    isPlatformOwner: appUser.isPlatformOwner ?? false,
+  };
 }
 
 /** The current user from the session cookie → stable `Users` row. */
@@ -89,6 +96,7 @@ export async function getCurrentUserProfile() {
       lastName: true,
       role: true,
       stripeId: true,
+      isPlatformOwner: true,
     },
   });
 }

@@ -5,13 +5,14 @@ import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
+import type { ServerUser } from '@/server/authUser';
 
-async function getEvent(eventId: string, userId: string, userEmail?: string) {
+async function getEvent(eventId: string, user: ServerUser) {
   // Verify access first
-  await verifyEventAccess(userId, userEmail, eventId);
-  
+  await verifyEventAccess(user, eventId);
+
   const event = await prisma.events.findUnique({
-    where: getEventWhereClause(userId, userEmail, eventId),
+    where: getEventWhereClause(user, eventId),
     select: { name: true, isDraft: true },
   });
   if (!event) {
@@ -20,17 +21,13 @@ async function getEvent(eventId: string, userId: string, userEmail?: string) {
   return event;
 }
 
-export default async function EventManagementLayout(
-  props: {
-    children: React.ReactNode;
-    params: Promise<{ eventId: string }>;
-  }
-) {
+export default async function EventManagementLayout(props: {
+  children: React.ReactNode;
+  params: Promise<{ eventId: string }>;
+}) {
   const params = await props.params;
 
-  const {
-    children
-  } = props;
+  const { children } = props;
 
   // Get user and verify authentication
   const user = await getUserFromIdTokenCookie();
@@ -38,11 +35,15 @@ export default async function EventManagementLayout(
     redirect('/auth/signin');
   }
 
-  const event = await getEvent(params.eventId, user.uid, user.email);
+  const event = await getEvent(params.eventId, user);
 
   return (
     <div>
-      <EventManagementNav eventId={params.eventId} eventName={event.name} isDraft={event.isDraft} />
+      <EventManagementNav
+        eventId={params.eventId}
+        eventName={event.name}
+        isDraft={event.isDraft}
+      />
       <div className="mt-4 mx-auto">{children}</div>
     </div>
   );

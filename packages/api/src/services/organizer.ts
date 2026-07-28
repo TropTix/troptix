@@ -1,42 +1,31 @@
 /**
  * LEGACY — the mobile-oriented reads for `apps/organizer-v2` only. Frozen: do
- * not extend, and do not copy `authorizeOrganizer` into new code.
+ * not extend.
  *
  * The web organizer surface uses `organizer-scope.ts` +
- * `organizer-dashboard.ts` instead. This file still carries the
- * `isPlatformOwner ? {} : { organizerUserId }` cross-organizer bypass that
- * ADR 0018 removes, and throws string errors the tRPC router matches on rather
- * than the typed errors in `_shared/errors.ts`. Both are retired when v2 moves
- * onto the new seam (see docs/plans/2026-07-organizer-dashboard-migration.md).
+ * `organizer-dashboard.ts` instead. Access here is ownership-only — the old
+ * `isPlatformOwner ? {} : { organizerUserId }` cross-organizer bypass was
+ * removed per ADR 0018 (writes never carry platform-owner power, and admin
+ * reads go through View-as on the web seam). Still throws string errors the
+ * tRPC router matches on rather than the typed errors in `_shared/errors.ts`;
+ * retired when v2 moves onto the new seam (see
+ * docs/plans/2026-07-organizer-dashboard-migration.md).
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 
-/**
- * Ensures the actor has organizer privileges.
- * Returns whether the actor is a platform owner (@usetroptix.com email)
- * and their userId.
- */
-async function authorizeOrganizer(prisma: PrismaClient, actor: Actor) {
+function requireUserId(actor: Actor): string {
   if (actor.kind !== 'user') {
     throw new Error('UNAUTHORIZED');
   }
-
-  const user = await prisma.users.findUnique({
-    where: { id: actor.userId },
-    select: { email: true },
-  });
-
-  const isPlatformOwner = user?.email?.endsWith('@usetroptix.com') ?? false;
-
-  return { userId: actor.userId, isPlatformOwner };
+  return actor.userId;
 }
 
 export async function getEvents(prisma: PrismaClient, actor: Actor) {
-  const { userId, isPlatformOwner } = await authorizeOrganizer(prisma, actor);
+  const userId = requireUserId(actor);
 
   const events = await prisma.events.findMany({
-    where: isPlatformOwner ? {} : { organizerUserId: userId },
+    where: { organizerUserId: userId },
     select: {
       id: true,
       name: true,
@@ -75,7 +64,7 @@ export async function getEvent(
   actor: Actor,
   eventId: string
 ) {
-  const { userId, isPlatformOwner } = await authorizeOrganizer(prisma, actor);
+  const userId = requireUserId(actor);
 
   const event = await prisma.events.findUnique({
     where: { id: eventId },
@@ -91,8 +80,7 @@ export async function getEvent(
     throw new Error('NOT_FOUND');
   }
 
-  // Authorization: if not platform owner, ensure they own the event
-  if (!isPlatformOwner && event.organizerUserId !== userId) {
+  if (event.organizerUserId !== userId) {
     throw new Error('UNAUTHORIZED');
   }
 
@@ -119,7 +107,7 @@ export async function checkInTicket(
   actor: Actor,
   ticketId: string
 ) {
-  const { userId, isPlatformOwner } = await authorizeOrganizer(prisma, actor);
+  const userId = requireUserId(actor);
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: ticketId },
@@ -130,7 +118,7 @@ export async function checkInTicket(
     throw new Error('NOT_FOUND');
   }
 
-  if (!isPlatformOwner && ticket.event.organizerUserId !== userId) {
+  if (ticket.event.organizerUserId !== userId) {
     throw new Error('UNAUTHORIZED');
   }
 

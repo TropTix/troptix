@@ -5,8 +5,8 @@ import { TRPCError } from '@trpc/server';
 
 export const organizerRouter = router({
   /**
-   * All events the signed-in organizer owns. Platform owners
-   * (@usetroptix.com) receive every event regardless of organizerUserId.
+   * All events the signed-in organizer owns. Ownership-only — the old
+   * platform-owner bypass was removed (ADR 0018).
    */
   events: protectedProcedure.query(async ({ ctx }) => {
     try {

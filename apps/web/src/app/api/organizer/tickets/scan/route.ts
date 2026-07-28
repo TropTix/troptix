@@ -1,11 +1,14 @@
 // DEPRECATED: legacy REST route for the old `apps/organizer` app; slated for
 // deletion with that app once v2's check-in is wired to a tRPC mutation.
 // See docs/plans/2026-07-organizer-dashboard-migration.md. Don't build on this.
+//
+// Thin adapter only — authorization and the atomic flip live in the
+// `scanTicket` service (ownership-only, ADR 0013; no platform-owner bypass on
+// writes, ADR 0018).
 import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { canAccessEvent } from '@/server/accessControl';
 import prisma from '@/server/prisma';
+import { scanTicket, NotFoundError, type Actor } from '@troptix/api/server';
 import { scanTicketSchema } from '@/lib/schemas/organizerApiSchemas';
-import { TicketStatus } from '@troptix/db';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -19,8 +22,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const organizerId = await getUserFromIdTokenCookie(token);
-  if (!organizerId) {
+  const user = await getUserFromIdTokenCookie(token);
+  if (!user) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 403 });
   }
 
@@ -34,57 +37,23 @@ export async function PUT(request: NextRequest) {
   }
   const { ticketId, eventId } = parsed.data;
 
-  // 3. Authorize: the caller must own the event (or be a platform owner).
-  const hasAccess = await canAccessEvent(
-    organizerId.uid,
-    organizerId.email,
-    eventId
-  );
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-  }
-
+  // 3. The service authorizes (event ownership) and performs the atomic flip.
+  const actor: Actor = {
+    kind: 'user',
+    userId: user.uid,
+    role: user.role ?? 'PATRON',
+  };
   try {
-    const scannedTicket = await updateScannedTicketStatus(ticketId, eventId);
-    return NextResponse.json(scannedTicket);
+    const result = await scanTicket(prisma, actor, { ticketId, eventId });
+    return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof NotFoundError) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
     console.error('Error scanning ticket:', error);
     return NextResponse.json(
       { error: 'An internal server error occurred' },
       { status: 500 }
     );
   }
-}
-
-async function updateScannedTicketStatus(ticketId: string, eventId: string) {
-  const failed = {
-    ticketName: undefined as string | undefined,
-    ticketDescription: undefined as string | undefined,
-    scanSucceeded: false,
-  };
-
-  const ticket = await prisma.tickets.findUnique({
-    where: { id: ticketId, eventId },
-    include: { ticketType: true },
-  });
-
-  if (!ticket) {
-    return failed;
-  }
-
-  const ticketName = ticket.ticketType?.name ?? 'Complementary';
-  const ticketDescription = ticket.ticketType?.description ?? '';
-
-  // Atomic check-then-flip: only the request that finds the ticket still
-  // AVAILABLE flips it, so two simultaneous scans can't both succeed.
-  const result = await prisma.tickets.updateMany({
-    where: { id: ticketId, eventId, status: TicketStatus.AVAILABLE },
-    data: { status: TicketStatus.NOT_AVAILABLE, checkinTimestamp: new Date() },
-  });
-
-  return {
-    ticketName,
-    ticketDescription,
-    scanSucceeded: result.count === 1,
-  };
 }

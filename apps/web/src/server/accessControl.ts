@@ -1,31 +1,31 @@
 import prisma from './prisma';
 import { notFound } from 'next/navigation';
+import type { ServerUser } from './authUser';
 
 /**
- * Check if an email belongs to a platform owner
+ * Legacy access helpers for the pages/routes not yet on the @troptix/api seam
+ * (see docs/plans/2026-07-organizer-dashboard-migration.md). Platform Owner is
+ * the explicit `Users.isPlatformOwner` grant carried on `ServerUser` (ADR
+ * 0022) — never inferred from an email. Platform-owner power here is
+ * read-side only; every write path authorizes through the service layer.
  */
-export function isPlatformOwner(email: string | undefined): boolean {
-  if (!email) return false;
-  return email.endsWith('@usetroptix.com');
+export function isPlatformOwner(
+  user: Pick<ServerUser, 'isPlatformOwner'> | null | undefined
+): boolean {
+  return user?.isPlatformOwner ?? false;
 }
 
 /**
- * Check if a user can access a specific event
- * Returns true if:
- * 1. User is the event creator, OR
- * 2. User has a @usetroptix.com email (platform owner)
+ * Whether the user may see this event: its owner, or a Platform Owner.
  */
 export async function canAccessEvent(
-  userId: string,
-  userEmail: string | undefined,
+  user: ServerUser,
   eventId: string
 ): Promise<boolean> {
-  // Platform owners have access to all events
-  if (isPlatformOwner(userEmail)) {
+  if (isPlatformOwner(user)) {
     return true;
   }
 
-  // Check if user is the event creator
   const event = await prisma.events.findUnique({
     where: { id: eventId },
     select: { organizerUserId: true },
@@ -35,7 +35,7 @@ export async function canAccessEvent(
     return false;
   }
 
-  return event.organizerUserId === userId;
+  return event.organizerUserId === user.uid;
 }
 
 /**
@@ -43,42 +43,28 @@ export async function canAccessEvent(
  * This is a convenience function for pages that need to verify access
  */
 export async function verifyEventAccess(
-  userId: string,
-  userEmail: string | undefined,
+  user: ServerUser,
   eventId: string
 ): Promise<void> {
-  const hasAccess = await canAccessEvent(userId, userEmail, eventId);
+  const hasAccess = await canAccessEvent(user, eventId);
   if (!hasAccess) {
     notFound();
   }
 }
 
 /**
- * Get the appropriate where clause for event queries based on user permissions
- * Platform owners get no restrictions, regular users get organizerUserId filter
+ * The event where-clause for the user: Platform Owners are unrestricted,
+ * everyone else is scoped to the events they own.
  */
-export function getEventWhereClause(
-  userId: string,
-  userEmail: string | undefined,
-  eventId?: string
-): any {
+export function getEventWhereClause(user: ServerUser, eventId?: string): any {
   const baseWhere = eventId ? { id: eventId } : {};
 
-  // Platform owners can see all events
-  if (isPlatformOwner(userEmail)) {
+  if (isPlatformOwner(user)) {
     return baseWhere;
   }
 
-  // Regular users can only see their own events
   return {
     ...baseWhere,
-    organizerUserId: userId,
+    organizerUserId: user.uid,
   };
-}
-
-/**
- * Check if user has platform owner privileges for UI display purposes
- */
-export function hasPlatformAccess(userEmail: string | undefined): boolean {
-  return isPlatformOwner(userEmail);
 }

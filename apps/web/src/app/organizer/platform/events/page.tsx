@@ -66,7 +66,7 @@ export default async function PlatformEventsPage() {
     redirect('/auth/signin');
   }
 
-  const events = await getAllPlatformEvents(user.uid, user.email);
+  const events = await getAllPlatformEvents(user);
 
   // Calculate platform-wide stats
   const platformStats = events.reduce(
