@@ -19,7 +19,12 @@ import Image from 'next/image';
 
 interface EventImageUploaderProps {
   currentImageUrl?: string | null;
-  onUploadComplete: (path: string | null) => void;
+  /**
+   * `file` is the just-uploaded image still in memory — callers that need the
+   * pixels (palette extraction) read it instead of re-downloading the path.
+   * Null on removal.
+   */
+  onUploadComplete: (path: string | null, file: File | null) => void;
 }
 
 export function EventImageUploader({
@@ -94,7 +99,7 @@ export function EventImageUploader({
     try {
       const path = await uploadEventFlyer(file);
       setPreviewUrl(eventFlyerUrl(path));
-      onUploadComplete(path);
+      onUploadComplete(path, file);
       setFile(null);
     } catch (uploadError: unknown) {
       const message =
@@ -119,7 +124,7 @@ export function EventImageUploader({
     setPreviewUrl(null);
     setIsUploading(false);
     const previous = currentImageUrl;
-    onUploadComplete(null);
+    onUploadComplete(null, null);
 
     if (previous) {
       try {

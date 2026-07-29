@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm, useFieldArray, FieldErrors, Control } from 'react-hook-form';
@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Edit, Loader2, PlusCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { eventFormSchema, EventFormValues } from '@/lib/schemas/eventSchema';
+import type { FlyerPalette } from '@troptix/api';
 
 import {
   ticketTypeSchema,
@@ -123,20 +124,50 @@ export default function EventForm({
     name: 'tickets',
   });
 
-  // Extraction runs once per flyer, here at upload — the palette is stored on
-  // the event, so the public page never re-extracts. Removing the flyer clears
-  // the palette and drops the treatment back to Classic.
-  const refreshPalette = async (path: string | null) => {
-    const url = eventFlyerUrl(path);
-    if (!url) {
+  // Extraction runs once per flyer — the palette is stored on the event, so
+  // the public page never re-extracts. The just-uploaded File is sampled
+  // in-memory (same-origin object URL: no re-download, no CORS); the stored
+  // path is the fallback for analyzing older uploads. The token discards a
+  // stale run when a newer flyer supersedes it, and `isExtracting` gates Save
+  // so a mid-extraction submit can't persist the previous flyer's palette.
+  // Failure is NOT "no usable color": the stored palette is kept and the
+  // organizer is told, instead of silently downgrading their theme.
+  const [isExtracting, setIsExtracting] = useState(false);
+  const extractSeq = useRef(0);
+  const refreshPalette = async (path: string | null, file?: File | null) => {
+    const token = ++extractSeq.current;
+    if (!path) {
       form.setValue('flyerPalette', null, { shouldDirty: true });
       form.setValue('pageTheme', 'off', { shouldDirty: true });
       return;
     }
-    const palette = await extractFlyerPaletteFromUrl(url);
-    form.setValue('flyerPalette', palette, { shouldDirty: true });
-    if (!palette || palette.isGray || !palette.vibrant) {
-      form.setValue('pageTheme', 'off', { shouldDirty: true });
+    setIsExtracting(true);
+    try {
+      let palette: FlyerPalette | null = null;
+      if (file) {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          palette = await extractFlyerPaletteFromUrl(objectUrl);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      } else {
+        const url = eventFlyerUrl(path);
+        palette = url ? await extractFlyerPaletteFromUrl(url) : null;
+      }
+      if (token !== extractSeq.current) return;
+      if (!palette) {
+        toast.error(
+          "Couldn't read the flyer's colors. Older uploads may need re-uploading to enable page themes."
+        );
+        return;
+      }
+      form.setValue('flyerPalette', palette, { shouldDirty: true });
+      if (palette.isGray || !palette.vibrant) {
+        form.setValue('pageTheme', 'off', { shouldDirty: true });
+      }
+    } finally {
+      if (token === extractSeq.current) setIsExtracting(false);
     }
   };
 
@@ -252,12 +283,12 @@ export default function EventForm({
             <CardContent>
               <EventImageUploader
                 currentImageUrl={form.watch('imageUrl')}
-                onUploadComplete={(url) => {
+                onUploadComplete={(url, file) => {
                   form.setValue('imageUrl', url, {
                     shouldValidate: true,
                     shouldDirty: true,
                   });
-                  void refreshPalette(url);
+                  void refreshPalette(url, file);
                 }}
               />
             </CardContent>
@@ -283,6 +314,10 @@ export default function EventForm({
                     palette={form.watch('flyerPalette') ?? null}
                     hasFlyer={!!form.watch('imageUrl')}
                     disabled={isPending}
+                    analyzing={isExtracting}
+                    onAnalyze={() =>
+                      void refreshPalette(form.getValues('imageUrl') ?? null)
+                    }
                   />
                 )}
               />
@@ -537,7 +572,9 @@ export default function EventForm({
               <div className="flex justify-end gap-2">
                 <Button
                   type="submit"
-                  disabled={isPending || !form.formState.isValid}
+                  disabled={
+                    isPending || !form.formState.isValid || isExtracting
+                  }
                 >
                   {isPending ? (
                     <>
