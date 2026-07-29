@@ -15,6 +15,10 @@ Writing rules, from Orwell, 1946. These govern prose: docs, PR text, messages. N
 
 Review every prose output against these rules before delivering.
 
+## Code comments
+
+Default to none. Write a comment only for what the code cannot say — an invariant, a gotcha, the why behind a non-obvious choice. Never narrate what the next line does or restate a name. Keep the rare needed comment to a line or two; long rationale belongs in an ADR.
+
 ## Where artifacts live
 
 - **`docs/roadmap.md`** — the living strategic roadmap. Edited in place over time; priorities reflect the current view.

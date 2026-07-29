@@ -15,23 +15,18 @@ import {
 } from 'lucide-react';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
-import { getFormattedCurrency, cn } from '@/lib/utils';
+import { priceLabelFor, cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Banner } from '@/components/ui/banner';
 import { OrgAvatar } from '@/components/OrgAvatar';
 import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import type { EventDetail } from '@troptix/api';
+import { themeStyle } from '@/lib/flyerTheme';
 import CheckoutSheet from './CheckoutSheet';
 import VenueMap from './VenueMap';
 
 // Public event page (Luma-light). Immersive poster hero on mobile, two-column
 // on desktop. See docs/plans/2026-06-event-page-redesign.md.
-
-function priceLabelFor(fromPriceCents: number | null): string {
-  if (fromPriceCents == null) return 'No tickets available';
-  if (fromPriceCents === 0) return 'Free';
-  return `From ${getFormattedCurrency(fromPriceCents / 100)} USD`;
-}
 
 const SECTION_LABEL =
   'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
@@ -203,8 +198,14 @@ export default function EventDetailView({
     <Share2 className="h-5 w-5" />
   );
 
+  // Derived during SSR so the page arrives themed. The wrapper scopes the
+  // overrides and owns the ink — every descendant inherits themed text color
+  // without per-region repeats. The checkout sheet (a portal) and the global
+  // nav sit outside it and stay on brand tokens.
+  const themeVars = themeStyle(event.pageTheme, event.flyerPalette);
+
   return (
-    <>
+    <div style={themeVars} className="text-foreground">
       {event.isDraft && (
         <Banner
           title="Draft Mode: Event Not Published"
@@ -379,6 +380,6 @@ export default function EventDetailView({
         event={event}
         resumeReservationId={resumeReservationId}
       />
-    </>
+    </div>
   );
 }

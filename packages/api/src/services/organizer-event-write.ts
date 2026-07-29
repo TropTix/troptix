@@ -11,6 +11,7 @@
  * `assertPaidTicketingAllowed`, the one home of the paid-ticketing gate.
  */
 import type { PrismaClient } from '@troptix/db';
+import { Prisma } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import {
   createEventInputSchema,
@@ -144,5 +145,12 @@ function eventFields(data: UpdateEventInput) {
     latitude: data.latitude,
     longitude: data.longitude,
     imageUrl: data.imageUrl,
+    pageTheme: data.pageTheme,
+    // Omitted (undefined) leaves the stored palette untouched; an explicit
+    // null clears it (flyer removed) — Prisma needs DbNull for that.
+    flyerPalette:
+      data.flyerPalette === undefined
+        ? undefined
+        : (data.flyerPalette ?? Prisma.DbNull),
   };
 }

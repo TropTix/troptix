@@ -16,6 +16,7 @@ import type {
   EventSummary,
   EventTicket,
 } from '../contracts/events';
+import { parseStoredFlyerPalette } from '../contracts/events';
 import { calculateFeesCents } from './_shared/fees';
 import { toEventSummary } from './_shared/eventSummary';
 import { getSaleState } from './_shared/saleState';
@@ -101,6 +102,8 @@ export async function getEventDetail(
       address: true,
       latitude: true,
       longitude: true,
+      pageTheme: true,
+      flyerPalette: true,
       // Public tiers only (a null/empty discount code means public).
       ticketTypes: {
         where: {
@@ -195,6 +198,8 @@ export async function getEventDetail(
     address: event.address,
     latitude: event.latitude,
     longitude: event.longitude,
+    pageTheme: event.pageTheme,
+    flyerPalette: parseStoredFlyerPalette(event.flyerPalette),
     fromPriceCents,
     tickets,
   };
