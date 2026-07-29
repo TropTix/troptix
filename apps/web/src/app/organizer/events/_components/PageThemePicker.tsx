@@ -7,22 +7,19 @@ import { cn } from '@/lib/utils';
 
 // Three fixed treatments, never a color picker — the system owns contrast.
 
+export const THEME_LABELS: Record<EventPageTheme, string> = {
+  off: 'Classic',
+  wash: 'Tinted wash',
+  dark: 'Poster dark',
+};
+
 const OPTIONS: {
   value: EventPageTheme;
-  label: string;
   blurb: string;
 }[] = [
-  { value: 'off', label: 'Classic', blurb: 'The standard TropTix look.' },
-  {
-    value: 'wash',
-    label: 'Tinted wash',
-    blurb: 'A light page tinted from your flyer.',
-  },
-  {
-    value: 'dark',
-    label: 'Poster dark',
-    blurb: 'A dark page built around your flyer.',
-  },
+  { value: 'off', blurb: 'The standard TropTix look.' },
+  { value: 'wash', blurb: 'A light page tinted from your flyer.' },
+  { value: 'dark', blurb: 'A dark page built around your flyer.' },
 ];
 
 function PreviewDots({
@@ -135,7 +132,9 @@ export function PageThemePicker({
             >
               <PreviewDots theme={opt.value} palette={palette} />
               <span className="min-w-0">
-                <span className="block text-sm font-medium">{opt.label}</span>
+                <span className="block text-sm font-medium">
+                  {THEME_LABELS[opt.value]}
+                </span>
                 <span className="block text-xs text-muted-foreground">
                   {unavailable ? unavailableReason : opt.blurb}
                 </span>
