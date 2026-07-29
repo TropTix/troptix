@@ -19,7 +19,9 @@ import Image from 'next/image';
 
 interface EventImageUploaderProps {
   currentImageUrl?: string | null;
-  onUploadComplete: (path: string | null) => void;
+  /** `file` is the uploaded image still in memory (null on removal), so
+   * palette extraction can read pixels without re-downloading the path. */
+  onUploadComplete: (path: string | null, file: File | null) => void;
 }
 
 export function EventImageUploader({
@@ -94,7 +96,7 @@ export function EventImageUploader({
     try {
       const path = await uploadEventFlyer(file);
       setPreviewUrl(eventFlyerUrl(path));
-      onUploadComplete(path);
+      onUploadComplete(path, file);
       setFile(null);
     } catch (uploadError: unknown) {
       const message =
@@ -119,7 +121,7 @@ export function EventImageUploader({
     setPreviewUrl(null);
     setIsUploading(false);
     const previous = currentImageUrl;
-    onUploadComplete(null);
+    onUploadComplete(null, null);
 
     if (previous) {
       try {

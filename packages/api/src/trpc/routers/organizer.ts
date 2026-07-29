@@ -44,9 +44,6 @@ export const organizerRouter = router({
       }
     }),
 
-  /**
-   * Check in a specific ticket.
-   */
   checkInTicket: protectedProcedure
     .input(z.object({ ticketId: z.string() }))
     .mutation(async ({ ctx, input }) => {

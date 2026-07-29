@@ -53,7 +53,7 @@ Review every prose output against these rules before delivering.
 - This is a **Yarn Classic (v1) workspaces** monorepo. The root `yarn.lock` is the single source of truth for dependencies; Vercel and CI both install with Yarn.
 - **Use Yarn, never npm, at the repo root or in any Yarn workspace.** `yarn install` / `yarn add <pkg>` / `yarn upgrade` / `yarn <script>` — never `npm install` / `npm ci`. Running npm generates a stray root `package-lock.json` that silently desyncs from `yarn.lock`. The duplicate tree is never built or deployed, but Dependabot still scans it: it once accounted for **159 of a 299-alert backlog** (53%), all phantom duplicates of deps already locked in `yarn.lock`. If you ever find a root `package-lock.json`, delete it.
 - Force transitive dependency versions via the root `resolutions` field — not npm `overrides`.
-- **Exception:** the standalone Expo apps under `apps/` that can't hoist into the workspace carry their _own_ lockfile (`apps/organizer` → `yarn.lock`, `apps/organizer-v2` → `package-lock.json`). Match whichever lockfile is already committed in that app and never add a second one.
+- **Exception:** the standalone Expo apps under `apps/` that can't hoist into the workspace carry their _own_ lockfile (`apps/organizer` → `yarn.lock`, `apps/mobile` → `package-lock.json`). Match whichever lockfile is already committed in that app and never add a second one. These two are the only sanctioned lockfiles below the root; a `package-lock.json` anywhere else, and above all at the root, is the stray one to delete.
 
 ## Naming
 

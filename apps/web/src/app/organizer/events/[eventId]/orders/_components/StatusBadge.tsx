@@ -5,7 +5,6 @@ interface StatusBadgeProps {
   status: string;
 }
 
-// Maps order status strings to Badge variants
 const getBadgeVariant = (status: string): BadgeProps['variant'] => {
   switch (
     status.toUpperCase() // Use uppercase for case-insensitive matching

@@ -1,5 +1,6 @@
 import { BackButton } from '@/components/ui/back-button';
 import prisma from '@/server/prisma';
+import { parseStoredFlyerPalette } from '@troptix/api';
 import EventForm from '../../_components/EventForm';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
@@ -44,7 +45,6 @@ export default async function EditEventPage(props: EditEventPageProps) {
   const params = await props.params;
   const { eventId } = params;
 
-  // Get user and verify authentication
   const user = await getUserFromIdTokenCookie();
   if (!user) {
     redirect('/auth/signin');
@@ -69,6 +69,8 @@ export default async function EditEventPage(props: EditEventPageProps) {
     longitude: event?.longitude ?? null,
     imageUrl: event?.imageUrl ?? '',
     description: event?.description ?? '',
+    pageTheme: event.pageTheme,
+    flyerPalette: parseStoredFlyerPalette(event.flyerPalette),
   };
 
   // Host brand for the read-only "Hosted by" line on the form. Paid ticketing

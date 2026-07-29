@@ -10,6 +10,7 @@ import {
   Receipt,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { formatOrderNumber } from '@/lib/utils';
 
 export type TicketInfo = {
   id: string;
@@ -37,11 +38,6 @@ function formatDate(date: Date | string) {
     hour: 'numeric',
     minute: '2-digit',
   });
-}
-
-/** Short, human-readable code shown under the QR (the QR itself encodes the id). */
-function shortCode(id: string) {
-  return `TT-${id.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
 }
 
 export default function TicketDisplayManager({
@@ -182,7 +178,7 @@ export default function TicketDisplayManager({
           </div>
 
           <div className="mt-4 font-mono text-[13px] font-semibold tracking-[0.2em] text-foreground">
-            {shortCode(ticket.id)}
+            {formatOrderNumber(ticket.id)}
           </div>
         </div>
       </div>

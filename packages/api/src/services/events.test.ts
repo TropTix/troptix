@@ -57,7 +57,12 @@ type OrgRel = {
 } | null;
 
 function fakeEvent(
-  overrides: { ticketTypes?: TierRow[]; organization?: OrgRel } = {}
+  overrides: {
+    ticketTypes?: TierRow[];
+    organization?: OrgRel;
+    pageTheme?: 'off' | 'wash' | 'dark';
+    flyerPalette?: unknown;
+  } = {}
 ) {
   return {
     id: 'ev-1',
@@ -75,6 +80,8 @@ function fakeEvent(
     address: '171 Ludlow St, New York, NY',
     latitude: 40.72,
     longitude: -73.98,
+    pageTheme: overrides.pageTheme ?? 'off',
+    flyerPalette: 'flyerPalette' in overrides ? overrides.flyerPalette : null,
     ticketTypes: overrides.ticketTypes ?? [],
   };
 }
@@ -140,6 +147,53 @@ describe('getEventDetail', () => {
     expect(result.tickets[0].id).toBe('open');
   });
 
+  it('reports why each tier is unbuyable via saleStatus', async () => {
+    const prisma = fakePrisma(
+      fakeEvent({
+        ticketTypes: [
+          tier({ id: 'live' }),
+          tier({ id: 'soldout', capacity: 5, sold: 5 }),
+          tier({
+            id: 'upcoming',
+            saleStartsAt: FUTURE,
+            saleEndsAt: new Date(FUTURE.getTime() + 86_400_000),
+          }),
+          tier({
+            id: 'closed',
+            saleStartsAt: new Date(PAST.getTime() - 86_400_000),
+            saleEndsAt: PAST,
+          }),
+        ],
+      })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    const byId = Object.fromEntries(result.tickets.map((t) => [t.id, t]));
+    expect(byId.live.saleStatus).toBe('onSale');
+    expect(byId.soldout.saleStatus).toBe('soldOut');
+    expect(byId.upcoming.saleStatus).toBe('notYetOnSale');
+    expect(byId.upcoming.maxAllowedToAdd).toBe(0);
+    expect(byId.closed.saleStatus).toBe('saleEnded');
+    expect(byId.closed.maxAllowedToAdd).toBe(0);
+  });
+
+  it('prefers soldOut over saleEnded once the window closes', async () => {
+    const prisma = fakePrisma(
+      fakeEvent({
+        ticketTypes: [
+          tier({
+            id: 'gone',
+            capacity: 5,
+            sold: 5,
+            saleStartsAt: new Date(PAST.getTime() - 86_400_000),
+            saleEndsAt: PAST,
+          }),
+        ],
+      })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.tickets[0].saleStatus).toBe('soldOut');
+  });
+
   it('serializes dates to ISO strings', async () => {
     const prisma = fakePrisma(fakeEvent());
     const result = await getEventDetail(prisma, { eventId: 'ev-1' });
@@ -152,6 +206,32 @@ describe('getEventDetail', () => {
     await expect(
       getEventDetail(prisma, { eventId: 'missing' })
     ).rejects.toThrow(NotFoundError);
+  });
+
+  it('passes through pageTheme and a valid flyerPalette', async () => {
+    const palette = {
+      dominant: '#131020',
+      candidates: ['#FF4D97', '#2EE6FF'],
+      chosenAccent: '#2EE6FF',
+    };
+    const prisma = fakePrisma(
+      fakeEvent({ pageTheme: 'dark', flyerPalette: palette })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.pageTheme).toBe('dark');
+    expect(result.flyerPalette).toEqual(palette);
+  });
+
+  it('degrades malformed flyerPalette JSONB to null instead of throwing', async () => {
+    const prisma = fakePrisma(
+      fakeEvent({
+        pageTheme: 'wash',
+        flyerPalette: { dominant: 'not-a-hex', unexpected: true },
+      })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.pageTheme).toBe('wash');
+    expect(result.flyerPalette).toBeNull();
   });
 });
 

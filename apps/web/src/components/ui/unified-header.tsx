@@ -51,7 +51,6 @@ export default function UnifiedHeader() {
   const { user } = useContext(TropTixContext);
   const pathname = usePathname();
 
-  // Effect to handle scroll-based styling
   useEffect(() => {
     const handleScroll = () => {
       setHasScrolled(window.scrollY > 10);

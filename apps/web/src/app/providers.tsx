@@ -12,19 +12,15 @@ import { PostHogProvider as PHProvider } from 'posthog-js/react';
 
 import AuthProvider from '@/components/AuthProvider';
 import UnifiedHeader from '@/components/ui/unified-header';
-import Footer from '@/components/ui/footer';
 
 const queryClient = new QueryClient();
 
 function GlobalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isOrganizer = pathname?.startsWith('/organizer');
-  const isEventPage = pathname?.startsWith('/e/');
   // Standard pages (and the event page) sit below the fixed header; organizer
   // pages manage their own top spacing.
   const offsetContent = !isOrganizer;
-  // The event page has its own sticky checkout bar, so it skips the footer.
-  const showFooter = !isOrganizer && !isEventPage;
 
   return (
     <div>
@@ -32,9 +28,23 @@ function GlobalLayout({ children }: { children: React.ReactNode }) {
       <div className={`flex-grow border-x ${offsetContent ? 'mt-16' : ''}`}>
         {children}
       </div>
-      {showFooter ? <Footer /> : null}
     </div>
   );
+}
+
+// The reservationId is a bearer capability (it dereferences to the order and
+// ticket QRs). It stays in the URL by design (resume-on-refresh), so strip it
+// from URL properties before they reach PostHog.
+function stripReservationParam(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  try {
+    const url = new URL(value);
+    if (!url.searchParams.has('reservation')) return value;
+    url.searchParams.delete('reservation');
+    return url.toString();
+  } catch {
+    return value;
+  }
 }
 
 function PostHogProvider({ children }: { children: React.ReactNode }) {
@@ -46,6 +56,18 @@ function PostHogProvider({ children }: { children: React.ReactNode }) {
       capture_pageleave: true,
       capture_exceptions: true,
       debug: process.env.NODE_ENV === 'development',
+      sanitize_properties: (properties) => {
+        for (const key of [
+          '$current_url',
+          '$referrer',
+          '$initial_current_url',
+        ]) {
+          if (properties[key]) {
+            properties[key] = stripReservationParam(properties[key]);
+          }
+        }
+        return properties;
+      },
     });
   }, []);
 

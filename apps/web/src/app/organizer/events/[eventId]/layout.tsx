@@ -34,7 +34,6 @@ export default async function EventManagementLayout(props: {
 
   const { children } = props;
 
-  // Get user and verify authentication
   const user = await getUserFromIdTokenCookie();
   if (!user) {
     redirect('/auth/signin');

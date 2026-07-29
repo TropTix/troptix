@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       },
       where: whereClause,
       orderBy: {
-        startsAt: 'desc', // Optional: order events by start date
+        startsAt: 'desc',
       },
     });
 

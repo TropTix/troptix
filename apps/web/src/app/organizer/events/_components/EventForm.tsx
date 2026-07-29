@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm, useFieldArray, FieldErrors, Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Edit, Loader2, PlusCircle, X } from 'lucide-react';
+import { ChevronDown, Edit, Loader2, PlusCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { eventFormSchema, EventFormValues } from '@/lib/schemas/eventSchema';
+import type { FlyerPalette } from '@troptix/api';
 
 import {
   ticketTypeSchema,
@@ -47,10 +48,24 @@ import {
 } from '@/components/ui/form';
 
 import { usePlacesWidget } from 'react-google-autocomplete';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { EventImageUploader } from '../_components/EventImageUpload';
+import {
+  PageThemePicker,
+  PreviewDots,
+  THEME_LABELS,
+} from '../_components/PageThemePicker';
+import { PageThemePreview } from '../_components/PageThemePreview';
 import { PublishRequirements } from '@/components/PublishRequirements';
 import { createEvent, updateEvent } from '../_actions/eventActions';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
+import { eventFlyerUrl } from '@/lib/supabase/storage';
+import { cn } from '@/lib/utils';
+import { extractFlyerPaletteFromUrl, themeAvailable } from '@/lib/flyerTheme';
 
 interface EventFormProps {
   initialData?: EventFormValues | null;
@@ -88,6 +103,8 @@ function defaultEventValues(): EventFormValues {
     longitude: null,
     tickets: [],
     imageUrl: null,
+    pageTheme: 'off',
+    flyerPalette: null,
   };
 }
 
@@ -107,6 +124,10 @@ export default function EventForm({
   const isEditing = !!eventId;
   // useForm only reads defaultValues on mount — compute them once, not per render.
   const [defaults] = useState(() => initialData ?? defaultEventValues());
+  // Open when a theme is already active; a secondary setting otherwise.
+  const [themeOpen, setThemeOpen] = useState(
+    () => (defaults.pageTheme ?? 'off') !== 'off'
+  );
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
     defaultValues: defaults,
@@ -117,6 +138,53 @@ export default function EventForm({
     control: form.control,
     name: 'tickets',
   });
+
+  // Extraction runs once per flyer, on the in-memory File when available. The
+  // token discards runs superseded by a newer flyer, and `isExtracting` gates
+  // Save so a mid-extraction submit can't persist the previous palette.
+  // Failure keeps the stored palette — it is not "no usable color".
+  const [isExtracting, setIsExtracting] = useState(false);
+  const extractSeq = useRef(0);
+  const refreshPalette = async (path: string | null, file?: File | null) => {
+    const token = ++extractSeq.current;
+    if (!path) {
+      form.setValue('flyerPalette', null, { shouldDirty: true });
+      form.setValue('pageTheme', 'off', { shouldDirty: true });
+      return;
+    }
+    setIsExtracting(true);
+    try {
+      let palette: FlyerPalette | null = null;
+      if (file) {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          palette = await extractFlyerPaletteFromUrl(objectUrl);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      } else {
+        const url = eventFlyerUrl(path);
+        palette = url ? await extractFlyerPaletteFromUrl(url) : null;
+      }
+      if (token !== extractSeq.current) return;
+      if (!palette) {
+        toast.error(
+          "Couldn't read the flyer's colors. Older uploads may need re-uploading to enable page themes."
+        );
+        return;
+      }
+      form.setValue('flyerPalette', palette, { shouldDirty: true });
+      if (!themeAvailable(palette)) {
+        form.setValue('pageTheme', 'off', { shouldDirty: true });
+      }
+    } finally {
+      if (token === extractSeq.current) setIsExtracting(false);
+    }
+  };
+
+  const previewPrices = (isEditing ? (ticketTypes ?? []) : fields).map(
+    (t) => t.price ?? 0
+  );
 
   const handleDrawerSubmit = (
     ticketData: TicketTypeFormValues & { id?: string }
@@ -230,14 +298,96 @@ export default function EventForm({
             <CardContent>
               <EventImageUploader
                 currentImageUrl={form.watch('imageUrl')}
-                onUploadComplete={(url) =>
+                onUploadComplete={(url, file) => {
                   form.setValue('imageUrl', url, {
                     shouldValidate: true,
                     shouldDirty: true,
-                  })
-                }
+                  });
+                  void refreshPalette(url, file);
+                }}
               />
             </CardContent>
+          </Card>
+
+          <Card>
+            <Collapsible open={themeOpen} onOpenChange={setThemeOpen}>
+              <CollapsibleTrigger asChild>
+                <button type="button" className="w-full text-left">
+                  <CardHeader>
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle>Page Theme</CardTitle>
+                      <ChevronDown
+                        className={cn(
+                          'h-4 w-4 text-muted-foreground transition-transform',
+                          themeOpen && 'rotate-180'
+                        )}
+                      />
+                    </div>
+                    {themeOpen ? (
+                      <CardDescription>
+                        Color your event page from your flyer.
+                      </CardDescription>
+                    ) : (
+                      <div className="flex items-center gap-2.5 pt-1">
+                        <PreviewDots
+                          theme={form.watch('pageTheme') ?? 'off'}
+                          palette={form.watch('flyerPalette') ?? null}
+                        />
+                        <span className="font-medium">
+                          {THEME_LABELS[form.watch('pageTheme') ?? 'off']}
+                        </span>
+                      </div>
+                    )}
+                  </CardHeader>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="pageTheme"
+                    render={({ field }) => (
+                      <PageThemePicker
+                        value={field.value ?? 'off'}
+                        onChange={(theme) =>
+                          form.setValue('pageTheme', theme, {
+                            shouldDirty: true,
+                          })
+                        }
+                        palette={form.watch('flyerPalette') ?? null}
+                        hasFlyer={!!form.watch('imageUrl')}
+                        disabled={isPending}
+                        analyzing={isExtracting}
+                        onAnalyze={() =>
+                          void refreshPalette(
+                            form.getValues('imageUrl') ?? null
+                          )
+                        }
+                        onPickAccent={(hex) => {
+                          const palette = form.getValues('flyerPalette');
+                          if (!palette) return;
+                          form.setValue(
+                            'flyerPalette',
+                            { ...palette, chosenAccent: hex },
+                            { shouldDirty: true }
+                          );
+                        }}
+                      />
+                    )}
+                  />
+                  <PageThemePreview
+                    theme={form.watch('pageTheme') ?? 'off'}
+                    palette={form.watch('flyerPalette') ?? null}
+                    name={form.watch('eventName')}
+                    imageUrl={eventFlyerUrl(form.watch('imageUrl'))}
+                    startsAt={form.watch('startsAt')}
+                    endsAt={form.watch('endsAt')}
+                    venue={form.watch('venue')}
+                    prices={previewPrices}
+                  />
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
 
           {isEditing && isDraft ? (
@@ -257,8 +407,6 @@ export default function EventForm({
             />
           ) : null}
         </div>
-
-        {/* Right Column: Event Form */}
 
         <div className="md:w-2/3">
           <Form {...form}>
@@ -488,7 +636,9 @@ export default function EventForm({
               <div className="flex justify-end gap-2">
                 <Button
                   type="submit"
-                  disabled={isPending || !form.formState.isValid}
+                  disabled={
+                    isPending || !form.formState.isValid || isExtracting
+                  }
                 >
                   {isPending ? (
                     <>

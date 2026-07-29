@@ -15,5 +15,4 @@ export const userDetailsSchema = z
     path: ['confirmEmail'],
   });
 
-// Define the type inferred from the schema
 export type UserDetailsFormData = z.infer<typeof userDetailsSchema>;

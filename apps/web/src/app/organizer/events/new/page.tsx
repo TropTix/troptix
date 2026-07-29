@@ -1,5 +1,3 @@
-// app/organizer/events/new/page.tsx
-
 import EventForm from '../_components/EventForm';
 import { BackButton } from '@/components/ui/back-button';
 import { getUserFromIdTokenCookie } from '@/server/authUser';

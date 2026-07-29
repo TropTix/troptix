@@ -16,9 +16,17 @@ import type {
   EventSummary,
   EventTicket,
 } from '../contracts/events';
+import { parseStoredFlyerPalette } from '../contracts/events';
 import { calculateFeesCents } from './_shared/fees';
 import { toEventSummary } from './_shared/eventSummary';
+import { getSaleState } from './_shared/saleState';
 import { NotFoundError } from './_shared/errors';
+
+const SALE_STATUS = {
+  Scheduled: 'notYetOnSale',
+  OnSale: 'onSale',
+  Ended: 'saleEnded',
+} as const;
 
 /**
  * Public discovery listing: upcoming, non-draft events shaped for the cards on
@@ -94,6 +102,8 @@ export async function getEventDetail(
       address: true,
       latitude: true,
       longitude: true,
+      pageTheme: true,
+      flyerPalette: true,
       // Public tiers only (a null/empty discount code means public).
       ticketTypes: {
         where: {
@@ -131,9 +141,10 @@ export async function getEventDetail(
       // — one pair, full timestamps (ADR 0020).
       const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
       const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
-      const onSale = now >= tt.saleStartsAt && now <= tt.saleEndsAt;
+      const saleStatus: EventTicket['saleStatus'] =
+        availability === 0 ? 'soldOut' : SALE_STATUS[getSaleState(tt, now)];
       const maxAllowedToAdd =
-        onSale && !event.isDraft
+        saleStatus === 'onSale' && !event.isDraft
           ? Math.max(0, Math.min(availability, tt.maxPurchasePerUser))
           : 0;
       const feesCents =
@@ -148,6 +159,7 @@ export async function getEventDetail(
         priceCents,
         feesCents,
         maxAllowedToAdd,
+        saleStatus,
       };
     })
     .sort((a, b) => {
@@ -186,6 +198,8 @@ export async function getEventDetail(
     address: event.address,
     latitude: event.latitude,
     longitude: event.longitude,
+    pageTheme: event.pageTheme,
+    flyerPalette: parseStoredFlyerPalette(event.flyerPalette),
     fromPriceCents,
     tickets,
   };

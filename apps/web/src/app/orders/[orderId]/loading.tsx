@@ -1,4 +1,3 @@
-// app/orders/[orderId]/loading.tsx
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Card,

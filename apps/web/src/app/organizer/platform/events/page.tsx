@@ -67,7 +67,6 @@ export default async function PlatformEventsPage() {
 
   const events = await getAllPlatformEvents(user);
 
-  // Calculate platform-wide stats
   const platformStats = events.reduce(
     (acc, event) => ({
       totalEvents: acc.totalEvents + 1,
@@ -105,7 +104,6 @@ export default async function PlatformEventsPage() {
         </Badge>
       </div>
 
-      {/* Platform Stats */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -169,7 +167,6 @@ export default async function PlatformEventsPage() {
         </Card>
       </div>
 
-      {/* Events Table */}
       <Card>
         <CardHeader>
           <CardTitle>All Platform Events</CardTitle>

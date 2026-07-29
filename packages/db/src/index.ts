@@ -33,23 +33,33 @@ import { PrismaClient } from './generated/prisma/client';
  * ("self-signed certificate in certificate chain"). Some envs (e.g. the Supabase
  * Vercel integration's preview branches) inject `sslmode`; our hand-set prod URL
  * does not, so this is a no-op there.
+ *
+ * `sslmode=disable` is the one value we honor rather than strip: the local
+ * Supabase Postgres (CI, `supabase db start`) has no SSL at all, and `pg` with
+ * a truthy `ssl` option aborts against a non-SSL server.
  */
-const connectionString = () => {
+const parseConnection = () => {
   const raw = process.env.POSTGRES_PRISMA_URL;
-  if (!raw) return raw;
+  const sslDefault = { rejectUnauthorized: false } as const;
+  if (!raw) return { connectionString: raw, ssl: sslDefault };
   try {
     const url = new URL(raw);
+    const sslDisabled = url.searchParams.get('sslmode') === 'disable';
     url.searchParams.delete('sslmode');
-    return url.toString();
+    return {
+      connectionString: url.toString(),
+      ssl: sslDisabled ? (false as const) : sslDefault,
+    };
   } catch {
-    return raw;
+    return { connectionString: raw, ssl: sslDefault };
   }
 };
 
-const createPrismaClient = () =>
-  new PrismaClient({
+const createPrismaClient = () => {
+  const { connectionString, ssl } = parseConnection();
+  return new PrismaClient({
     adapter: new PrismaPg({
-      connectionString: connectionString(),
+      connectionString,
       // Supabase pgbouncer drops idle server-side connections after ~30s. Close
       // pool connections after 20s of idleness so the pool never hands out a
       // dead socket, which would surface as "Connection terminated unexpectedly".
@@ -57,10 +67,11 @@ const createPrismaClient = () =>
       // Give Supabase free-tier enough time to wake a cold pooler connection.
       connectionTimeoutMillis: 15000,
       // SSL is governed here (the Rust engine ignored cert validation pre-v7);
-      // see connectionString() for why sslmode is stripped from the URL.
-      ssl: { rejectUnauthorized: false },
+      // see parseConnection() for why sslmode is stripped from the URL.
+      ssl,
     }),
   });
+};
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

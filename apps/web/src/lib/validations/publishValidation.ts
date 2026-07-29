@@ -121,7 +121,6 @@ export function validateEventForPublish(
       missingRequirements.push('Valid end date (must be after start date)');
     }
 
-    // Check if event is in the past
     const now = new Date();
     if (event.endsAt <= now) {
       errors.push({
@@ -142,7 +141,6 @@ export function validateEventForPublish(
     });
     missingRequirements.push('At least one ticket type');
   } else {
-    // Validate each ticket type
     event.ticketTypes.forEach((ticket, index) => {
       if (!ticket.name || ticket.name.trim().length < 3) {
         errors.push({
@@ -197,7 +195,6 @@ export function validateEventForPublish(
         );
       }
 
-      // Validate ticket sale dates
       if (ticket.saleEndsAt <= ticket.saleStartsAt) {
         errors.push({
           field: `ticketTypes[${index}].saleEndsAt`,
@@ -209,7 +206,6 @@ export function validateEventForPublish(
         );
       }
 
-      // Check if ticket sales end before or at event start
       if (event.endsAt && ticket.saleEndsAt > event.endsAt) {
         errors.push({
           field: `ticketTypes[${index}].saleEndsAt`,
@@ -226,7 +222,7 @@ export function validateEventForPublish(
   return {
     isValid: errors.length === 0,
     errors,
-    missingRequirements: Array.from(new Set(missingRequirements)), // Remove duplicates
+    missingRequirements: Array.from(new Set(missingRequirements)),
   };
 }
 

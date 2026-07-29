@@ -51,9 +51,6 @@ describe('appRouter.organizer (via createCaller)', () => {
   });
 
   it('rejects invalid input at the boundary (empty ticketId)', async () => {
-    // We expect Zod validation error for empty string if it's not a valid format
-    // Zod string() allows empty string unless min(1) is used, but assuming typical string validations
-    // If not, we test that it throws when undefined
     await expect(
       (caller(fakePrisma({})).organizer.checkInTicket as any)({})
     ).rejects.toThrow();

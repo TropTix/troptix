@@ -254,6 +254,15 @@ model Orders {
   @@index([userId])
 }
 
+// How the public event page is themed from the flyer. `off` renders the brand
+// theme; `wash` tints a light page from the flyer; `dark` builds a dark stage
+// in the flyer's hue.
+enum EventPageTheme {
+  off
+  wash
+  dark
+}
+
 model Events {
   id        String    @id @default(uuid())
   createdAt DateTime  @default(now())
@@ -286,6 +295,13 @@ model Events {
   countryCode String?
   latitude    Float?
   longitude   Float?
+
+  // Flyer-derived page theming. The organizer picks a treatment at create/edit
+  // time; the palette is extracted once from the flyer at upload and stored
+  // raw (hex strings) so the derivation can evolve in code without a backfill.
+  // See apps/web/src/lib/flyerTheme.ts.
+  pageTheme    EventPageTheme @default(off)
+  flyerPalette Json?
 
   // Ticket Details
   tickets      Tickets[]

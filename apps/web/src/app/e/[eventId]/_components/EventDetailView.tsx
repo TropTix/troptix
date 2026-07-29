@@ -15,23 +15,18 @@ import {
 } from 'lucide-react';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
-import { getFormattedCurrency, cn } from '@/lib/utils';
+import { priceLabelFor, cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Banner } from '@/components/ui/banner';
 import { OrgAvatar } from '@/components/OrgAvatar';
 import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import type { EventDetail } from '@troptix/api';
+import { themeStyle } from '@/lib/flyerTheme';
 import CheckoutSheet from './CheckoutSheet';
 import VenueMap from './VenueMap';
 
 // Public event page (Luma-light). Immersive poster hero on mobile, two-column
 // on desktop. See docs/plans/2026-06-event-page-redesign.md.
-
-function priceLabelFor(fromPriceCents: number | null): string {
-  if (fromPriceCents == null) return 'No tickets available';
-  if (fromPriceCents === 0) return 'Free';
-  return `From ${getFormattedCurrency(fromPriceCents / 100)} USD`;
-}
 
 const SECTION_LABEL =
   'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
@@ -134,16 +129,23 @@ function HostedByInline({ event }: { event: EventDetail }) {
   );
 }
 
-export default function EventPageClean({ event }: { event: EventDetail }) {
+export default function EventDetailView({
+  event,
+  eventEnded,
+}: {
+  event: EventDetail;
+  /** Server-computed so SSR and hydration agree. */
+  eventEnded: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const resumeReservationId = searchParams?.get('reservation') ?? null;
-  const [accent, setAccent] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
 
-  // Resume an in-flight checkout after the Stripe redirect / a refresh
-  // (?reservation=…): open the sheet so it can finalize (ADR 0018).
+  // Resume an in-flight checkout after the Stripe redirect / a refresh (ADR
+  // 0018). The param stays in the URL on purpose — scrubbing it would break
+  // refresh-resume; the PostHog sanitizer keeps it out of analytics instead.
   useEffect(() => {
     if (resumeReservationId) setSheetOpen(true);
   }, [resumeReservationId]);
@@ -165,55 +167,6 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
   const hasPaidTickets = event.tickets.some((t) => t.priceCents > 0);
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
-
-  // Saturation-weighted average so a vibrant subject wins over a dark
-  // background; falls back to null (no halo) if the canvas is CORS-tainted.
-  // The halo is desktop-only, so skip the extra image fetch on mobile.
-  useEffect(() => {
-    if (!window.matchMedia('(min-width: 768px)').matches) return;
-    let cancelled = false;
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        const size = 24;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, size, size);
-        const { data } = ctx.getImageData(0, 0, size, size);
-        let r = 0;
-        let g = 0;
-        let b = 0;
-        let wSum = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          const R = data[i];
-          const G = data[i + 1];
-          const B = data[i + 2];
-          const max = Math.max(R, G, B);
-          const min = Math.min(R, G, B);
-          const sat = max === 0 ? 0 : (max - min) / max;
-          const w = sat * sat + 0.05;
-          r += R * w;
-          g += G * w;
-          b += B * w;
-          wSum += w;
-        }
-        if (!cancelled && wSum > 0) {
-          const round = (n: number) => Math.round(n / wSum);
-          setAccent(`${round(r)}, ${round(g)}, ${round(b)}`);
-        }
-      } catch {
-        /* tainted canvas (CORS) — no halo */
-      }
-    };
-    img.src = imageUrl;
-    return () => {
-      cancelled = true;
-    };
-  }, [imageUrl]);
 
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
@@ -245,8 +198,14 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
     <Share2 className="h-5 w-5" />
   );
 
+  // Derived during SSR so the page arrives themed. The wrapper scopes the
+  // overrides and owns the ink — every descendant inherits themed text color
+  // without per-region repeats. The checkout sheet (a portal) and the global
+  // nav sit outside it and stay on brand tokens.
+  const themeVars = themeStyle(event.pageTheme, event.flyerPalette);
+
   return (
-    <>
+    <div style={themeVars} className="text-foreground">
       {event.isDraft && (
         <Banner
           title="Draft Mode: Event Not Published"
@@ -293,7 +252,12 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
               </button>
             </div>
             <span className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full',
+                  eventEnded ? 'bg-white/50' : 'bg-emerald-400'
+                )}
+              />
               {heroChip}
             </span>
           </div>
@@ -301,27 +265,15 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
 
         <div className="mx-auto w-full max-w-5xl px-5 py-6 md:px-8 md:py-14">
           <div className="md:grid md:grid-cols-[minmax(0,380px)_1fr] md:items-start md:gap-12">
-            {/* Desktop: poster aside with a soft flyer-coloured halo. */}
             <aside className="hidden md:block md:sticky md:top-20">
-              <div className="relative">
-                {accent && (
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute -inset-4 rounded-[2rem] opacity-70 blur-3xl"
-                    style={{
-                      background: `radial-gradient(circle, rgba(${accent}, 0.4), transparent 70%)`,
-                    }}
-                  />
-                )}
-                <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-xl">
-                  <Image
-                    src={imageUrl}
-                    alt={event.name}
-                    fill
-                    sizes="380px"
-                    className="object-cover"
-                  />
-                </div>
+              <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-xl">
+                <Image
+                  src={imageUrl}
+                  alt={event.name}
+                  fill
+                  sizes="380px"
+                  className="object-cover"
+                />
               </div>
               <div className="mt-5 border-t border-border pt-5">
                 <p className={SECTION_LABEL}>Presented by</p>
@@ -400,7 +352,7 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-5 py-3.5">
           <div className="min-w-0 flex-1">
             <div className="text-lg font-extrabold">{priceLabel}</div>
-            {!isFree && (
+            {!isFree && !eventEnded && (
               <div className="text-xs text-muted-foreground">
                 fees calculated at checkout
               </div>
@@ -408,11 +360,16 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
           </div>
           <button
             type="button"
+            disabled={eventEnded}
             onClick={() => setSheetOpen(true)}
-            className="flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+            className="flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
           >
-            {hasPaidTickets ? 'Get Tickets' : 'RSVP'}
-            <ArrowRight className="h-5 w-5" />
+            {eventEnded
+              ? 'No longer on sale'
+              : hasPaidTickets
+                ? 'Get Tickets'
+                : 'RSVP'}
+            {!eventEnded && <ArrowRight className="h-5 w-5" />}
           </button>
         </div>
       </div>
@@ -423,6 +380,6 @@ export default function EventPageClean({ event }: { event: EventDetail }) {
         event={event}
         resumeReservationId={resumeReservationId}
       />
-    </>
+    </div>
   );
 }

@@ -1,4 +1,3 @@
-// app/orders/page.tsx
 import prisma from '@/server/prisma';
 import { getDateFormatter, formatTime } from '@/lib/dateUtils';
 import Link from 'next/link';

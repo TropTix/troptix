@@ -1,6 +1,5 @@
-// app/not-found.tsx
 import Link from 'next/link';
-import { Button } from '@/components/ui/button'; // Adjust path if your components are elsewhere
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -8,8 +7,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'; // Adjust path
-import { AlertTriangle, Home, Search } from 'lucide-react'; // Optional: for icons
+} from '@/components/ui/card';
+import { AlertTriangle, Home, Search } from 'lucide-react';
 
 export default function NotFound() {
   return (

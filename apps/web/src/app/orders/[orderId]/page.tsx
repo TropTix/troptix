@@ -1,11 +1,4 @@
-import {
-  Orders as PrismaOrder,
-  Tickets as PrismaTicket,
-  Events as PrismaEvent,
-  TicketTypes as PrismaTicketType,
-  OrderStatus,
-  OrderType,
-} from '@troptix/db';
+import { OrderStatus, OrderType } from '@troptix/db';
 import Link from 'next/link';
 import Image from 'next/image';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
@@ -14,58 +7,21 @@ import {
   CalendarDays,
   MapPin,
   Ticket,
-  FileText,
   ArrowUpRight,
   Redo,
   AlertTriangle,
+  Info,
 } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import prisma from '@/server/prisma';
 import { getDateFormatter } from '@/lib/dateUtils';
-import { getFormattedCurrency } from '@/lib/utils';
-
-// Kept for the receipt page, which types its own query against these.
-export interface EnrichedTicket extends PrismaTicket {
-  ticketType: PrismaTicketType | null;
-}
-export interface EnrichedOrder extends PrismaOrder {
-  event: PrismaEvent & { imageUrl?: string | null };
-  tickets: EnrichedTicket[];
-}
-
-async function getOrder(orderId: string) {
-  try {
-    return await prisma.orders.findUnique({
-      where: { id: orderId },
-      select: {
-        id: true,
-        createdAt: true,
-        total: true,
-        totalCents: true,
-        type: true,
-        cardType: true,
-        cardLast4: true,
-        status: true,
-        event: {
-          select: {
-            id: true,
-            name: true,
-            imageUrl: true,
-            startsAt: true,
-            endsAt: true,
-            venue: true,
-          },
-        },
-        _count: { select: { tickets: true } },
-      },
-    });
-  } catch (error) {
-    console.error('Failed to fetch order:', error);
-    return null;
-  }
-}
+import { getFormattedCurrency, formatOrderNumber } from '@/lib/utils';
+import {
+  getOrder,
+  getOrderTickets,
+  aggregateTicketsForReceipt,
+} from '@/server/orders';
 
 function CenteredState({ children }: { children: React.ReactNode }) {
   return (
@@ -75,7 +31,7 @@ function CenteredState({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function OrderDetailsPage(props: {
+export default async function OrderPage(props: {
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await props.params;
@@ -103,7 +59,7 @@ export default async function OrderDetailsPage(props: {
   const now = new Date();
   const isPastEvent = new Date(order.event.endsAt) < now;
 
-  if (order.status === OrderStatus.PENDING && !isPastEvent) {
+  if (order.status === OrderStatus.PENDING) {
     return (
       <CenteredState>
         <Redo className="h-6 w-6 animate-spin text-primary" />
@@ -124,14 +80,41 @@ export default async function OrderDetailsPage(props: {
     );
   }
 
-  const isFree =
-    order.type === OrderType.FREE || (order.totalCents ?? order.total) === 0;
-  const totalDisplay = getFormattedCurrency(
-    (order.totalCents ?? Math.round(order.total * 100)) / 100
-  );
+  if (order.status === OrderStatus.CANCELLED) {
+    return (
+      <CenteredState>
+        <Alert className="text-left">
+          <Info className="h-5 w-5" />
+          <AlertTitle className="font-semibold">Order cancelled</AlertTitle>
+          <AlertDescription className="mt-1">
+            This order for{' '}
+            <span className="font-medium text-foreground">
+              {order.event.name}
+            </span>{' '}
+            has been cancelled. Contact support if you have questions.
+          </AlertDescription>
+        </Alert>
+        <Button asChild variant="outline" className="mt-6">
+          <Link href="/orders">Back to your tickets</Link>
+        </Button>
+      </CenteredState>
+    );
+  }
+
+  const totalCents = order.totalCents ?? Math.round(order.total * 100);
+  const isFree = order.type === OrderType.FREE || totalCents === 0;
+  const totalDisplay = getFormattedCurrency(totalCents / 100);
   const isCompleted = order.status === OrderStatus.COMPLETED;
   const ticketCount = order._count.tickets;
   const poster = eventFlyerUrl(order.event.imageUrl) || DEFAULT_EVENT_IMAGE;
+  const orderNumber = formatOrderNumber(order.id);
+
+  const lines = isFree
+    ? []
+    : aggregateTicketsForReceipt(await getOrderTickets(orderId));
+  const subtotalCents =
+    order.subtotalCents ?? Math.round((order.subtotal ?? 0) * 100);
+  const feesCents = order.feesCents ?? Math.round((order.fees ?? 0) * 100);
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,7 +133,6 @@ export default async function OrderDetailsPage(props: {
         </div>
 
         <div className="space-y-4">
-          {/* Event */}
           <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
             <div className="relative h-[76px] w-[62px] flex-shrink-0 overflow-hidden rounded-xl">
               <Image
@@ -178,7 +160,6 @@ export default async function OrderDetailsPage(props: {
             </div>
           </div>
 
-          {/* Primary action — the tickets are the point */}
           <Button
             asChild
             size="lg"
@@ -190,7 +171,6 @@ export default async function OrderDetailsPage(props: {
             </Link>
           </Button>
 
-          {/* Order summary — receipt-style, machine data in mono */}
           <div>
             <div className="mb-1.5 px-1 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
               Order
@@ -199,7 +179,7 @@ export default async function OrderDetailsPage(props: {
               <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
                 <dt className="text-sm text-muted-foreground">Order number</dt>
                 <dd className="font-mono text-sm font-semibold tracking-wide">
-                  {order.id}
+                  {orderNumber}
                 </dd>
               </div>
               <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
@@ -251,18 +231,51 @@ export default async function OrderDetailsPage(props: {
             </dl>
           </div>
 
-          {/* Secondary actions */}
-          {!isFree && (
-            <Button
-              asChild
-              variant="outline"
-              className="h-12 w-full rounded-2xl font-semibold"
-            >
-              <Link href={`/orders/${order.id}/receipt`}>
-                <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
-                View full receipt
-              </Link>
-            </Button>
+          {!isFree && lines.length > 0 && (
+            <div>
+              <div className="mb-1.5 px-1 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Receipt
+              </div>
+              <dl className="overflow-hidden rounded-2xl border border-border bg-card">
+                {lines.map((line) => (
+                  <div
+                    key={line.key}
+                    className="flex items-center justify-between border-b border-border/70 px-4 py-3"
+                  >
+                    <dt className="min-w-0 text-sm">
+                      <span className="font-medium text-foreground">
+                        {line.name}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {' '}
+                        × {line.quantity}
+                      </span>
+                    </dt>
+                    <dd className="font-mono text-sm font-semibold">
+                      {getFormattedCurrency(line.total)}
+                    </dd>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between border-b border-border/70 px-4 py-2.5">
+                  <dt className="text-sm text-muted-foreground">Subtotal</dt>
+                  <dd className="font-mono text-sm">
+                    {getFormattedCurrency(subtotalCents / 100)}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between border-b border-border/70 px-4 py-2.5">
+                  <dt className="text-sm text-muted-foreground">Fees</dt>
+                  <dd className="font-mono text-sm">
+                    {getFormattedCurrency(feesCents / 100)}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between px-4 py-3">
+                  <dt className="text-sm font-semibold">Total</dt>
+                  <dd className="font-mono text-sm font-bold">
+                    {totalDisplay}
+                  </dd>
+                </div>
+              </dl>
+            </div>
           )}
 
           <Link

@@ -65,7 +65,6 @@ const CheckInButton = ({
         <Loader2 className="h-4 w-4 animate-spin mx-auto" />
       ) : (
         <>
-          {/* Mobile view: Icon only */}
           <span className="md:hidden">
             {currentStatus === 'AVAILABLE' ? (
               <Check className="h-4 w-4" />
@@ -73,7 +72,6 @@ const CheckInButton = ({
               <X className="h-4 w-4" />
             )}
           </span>
-          {/* Desktop view: Text only */}
           <span className="hidden md:block whitespace-nowrap">
             {currentStatus === 'AVAILABLE' ? 'Check In' : 'Check Out'}
           </span>
@@ -224,7 +222,6 @@ const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
     },
   ];
 
-  // Filter attendees based on search term
   const filteredAttendees = useMemo(() => {
     if (!searchTerm) return attendees;
 

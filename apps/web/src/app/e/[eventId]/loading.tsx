@@ -1,10 +1,9 @@
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Keep in sync with EventPageClean's layout.
+// Keep in sync with EventDetailView's layout.
 export default function EventDetailPageLoading() {
   return (
     <main className="min-h-screen bg-background">
-      {/* Mobile hero */}
       <Skeleton className="aspect-[4/5] w-full rounded-b-3xl md:hidden" />
 
       <div className="mx-auto w-full max-w-5xl px-5 py-6 md:px-8 md:py-14">
