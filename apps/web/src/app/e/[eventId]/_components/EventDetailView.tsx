@@ -204,10 +204,8 @@ export default function EventDetailView({
     <Share2 className="h-5 w-5" />
   );
 
-  // The organizer's flyer theme, derived from the stored palette — pure math,
-  // computed during SSR so the page arrives themed (no flash, no extraction).
-  // The wrapper scopes the CSS-variable overrides to the page: the checkout
-  // sheet (a portal) and the global nav deliberately stay on brand tokens.
+  // Derived during SSR so the page arrives themed. The wrapper scopes the
+  // overrides: the checkout sheet (a portal) and nav stay on brand tokens.
   const themeVars = (deriveThemeVars(event.pageTheme, event.flyerPalette) ??
     undefined) as CSSProperties | undefined;
 

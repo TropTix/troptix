@@ -1,9 +1,8 @@
 import { deriveThemeVars, themeAvailable } from './flyerTheme';
 import type { FlyerPalette } from '@troptix/api';
 
-// The module's header promises specific WCAG ratios; this file holds every
-// emitted pairing to them across adversarial palettes — pastels, near-blacks,
-// grayscale-dominant posters — where naive derivation is known to fail.
+// Holds every emitted pairing to the module's promised WCAG ratios, across
+// adversarial palettes where naive derivation is known to fail.
 
 function lum(triplet: string): number {
   const m = triplet.match(/^(-?[\d.]+) ([\d.]+)% ([\d.]+)%$/);
@@ -143,8 +142,7 @@ describe('deriveThemeVars contrast guardrails', () => {
   });
 
   it('a grayscale-dominant poster still themes in its art color, not red', () => {
-    // rgbToHsl reports hue 0 (red) for grayscale; without the dull-dominant
-    // guard the dark stage for a black poster came out maroon.
+    // Grayscale reports hue 0 (red) — without the guard, a maroon stage.
     const vars = deriveThemeVars('dark', PALETTES['black poster + blue art'])!;
     const hue = parseFloat(vars['--background'].split(' ')[0]);
     expect(Math.abs(hue - 213)).toBeLessThan(30); // #2F80ED's hue family

@@ -129,14 +129,10 @@ export default function EventForm({
     name: 'tickets',
   });
 
-  // Extraction runs once per flyer — the palette is stored on the event, so
-  // the public page never re-extracts. The just-uploaded File is sampled
-  // in-memory (same-origin object URL: no re-download, no CORS); the stored
-  // path is the fallback for analyzing older uploads. The token discards a
-  // stale run when a newer flyer supersedes it, and `isExtracting` gates Save
-  // so a mid-extraction submit can't persist the previous flyer's palette.
-  // Failure is NOT "no usable color": the stored palette is kept and the
-  // organizer is told, instead of silently downgrading their theme.
+  // Extraction runs once per flyer, on the in-memory File when available. The
+  // token discards runs superseded by a newer flyer, and `isExtracting` gates
+  // Save so a mid-extraction submit can't persist the previous palette.
+  // Failure keeps the stored palette — it is not "no usable color".
   const [isExtracting, setIsExtracting] = useState(false);
   const extractSeq = useRef(0);
   const refreshPalette = async (path: string | null, file?: File | null) => {
@@ -176,8 +172,6 @@ export default function EventForm({
     }
   };
 
-  // Cheapest known ticket for the preview's price line: the in-form rows on
-  // create, the server-provided types on edit.
   const previewPrices = (isEditing ? (ticketTypes ?? []) : fields).map(
     (t) => t.price ?? 0
   );

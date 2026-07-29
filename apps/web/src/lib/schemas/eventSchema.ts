@@ -29,8 +29,7 @@ export const eventFormSchema = z
     // plain string — not `.url()`, which would reject the path. Empty string
     // means "no image". Render via eventFlyerUrl().
     imageUrl: z.string().nullable().optional(),
-    // Page treatment + colors extracted from the flyer at upload
-    // (see @/lib/flyerTheme).
+    // Page treatment + palette extracted at upload (see @/lib/flyerTheme).
     pageTheme: eventPageThemeSchema.optional(),
     flyerPalette: flyerPaletteSchema.nullable().optional(),
   })

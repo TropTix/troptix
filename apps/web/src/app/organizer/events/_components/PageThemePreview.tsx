@@ -6,9 +6,7 @@ import type { CSSProperties } from 'react';
 import type { EventPageTheme, FlyerPalette } from '@troptix/api';
 import { deriveThemeVars } from '@/lib/flyerTheme';
 
-// A miniature of the public event page, themed exactly the way the page will
-// be: same derivation, same CSS variables, scoped to this box. Re-derives on
-// every prop change, so swatch and treatment picks show up as they're clicked.
+// Miniature of the public page: same derivation and CSS variables, scoped here.
 
 export function PageThemePreview({
   theme,

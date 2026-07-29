@@ -19,11 +19,8 @@ import Image from 'next/image';
 
 interface EventImageUploaderProps {
   currentImageUrl?: string | null;
-  /**
-   * `file` is the just-uploaded image still in memory — callers that need the
-   * pixels (palette extraction) read it instead of re-downloading the path.
-   * Null on removal.
-   */
+  /** `file` is the uploaded image still in memory (null on removal), so
+   * palette extraction can read pixels without re-downloading the path. */
   onUploadComplete: (path: string | null, file: File | null) => void;
 }
 

@@ -96,12 +96,9 @@ function solveL(c: HSL, vs: HSL, target: number, dir: 1 | -1): HSL {
   return { ...c, l };
 }
 
-// CTA pair: keep the flyer color while clearing two independent bars — the
-// fill must read as a shape against the page (≥3:1, the WCAG non-text
-// minimum; also covers --ring), and the label must read on the fill (≥4.5:1).
-// Candidates darken (light text) or lighten (dark text); any that sink back
-// into the ground are discarded, then the survivor that moves the fill least
-// from the flyer's actual color wins.
+// Two independent bars: the fill must read against the page (≥3:1, WCAG
+// non-text — also covers --ring) and the label on the fill (≥4.5:1). The
+// candidate that moves the fill least from the flyer's color wins.
 function solveCta(vib: HSL, bg: HSL): { fill: HSL; ink: HSL } {
   const away: 1 | -1 = bg.l > 0.5 ? -1 : 1;
   const base = solveL(vib, bg, 3, away);
@@ -187,8 +184,7 @@ export function extractFlyerPalette(
     const vibrant2 = vibrant
       ? (vivid.find((c) => hueDist(c.h, vibrant.h) > 40) ?? null)
       : null;
-    // The organizer-facing swatch row: best-first vivid colors, greedily kept
-    // only when visually distinct from every color already kept.
+    // Swatch-row candidates: kept only when visually distinct from the rest.
     const candidates: HSL[] = [];
     for (const c of vivid) {
       if (
@@ -237,8 +233,6 @@ const t = ({ h, s, l }: HSL) =>
 /** shadcn CSS variable overrides, as `--var: "H S% L%"` triplets. */
 export type ThemeVars = Record<string, string>;
 
-// The color that leads the theme: the organizer's swatch pick, falling back
-// to the extraction's auto-pick.
 function leadColor(palette: FlyerPalette): string | null {
   return palette.chosenAccent ?? palette.vibrant;
 }
@@ -255,8 +249,7 @@ function deriveWash(palette: FlyerPalette): ThemeVars | null {
   const H = src.h;
   const S = Math.min(0.5, Math.max(0.22, src.s * 0.5));
   const bg: HSL = { h: H, s: S, l: 0.94 };
-  // Secondary is the darkest light surface the theme emits — muted text solved
-  // against it clears every other surface (bg, card, muted) for free.
+  // The darkest light surface — muted text solved against it clears the rest.
   const secondary: HSL = { h: H, s: S, l: 0.88 };
   const ink = solveL({ h: H, s: 0.3, l: 0.14 }, bg, 12, -1);
   const muted = solveL({ h: H, s: 0.18, l: 0.5 }, secondary, 4.6, -1);
@@ -288,17 +281,14 @@ function deriveDark(palette: FlyerPalette): ThemeVars | null {
   if (palette.isGray || !lead) return null;
   const dominant = hexToHsl(palette.dominant);
   const vibrant = hexToHsl(lead);
-  // A desaturated dominant (grayscale converts to hue 0 — red) carries no
-  // real hue, and the saturation floor below would manufacture color from it.
-  // Unlike wash, a *dark* saturated dominant is fine here: it is already the
-  // stage. Only near-gray hands the hue to the vibrant color.
+  // Near-gray dominants report hue 0 (red) and the saturation floor would
+  // manufacture color from it — only those hand the hue to the vibrant color.
   const domDull = dominant.s < 0.15;
   const src = domDull ? vibrant : dominant;
   const H = src.h;
   const S = Math.min(0.45, Math.max(0.15, src.s * 0.55));
   const bg: HSL = { h: H, s: S, l: 0.1 };
-  // Secondary is the lightest dark surface — solving muted text against it
-  // clears bg, card, and muted too.
+  // The lightest dark surface — muted text solved against it clears the rest.
   const secondary: HSL = { h: H, s: S * 0.8, l: 0.2 };
   const ink: HSL = { h: H, s: 0.12, l: 0.94 };
   const muted = solveL({ h: H, s: 0.1, l: 0.55 }, secondary, 4.6, 1);

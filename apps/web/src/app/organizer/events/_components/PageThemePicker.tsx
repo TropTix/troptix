@@ -4,9 +4,7 @@ import type { EventPageTheme, FlyerPalette } from '@troptix/api';
 import { deriveThemeVars, themeAvailable } from '@/lib/flyerTheme';
 import { cn } from '@/lib/utils';
 
-// The organizer-facing page-theme control: three fixed treatments, never a
-// color picker. Wash/dark disable themselves (with the reason) until a flyer
-// with usable color is uploaded; the dots preview the actual derived theme.
+// Three fixed treatments, never a color picker — the system owns contrast.
 
 const OPTIONS: {
   value: EventPageTheme;
@@ -78,9 +76,6 @@ export function PageThemePicker({
   const usable = themeAvailable(palette);
   const candidates = palette?.candidates ?? [];
   const lead = palette ? (palette.chosenAccent ?? palette.vibrant) : null;
-  // Three distinct reasons a treatment is off, told apart honestly: no flyer
-  // at all, a flyer we have never analyzed (pre-existing events), and a flyer
-  // that was analyzed and genuinely has no usable color.
   const analyzed = palette !== null;
   const unavailableReason = !hasFlyer
     ? 'Upload a flyer to enable this.'
