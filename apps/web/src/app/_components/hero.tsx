@@ -182,29 +182,9 @@ function HeroCopy({ prefersReduced }: { prefersReduced: boolean }) {
       >
         <Link
           href="/organizer/events/new"
-          className="group relative inline-flex h-14 items-stretch rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_32px_-12px_hsl(var(--primary)/0.55)] transition-all hover:bg-primary/90 hover:shadow-[0_16px_40px_-14px_hsl(var(--primary)/0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="inline-flex h-14 items-center justify-center rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground shadow-[0_12px_32px_-12px_hsl(var(--primary)/0.55)] transition-all hover:bg-primary/90 hover:shadow-[0_16px_40px_-14px_hsl(var(--primary)/0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <span className="inline-flex items-center pl-7 pr-6 text-base font-semibold">
-            Create your event
-          </span>
-          <span
-            aria-hidden
-            className="my-2 border-l border-dashed border-primary-foreground/40"
-          />
-          <span
-            aria-hidden
-            className="inline-flex w-[84px] items-center justify-center text-[9px] font-bold uppercase tracking-[0.24em] text-primary-foreground/85 transition-transform group-hover:scale-105"
-          >
-            On sale
-          </span>
-          <span
-            aria-hidden
-            className="absolute -top-[7px] left-[calc(100%-84px)] h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-background"
-          />
-          <span
-            aria-hidden
-            className="absolute -bottom-[7px] left-[calc(100%-84px)] h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-background"
-          />
+          Create your event
         </Link>
 
         <Link
