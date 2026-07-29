@@ -12,19 +12,15 @@ import { PostHogProvider as PHProvider } from 'posthog-js/react';
 
 import AuthProvider from '@/components/AuthProvider';
 import UnifiedHeader from '@/components/ui/unified-header';
-import Footer from '@/components/ui/footer';
 
 const queryClient = new QueryClient();
 
 function GlobalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isOrganizer = pathname?.startsWith('/organizer');
-  const isEventPage = pathname?.startsWith('/e/');
   // Standard pages (and the event page) sit below the fixed header; organizer
   // pages manage their own top spacing.
   const offsetContent = !isOrganizer;
-  // The event page has its own sticky checkout bar, so it skips the footer.
-  const showFooter = !isOrganizer && !isEventPage;
 
   return (
     <div>
@@ -32,7 +28,6 @@ function GlobalLayout({ children }: { children: React.ReactNode }) {
       <div className={`flex-grow border-x ${offsetContent ? 'mt-16' : ''}`}>
         {children}
       </div>
-      {showFooter ? <Footer /> : null}
     </div>
   );
 }
