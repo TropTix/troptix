@@ -4,7 +4,9 @@ import type { EventPageTheme, FlyerPalette } from '@troptix/api';
 // organizer uploads a flyer (`extractFlyerPalette`); the palette is stored on
 // the event. Derivation (`deriveThemeVars`) is a pure function of the stored
 // palette — cheap enough to run on every render, server or client — and owns
-// the contrast guardrails: body ink ≥12:1, muted ≥4.6:1, CTA ≥4.5:1.
+// the contrast guardrails: body ink ≥12:1 vs the ground, muted text ≥4.6:1 vs
+// every emitted surface, CTA label ≥4.5:1 on its fill, and the CTA fill (and
+// so --ring) ≥3:1 vs the ground. flyerTheme.test.ts holds these to account.
 
 type HSL = { h: number; s: number; l: number };
 
@@ -94,16 +96,29 @@ function solveL(c: HSL, vs: HSL, target: number, dir: 1 | -1): HSL {
   return { ...c, l };
 }
 
-// CTA pair: keep the flyer color, darken (light text) or lighten (dark text) —
-// whichever moves the fill less from what the flyer actually looks like.
-function solveCta(vib: HSL): { fill: HSL; ink: HSL } {
+// CTA pair: keep the flyer color while clearing two independent bars — the
+// fill must read as a shape against the page (≥3:1, the WCAG non-text
+// minimum; also covers --ring), and the label must read on the fill (≥4.5:1).
+// Candidates darken (light text) or lighten (dark text); any that sink back
+// into the ground are discarded, then the survivor that moves the fill least
+// from the flyer's actual color wins.
+function solveCta(vib: HSL, bg: HSL): { fill: HSL; ink: HSL } {
+  const away: 1 | -1 = bg.l > 0.5 ? -1 : 1;
+  const base = solveL(vib, bg, 3, away);
   const darkInk: HSL = { h: vib.h, s: 0.55, l: 0.09 };
   const liteInk: HSL = { h: vib.h, s: 0.35, l: 0.97 };
-  const asDark = solveL(vib, liteInk, 4.5, -1);
-  const asLite = solveL(vib, darkInk, 4.5, 1);
-  return Math.abs(asDark.l - vib.l) <= Math.abs(asLite.l - vib.l)
-    ? { fill: asDark, ink: liteInk }
-    : { fill: asLite, ink: darkInk };
+  const candidates = [
+    { fill: solveL(base, liteInk, 4.5, -1), ink: liteInk },
+    { fill: solveL(base, darkInk, 4.5, 1), ink: darkInk },
+  ].filter((c) => contrast(c.fill, bg) >= 3 && contrast(c.fill, c.ink) >= 4.5);
+  if (candidates.length === 0) {
+    const fill = solveL({ ...vib, l: bg.l > 0.5 ? 0.35 : 0.65 }, bg, 4.5, away);
+    return { fill, ink: bg.l > 0.5 ? liteInk : darkInk };
+  }
+  candidates.sort(
+    (a, b) => Math.abs(a.fill.l - vib.l) - Math.abs(b.fill.l - vib.l)
+  );
+  return candidates[0];
 }
 
 function hueDist(a: number, b: number): number {
@@ -139,6 +154,9 @@ export function extractFlyerPalette(
       { n: number; r: number; g: number; b: number }
     >();
     for (let i = 0; i < px.length; i += 16) {
+      // Transparent pixels (logo-style PNGs) would otherwise read as opaque
+      // black and swamp the dominant bucket.
+      if (px[i + 3] < 125) continue;
       const r = px[i];
       const g = px[i + 1];
       const b = px[i + 2];
@@ -215,9 +233,12 @@ function deriveWash(palette: FlyerPalette): ThemeVars | null {
   const H = src.h;
   const S = Math.min(0.5, Math.max(0.22, src.s * 0.5));
   const bg: HSL = { h: H, s: S, l: 0.94 };
+  // Secondary is the darkest light surface the theme emits — muted text solved
+  // against it clears every other surface (bg, card, muted) for free.
+  const secondary: HSL = { h: H, s: S, l: 0.88 };
   const ink = solveL({ h: H, s: 0.3, l: 0.14 }, bg, 12, -1);
-  const muted = solveL({ h: H, s: 0.18, l: 0.5 }, bg, 4.6, -1);
-  const cta = solveCta(vibrant);
+  const muted = solveL({ h: H, s: 0.18, l: 0.5 }, secondary, 4.6, -1);
+  const cta = solveCta(vibrant, bg);
   const acc = palette.vibrant2 ? hexToHsl(palette.vibrant2) : vibrant;
   return {
     '--background': t(bg),
@@ -228,7 +249,7 @@ function deriveWash(palette: FlyerPalette): ThemeVars | null {
     '--popover-foreground': t(ink),
     '--primary': t(cta.fill),
     '--primary-foreground': t(cta.ink),
-    '--secondary': t({ h: H, s: S, l: 0.88 }),
+    '--secondary': t(secondary),
     '--secondary-foreground': t(ink),
     '--muted': t({ h: H, s: S, l: 0.91 }),
     '--muted-foreground': t(muted),
@@ -244,16 +265,24 @@ function deriveDark(palette: FlyerPalette): ThemeVars | null {
   if (palette.isGray || !palette.vibrant) return null;
   const dominant = hexToHsl(palette.dominant);
   const vibrant = hexToHsl(palette.vibrant);
-  const H = dominant.h;
-  const S = Math.min(0.45, Math.max(0.15, dominant.s * 0.55));
+  // A desaturated dominant (grayscale converts to hue 0 — red) carries no
+  // real hue, and the saturation floor below would manufacture color from it.
+  // Unlike wash, a *dark* saturated dominant is fine here: it is already the
+  // stage. Only near-gray hands the hue to the vibrant color.
+  const domDull = dominant.s < 0.15;
+  const src = domDull ? vibrant : dominant;
+  const H = src.h;
+  const S = Math.min(0.45, Math.max(0.15, src.s * 0.55));
   const bg: HSL = { h: H, s: S, l: 0.1 };
+  // Secondary is the lightest dark surface — solving muted text against it
+  // clears bg, card, and muted too.
+  const secondary: HSL = { h: H, s: S * 0.8, l: 0.2 };
   const ink: HSL = { h: H, s: 0.12, l: 0.94 };
-  const muted = solveL({ h: H, s: 0.1, l: 0.55 }, bg, 4.6, 1);
-  const lift = (c: HSL): HSL =>
-    solveL({ ...c, l: Math.max(c.l, 0.45) }, bg, 2.5, 1);
-  const cta = solveCta(lift(vibrant));
+  const muted = solveL({ h: H, s: 0.1, l: 0.55 }, secondary, 4.6, 1);
+  const cta = solveCta(vibrant, bg);
   const acc = solveCta(
-    lift(palette.vibrant2 ? hexToHsl(palette.vibrant2) : vibrant)
+    palette.vibrant2 ? hexToHsl(palette.vibrant2) : vibrant,
+    bg
   );
   return {
     '--background': t(bg),
@@ -264,7 +293,7 @@ function deriveDark(palette: FlyerPalette): ThemeVars | null {
     '--popover-foreground': t(ink),
     '--primary': t(cta.fill),
     '--primary-foreground': t(cta.ink),
-    '--secondary': t({ h: H, s: S * 0.8, l: 0.2 }),
+    '--secondary': t(secondary),
     '--secondary-foreground': t(ink),
     '--muted': t({ h: H, s: S * 0.8, l: 0.17 }),
     '--muted-foreground': t(muted),

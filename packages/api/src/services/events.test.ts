@@ -57,7 +57,12 @@ type OrgRel = {
 } | null;
 
 function fakeEvent(
-  overrides: { ticketTypes?: TierRow[]; organization?: OrgRel } = {}
+  overrides: {
+    ticketTypes?: TierRow[];
+    organization?: OrgRel;
+    pageTheme?: 'off' | 'wash' | 'dark';
+    flyerPalette?: unknown;
+  } = {}
 ) {
   return {
     id: 'ev-1',
@@ -75,6 +80,8 @@ function fakeEvent(
     address: '171 Ludlow St, New York, NY',
     latitude: 40.72,
     longitude: -73.98,
+    pageTheme: overrides.pageTheme ?? 'off',
+    flyerPalette: 'flyerPalette' in overrides ? overrides.flyerPalette : null,
     ticketTypes: overrides.ticketTypes ?? [],
   };
 }
@@ -199,6 +206,33 @@ describe('getEventDetail', () => {
     await expect(
       getEventDetail(prisma, { eventId: 'missing' })
     ).rejects.toThrow(NotFoundError);
+  });
+
+  it('passes through pageTheme and a valid flyerPalette', async () => {
+    const palette = {
+      dominant: '#131020',
+      vibrant: '#FF4D97',
+      vibrant2: null,
+      isGray: false,
+    };
+    const prisma = fakePrisma(
+      fakeEvent({ pageTheme: 'dark', flyerPalette: palette })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.pageTheme).toBe('dark');
+    expect(result.flyerPalette).toEqual(palette);
+  });
+
+  it('degrades malformed flyerPalette JSONB to null instead of throwing', async () => {
+    const prisma = fakePrisma(
+      fakeEvent({
+        pageTheme: 'wash',
+        flyerPalette: { dominant: 'not-a-hex', unexpected: true },
+      })
+    );
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.pageTheme).toBe('wash');
+    expect(result.flyerPalette).toBeNull();
   });
 });
 
