@@ -27,7 +27,6 @@ export function PublishRequirements({
 }: PublishRequirementsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Create a mock validation object with defaults for missing fields
   const validationData: EventForValidation = {
     id: eventData.id || '',
     name: eventData.name || null,
@@ -193,7 +192,6 @@ export function PublishRequirements({
             : `Complete ${totalCount - completedCount} more requirement${totalCount - completedCount === 1 ? '' : 's'} to publish.`}
         </CardDescription>
 
-        {/* Progress Bar */}
         <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
           <div
             className={cn(

@@ -108,7 +108,6 @@ export function TicketTypesTable({
             ))}
           </ul>
 
-          {/* Desktop: the full table. */}
           <div className="hidden rounded-md border md:block">
             <Table>
               <TableHeader>

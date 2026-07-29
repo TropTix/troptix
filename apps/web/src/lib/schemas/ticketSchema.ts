@@ -7,17 +7,17 @@ export const ticketTypeSchema = z
   .object({
     name: z.string().min(3, { message: 'Name must be at least 3 characters.' }),
     description: z.string().optional(),
-    price: z.coerce // Coerce input string to number
+    price: z.coerce
       .number({ invalid_type_error: 'Price must be a number.' })
       .min(0, { message: 'Price cannot be negative.' })
       .multipleOf(0.01, {
         message: 'Price must have at most 2 decimal places.',
       }),
-    capacity: z.coerce // Coerce input string to number
+    capacity: z.coerce
       .number({ invalid_type_error: 'Quantity must be a number.' })
       .int({ message: 'Quantity must be a whole number.' })
       .positive({ message: 'Quantity must be greater than zero.' }),
-    maxPurchasePerUser: z.coerce // Coerce input string to number
+    maxPurchasePerUser: z.coerce
       .number({ invalid_type_error: 'Max purchase must be a number.' })
       .int({ message: 'Max purchase must be a whole number.' })
       .positive({ message: 'Max purchase must be greater than zero.' }),
@@ -30,8 +30,7 @@ export const ticketTypeSchema = z
   })
   .refine((data) => data.saleEndsAt > data.saleStartsAt, {
     message: 'Sale end date must be after the start date.',
-    path: ['saleEndsAt'], // Associate error with the end date field
+    path: ['saleEndsAt'],
   });
 
-// Type inferred from the schema
 export type TicketTypeFormValues = z.infer<typeof ticketTypeSchema>;

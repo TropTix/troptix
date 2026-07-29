@@ -1,4 +1,3 @@
-// app/organizer/events/[eventId]/loading.tsx
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Card,

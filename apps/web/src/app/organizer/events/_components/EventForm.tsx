@@ -258,8 +258,6 @@ export default function EventForm({
           ) : null}
         </div>
 
-        {/* Right Column: Event Form */}
-
         <div className="md:w-2/3">
           <Form {...form}>
             <form

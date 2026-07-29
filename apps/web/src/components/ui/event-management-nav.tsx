@@ -8,8 +8,6 @@ import {
   Settings,
   Ticket,
   Users,
-  Percent,
-  ScanLine,
   ClipboardList,
   FileText,
   Pencil,
@@ -48,7 +46,6 @@ export function EventManagementNav({
         setIsPublished(!checked);
 
         if (response.status === 400 && data.validationErrors) {
-          // Handle validation errors specifically
           const requirements = data.missingRequirements || [];
           console.log('requirements', requirements);
           const errorMessage =
@@ -106,16 +103,6 @@ export function EventManagementNav({
       href: `/organizer/events/${eventId}/orders`,
       icon: ClipboardList,
     },
-    // {
-    //   name: 'Promotions',
-    //   href: `/organizer/events/${eventId}/promotions`,
-    //   icon: Percent,
-    // },
-    // {
-    //   name: 'Check-in',
-    //   href: `/organizer/events/${eventId}/check-in`,
-    //   icon: ScanLine,
-    // },
   ];
 
   return (

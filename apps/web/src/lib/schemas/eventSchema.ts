@@ -9,11 +9,11 @@ export const eventFormSchema = z
     description: z.string().min(1, { message: 'Description is required.' }),
     startsAt: z.date({
       required_error: 'Start date is required.',
-      invalid_type_error: 'Start date must be a valid date.', // Added invalid type error
+      invalid_type_error: 'Start date must be a valid date.',
     }),
     endsAt: z.date({
       required_error: 'End date is required.',
-      invalid_type_error: 'End date must be a valid date.', // Added invalid type error
+      invalid_type_error: 'End date must be a valid date.',
     }),
     venue: z.string().min(1, { message: 'Venue is required.' }),
     address: z.string().min(5, {

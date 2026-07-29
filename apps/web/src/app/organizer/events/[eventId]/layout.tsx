@@ -7,9 +7,8 @@ import { redirect } from 'next/navigation';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 
 async function getEvent(eventId: string, userId: string, userEmail?: string) {
-  // Verify access first
   await verifyEventAccess(userId, userEmail, eventId);
-  
+
   const event = await prisma.events.findUnique({
     where: getEventWhereClause(userId, userEmail, eventId),
     select: { name: true, isDraft: true },
@@ -20,19 +19,14 @@ async function getEvent(eventId: string, userId: string, userEmail?: string) {
   return event;
 }
 
-export default async function EventManagementLayout(
-  props: {
-    children: React.ReactNode;
-    params: Promise<{ eventId: string }>;
-  }
-) {
+export default async function EventManagementLayout(props: {
+  children: React.ReactNode;
+  params: Promise<{ eventId: string }>;
+}) {
   const params = await props.params;
 
-  const {
-    children
-  } = props;
+  const { children } = props;
 
-  // Get user and verify authentication
   const user = await getUserFromIdTokenCookie();
   if (!user) {
     redirect('/auth/signin');
@@ -42,7 +36,11 @@ export default async function EventManagementLayout(
 
   return (
     <div>
-      <EventManagementNav eventId={params.eventId} eventName={event.name} isDraft={event.isDraft} />
+      <EventManagementNav
+        eventId={params.eventId}
+        eventName={event.name}
+        isDraft={event.isDraft}
+      />
       <div className="mt-4 mx-auto">{children}</div>
     </div>
   );
