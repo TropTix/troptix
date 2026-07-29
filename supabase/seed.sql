@@ -50,7 +50,7 @@ insert into public."Events" (
     'Demo Organizer', 'seed_org_1',
     '2026-08-15 18:00:00', '2026-08-15 23:00:00',
     'Demo Arena', '123 Demo Street, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
-    'wash', '{"dominant": "#7A1E2B", "vibrant": "#FF4757", "vibrant2": "#FFD23F", "isGray": false, "candidates": ["#FF4757", "#FFD23F", "#7A1E2B"], "chosenAccent": null}'
+    'wash', '{"dominant": "#7A1E2B", "candidates": ["#FF4757", "#FFD23F", "#7A1E2B"], "chosenAccent": null}'
   ),
   (
     'seed_event_2', now(), now(), false,
@@ -58,7 +58,7 @@ insert into public."Events" (
     'Demo Organizer', 'seed_org_1',
     '2026-09-05 12:00:00', '2026-09-05 18:00:00',
     'Demo Park', '45 Community Ave, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
-    'dark', '{"dominant": "#131020", "vibrant": "#FF4D97", "vibrant2": "#FFB454", "isGray": false, "candidates": ["#FF4D97", "#FFB454", "#2EE6FF"], "chosenAccent": null}'
+    'dark', '{"dominant": "#131020", "candidates": ["#FF4D97", "#FFB454", "#2EE6FF"], "chosenAccent": null}'
   ),
   (
     'seed_event_3', now(), now(), false,

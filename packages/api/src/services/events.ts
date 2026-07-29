@@ -16,7 +16,7 @@ import type {
   EventSummary,
   EventTicket,
 } from '../contracts/events';
-import { flyerPaletteSchema } from '../contracts/events';
+import { parseStoredFlyerPalette } from '../contracts/events';
 import { calculateFeesCents } from './_shared/fees';
 import { toEventSummary } from './_shared/eventSummary';
 import { getSaleState } from './_shared/saleState';
@@ -199,12 +199,7 @@ export async function getEventDetail(
     latitude: event.latitude,
     longitude: event.longitude,
     pageTheme: event.pageTheme,
-    // Stored as JSONB; validate on the way out so a malformed row degrades to
-    // the brand theme instead of breaking the page.
-    flyerPalette: flyerPaletteSchema
-      .nullable()
-      .catch(null)
-      .parse(event.flyerPalette ?? null),
+    flyerPalette: parseStoredFlyerPalette(event.flyerPalette),
     fromPriceCents,
     tickets,
   };

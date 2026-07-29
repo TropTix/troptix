@@ -19,11 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AddTicketTypeDrawer } from '../_components/AddTicketTypeDrawer';
 import { DatePicker } from '@/components/DatePicker';
-import {
-  formatTime,
-  combineDateTime,
-  getDateRangeFormatter,
-} from '@/lib/dateUtils';
+import { formatTime, combineDateTime } from '@/lib/dateUtils';
 import {
   Card,
   CardContent,
@@ -59,7 +55,7 @@ import { PublishRequirements } from '@/components/PublishRequirements';
 import { createEvent, updateEvent } from '../_actions/eventActions';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
-import { extractFlyerPaletteFromUrl } from '@/lib/flyerTheme';
+import { extractFlyerPaletteFromUrl, themeAvailable } from '@/lib/flyerTheme';
 
 interface EventFormProps {
   initialData?: EventFormValues | null;
@@ -164,7 +160,7 @@ export default function EventForm({
         return;
       }
       form.setValue('flyerPalette', palette, { shouldDirty: true });
-      if (palette.isGray || !palette.vibrant) {
+      if (!themeAvailable(palette)) {
         form.setValue('pageTheme', 'off', { shouldDirty: true });
       }
     } finally {
@@ -175,12 +171,6 @@ export default function EventForm({
   const previewPrices = (isEditing ? (ticketTypes ?? []) : fields).map(
     (t) => t.price ?? 0
   );
-  const previewPriceLabel =
-    previewPrices.length === 0
-      ? 'Tickets'
-      : Math.min(...previewPrices) === 0
-        ? 'Free'
-        : `From $${Math.min(...previewPrices).toFixed(2)}`;
 
   const handleDrawerSubmit = (
     ticketData: TicketTypeFormValues & { id?: string }
@@ -346,12 +336,10 @@ export default function EventForm({
                 palette={form.watch('flyerPalette') ?? null}
                 name={form.watch('eventName')}
                 imageUrl={eventFlyerUrl(form.watch('imageUrl'))}
-                dateLabel={getDateRangeFormatter(
-                  form.watch('startsAt'),
-                  form.watch('endsAt')
-                )}
+                startsAt={form.watch('startsAt')}
+                endsAt={form.watch('endsAt')}
                 venue={form.watch('venue')}
-                priceLabel={previewPriceLabel}
+                prices={previewPrices}
               />
             </CardContent>
           </Card>

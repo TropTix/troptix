@@ -2,37 +2,42 @@
 
 import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
-import type { CSSProperties } from 'react';
 import type { EventPageTheme, FlyerPalette } from '@troptix/api';
-import { deriveThemeVars } from '@/lib/flyerTheme';
+import { themeStyle } from '@/lib/flyerTheme';
+import { getDateRangeFormatter } from '@/lib/dateUtils';
+import { priceLabelFor } from '@/lib/utils';
 
-// Miniature of the public page: same derivation and CSS variables, scoped here.
+// Miniature of the public page: same derivation, CSS variables, and label
+// formatters, so it stays a true preview by construction.
 
 export function PageThemePreview({
   theme,
   palette,
   name,
   imageUrl,
-  dateLabel,
+  startsAt,
+  endsAt,
   venue,
-  priceLabel,
+  /** Ticket prices in dollars; empty when none exist yet. */
+  prices,
 }: {
   theme: EventPageTheme;
   palette: FlyerPalette | null;
   name: string;
   imageUrl: string | null;
-  dateLabel: string;
+  startsAt: Date;
+  endsAt: Date;
   venue: string;
-  priceLabel: string;
+  prices: number[];
 }) {
-  const vars = (deriveThemeVars(theme, palette) ?? undefined) as
-    | CSSProperties
-    | undefined;
+  const priceLabel = priceLabelFor(
+    prices.length ? Math.round(Math.min(...prices) * 100) : null
+  );
 
   return (
     <div>
       <div
-        style={vars}
+        style={themeStyle(theme, palette)}
         className="overflow-hidden rounded-lg border border-input"
       >
         <div className="bg-background p-3 text-foreground">
@@ -53,7 +58,7 @@ export function PageThemePreview({
                 {name || 'Your event'}
               </div>
               <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                {dateLabel}
+                {getDateRangeFormatter(startsAt, endsAt)}
               </div>
               <div className="truncate text-xs text-muted-foreground">
                 {venue || 'Venue'}

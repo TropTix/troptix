@@ -23,24 +23,29 @@ const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
 export const flyerPaletteSchema = z.object({
   /** Most frequent color — often the poster's background. */
   dominant: hexColor,
-  /** Most saturated mid-lightness color; null when nothing qualifies. */
-  vibrant: hexColor.nullable(),
-  /** Second vivid color at least 40° of hue away; null when none. */
-  vibrant2: hexColor.nullable(),
-  /** True when the flyer has no usable color (mono/grayscale art). */
-  isGray: z.boolean(),
   /**
-   * The distinct vivid colors found, best first — the organizer's swatch row.
-   * Optional: palettes extracted before this field existed don't have it.
+   * Distinct vivid colors, best first — the organizer's swatch row. Empty
+   * means the flyer has no usable color and the themes are unavailable.
    */
-  candidates: z.array(hexColor).max(8).optional(),
+  candidates: z.array(hexColor).max(5),
   /**
    * The candidate the organizer picked to lead the theme; when absent the
-   * derivation uses `vibrant` (the auto-pick).
+   * lead is `candidates[0]` (the auto-pick).
    */
   chosenAccent: hexColor.nullable().optional(),
 });
 export type FlyerPalette = z.infer<typeof flyerPaletteSchema>;
+
+/**
+ * Read a stored (JSONB) palette: malformed rows degrade to null — "no
+ * palette", the brand theme — instead of breaking the read.
+ */
+export function parseStoredFlyerPalette(value: unknown): FlyerPalette | null {
+  return flyerPaletteSchema
+    .nullable()
+    .catch(null)
+    .parse(value ?? null);
+}
 
 // A public ticket tier, shaped for the event page's selection sheet. No
 // discount codes or raw inventory counts — `maxAllowedToAdd` (0 when sold out /

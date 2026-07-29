@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { EventPageTheme, FlyerPalette } from '@troptix/api';
 
 // Flyer-derived page theming. Extraction runs ONCE, client-side, when the
@@ -83,6 +84,21 @@ function luminance({ h, s, l }: HSL): number {
 function contrast(a: HSL, b: HSL): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
+}
+
+function parseTriplet(triplet: string): HSL {
+  const m = triplet.match(/^(-?[\d.]+) ([\d.]+)% ([\d.]+)%$/);
+  if (!m) throw new Error(`not an HSL triplet: "${triplet}"`);
+  return {
+    h: parseFloat(m[1]),
+    s: parseFloat(m[2]) / 100,
+    l: parseFloat(m[3]) / 100,
+  };
+}
+
+/** WCAG contrast between two `"H S% L%"` triplets (as emitted in ThemeVars). */
+export function tripletContrast(a: string, b: string): number {
+  return contrast(parseTriplet(a), parseTriplet(b));
 }
 
 /** Walk lightness until the color clears `target` contrast against `vs`. */
@@ -180,10 +196,6 @@ export function extractFlyerPalette(
     const vivid = clusters
       .filter((c) => c.s >= 0.22 && c.l >= 0.18 && c.l <= 0.85)
       .sort((a, b) => score(b) - score(a));
-    const vibrant = vivid[0] ?? null;
-    const vibrant2 = vibrant
-      ? (vivid.find((c) => hueDist(c.h, vibrant.h) > 40) ?? null)
-      : null;
     // Swatch-row candidates: kept only when visually distinct from the rest.
     const candidates: HSL[] = [];
     for (const c of vivid) {
@@ -198,9 +210,6 @@ export function extractFlyerPalette(
     }
     return {
       dominant: hslToHex(clusters[0]),
-      vibrant: vibrant ? hslToHex(vibrant) : null,
-      vibrant2: vibrant2 ? hslToHex(vibrant2) : null,
-      isGray: !clusters.some((c) => c.s >= 0.15 && c.share > 0.03),
       candidates: candidates.map(hslToHex),
       chosenAccent: null,
     };
@@ -233,19 +242,35 @@ const t = ({ h, s, l }: HSL) =>
 /** shadcn CSS variable overrides, as `--var: "H S% L%"` triplets. */
 export type ThemeVars = Record<string, string>;
 
-function leadColor(palette: FlyerPalette): string | null {
-  return palette.chosenAccent ?? palette.vibrant;
+/** The color that leads the theme: the organizer's pick, else the auto-pick. */
+export function leadColor(palette: FlyerPalette | null): string | null {
+  if (!palette) return null;
+  return palette.chosenAccent ?? palette.candidates[0] ?? null;
 }
 
-function deriveWash(palette: FlyerPalette): ThemeVars | null {
-  const lead = leadColor(palette);
-  if (palette.isGray || !lead) return null;
-  const dominant = hexToHsl(palette.dominant);
-  const vibrant = hexToHsl(lead);
+/** Whether a treatment can render for this palette (drives picker states). */
+export function themeAvailable(palette: FlyerPalette | null): boolean {
+  return leadColor(palette) !== null;
+}
+
+// The secondary color for chips/highlights: the first candidate far enough in
+// hue from the lead to read as a different color, else the lead itself.
+function accentColor(palette: FlyerPalette, lead: HSL): HSL {
+  const hex = palette.candidates.find(
+    (c) => hueDist(hexToHsl(c).h, lead.h) > 40
+  );
+  return hex ? hexToHsl(hex) : lead;
+}
+
+function deriveWash(
+  palette: FlyerPalette,
+  dominant: HSL,
+  lead: HSL
+): ThemeVars {
   // Poster backgrounds are usually near-black or near-white — no usable hue.
-  // Tint from the vibrant color in that case: it's the flyer's identity.
+  // Tint from the lead color in that case: it's the flyer's identity.
   const domDull = dominant.s < 0.25 || dominant.l < 0.2 || dominant.l > 0.85;
-  const src = domDull ? vibrant : dominant;
+  const src = domDull ? lead : dominant;
   const H = src.h;
   const S = Math.min(0.5, Math.max(0.22, src.s * 0.5));
   const bg: HSL = { h: H, s: S, l: 0.94 };
@@ -253,8 +278,8 @@ function deriveWash(palette: FlyerPalette): ThemeVars | null {
   const secondary: HSL = { h: H, s: S, l: 0.88 };
   const ink = solveL({ h: H, s: 0.3, l: 0.14 }, bg, 12, -1);
   const muted = solveL({ h: H, s: 0.18, l: 0.5 }, secondary, 4.6, -1);
-  const cta = solveCta(vibrant, bg);
-  const acc = palette.vibrant2 ? hexToHsl(palette.vibrant2) : vibrant;
+  const cta = solveCta(lead, bg);
+  const acc = accentColor(palette, lead);
   return {
     '--background': t(bg),
     '--foreground': t(ink),
@@ -276,15 +301,15 @@ function deriveWash(palette: FlyerPalette): ThemeVars | null {
   };
 }
 
-function deriveDark(palette: FlyerPalette): ThemeVars | null {
-  const lead = leadColor(palette);
-  if (palette.isGray || !lead) return null;
-  const dominant = hexToHsl(palette.dominant);
-  const vibrant = hexToHsl(lead);
+function deriveDark(
+  palette: FlyerPalette,
+  dominant: HSL,
+  lead: HSL
+): ThemeVars {
   // Near-gray dominants report hue 0 (red) and the saturation floor would
-  // manufacture color from it — only those hand the hue to the vibrant color.
+  // manufacture color from it — only those hand the hue to the lead color.
   const domDull = dominant.s < 0.15;
-  const src = domDull ? vibrant : dominant;
+  const src = domDull ? lead : dominant;
   const H = src.h;
   const S = Math.min(0.45, Math.max(0.15, src.s * 0.55));
   const bg: HSL = { h: H, s: S, l: 0.1 };
@@ -292,11 +317,8 @@ function deriveDark(palette: FlyerPalette): ThemeVars | null {
   const secondary: HSL = { h: H, s: S * 0.8, l: 0.2 };
   const ink: HSL = { h: H, s: 0.12, l: 0.94 };
   const muted = solveL({ h: H, s: 0.1, l: 0.55 }, secondary, 4.6, 1);
-  const cta = solveCta(vibrant, bg);
-  const acc = solveCta(
-    palette.vibrant2 ? hexToHsl(palette.vibrant2) : vibrant,
-    bg
-  );
+  const cta = solveCta(lead, bg);
+  const acc = solveCta(accentColor(palette, lead), bg);
   return {
     '--background': t(bg),
     '--foreground': t(ink),
@@ -328,10 +350,21 @@ export function deriveThemeVars(
   palette: FlyerPalette | null
 ): ThemeVars | null {
   if (theme === 'off' || !palette) return null;
-  return theme === 'wash' ? deriveWash(palette) : deriveDark(palette);
+  const lead = leadColor(palette);
+  if (!lead) return null;
+  const dominant = hexToHsl(palette.dominant);
+  const leadHsl = hexToHsl(lead);
+  return theme === 'wash'
+    ? deriveWash(palette, dominant, leadHsl)
+    : deriveDark(palette, dominant, leadHsl);
 }
 
-/** Whether a treatment can render for this palette (drives picker states). */
-export function themeAvailable(palette: FlyerPalette | null): boolean {
-  return !!palette && !palette.isGray && !!palette.vibrant;
+/** `deriveThemeVars` as a React inline style (undefined = brand theme). */
+export function themeStyle(
+  theme: EventPageTheme,
+  palette: FlyerPalette | null
+): CSSProperties | undefined {
+  return (deriveThemeVars(theme, palette) ?? undefined) as
+    | CSSProperties
+    | undefined;
 }

@@ -1,6 +1,6 @@
 import { BackButton } from '@/components/ui/back-button';
 import prisma from '@/server/prisma';
-import { flyerPaletteSchema } from '@troptix/api';
+import { parseStoredFlyerPalette } from '@troptix/api';
 import EventForm from '../../_components/EventForm';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
@@ -76,11 +76,7 @@ export default async function EditEventPage(props: EditEventPageProps) {
     imageUrl: event?.imageUrl ?? '',
     description: event?.description ?? '',
     pageTheme: event.pageTheme,
-    // JSONB → validated shape; malformed rows degrade to "no palette".
-    flyerPalette: flyerPaletteSchema
-      .nullable()
-      .catch(null)
-      .parse(event.flyerPalette ?? null),
+    flyerPalette: parseStoredFlyerPalette(event.flyerPalette),
   };
 
   // Host brand for the read-only "Hosted by" line on the form. Paid ticketing

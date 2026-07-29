@@ -211,9 +211,6 @@ describe('getEventDetail', () => {
   it('passes through pageTheme and a valid flyerPalette', async () => {
     const palette = {
       dominant: '#131020',
-      vibrant: '#FF4D97',
-      vibrant2: null,
-      isGray: false,
       candidates: ['#FF4D97', '#2EE6FF'],
       chosenAccent: '#2EE6FF',
     };

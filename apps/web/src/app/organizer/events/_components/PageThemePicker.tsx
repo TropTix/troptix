@@ -1,7 +1,8 @@
 'use client';
 
 import type { EventPageTheme, FlyerPalette } from '@troptix/api';
-import { deriveThemeVars, themeAvailable } from '@/lib/flyerTheme';
+import { deriveThemeVars, leadColor, themeAvailable } from '@/lib/flyerTheme';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 // Three fixed treatments, never a color picker — the system owns contrast.
@@ -75,7 +76,7 @@ export function PageThemePicker({
 }) {
   const usable = themeAvailable(palette);
   const candidates = palette?.candidates ?? [];
-  const lead = palette ? (palette.chosenAccent ?? palette.vibrant) : null;
+  const lead = leadColor(palette);
   const analyzed = palette !== null;
   const unavailableReason = !hasFlyer
     ? 'Upload a flyer to enable this.'
@@ -144,14 +145,15 @@ export function PageThemePicker({
         })}
       </div>
       {hasFlyer && !analyzed && onAnalyze && (
-        <button
+        <Button
           type="button"
+          variant="link"
           onClick={onAnalyze}
           disabled={disabled || analyzing}
-          className="text-xs font-medium text-primary underline underline-offset-2 disabled:opacity-50"
+          className="h-auto p-0 text-xs"
         >
           {analyzing ? 'Analyzing flyer…' : 'Analyze flyer colors'}
-        </button>
+        </Button>
       )}
     </div>
   );

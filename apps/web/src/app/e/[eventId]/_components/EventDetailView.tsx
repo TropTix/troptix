@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -15,24 +15,18 @@ import {
 } from 'lucide-react';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
-import { getFormattedCurrency, cn } from '@/lib/utils';
+import { priceLabelFor, cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Banner } from '@/components/ui/banner';
 import { OrgAvatar } from '@/components/OrgAvatar';
 import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import type { EventDetail } from '@troptix/api';
-import { deriveThemeVars } from '@/lib/flyerTheme';
+import { themeStyle } from '@/lib/flyerTheme';
 import CheckoutSheet from './CheckoutSheet';
 import VenueMap from './VenueMap';
 
 // Public event page (Luma-light). Immersive poster hero on mobile, two-column
 // on desktop. See docs/plans/2026-06-event-page-redesign.md.
-
-function priceLabelFor(fromPriceCents: number | null): string {
-  if (fromPriceCents == null) return 'No tickets available';
-  if (fromPriceCents === 0) return 'Free';
-  return `From ${getFormattedCurrency(fromPriceCents / 100)} USD`;
-}
 
 const SECTION_LABEL =
   'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
@@ -205,12 +199,13 @@ export default function EventDetailView({
   );
 
   // Derived during SSR so the page arrives themed. The wrapper scopes the
-  // overrides: the checkout sheet (a portal) and nav stay on brand tokens.
-  const themeVars = (deriveThemeVars(event.pageTheme, event.flyerPalette) ??
-    undefined) as CSSProperties | undefined;
+  // overrides and owns the ink — every descendant inherits themed text color
+  // without per-region repeats. The checkout sheet (a portal) and the global
+  // nav sit outside it and stay on brand tokens.
+  const themeVars = themeStyle(event.pageTheme, event.flyerPalette);
 
   return (
-    <div style={themeVars}>
+    <div style={themeVars} className="text-foreground">
       {event.isDraft && (
         <Banner
           title="Draft Mode: Event Not Published"
@@ -353,7 +348,7 @@ export default function EventDetailView({
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 animate-in border-t border-border bg-background/95 text-foreground backdrop-blur-xl duration-300 slide-in-from-bottom">
+      <div className="fixed inset-x-0 bottom-0 z-40 animate-in border-t border-border bg-background/95 backdrop-blur-xl duration-300 slide-in-from-bottom">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-5 py-3.5">
           <div className="min-w-0 flex-1">
             <div className="text-lg font-extrabold">{priceLabel}</div>
