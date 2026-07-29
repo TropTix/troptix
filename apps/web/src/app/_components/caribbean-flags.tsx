@@ -24,7 +24,7 @@ export default function CaribbeanFlags() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % caribbeanCountries.length);
-    }, 2000); // Change every 2 seconds
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);

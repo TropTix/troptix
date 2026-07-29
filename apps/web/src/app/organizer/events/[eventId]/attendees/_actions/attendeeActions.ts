@@ -8,7 +8,6 @@ import { getEventWhereClause, verifyEventAccess } from '@/server/accessControl';
 
 export async function toggleTicketStatus(ticketId: string, eventId: string) {
   try {
-    // Get the authenticated user
     const user = await getUserFromIdTokenCookie();
     if (!user) {
       throw new Error('User not authenticated');
@@ -17,7 +16,6 @@ export async function toggleTicketStatus(ticketId: string, eventId: string) {
     const userEmail = user.email;
     await verifyEventAccess(userId, userEmail, eventId);
 
-    // First, get the current ticket to check ownership and current status
     const ticket = await prisma.tickets.findFirst({
       where: {
         id: ticketId,
@@ -34,13 +32,11 @@ export async function toggleTicketStatus(ticketId: string, eventId: string) {
       throw new Error('Ticket not found or unauthorized');
     }
 
-    // Toggle the status
     const newStatus: TicketStatus =
       ticket.status === TicketStatus.AVAILABLE
         ? TicketStatus.NOT_AVAILABLE
         : TicketStatus.AVAILABLE;
 
-    // Update the ticket status and record/clear the check-in time.
     const updatedTicket = await prisma.tickets.update({
       where: {
         id: ticketId,
@@ -57,7 +53,6 @@ export async function toggleTicketStatus(ticketId: string, eventId: string) {
       },
     });
 
-    // Revalidate the attendees page to reflect the changes
     revalidatePath(`/organizer/events/${eventId}/attendees`);
 
     return {

@@ -21,10 +21,10 @@ import { toast } from 'sonner';
 type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading';
 
 function ToastTester() {
-  const [toastType, setToastType] = useState<ToastType>('success'); // State for selected toast type
+  const [toastType, setToastType] = useState<ToastType>('success');
   const [customMessage, setCustomMessage] = useState<string>('');
   const [customDescription, setCustomDescription] = useState<string>('');
-  const [isOpen, setIsOpen] = useState(false); // State for Collapsible
+  const [isOpen, setIsOpen] = useState(false);
 
   const getDefaultMessage = (type: ToastType): string => {
     return `Test Toast ${type.charAt(0).toUpperCase() + type.slice(1)}`;
@@ -84,7 +84,7 @@ function ToastTester() {
         {' '}
         <Select
           value={toastType}
-          onValueChange={(value: ToastType) => setToastType(value)} // Update state on change
+          onValueChange={(value: ToastType) => setToastType(value)}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select toast type" />

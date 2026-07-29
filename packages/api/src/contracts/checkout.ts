@@ -71,8 +71,6 @@ export const validatedItemMessageSchema = z.enum([
 ]);
 export type ValidatedItemMessage = z.infer<typeof validatedItemMessageSchema>;
 
-// --- CheckoutTicket -----------------------------------------------------------
-
 export const checkoutTicketSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -103,8 +101,6 @@ export type CheckoutConfigResponse = z.infer<
   typeof checkoutConfigResponseSchema
 >;
 
-// --- applyCode ----------------------------------------------------------------
-
 export const applyCodeInputSchema = z.object({
   eventId: z.string().min(1),
   code: z.string().min(1).max(100),
@@ -125,8 +121,6 @@ export const applyCodeResponseSchema = z.discriminatedUnion('type', [
   }),
 ]);
 export type ApplyCodeResponse = z.infer<typeof applyCodeResponseSchema>;
-
-// --- getCheckoutConfig input --------------------------------------------------
 
 export const checkoutConfigInputSchema = z.object({
   eventId: z.string().min(1),

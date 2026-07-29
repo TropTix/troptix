@@ -27,15 +27,12 @@ import { useContext, useEffect, useState } from 'react';
 import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
 
-// Helper to check if the user is a platform owner
 // This is also checked on the backed
 const isPlatformOwner = (email?: string | null): boolean => {
   if (!email) return false;
   return email.endsWith('@usetroptix.com');
 };
 
-// Helper to generate user initials for the avatar
-// Accepts user object with firstName, lastName, email
 const getUserInitials = (user?: {
   firstName?: string | null;
   lastName?: string | null;
@@ -58,7 +55,6 @@ export default function UnifiedHeader() {
   const { user } = useContext(TropTixContext);
   const pathname = usePathname();
 
-  // Effect to handle scroll-based styling
   useEffect(() => {
     const handleScroll = () => {
       setHasScrolled(window.scrollY > 10);

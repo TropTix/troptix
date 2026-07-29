@@ -5,7 +5,6 @@ describe('useScreenSize', () => {
   const originalInnerWidth = window.innerWidth;
 
   afterEach(() => {
-    // Reset the window width after each test
     window.innerWidth = originalInnerWidth;
     act(() => {
       window.dispatchEvent(new Event('resize'));

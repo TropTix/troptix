@@ -37,13 +37,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChevronDownIcon } from 'lucide-react';
 
-// Extend TableMeta if it's not already done globally or in specific implementations
-// declare module '@tanstack/table-core' {
-//   interface TableMeta<TData extends RowData> {
-//      [key: string]: any; // Allow flexible meta properties
-//   }
-// }
-
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];

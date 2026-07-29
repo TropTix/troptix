@@ -1,4 +1,3 @@
-// app/organizer/dashboard/loading.tsx (or appropriate path)
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Card,

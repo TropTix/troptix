@@ -14,13 +14,11 @@ export type PlatformEventData = {
   isDraft: boolean;
   status: 'Active' | 'Upcoming' | 'Past' | 'Draft';
   createdAt: Date;
-  // Owner information
   organizer: {
     id: string;
     name: string | null;
     email: string | null;
   };
-  // Basic stats
   stats: {
     totalOrders: number;
     totalRevenue: number;
@@ -32,12 +30,10 @@ export async function getAllPlatformEvents(
   userId: string,
   userEmail?: string
 ): Promise<PlatformEventData[]> {
-  // Verify user has platform access
   if (!isPlatformOwner(userEmail)) {
     notFound();
   }
 
-  // Fetch all events with organizer info and basic stats
   const eventsRaw = await prisma.events.findMany({
     select: {
       id: true,
@@ -65,7 +61,6 @@ export async function getAllPlatformEvents(
     ],
   });
 
-  // Get organizer information for all unique organizer IDs
   const organizerIds = Array.from(
     new Set(eventsRaw.map((event) => event.organizerUserId))
   );
@@ -79,17 +74,14 @@ export async function getAllPlatformEvents(
     },
   });
 
-  // Create organizer lookup map
   // TODO: This is a hack to get the organizer name. We should store the organizer name in the event table.
   // I just don't want to change the schema right now.
   const organizerMap = new Map(organizers.map((org) => [org.id, org]));
 
-  // Process events with status calculation and stats
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const processedEvents: PlatformEventData[] = eventsRaw.map((event) => {
-    // Calculate status
     let status: PlatformEventData['status'];
     if (event.isDraft) {
       status = 'Draft';
@@ -101,7 +93,6 @@ export async function getAllPlatformEvents(
       status = 'Upcoming';
     }
 
-    // Calculate stats
     const totalRevenue = event.orders.reduce(
       (sum, order) => sum + order.total,
       0
@@ -111,7 +102,6 @@ export async function getAllPlatformEvents(
       0
     );
 
-    // Get organizer info
     const organizer = organizerMap.get(event.organizerUserId) || {
       id: event.organizerUserId,
       email: null,

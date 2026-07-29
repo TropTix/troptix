@@ -71,13 +71,11 @@ export default function Features() {
   return (
     <section className="py-24 bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          // className="text-center mb-16"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             Everything you need for amazing events
@@ -88,13 +86,11 @@ export default function Features() {
           </p>
         </motion.div>
 
-        {/* Features grid */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          // className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
         >
           {features.map((feature, index) => (
             <FeatureTile
@@ -120,21 +116,17 @@ function FeatureTile({ feature, index, variants }) {
         scale: 1.05,
         transition: { type: 'spring', stiffness: 300, damping: 20 },
       }}
-      // className="group relative p-8 bg-card rounded-2xl border border-border hover:border-primary/20 transition-all duration-300 hover:shadow-xl"
     >
-      {/* Gradient background on hover */}
       <div
         className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity duration-300`}
       />
 
-      {/* Icon */}
       <div
         className={`relative w-12 h-12 mb-6 rounded-xl bg-gradient-to-br ${feature.color} p-3 shadow-lg`}
       >
         <Icon className="w-6 h-6 text-white" />
       </div>
 
-      {/* Content */}
       <div className="relative">
         <h3 className="text-xl font-semibold text-foreground mb-3 group-hover:text-primary transition-colors">
           {feature.title}

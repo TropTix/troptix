@@ -14,7 +14,6 @@ interface EditEventPageProps {
 
 async function getEvent(eventId: string, userId: string, userEmail?: string) {
   try {
-    // Verify access first
     await verifyEventAccess(userId, userEmail, eventId);
 
     const event = await prisma.events.findUnique({
@@ -46,7 +45,6 @@ export default async function EditEventPage(props: EditEventPageProps) {
   const params = await props.params;
   const { eventId } = params;
 
-  // Get user and verify authentication
   const user = await getUserFromIdTokenCookie();
   if (!user) {
     redirect('/auth/signin');

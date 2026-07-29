@@ -1,9 +1,6 @@
 import prisma from './prisma';
 import { notFound } from 'next/navigation';
 
-/**
- * Check if an email belongs to a platform owner
- */
 export function isPlatformOwner(email: string | undefined): boolean {
   if (!email) return false;
   return email.endsWith('@usetroptix.com');

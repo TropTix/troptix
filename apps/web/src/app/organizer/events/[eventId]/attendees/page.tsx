@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/mobile-stats-card';
 import { Users, UserCheck, UserX, Ticket } from 'lucide-react';
 
-// Define the structure of the data we expect to fetch
 export interface FetchedTicketData {
   id: string;
   createdAt: Date | null;
@@ -36,7 +35,6 @@ async function fetchTickets(
   userEmail?: string
 ) {
   try {
-    // Verify access first
     await verifyEventAccess(userId, userEmail, eventId);
 
     const tickets = await prisma.tickets.findMany({
@@ -108,18 +106,15 @@ export default async function EventAttendeesPage(
   const { eventId } = params;
   const user = await getUserFromIdTokenCookie();
 
-  // Redirect to signin if user is not authenticated
   if (!user) {
     redirect('/auth/signin');
   }
 
-  // Fetch the initial list of attendees (tickets) and event info
   const [initialAttendees, eventName] = await Promise.all([
     fetchTickets(eventId, user.uid, user.email),
     fetchEventName(eventId, user.uid, user.email),
   ]);
 
-  // Calculate statistics
   const totalAttendees = initialAttendees.length;
   const checkedInAttendees = initialAttendees.filter(
     (ticket) => ticket.status === 'NOT_AVAILABLE'
