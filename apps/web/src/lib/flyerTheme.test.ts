@@ -69,6 +69,14 @@ const PALETTES: Record<string, FlyerPalette> = {
     vibrant2: '#FF7A1C',
     isGray: false,
   },
+  'organizer picked a non-default swatch': {
+    dominant: '#131020',
+    vibrant: '#FF4D97',
+    vibrant2: '#FFB454',
+    isGray: false,
+    candidates: ['#FF4D97', '#FFB454', '#2EE6FF'],
+    chosenAccent: '#2EE6FF',
+  },
 };
 
 const THEMES = ['wash', 'dark'] as const;
@@ -123,6 +131,16 @@ describe('deriveThemeVars contrast guardrails', () => {
       });
     }
   }
+
+  it('the chosen swatch leads the CTA instead of the auto-pick', () => {
+    const palette = PALETTES['organizer picked a non-default swatch'];
+    for (const theme of THEMES) {
+      const hue = parseFloat(
+        deriveThemeVars(theme, palette)!['--primary'].split(' ')[0]
+      );
+      expect(Math.abs(hue - 189)).toBeLessThan(25); // #2EE6FF cyan, not pink
+    }
+  });
 
   it('a grayscale-dominant poster still themes in its art color, not red', () => {
     // rgbToHsl reports hue 0 (red) for grayscale; without the dull-dominant

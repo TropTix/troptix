@@ -187,11 +187,26 @@ export function extractFlyerPalette(
     const vibrant2 = vibrant
       ? (vivid.find((c) => hueDist(c.h, vibrant.h) > 40) ?? null)
       : null;
+    // The organizer-facing swatch row: best-first vivid colors, greedily kept
+    // only when visually distinct from every color already kept.
+    const candidates: HSL[] = [];
+    for (const c of vivid) {
+      if (
+        candidates.every(
+          (k) => hueDist(k.h, c.h) > 25 || Math.abs(k.l - c.l) > 0.25
+        )
+      ) {
+        candidates.push(c);
+      }
+      if (candidates.length === 5) break;
+    }
     return {
       dominant: hslToHex(clusters[0]),
       vibrant: vibrant ? hslToHex(vibrant) : null,
       vibrant2: vibrant2 ? hslToHex(vibrant2) : null,
       isGray: !clusters.some((c) => c.s >= 0.15 && c.share > 0.03),
+      candidates: candidates.map(hslToHex),
+      chosenAccent: null,
     };
   } catch {
     return null;
@@ -222,10 +237,17 @@ const t = ({ h, s, l }: HSL) =>
 /** shadcn CSS variable overrides, as `--var: "H S% L%"` triplets. */
 export type ThemeVars = Record<string, string>;
 
+// The color that leads the theme: the organizer's swatch pick, falling back
+// to the extraction's auto-pick.
+function leadColor(palette: FlyerPalette): string | null {
+  return palette.chosenAccent ?? palette.vibrant;
+}
+
 function deriveWash(palette: FlyerPalette): ThemeVars | null {
-  if (palette.isGray || !palette.vibrant) return null;
+  const lead = leadColor(palette);
+  if (palette.isGray || !lead) return null;
   const dominant = hexToHsl(palette.dominant);
-  const vibrant = hexToHsl(palette.vibrant);
+  const vibrant = hexToHsl(lead);
   // Poster backgrounds are usually near-black or near-white — no usable hue.
   // Tint from the vibrant color in that case: it's the flyer's identity.
   const domDull = dominant.s < 0.25 || dominant.l < 0.2 || dominant.l > 0.85;
@@ -262,9 +284,10 @@ function deriveWash(palette: FlyerPalette): ThemeVars | null {
 }
 
 function deriveDark(palette: FlyerPalette): ThemeVars | null {
-  if (palette.isGray || !palette.vibrant) return null;
+  const lead = leadColor(palette);
+  if (palette.isGray || !lead) return null;
   const dominant = hexToHsl(palette.dominant);
-  const vibrant = hexToHsl(palette.vibrant);
+  const vibrant = hexToHsl(lead);
   // A desaturated dominant (grayscale converts to hue 0 — red) carries no
   // real hue, and the saturation floor below would manufacture color from it.
   // Unlike wash, a *dark* saturated dominant is fine here: it is already the

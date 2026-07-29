@@ -19,7 +19,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AddTicketTypeDrawer } from '../_components/AddTicketTypeDrawer';
 import { DatePicker } from '@/components/DatePicker';
-import { formatTime, combineDateTime } from '@/lib/dateUtils';
+import {
+  formatTime,
+  combineDateTime,
+  getDateRangeFormatter,
+} from '@/lib/dateUtils';
 import {
   Card,
   CardContent,
@@ -50,6 +54,7 @@ import {
 import { usePlacesWidget } from 'react-google-autocomplete';
 import { EventImageUploader } from '../_components/EventImageUpload';
 import { PageThemePicker } from '../_components/PageThemePicker';
+import { PageThemePreview } from '../_components/PageThemePreview';
 import { PublishRequirements } from '@/components/PublishRequirements';
 import { createEvent, updateEvent } from '../_actions/eventActions';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
@@ -170,6 +175,18 @@ export default function EventForm({
       if (token === extractSeq.current) setIsExtracting(false);
     }
   };
+
+  // Cheapest known ticket for the preview's price line: the in-form rows on
+  // create, the server-provided types on edit.
+  const previewPrices = (isEditing ? (ticketTypes ?? []) : fields).map(
+    (t) => t.price ?? 0
+  );
+  const previewPriceLabel =
+    previewPrices.length === 0
+      ? 'Tickets'
+      : Math.min(...previewPrices) === 0
+        ? 'Free'
+        : `From $${Math.min(...previewPrices).toFixed(2)}`;
 
   const handleDrawerSubmit = (
     ticketData: TicketTypeFormValues & { id?: string }
@@ -301,7 +318,7 @@ export default function EventForm({
                 Color your event page from your flyer.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <FormField
                 control={form.control}
                 name="pageTheme"
@@ -318,8 +335,29 @@ export default function EventForm({
                     onAnalyze={() =>
                       void refreshPalette(form.getValues('imageUrl') ?? null)
                     }
+                    onPickAccent={(hex) => {
+                      const palette = form.getValues('flyerPalette');
+                      if (!palette) return;
+                      form.setValue(
+                        'flyerPalette',
+                        { ...palette, chosenAccent: hex },
+                        { shouldDirty: true }
+                      );
+                    }}
                   />
                 )}
+              />
+              <PageThemePreview
+                theme={form.watch('pageTheme') ?? 'off'}
+                palette={form.watch('flyerPalette') ?? null}
+                name={form.watch('eventName')}
+                imageUrl={eventFlyerUrl(form.watch('imageUrl'))}
+                dateLabel={getDateRangeFormatter(
+                  form.watch('startsAt'),
+                  form.watch('endsAt')
+                )}
+                venue={form.watch('venue')}
+                priceLabel={previewPriceLabel}
               />
             </CardContent>
           </Card>

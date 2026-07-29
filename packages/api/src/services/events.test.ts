@@ -214,6 +214,8 @@ describe('getEventDetail', () => {
       vibrant: '#FF4D97',
       vibrant2: null,
       isGray: false,
+      candidates: ['#FF4D97', '#2EE6FF'],
+      chosenAccent: '#2EE6FF',
     };
     const prisma = fakePrisma(
       fakeEvent({ pageTheme: 'dark', flyerPalette: palette })

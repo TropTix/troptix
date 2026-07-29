@@ -61,6 +61,7 @@ export function PageThemePicker({
   disabled,
   analyzing,
   onAnalyze,
+  onPickAccent,
 }: {
   value: EventPageTheme;
   onChange: (theme: EventPageTheme) => void;
@@ -71,8 +72,12 @@ export function PageThemePicker({
   analyzing?: boolean;
   /** Extract from the stored flyer — for events saved before analysis existed. */
   onAnalyze?: () => void;
+  /** The organizer picked which extracted color leads the theme. */
+  onPickAccent?: (hex: string) => void;
 }) {
   const usable = themeAvailable(palette);
+  const candidates = palette?.candidates ?? [];
+  const lead = palette ? (palette.chosenAccent ?? palette.vibrant) : null;
   // Three distinct reasons a treatment is off, told apart honestly: no flyer
   // at all, a flyer we have never analyzed (pre-existing events), and a flyer
   // that was analyzed and genuinely has no usable color.
@@ -84,7 +89,34 @@ export function PageThemePicker({
       : 'Your flyer has no usable color for this.';
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {usable && candidates.length > 1 && onPickAccent && (
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+            Lead color — from your flyer
+          </p>
+          <div className="flex gap-2" role="radiogroup" aria-label="Lead color">
+            {candidates.map((hex) => (
+              <button
+                key={hex}
+                type="button"
+                role="radio"
+                aria-checked={hex === lead}
+                aria-label={`Lead color ${hex}`}
+                disabled={disabled || value === 'off'}
+                onClick={() => onPickAccent(hex)}
+                className={cn(
+                  'h-8 w-8 rounded-full border border-black/10 transition-shadow',
+                  hex === lead && 'ring-2 ring-primary ring-offset-2',
+                  (disabled || value === 'off') &&
+                    'cursor-not-allowed opacity-50'
+                )}
+                style={{ background: hex }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
       <div className="space-y-2" role="radiogroup" aria-label="Page theme">
         {OPTIONS.map((opt) => {
           const needsPalette = opt.value !== 'off';

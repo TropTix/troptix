@@ -29,6 +29,16 @@ export const flyerPaletteSchema = z.object({
   vibrant2: hexColor.nullable(),
   /** True when the flyer has no usable color (mono/grayscale art). */
   isGray: z.boolean(),
+  /**
+   * The distinct vivid colors found, best first — the organizer's swatch row.
+   * Optional: palettes extracted before this field existed don't have it.
+   */
+  candidates: z.array(hexColor).max(8).optional(),
+  /**
+   * The candidate the organizer picked to lead the theme; when absent the
+   * derivation uses `vibrant` (the auto-pick).
+   */
+  chosenAccent: hexColor.nullable().optional(),
 });
 export type FlyerPalette = z.infer<typeof flyerPaletteSchema>;
 
