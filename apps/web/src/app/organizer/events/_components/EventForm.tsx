@@ -54,7 +54,11 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { EventImageUploader } from '../_components/EventImageUpload';
-import { PageThemePicker, THEME_LABELS } from '../_components/PageThemePicker';
+import {
+  PageThemePicker,
+  PreviewDots,
+  THEME_LABELS,
+} from '../_components/PageThemePicker';
 import { PageThemePreview } from '../_components/PageThemePreview';
 import { PublishRequirements } from '@/components/PublishRequirements';
 import { createEvent, updateEvent } from '../_actions/eventActions';
@@ -312,19 +316,28 @@ export default function EventForm({
                   <CardHeader>
                     <div className="flex items-center justify-between gap-2">
                       <CardTitle>Page Theme</CardTitle>
-                      <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                        {THEME_LABELS[form.watch('pageTheme') ?? 'off']}
-                        <ChevronDown
-                          className={cn(
-                            'h-4 w-4 transition-transform',
-                            themeOpen && 'rotate-180'
-                          )}
-                        />
-                      </span>
+                      <ChevronDown
+                        className={cn(
+                          'h-4 w-4 text-muted-foreground transition-transform',
+                          themeOpen && 'rotate-180'
+                        )}
+                      />
                     </div>
-                    <CardDescription>
-                      Color your event page from your flyer.
-                    </CardDescription>
+                    {themeOpen ? (
+                      <CardDescription>
+                        Color your event page from your flyer.
+                      </CardDescription>
+                    ) : (
+                      <div className="flex items-center gap-2.5 pt-1">
+                        <PreviewDots
+                          theme={form.watch('pageTheme') ?? 'off'}
+                          palette={form.watch('flyerPalette') ?? null}
+                        />
+                        <span className="font-medium">
+                          {THEME_LABELS[form.watch('pageTheme') ?? 'off']}
+                        </span>
+                      </div>
+                    )}
                   </CardHeader>
                 </button>
               </CollapsibleTrigger>

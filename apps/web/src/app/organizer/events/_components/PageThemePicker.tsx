@@ -22,7 +22,7 @@ const OPTIONS: {
   { value: 'dark', blurb: 'A dark page built around your flyer.' },
 ];
 
-function PreviewDots({
+export function PreviewDots({
   theme,
   palette,
 }: {
