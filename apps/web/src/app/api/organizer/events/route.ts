@@ -28,9 +28,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // No platform-owner bypass: never list an event whose scan would 404.
-    const whereClause = { organizerUserId: organizerId.uid };
-
     const events = await prisma.events.findMany({
       select: {
         id: true,
@@ -42,7 +39,7 @@ export async function GET(request: NextRequest) {
         address: true,
         isDraft: false,
       },
-      where: whereClause,
+      where: { organizerUserId: organizerId.uid },
       orderBy: {
         startsAt: 'desc',
       },
