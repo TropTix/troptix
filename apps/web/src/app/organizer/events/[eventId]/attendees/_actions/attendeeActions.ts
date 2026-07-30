@@ -3,65 +3,43 @@
 import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { TicketStatus } from '@troptix/db';
-import { getEventWhereClause, verifyEventAccess } from '@/server/accessControl';
+import { userToActor } from '@/server/actor';
+import {
+  toggleTicketCheckIn,
+  ConflictError,
+  NotFoundError,
+} from '@troptix/api/server';
 
-export async function toggleTicketStatus(ticketId: string, eventId: string) {
+export async function toggleTicketStatus(ticketId: string) {
   try {
     const user = await getUserFromIdTokenCookie();
     if (!user) {
       throw new Error('User not authenticated');
     }
-    await verifyEventAccess(user, eventId);
 
-    const ticket = await prisma.tickets.findFirst({
-      where: {
-        id: ticketId,
-        eventId: eventId,
-        event: getEventWhereClause(user, eventId),
-      },
-      select: {
-        id: true,
-        status: true,
-      },
+    const updatedTicket = await toggleTicketCheckIn(prisma, userToActor(user), {
+      ticketId,
     });
 
-    if (!ticket) {
-      throw new Error('Ticket not found or unauthorized');
-    }
-
-    const newStatus: TicketStatus =
-      ticket.status === TicketStatus.AVAILABLE
-        ? TicketStatus.NOT_AVAILABLE
-        : TicketStatus.AVAILABLE;
-
-    const updatedTicket = await prisma.tickets.update({
-      where: {
-        id: ticketId,
-      },
-      data: {
-        status: newStatus,
-        checkinTimestamp:
-          newStatus === TicketStatus.NOT_AVAILABLE ? new Date() : null,
-        updatedAt: new Date(),
-      },
-      select: {
-        id: true,
-        status: true,
-      },
-    });
-
-    revalidatePath(`/organizer/events/${eventId}/attendees`);
+    // Path from the mutation's own result — never the client's event param.
+    revalidatePath(`/organizer/events/${updatedTicket.eventId}/attendees`);
 
     return {
       success: true,
-      data: updatedTicket,
+      data: { id: updatedTicket.id, status: updatedTicket.status },
     };
   } catch (error) {
     console.error('Error toggling ticket status:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      error:
+        error instanceof NotFoundError
+          ? 'Ticket not found or unauthorized'
+          : error instanceof ConflictError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : 'Unknown error occurred',
     };
   }
 }

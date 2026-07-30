@@ -50,6 +50,11 @@ export {
   updateTicketType,
 } from './services/organizer-ticket-type-write';
 export {
+  scanTicket,
+  toggleTicketCheckIn,
+  type ScanTicketResult,
+} from './services/organizer-checkin';
+export {
   ensureOrganizationForUser,
   findOrganizationForOwner,
   getOrganizationBySlug,
@@ -60,6 +65,7 @@ export { toCents } from './services/_shared/organizerMapping';
 export {
   NotFoundError,
   UnauthorizedError,
+  ConflictError,
   PaidTicketingNotEnabledError,
 } from './services/_shared/errors';
 
