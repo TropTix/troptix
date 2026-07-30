@@ -9,7 +9,7 @@ import {
   Ticket,
   Users,
   ClipboardList,
-  FileText,
+  LayoutDashboard,
   Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -68,7 +68,7 @@ export function EventManagementNav({
 
       setIsPublished(!data.isDraft);
       toast.success(
-        data.isDraft ? 'Event set to draft' : 'Event published successfully'
+        data.isDraft ? 'Event unpublished' : 'Event published successfully'
       );
     } catch (error) {
       // Revert optimistic update on error
@@ -82,7 +82,11 @@ export function EventManagementNav({
   };
 
   const links = [
-    { name: 'Summary', href: `/organizer/events/${eventId}`, icon: FileText },
+    {
+      name: 'Dashboard',
+      href: `/organizer/events/${eventId}`,
+      icon: LayoutDashboard,
+    },
     {
       name: 'Edit',
       href: `/organizer/events/${eventId}/edit`,
@@ -124,8 +128,8 @@ export function EventManagementNav({
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground w-16 text-right">
-              {isPublished ? 'Published' : 'Draft'}
+            <span className="text-sm text-muted-foreground w-24 text-right">
+              {isPublished ? 'Published' : 'Unpublished'}
             </span>
             <Switch
               checked={isPublished}

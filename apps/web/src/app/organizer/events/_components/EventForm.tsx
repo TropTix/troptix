@@ -101,7 +101,21 @@ function defaultEventValues(): EventFormValues {
     countryCode: '',
     latitude: null,
     longitude: null,
-    tickets: [],
+    // Seeded so a first event isn't blocked on tickets; editable/deletable.
+    // Sale window: now → event end, matching the drawer's defaults.
+    tickets: [
+      {
+        name: 'General Admission',
+        description: '',
+        price: 0,
+        capacity: 100,
+        maxPurchasePerUser: 10,
+        discountCode: undefined,
+        ticketingFees: 'PASS_TICKET_FEES' as const,
+        saleStartsAt: new Date(),
+        saleEndsAt: nextDay,
+      },
+    ],
     imageUrl: null,
     pageTheme: 'off',
     flyerPalette: null,
@@ -450,10 +464,15 @@ export default function EventForm({
                           <Textarea
                             placeholder="Tell attendees about the event..."
                             rows={4}
+                            maxLength={4000}
                             {...field}
                             value={field.value ?? ''}
                           />
                         </FormControl>
+
+                        <div className="text-right text-xs text-muted-foreground">
+                          {(field.value ?? '').length}/4000
+                        </div>
 
                         <FormMessage />
                       </FormItem>
@@ -539,18 +558,8 @@ export default function EventForm({
 
               {!isEditing && (
                 <Card>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="float-right mt-4 mr-4"
-                    onClick={() => setDrawer({ index: null })}
-                    disabled={isPending}
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                  </Button>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-4">
                       <div>
                         <CardTitle>Tickets</CardTitle>
                         <CardDescription>
@@ -558,6 +567,16 @@ export default function EventForm({
                           add them later.
                         </CardDescription>
                       </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => setDrawer({ index: null })}
+                        disabled={isPending}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Ticket Option
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -577,7 +596,10 @@ export default function EventForm({
                           <TableBody>
                             {fields.map((field, index) => (
                               <TableRow key={field.id}>
-                                <TableCell className="font-medium">
+                                <TableCell
+                                  className="max-w-[200px] truncate font-medium"
+                                  title={field.name}
+                                >
                                   {field.name}
                                 </TableCell>
                                 <TableCell>

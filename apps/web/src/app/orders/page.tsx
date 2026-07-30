@@ -135,9 +135,6 @@ export default async function OrdersPage() {
         <div className="max-w-7xl mx-auto space-y-12">
           {upcoming.length > 0 && (
             <section>
-              <h2 className="mb-5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Upcoming
-              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {upcoming.map((order) => (
                   <OrderCard key={order.id} order={toCardProps(order)} />

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { getFormattedCurrency, cn } from '@/lib/utils';
 import type { EventTicket } from '@troptix/api';
@@ -65,7 +66,6 @@ export default function SelectStep({
   qty,
   totalCents,
   feesCents,
-  isFree,
   eventName,
   onContinue,
 }: {
@@ -75,10 +75,11 @@ export default function SelectStep({
   qty: number;
   totalCents: number;
   feesCents: number;
-  isFree: boolean;
   eventName: string;
   onContinue: () => void;
 }) {
+  // Empty-selection taps shake the CTA instead of a disabled dead end.
+  const [shake, setShake] = useState(false);
   return (
     <>
       <div className="space-y-0.5 border-b border-border px-5 py-4">
@@ -103,19 +104,31 @@ export default function SelectStep({
               className={cn(
                 'rounded-xl border p-4 transition-colors',
                 q > 0 ? 'border-primary bg-primary/5' : 'border-border',
-                unavailable && 'opacity-60'
+                unavailable && 'border-transparent bg-muted'
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-semibold">{t.name}</div>
+                  <div
+                    className={cn(
+                      'font-semibold',
+                      unavailable && 'text-muted-foreground'
+                    )}
+                  >
+                    {t.name}
+                  </div>
                   {t.description && (
                     <div className="mt-0.5 text-sm text-muted-foreground">
                       {t.description}
                     </div>
                   )}
                   <div className="mt-1.5 text-sm">
-                    <span className="font-bold">
+                    <span
+                      className={cn(
+                        'font-bold',
+                        unavailable && 'text-muted-foreground'
+                      )}
+                    >
                       {t.priceCents === 0 ? 'Free' : money(t.priceCents)}
                     </span>
                     {t.feesCents > 0 && (
@@ -128,7 +141,7 @@ export default function SelectStep({
                 </div>
                 <div className="shrink-0 pt-0.5">
                   {unavailable ? (
-                    <span className="text-xs font-semibold text-muted-foreground">
+                    <span className="inline-flex items-center rounded-full bg-muted-foreground/15 px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                       {UNAVAILABLE_LABEL[t.saleStatus]}
                     </span>
                   ) : (
@@ -169,15 +182,22 @@ export default function SelectStep({
         </div>
         <button
           type="button"
-          disabled={qty === 0}
-          onClick={onContinue}
-          className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
+          aria-disabled={qty === 0}
+          onClick={() => {
+            if (qty === 0) {
+              setShake(true);
+              return;
+            }
+            onContinue();
+          }}
+          onAnimationEnd={() => setShake(false)}
+          className={cn(
+            'flex h-12 w-full items-center justify-center rounded-2xl bg-primary font-bold text-primary-foreground transition-colors',
+            qty === 0 ? 'cursor-default opacity-40' : 'hover:bg-primary/90',
+            shake && 'animate-cta-shake'
+          )}
         >
-          {qty === 0
-            ? 'Select tickets to continue'
-            : isFree
-              ? 'RSVP'
-              : 'Continue'}
+          Continue
         </button>
       </div>
     </>
