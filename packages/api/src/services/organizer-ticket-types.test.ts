@@ -32,7 +32,7 @@ const ticketType = (over: Record<string, unknown> = {}) => ({
 
 function fakePrisma(
   opts: {
-    email?: string;
+    platformOwner?: boolean;
     event?: unknown; // undefined → owned with one ticket type; null → not found
     ticketTypes?: unknown[];
     revenue?: unknown[];
@@ -53,11 +53,7 @@ function fakePrisma(
     users: {
       findUnique: vi
         .fn()
-        .mockResolvedValue(
-          opts.email === undefined
-            ? { email: 'o@b.com' }
-            : { email: opts.email }
-        ),
+        .mockResolvedValue({ isPlatformOwner: opts.platformOwner ?? false }),
     },
     events: { findFirst: eventsFindFirst },
     tickets: { groupBy: ticketsGroupBy },
@@ -123,7 +119,7 @@ describe('listTicketTypes — authorization', () => {
 
   it('honors View-as for a platform owner', async () => {
     const { prisma, eventsFindFirst } = fakePrisma({
-      email: 'staff@usetroptix.com',
+      platformOwner: true,
     });
     await listTicketTypes(
       prisma,

@@ -9,6 +9,8 @@ export type User = {
   stripeId?: string;
   role?: Role;
   isOrganizer?: boolean;
+  /** The explicit Platform Owner grant, hydrated from /api/user/me. */
+  isPlatformOwner?: boolean;
   telephoneNumber?: string;
   billingAddress1?: string;
   billingAddress2?: string;

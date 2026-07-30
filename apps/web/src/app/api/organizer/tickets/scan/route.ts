@@ -35,11 +35,7 @@ export async function PUT(request: NextRequest) {
   const { ticketId, eventId } = parsed.data;
 
   // 3. Authorize: the caller must own the event (or be a platform owner).
-  const hasAccess = await canAccessEvent(
-    organizerId.uid,
-    organizerId.email,
-    eventId
-  );
+  const hasAccess = await canAccessEvent(organizerId, eventId);
   if (!hasAccess) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }

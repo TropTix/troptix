@@ -28,12 +28,6 @@ import { useContext, useEffect, useState } from 'react';
 import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
 
-// This is also checked on the backed
-const isPlatformOwner = (email?: string | null): boolean => {
-  if (!email) return false;
-  return email.endsWith('@usetroptix.com');
-};
-
 const getUserInitials = (user?: {
   firstName?: string | null;
   lastName?: string | null;
@@ -71,7 +65,8 @@ export default function UnifiedHeader() {
   }
 
   const isOrganizerRoute = pathname?.startsWith('/organizer');
-  const userIsPlatformOwner = isPlatformOwner(user?.email);
+  // The explicit grant from /api/user/me — display only; the server enforces.
+  const userIsPlatformOwner = user?.isPlatformOwner ?? false;
 
   // Organizer-specific navigation, shown contextually
   const organizerNavItems = [

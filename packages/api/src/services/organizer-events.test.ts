@@ -16,17 +16,15 @@ const NOW = new Date('2026-07-15T12:00:00Z');
 const OWNER: Actor = { kind: 'user', userId: 'owner-1', role: 'PATRON' };
 const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 
-function fakePrisma(opts: { email?: string; events?: unknown[] } = {}) {
+function fakePrisma(
+  opts: { platformOwner?: boolean; events?: unknown[] } = {}
+) {
   const eventsFindMany = vi.fn().mockResolvedValue(opts.events ?? []);
   const prisma = {
     users: {
       findUnique: vi
         .fn()
-        .mockResolvedValue(
-          opts.email === undefined
-            ? { email: 'o@b.com' }
-            : { email: opts.email }
-        ),
+        .mockResolvedValue({ isPlatformOwner: opts.platformOwner ?? false }),
     },
     events: { findMany: eventsFindMany },
   } as unknown as PrismaClient;
@@ -65,7 +63,7 @@ describe('listOrganizerEvents — authorization', () => {
   });
 
   it('ignores View-as for a non-platform-owner (pins them to themselves)', async () => {
-    const { prisma, eventsFindMany } = fakePrisma({ email: 'x@gmail.com' });
+    const { prisma, eventsFindMany } = fakePrisma({ platformOwner: false });
     await listOrganizerEvents(
       prisma,
       OWNER,
@@ -79,7 +77,7 @@ describe('listOrganizerEvents — authorization', () => {
 
   it('honors View-as for a platform owner', async () => {
     const { prisma, eventsFindMany } = fakePrisma({
-      email: 'staff@usetroptix.com',
+      platformOwner: true,
     });
     await listOrganizerEvents(
       prisma,

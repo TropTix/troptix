@@ -1,5 +1,6 @@
 import prisma from '@/server/prisma';
-import { verifyEventAccess, isPlatformOwner } from '@/server/accessControl';
+import { isPlatformOwner } from '@/server/accessControl';
+import type { ServerUser } from '@/server/authUser';
 import { notFound } from 'next/navigation';
 
 // Extended event data for platform admins
@@ -27,10 +28,9 @@ export type PlatformEventData = {
 };
 
 export async function getAllPlatformEvents(
-  userId: string,
-  userEmail?: string
+  user: ServerUser
 ): Promise<PlatformEventData[]> {
-  if (!isPlatformOwner(userEmail)) {
+  if (!isPlatformOwner(user)) {
     notFound();
   }
 

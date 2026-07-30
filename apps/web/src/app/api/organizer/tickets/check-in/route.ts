@@ -48,7 +48,7 @@ export async function PUT(request: NextRequest) {
     // Security Check: the caller must own this ticket's event, or be a platform
     // owner (consistent with the events/orders routes).
     if (
-      !isPlatformOwner(organizerId.email) &&
+      !isPlatformOwner(organizerId) &&
       ticket.event.organizerUserId !== organizerId.uid
     ) {
       return NextResponse.json(

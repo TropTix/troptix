@@ -6,11 +6,13 @@ import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 
-async function getEvent(eventId: string, userId: string, userEmail?: string) {
-  await verifyEventAccess(userId, userEmail, eventId);
+import type { ServerUser } from '@/server/authUser';
+
+async function getEvent(eventId: string, user: ServerUser) {
+  await verifyEventAccess(user, eventId);
 
   const event = await prisma.events.findUnique({
-    where: getEventWhereClause(userId, userEmail, eventId),
+    where: getEventWhereClause(user, eventId),
     select: { name: true, isDraft: true },
   });
   if (!event) {
@@ -32,7 +34,7 @@ export default async function EventManagementLayout(props: {
     redirect('/auth/signin');
   }
 
-  const event = await getEvent(params.eventId, user.uid, user.email);
+  const event = await getEvent(params.eventId, user);
 
   return (
     <div>
