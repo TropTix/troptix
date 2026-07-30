@@ -22,6 +22,10 @@ export interface FetchedTicketData {
   id: string;
   createdAt: Date | null;
   status: TicketStatus;
+  // Whether they are through the door. The status enum is mid-cutover
+  // (AVAILABLE/VALID both mean un-checked-in), so the timestamp is the one
+  // field every check-in path stamps and clears.
+  checkinTimestamp: Date | null;
   email: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -45,6 +49,7 @@ async function fetchTickets(eventId: string, user: ServerUser) {
       id: true,
       createdAt: true,
       status: true,
+      checkinTimestamp: true,
       email: true,
       firstName: true,
       lastName: true,
@@ -102,7 +107,7 @@ export default async function EventAttendeesPage(
 
   const totalAttendees = initialAttendees.length;
   const checkedInAttendees = initialAttendees.filter(
-    (ticket) => ticket.status === 'NOT_AVAILABLE'
+    (ticket) => ticket.checkinTimestamp !== null
   ).length;
   const notCheckedInAttendees = totalAttendees - checkedInAttendees;
   const checkInRate =
