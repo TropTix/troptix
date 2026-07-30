@@ -1,8 +1,8 @@
 ---
 title: Unified Notifications — notify catalog, Toaster restyle, Alert consolidation
-status: proposed
+status: active
 created: 2026-07-02
-tracking-issue: TBD
+tracking-issue: '#414'
 ---
 
 # Unified Notifications
@@ -25,8 +25,8 @@ The new `/e/[eventId]` page and its checkout (`CheckoutSheet`, `ContactStep`, `S
 
 ## Decisions
 
-1. **Strict domain-semantic catalog.** A new `apps/web/src/lib/notify.ts` exports a single `notify` object whose methods name product events: `notify.paymentFailed(err)`, `notify.checkInUpdated()`, `notify.promoApplied(msg)`, `notify.emailCopied()`. Every toast is a named method — no generic `notify.error(message)` escape hatch. The module is the complete, reviewable vocabulary of everything the app can say via toast. Async flows (promo apply, contact form send) are domain methods that wrap `toast.promise` internally, replacing manual `loading`/`dismiss` pairs.
-2. **Sonner stays direct-only inside the module.** ESLint `no-restricted-imports` bans `sonner` everywhere except `lib/notify.ts` and `components/toaster.tsx`, with a scoped exemption for `src/app/events/**` until that tree is deleted.
+1. **Strict domain-semantic catalog.** A new `apps/web/src/lib/notify.ts` exports a single `notify` object whose methods name product events: `notify.eventPublished()`, `notify.attendeeCheckedIn()`, `notify.emailCopied()`. Every toast is a named method — no generic `notify.error(message)` escape hatch, and the catalog owns message formatting (e.g. `eventPublishBlocked(missing: string[])` builds its own title) so copy cannot be smuggled in from call sites. The module is the complete, reviewable vocabulary of everything the app can say via toast. Async flows (promo apply, contact form send) are domain methods that wrap `toast.promise` internally, replacing manual `loading`/`dismiss` pairs.
+2. **Sonner stays direct-only inside the module.** ESLint `no-restricted-imports` bans `sonner` everywhere except `lib/notify.ts` and `components/toaster.tsx`; call sites pending migration carry a warn-severity override (not `off`, so the debt stays visible in every lint run and other restricted imports still apply) until PR 2 removes it.
 3. **Tokens now, on v3.** Add `--success` and `--warning` as HSL channel vars in `globals.css`, wired into `tailwind.config.ts` exactly like `--destructive`. This pulls forward the design-system plan's "one additive token change"; the components migrate mechanically when Tailwind v4 lands.
 4. **Neutral-surface severity language.** Toasts and Alerts use `bg-background text-foreground border-border` with severity carried by the icon color (`text-destructive` / `text-success` / `text-warning` / `text-primary`) — not tinted pastel fills. An inline Alert may use at most a soft tint (`bg-destructive/5`) where it needs more weight. Radius from `--radius`.
 5. **Toaster behavior defaults.** Position mobile `top-center` / desktop `bottom-right` (unchanged); `closeButton` enabled. Durations are internal presets in `notify.ts` (roughly: success/info short, warning/error long); raw millisecond `duration` is not part of any public API surface.
@@ -35,28 +35,28 @@ The new `/e/[eventId]` page and its checkout (`CheckoutSheet`, `ContactStep`, `S
    - Order confirmation page: inline `StatusDisplay` only; its toast barrage is deleted.
    - Payment failures render inline (destructive Alert) within the new CheckoutSheet; toasts are not used for payment outcomes. This is a requirement recorded in the checkout redesign plan — implementing it is that initiative's work, not this one's.
    - Promo apply, availability, RSVP, contact form, clipboard copy, check-in toggle: toasts. Submit-then-navigate outcomes (event/ticket created): toasts.
-8. **Legacy tree untouched.** The ~25 call sites under `src/app/events/[eventId]/` are not migrated — they die with the page. Only living surfaces migrate (~8 files): auth forms, organizer event/ticket forms, AttendeeTable, confirmation page, contact form, cta, event-management-nav, and `hooks/useCheckout.tsx` _if_ it survives into the new flow (check at implementation time).
-9. **Dev catalog page.** `/dev/notifications` — hardcoded buttons calling every real `notify.*` method (grouped by domain) plus all Alert variants side by side; `notFound()` in production. Doubles as a copy-review surface. Updated by convention, not lint. Delete `toast-tester.tsx`.
+8. **Legacy tree resolved by deletion.** The legacy `/events/[eventId]` checkout — and `hooks/useCheckout.tsx`, its only dependent — was deleted on main (#416) while PR 1 was in review, taking its ~25 call sites with it. No exemption or migration needed. Living surfaces migrate (~8 files): auth forms, organizer event/ticket forms, AttendeeTable, confirmation page, contact form, cta, event-management-nav.
+9. **Dev catalog page.** `/dev/notifications` — hardcoded buttons calling every real `notify.*` method (grouped by domain) plus all Alert variants side by side. Gated structurally by a route-group layout (`src/app/dev/layout.tsx`) that 404s production deployments while staying reachable locally and on Vercel previews — where copy review actually happens. Doubles as a copy-review surface. Updated by convention, not lint. Delete `toast-tester.tsx`.
 
 ## Phases
 
-**PR 1 — Foundation.** `--success`/`--warning` tokens; Toaster restyle; `lib/notify.ts` with the full catalog for living call sites; ESLint ban + legacy exemption; `/dev/notifications`; delete `toast-tester.tsx`. Shippable alone — nothing breaks; old code keeps working under the exemption.
+**PR 1 — Foundation.** `--success`/`--warning` tokens; Toaster restyle; `lib/notify.ts` with the full catalog for living call sites; ESLint ban with a warn-severity override for pending call sites; `/dev/notifications`; delete `toast-tester.tsx`. Shippable alone — nothing breaks; unmigrated code lints as warnings.
 
-**PR 2 — Migration.** Move the living files to `notify.*`; de-toast the confirmation page (inline `StatusDisplay` becomes the sole surface); resolve `useCheckout` (migrate or leave-to-die).
+**PR 2 — Migration.** Move the living files to `notify.*` and delete the warn override; de-toast the confirmation page (inline `StatusDisplay` becomes the sole surface); drop `EventForm`'s validation toast in favor of its inline `FormMessage` errors (owned-surface rule).
 
 **PR 3 — Alert consolidation.** Refreshed Alert primitive (variants, dismiss, icons, roles); delete `banner.tsx` and migrate its call sites; annotate the design-system plan (Phase 3 partial / Phase 5 landed early) and the checkout-redesign plan (inline payment-failure requirement).
 
 ## Verification
 
-- `cd apps/web && yarn typecheck && yarn lint && yarn build` clean per PR.
-- ESLint: a direct `import { toast } from 'sonner'` outside the allowed files fails lint; the same import under `src/app/events/**` passes.
-- `/dev/notifications` in `next dev`: every catalog method fires a correctly styled toast; all Alert variants render; the route 404s in a production build.
+- `cd apps/web && yarn typecheck && yarn build` clean per PR; `yarn lint` introduces no new errors (pre-existing react-hooks failures are tracked in #418).
+- ESLint: a direct `import { toast } from 'sonner'` outside the allowed files fails lint; in pending-migration files it reports as a warning until PR 2.
+- `/dev/notifications` in `next dev`: every catalog method fires a correctly styled toast; all Alert variants render; the route 404s in production deployments and local production builds, and renders on Vercel previews.
 - Visual smoke: auth error toast, organizer event-create success, promo-code apply (promise flow), confirmation page shows inline status with zero toasts, PaidWarningBanner renders via Alert.
-- `grep -rn "from 'sonner'" apps/web/src --include='*.tsx'` returns only `lib/notify.ts`, `components/toaster.tsx`, and legacy `app/events/**` files.
+- After PR 2: `grep -rn "from 'sonner'" apps/web/src --include='*.tsx'` returns only `lib/notify.ts` and `components/toaster.tsx`.
 
 ## Out of scope
 
-- The legacy `/events/[eventId]` tree (deleted by the checkout cutover, not this initiative).
+- The legacy `/events/[eventId]` tree (deleted upstream via #416).
 - Implementing the new checkout's inline payment-failure UX (requirement handed to the checkout redesign plan).
 - Mobile apps (`apps/organizer` uses gluestack toast; `apps/organizer-v2` has none).
 - Storybook or any component-workbench dependency.
@@ -64,6 +64,6 @@ The new `/e/[eventId]` page and its checkout (`CheckoutSheet`, `ContactStep`, `S
 
 ## Open items (resolve during implementation)
 
-- `useCheckout.tsx` liveness — shared with the new checkout or legacy-only?
-- Exact `--success` / `--warning` hues (green/amber families tuned against the indigo/neutral palette).
-- Final duration preset values.
+- ~~`useCheckout.tsx` liveness~~ — resolved: legacy-only, deleted with the tree (#416).
+- Exact `--success` / `--warning` hues (green/amber families tuned against the indigo/neutral palette) — PR 1 shipped green-600 / amber-600; revisit if they clash.
+- Final duration preset values — PR 1 shipped errors 8s, everything else sonner's 4s default.
