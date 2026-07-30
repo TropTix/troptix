@@ -1,9 +1,8 @@
 import React from 'react';
 import prisma from '@/server/prisma';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
-import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 import { TicketStatus, TicketTypes, Orders } from '@troptix/db';
 import {
   Card,
@@ -35,14 +34,15 @@ export interface FetchedTicketData {
 
 import type { ServerUser } from '@/server/authUser';
 
+// Layout and page fetch in parallel, so every read here carries its own
+// ownership scope — the layout's 404 is not protection. Errors propagate: a
+// DB failure must not render as an empty attendee list.
 async function fetchTickets(eventId: string, user: ServerUser) {
-  try {
-    await verifyEventAccess(user, eventId);
-
+  {
     const tickets = await prisma.tickets.findMany({
       where: {
         eventId: eventId,
-        event: getEventWhereClause(user, eventId),
+        event: { organizerUserId: user.uid, deletedAt: null },
         order: {
           status: 'COMPLETED',
         },
@@ -71,25 +71,20 @@ async function fetchTickets(eventId: string, user: ServerUser) {
       },
     });
     return tickets;
-  } catch (error) {
-    console.error('Failed to fetch tickets:', error);
-    return [];
   }
 }
 
 async function fetchEventName(eventId: string, user: ServerUser) {
-  try {
-    const event = await prisma.events.findUnique({
-      where: getEventWhereClause(user, eventId),
-      select: {
-        name: true,
-      },
-    });
-    return event?.name || 'Unknown Event';
-  } catch (error) {
-    console.error('Failed to fetch event name:', error);
-    return 'Unknown Event';
+  const event = await prisma.events.findUnique({
+    where: { id: eventId, organizerUserId: user.uid, deletedAt: null },
+    select: {
+      name: true,
+    },
+  });
+  if (!event) {
+    notFound();
   }
+  return event.name;
 }
 
 interface EventAttendeesPageProps {

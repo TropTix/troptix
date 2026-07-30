@@ -12,32 +12,13 @@
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 
-/**
- * Ensures the actor has organizer privileges.
- * Returns whether the actor is a platform owner (@usetroptix.com email)
- * and their userId.
- */
-async function authorizeOrganizer(prisma: PrismaClient, actor: Actor) {
+export async function getEvents(prisma: PrismaClient, actor: Actor) {
   if (actor.kind !== 'user') {
     throw new Error('UNAUTHORIZED');
   }
 
-  const user = await prisma.users.findUnique({
-    where: { id: actor.userId },
-    select: { isPlatformOwner: true },
-  });
-
-  return {
-    userId: actor.userId,
-    isPlatformOwner: user?.isPlatformOwner ?? false,
-  };
-}
-
-export async function getEvents(prisma: PrismaClient, actor: Actor) {
-  const { userId, isPlatformOwner } = await authorizeOrganizer(prisma, actor);
-
   const events = await prisma.events.findMany({
-    where: isPlatformOwner ? {} : { organizerUserId: userId },
+    where: { organizerUserId: actor.userId },
     select: {
       id: true,
       name: true,
@@ -76,7 +57,9 @@ export async function getEvent(
   actor: Actor,
   eventId: string
 ) {
-  const { userId, isPlatformOwner } = await authorizeOrganizer(prisma, actor);
+  if (actor.kind !== 'user') {
+    throw new Error('UNAUTHORIZED');
+  }
 
   const event = await prisma.events.findUnique({
     where: { id: eventId },
@@ -92,8 +75,7 @@ export async function getEvent(
     throw new Error('NOT_FOUND');
   }
 
-  // Authorization: if not platform owner, ensure they own the event
-  if (!isPlatformOwner && event.organizerUserId !== userId) {
+  if (event.organizerUserId !== actor.userId) {
     throw new Error('UNAUTHORIZED');
   }
 

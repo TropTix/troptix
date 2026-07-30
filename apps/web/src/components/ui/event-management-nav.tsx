@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import {
   ArrowLeft,
@@ -26,6 +26,11 @@ export function EventManagementNav({
   isDraft: boolean;
 }) {
   const pathname = usePathname();
+  // View-as rides the query string (ADR 0018); every tab must carry it or a
+  // Platform Owner's session re-scopes to themselves one click in.
+  const viewAs = useSearchParams().get('viewAs');
+  const withScope = (href: string) =>
+    viewAs ? `${href}?viewAs=${encodeURIComponent(viewAs)}` : href;
   const router = useRouter();
   const [isPublished, setIsPublished] = useState(!isDraft);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,7 +112,7 @@ export function EventManagementNav({
       href: `/organizer/events/${eventId}/orders`,
       icon: ClipboardList,
     },
-  ];
+  ].map((link) => ({ ...link, href: withScope(link.href) }));
 
   return (
     <div className="border-b bg-card rounded-xl sticky top-0 z-10">
