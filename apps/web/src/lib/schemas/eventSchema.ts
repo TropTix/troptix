@@ -7,7 +7,12 @@ export const eventFormSchema = z
     eventName: z.string().min(3, {
       message: 'Event name must be at least 3 characters.',
     }),
-    description: z.string().min(1, { message: 'Description is required.' }),
+    // Max matches the DB column (VarChar(4000)) so the limit surfaces here,
+    // not as a generic write error.
+    description: z
+      .string()
+      .min(1, { message: 'Description is required.' })
+      .max(4000, { message: 'Description must be 4000 characters or fewer.' }),
     startsAt: z.date({
       required_error: 'Start date is required.',
       invalid_type_error: 'Start date must be a valid date.',

@@ -324,7 +324,6 @@ export default function CheckoutSheet({
                 qty={qty}
                 totalCents={totalCents}
                 feesCents={feesCents}
-                isFree={isFree}
                 eventName={event.name}
                 onContinue={() => setStep('contact')}
               />

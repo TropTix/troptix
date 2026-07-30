@@ -69,7 +69,9 @@ export default async function EventOverviewPage({
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">{event.name}</h1>
-            <Badge variant={STATUS_VARIANT[event.status]}>{event.status}</Badge>
+            <Badge variant={STATUS_VARIANT[event.status]}>
+              {event.status === 'Draft' ? 'Unpublished' : event.status}
+            </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
             {getDateFormatter(new Date(event.startsAt), 'EEE, MMM d, yyyy')}
@@ -78,7 +80,7 @@ export default async function EventOverviewPage({
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/events/${event.id}`} target="_blank" rel="noopener">
+            <Link href={`/e/${event.id}`} target="_blank" rel="noopener">
               <Eye className="mr-2 h-4 w-4" />
               View public
             </Link>

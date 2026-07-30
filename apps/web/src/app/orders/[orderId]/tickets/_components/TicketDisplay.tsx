@@ -2,13 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  ChevronLeft,
-  ChevronRight,
-  CalendarDays,
-  MapPin,
-  Receipt,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, MapPin } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatOrderNumber } from '@/lib/utils';
 
@@ -81,9 +75,9 @@ export default function TicketDisplayManager({
         <Link
           href={`/orders/${orderId}`}
           aria-label="Order details and receipt"
-          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-9 items-center rounded-full px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <Receipt className="h-[18px] w-[18px]" />
+          Receipt
         </Link>
       </div>
 

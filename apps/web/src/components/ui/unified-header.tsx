@@ -18,6 +18,7 @@ import {
   Home,
   LogOut,
   PlusCircle,
+  Search,
   Shield,
   Ticket,
 } from 'lucide-react';
@@ -203,7 +204,7 @@ export default function UnifiedHeader() {
               <>
                 <Button variant="ghost" className="p-2 " asChild>
                   <Link href="/discover">
-                    <Calendar className="h-5 w-5" />
+                    <Search className="h-5 w-5" />
                     <span className="hidden md:inline ml-2">
                       Explore Events
                     </span>
