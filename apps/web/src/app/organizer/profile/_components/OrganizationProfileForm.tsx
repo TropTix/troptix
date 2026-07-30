@@ -122,11 +122,17 @@ export default function OrganizationProfileForm({
             form.setValue('logoUrl', path ?? '', { shouldDirty: true })
           }
         />
-        <Button asChild variant="outline" size="sm" className="gap-1.5">
-          <a href={`/o/${savedSlug}`} target="_blank" rel="noopener noreferrer">
-            View profile <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        </Button>
+        {savedSlug && (
+          <Button asChild variant="outline" size="sm" className="gap-1.5">
+            <a
+              href={`/o/${savedSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View profile <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+        )}
       </div>
 
       <Form {...form}>
