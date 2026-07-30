@@ -45,12 +45,9 @@ export function findOrganizationForOwner(
 }
 
 /**
- * The user's Organization, creating it on first need (with a slug generated
- * from the display name). Idempotent: returns the existing org if the user
- * already owns one. Called on event save so ownership can be dual-written
- * (`organizerUserId` == `ownerUserId`); the profile save has its own
- * create-or-update path (`updateOrganizationProfile`), which takes the user's
- * chosen slug instead of generating one.
+ * The user's Organization, created on first need with a generated slug.
+ * Idempotent. Event-save path only — the profile save creates via
+ * `updateOrganizationProfile` with the user's chosen slug instead.
  */
 export async function ensureOrganizationForUser(
   prisma: PrismaClient,
@@ -101,15 +98,10 @@ const blankToNull = (value: string | null): string | null => {
 };
 
 /**
- * Save the caller's Organization brand (the Profile Info editor, F6) —
- * create-or-update in one call. Validation runs before any write, so a
- * rejected slug never leaves a half-created Organization behind, and the
- * created org carries the user's chosen slug rather than a generated one.
- * Slug is only re-validated when it differs from the existing one:
- * format/reserved via `isValidSlug`, then a uniqueness check excluding the org
- * itself. The DB unique indexes are the final backstop: a slug race maps to
- * `slug_taken`; losing the one-org-per-owner race on create retries as an
- * update of the winner's row.
+ * Save the Organization brand (Profile Info editor, F6) — create-or-update.
+ * Validation runs before any write, so a rejected slug never leaves a
+ * half-created Organization behind. The unique indexes are the backstop:
+ * a slug race maps to `slug_taken`; losing the owner race retries as update.
  */
 export async function updateOrganizationProfile(
   prisma: PrismaClient,
@@ -143,10 +135,8 @@ export async function updateOrganizationProfile(
     if (org) {
       await prisma.organization.update({ where: { id: org.id }, data });
     } else {
-      // Owner-only today: creating keys on the caller's own id. Phase 1 gives
-      // Admins this form — the save must then scope to the acting Organization
-      // (or split create from update), or an Admin's first save mints them a
-      // phantom org of their own. See docs/plans/2026-07-team-membership.md.
+      // Owner-only today. Phase 1 must scope this to the acting Organization
+      // before Admins get the form, or an Admin's first save mints them an org.
       await prisma.organization.create({
         data: { ownerUserId: input.ownerUserId, ...data },
       });

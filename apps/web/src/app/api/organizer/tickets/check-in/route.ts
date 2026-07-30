@@ -1,10 +1,6 @@
 // DEPRECATED: legacy REST route for the old `apps/organizer` app; slated for
 // deletion with that app once v2's check-in is wired to a tRPC mutation.
 // See docs/plans/2026-07-organizer-dashboard-migration.md. Don't build on this.
-//
-// Thin adapter only — authorization and the toggle live in the
-// `toggleTicketCheckIn` service (ownership-only, ADR 0013; no platform-owner
-// bypass on writes, ADR 0018).
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
@@ -14,7 +10,6 @@ import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function PUT(request: NextRequest) {
-  // 1. Authenticate the user
   const headersList = await headers();
   const authorization = headersList.get('authorization');
   const token = authorization?.split(' ')[1];
@@ -28,7 +23,6 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 403 });
   }
 
-  // 2. Validate the request body
   const parsed = checkInTicketSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(
@@ -38,7 +32,6 @@ export async function PUT(request: NextRequest) {
   }
   const { ticketId } = parsed.data;
 
-  // 3. The service authorizes (ticket -> event ownership) and toggles.
   try {
     const updatedTicket = await toggleTicketCheckIn(prisma, userToActor(user), {
       ticketId,

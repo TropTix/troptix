@@ -40,8 +40,6 @@ export async function GET(
     );
   }
 
-  // Ownership-only (ADR 0018): the caller must own the event, and a
-  // soft-deleted event is gone here like everywhere on the seam.
   const ownedEvent = await prisma.events.findUnique({
     where: { id: eventId, organizerUserId: organizerId.uid, deletedAt: null },
     select: { id: true },

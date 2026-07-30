@@ -27,8 +27,6 @@ import { useContext, useEffect, useState } from 'react';
 import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
 
-// Helper to generate user initials for the avatar
-// Accepts user object with firstName, lastName, email
 const getUserInitials = (user?: {
   firstName?: string | null;
   lastName?: string | null;

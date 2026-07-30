@@ -29,11 +29,9 @@ export interface FetchedTicketData {
   order: Pick<Orders, 'id'> | null;
 }
 
-// Ownership scoping in each query is the access check. Layout and page fetch
-// in PARALLEL in the App Router — the layout's 404 wins the render but does
-// not stop these from executing, so every read here must carry its own
-// organizerUserId scope. Errors propagate to the error boundary: a DB failure
-// must not render as an empty attendee list.
+// Layout and page fetch in parallel, so every read here carries its own
+// ownership scope — the layout's 404 is not protection. Errors propagate: a
+// DB failure must not render as an empty attendee list.
 async function fetchTickets(eventId: string, user: ServerUser) {
   return prisma.tickets.findMany({
     where: {

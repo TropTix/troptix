@@ -253,9 +253,7 @@ export default async function PlatformEventsPage() {
 
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {/* View-as deep link (ADR 0018): observe the owner's
-                              dashboard, read-only. No edit link — writes never
-                              accept View-as. */}
+                          {/* Read-only View-as; no edit link — writes never accept it. */}
                           <Button variant="ghost" size="sm" asChild>
                             <Link
                               href={`/organizer/events/${event.id}?viewAs=${event.organizer.id}`}

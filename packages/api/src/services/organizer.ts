@@ -1,15 +1,9 @@
 /**
- * LEGACY — the mobile-oriented reads for `apps/organizer-v2` only. Frozen: do
- * not extend.
- *
- * The web organizer surface uses `organizer-scope.ts` +
- * `organizer-dashboard.ts` instead. Access here is ownership-only — the old
- * `isPlatformOwner ? {} : { organizerUserId }` cross-organizer bypass was
- * removed per ADR 0018 (writes never carry platform-owner power, and admin
- * reads go through View-as on the web seam). Still throws string errors the
- * tRPC router matches on rather than the typed errors in `_shared/errors.ts`;
- * retired when v2 moves onto the new seam (see
- * docs/plans/2026-07-organizer-dashboard-migration.md).
+ * LEGACY — mobile-oriented reads for `apps/organizer-v2` only. Frozen: do not
+ * extend. Ownership-only (the platform-owner bypass was removed, ADR 0018),
+ * string errors the tRPC router matches on. Retired when v2 moves onto the
+ * seam (docs/plans/2026-07-organizer-dashboard-migration.md); until then
+ * Membership (ADR 0022) must land here and in organizer-checkin.ts.
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';

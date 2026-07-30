@@ -24,11 +24,9 @@ export type ScanTicketResult = {
 };
 
 /**
- * Door scan: one-way check-in, atomic check-then-flip — only the request that
- * finds the ticket still AVAILABLE flips it, so two simultaneous scans of the
- * same QR can't both succeed. A ticket that doesn't exist (or belongs to a
- * different event) is a failed scan, not an error — the scanner UI shows
- * "invalid ticket" either way. An event the actor doesn't own is NotFound.
+ * Door scan: atomic check-then-flip, so two simultaneous scans of one QR
+ * can't both succeed. A missing/foreign ticket is a failed scan, not an
+ * error; an event the actor doesn't own is NotFound.
  */
 export async function scanTicket(
   prisma: PrismaClient,
@@ -91,8 +89,7 @@ export async function toggleTicketCheckIn(
     throw new NotFoundError('Ticket not found');
   }
 
-  // VALID counts as un-checked (never rewritten to AVAILABLE by mistake);
-  // undo restores AVAILABLE, the legacy un-checked state, as it always has.
+  // Undo restores AVAILABLE, the legacy un-checked state, as it always has.
   const checkingIn = (UNCHECKED_STATUSES as string[]).includes(ticket.status);
   return prisma.tickets.update({
     where: { id: ticket.id },

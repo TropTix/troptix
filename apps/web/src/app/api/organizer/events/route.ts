@@ -28,8 +28,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Ownership-only: no platform-owner bypass, so the app never lists an
-    // event its scan/check-in calls would then reject (ADR 0018).
+    // No platform-owner bypass: never list an event whose scan would 404.
     const whereClause = { organizerUserId: organizerId.uid };
 
     const events = await prisma.events.findMany({
