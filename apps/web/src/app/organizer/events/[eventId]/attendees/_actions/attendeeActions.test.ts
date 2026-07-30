@@ -7,7 +7,8 @@ jest.mock('@/server/authUser', () => ({ getUserFromIdTokenCookie: jest.fn() }));
 jest.mock('@/server/prisma', () => ({ __esModule: true, default: {} }));
 jest.mock('@troptix/api/server', () => {
   class NotFoundError extends Error {}
-  return { toggleTicketCheckIn: jest.fn(), NotFoundError };
+  class ConflictError extends Error {}
+  return { toggleTicketCheckIn: jest.fn(), NotFoundError, ConflictError };
 });
 
 import { revalidatePath } from 'next/cache';
@@ -15,6 +16,7 @@ import { getUserFromIdTokenCookie } from '@/server/authUser';
 import {
   toggleTicketCheckIn,
   NotFoundError as FakeNotFoundError,
+  ConflictError as FakeConflictError,
 } from '@troptix/api/server';
 import { toggleTicketStatus } from './attendeeActions';
 
@@ -65,6 +67,17 @@ describe('toggleTicketStatus', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Ticket not found or unauthorized');
+  });
+
+  it('surfaces a ConflictError message verbatim (void or raced ticket)', async () => {
+    mockToggle.mockRejectedValue(
+      new FakeConflictError('This ticket is not valid for entry')
+    );
+
+    const result = await toggleTicketStatus('t1');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('This ticket is not valid for entry');
   });
 
   it('fails without an authenticated user', async () => {

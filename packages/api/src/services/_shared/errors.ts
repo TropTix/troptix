@@ -31,6 +31,19 @@ export class UnauthorizedError extends Error {
 }
 
 /**
+ * The resource exists and the actor may touch it, but its current state does
+ * not allow this operation — a ticket already scanned, or one that is void.
+ * Distinct from NotFound so an adapter can tell the caller to re-read rather
+ * than treat it as missing. → HTTP 409.
+ */
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
+/**
  * A write asked for a PAID ticket type (price > 0) but the owning Organization
  * isn't approved for paid ticketing (`Organization.paidTicketingEnabled`).
  * The gate lives in the write services (CONTEXT.md), not the DB. → HTTP 403.

@@ -4,7 +4,11 @@
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
-import { toggleTicketCheckIn, NotFoundError } from '@troptix/api/server';
+import {
+  toggleTicketCheckIn,
+  ConflictError,
+  NotFoundError,
+} from '@troptix/api/server';
 import { checkInTicketSchema } from '@/lib/schemas/organizerApiSchemas';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
@@ -40,6 +44,9 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     if (error instanceof NotFoundError) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
+    }
+    if (error instanceof ConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
     }
     console.error('Error checking in ticket:', error);
     return NextResponse.json(

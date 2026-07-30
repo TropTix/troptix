@@ -116,12 +116,8 @@ export async function checkInTicket(
     throw new Error('UNAUTHORIZED');
   }
 
-  if (ticket.status === 'NOT_AVAILABLE' || ticket.checkinTimestamp) {
-    throw new Error('ALREADY_CHECKED_IN');
-  }
-
-  // Atomic check-then-flip: only the request that finds the ticket still
-  // un-checked flips it, so two simultaneous scans of one ticket can't both
+  // Atomic check-then-flip is the only gate: only the request that finds the
+  // ticket still un-checked flips it, so two simultaneous scans can't both
   // succeed. Un-checked means legacy AVAILABLE or the canonical VALID the
   // reservation checkout mints (the lifecycle enums are mid-cutover).
   const result = await prisma.tickets.updateMany({
@@ -136,7 +132,14 @@ export async function checkInTicket(
     },
   });
   if (result.count === 0) {
-    throw new Error('ALREADY_CHECKED_IN');
+    // A void ticket is not "already scanned" — telling door staff it was is
+    // what gets a refunded holder waved through. The read may be stale, but a
+    // stale un-checked status means we lost a race, which IS already-checked-in.
+    throw new Error(
+      ['USED', 'CANCELLED', 'REFUNDED'].includes(ticket.status)
+        ? 'TICKET_NOT_VALID'
+        : 'ALREADY_CHECKED_IN'
+    );
   }
 
   return { success: true };

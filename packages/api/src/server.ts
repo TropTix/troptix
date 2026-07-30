@@ -65,6 +65,7 @@ export { toCents } from './services/_shared/organizerMapping';
 export {
   NotFoundError,
   UnauthorizedError,
+  ConflictError,
   PaidTicketingNotEnabledError,
 } from './services/_shared/errors';
 

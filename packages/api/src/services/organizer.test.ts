@@ -98,6 +98,21 @@ describe('checkInTicket', () => {
     expect(res).toEqual({ success: true });
   });
 
+  it('reports a void ticket as not valid, not as already checked in', async () => {
+    for (const voidStatus of ['REFUNDED', 'CANCELLED', 'USED'] as const) {
+      const prisma = fakePrisma({
+        ticket: {
+          id: 't-1',
+          status: voidStatus,
+          event: { organizerUserId: 'org-1' },
+        },
+      });
+      await expect(checkInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
+        'TICKET_NOT_VALID'
+      );
+    }
+  });
+
   it('successfully checks in a VALID ticket (the status the checkout mints)', async () => {
     const prisma = fakePrisma({
       ticket: {

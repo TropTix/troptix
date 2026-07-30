@@ -19,10 +19,12 @@ jest.mock('@/server/authUser', () => ({
 jest.mock('@/server/prisma', () => ({ __esModule: true, default: {} }));
 jest.mock('@troptix/api/server', () => {
   class NotFoundError extends Error {}
+  class ConflictError extends Error {}
   return {
     scanTicket: jest.fn(),
     toggleTicketCheckIn: jest.fn(),
     NotFoundError,
+    ConflictError,
   };
 });
 
@@ -31,6 +33,7 @@ import {
   scanTicket,
   toggleTicketCheckIn,
   NotFoundError as FakeNotFoundError,
+  ConflictError as FakeConflictError,
 } from '@troptix/api/server';
 import { PUT as scanPUT } from '../tickets/scan/route';
 import { PUT as checkInPUT } from '../tickets/check-in/route';
@@ -130,6 +133,18 @@ describe('check-in route', () => {
     expect(body.id).toBe('t1');
     expect(body.status).toBe('NOT_AVAILABLE');
     expect(mockToggle.mock.calls[0][2]).toEqual({ ticketId: 't1' });
+  });
+
+  it('maps a service ConflictError to 409 with its message', async () => {
+    mockToggle.mockRejectedValue(
+      new FakeConflictError('This ticket is not valid for entry')
+    );
+
+    const res = await checkInPUT(req({ ticketId: 't1' }));
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.error).toBe('This ticket is not valid for entry');
   });
 
   it('rejects a malformed body with 400', async () => {

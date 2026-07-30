@@ -4,7 +4,11 @@ import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
-import { toggleTicketCheckIn, NotFoundError } from '@troptix/api/server';
+import {
+  toggleTicketCheckIn,
+  ConflictError,
+  NotFoundError,
+} from '@troptix/api/server';
 
 export async function toggleTicketStatus(ticketId: string) {
   try {
@@ -31,9 +35,11 @@ export async function toggleTicketStatus(ticketId: string) {
       error:
         error instanceof NotFoundError
           ? 'Ticket not found or unauthorized'
-          : error instanceof Error
+          : error instanceof ConflictError
             ? error.message
-            : 'Unknown error occurred',
+            : error instanceof Error
+              ? error.message
+              : 'Unknown error occurred',
     };
   }
 }

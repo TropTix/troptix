@@ -62,6 +62,12 @@ export const organizerRouter = router({
             message: 'Ticket already checked in',
           });
         }
+        if (e.message === 'TICKET_NOT_VALID') {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'This ticket is not valid for entry',
+          });
+        }
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: e.message,

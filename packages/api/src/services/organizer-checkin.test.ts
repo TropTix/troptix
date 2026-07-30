@@ -7,7 +7,11 @@
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
-import { NotFoundError, UnauthorizedError } from './_shared/errors';
+import {
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
+} from './_shared/errors';
 import { scanTicket, toggleTicketCheckIn } from './organizer-checkin';
 
 const owner: Actor = { kind: 'user', userId: 'org-1', role: 'PATRON' };
@@ -15,7 +19,7 @@ const owner: Actor = { kind: 'user', userId: 'org-1', role: 'PATRON' };
 type TicketRow = {
   id: string;
   eventId: string;
-  status: 'AVAILABLE' | 'VALID' | 'NOT_AVAILABLE';
+  status: 'AVAILABLE' | 'VALID' | 'NOT_AVAILABLE' | 'REFUNDED' | 'CANCELLED';
   checkinTimestamp: Date | null;
   ticketType: { name: string; description: string } | null;
 };
@@ -65,10 +69,15 @@ function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
         }
         return { count };
       },
-      update: async ({ where, data }: any) => {
-        const t = tickets.find((x) => x.id === where.id)!;
-        Object.assign(t, data);
-        return { ...t };
+      updateManyAndReturn: async ({ where, data }: any) => {
+        const updated: TicketRow[] = [];
+        for (const t of tickets) {
+          if (t.id === where.id && where.status.in.includes(t.status)) {
+            Object.assign(t, data);
+            updated.push({ ...t });
+          }
+        }
+        return updated;
       },
     },
   } as unknown as PrismaClient;
@@ -223,6 +232,40 @@ describe('toggleTicketCheckIn', () => {
     });
     expect(updated.status).toBe('NOT_AVAILABLE');
     expect(updated.checkinTimestamp).toBeInstanceOf(Date);
+  });
+
+  it('refuses a void ticket instead of resurrecting it as AVAILABLE', async () => {
+    for (const voidStatus of ['REFUNDED', 'CANCELLED'] as const) {
+      const { events, tickets } = seed();
+      tickets[0].status = voidStatus;
+      const prisma = makeFakePrisma(events, tickets);
+      await expect(
+        toggleTicketCheckIn(prisma, owner, { ticketId: 't1' })
+      ).rejects.toBeInstanceOf(ConflictError);
+      // Untouched — a scannable state would let a refunded holder through.
+      expect(tickets[0].status).toBe(voidStatus);
+      expect(tickets[0].checkinTimestamp).toBeNull();
+    }
+  });
+
+  it('refuses when the row changed between the read and the write', async () => {
+    const { events, tickets } = seed();
+    const prisma = makeFakePrisma(events, tickets);
+    // A competing scan won the race: the stored row is already checked in,
+    // but this caller's read saw it un-checked.
+    tickets[0].status = 'NOT_AVAILABLE';
+    tickets[0].checkinTimestamp = new Date();
+    const stale = { ...prisma } as any;
+    stale.tickets = {
+      ...(prisma as any).tickets,
+      findFirst: async () => ({ id: 't1', status: 'AVAILABLE' }),
+    };
+    await expect(
+      toggleTicketCheckIn(stale, owner, { ticketId: 't1' })
+    ).rejects.toBeInstanceOf(ConflictError);
+    // The winner's check-in survives; the loser did not clear it.
+    expect(tickets[0].status).toBe('NOT_AVAILABLE');
+    expect(tickets[0].checkinTimestamp).toBeInstanceOf(Date);
   });
 
   it('clears checkinTimestamp when undoing a check-in', async () => {

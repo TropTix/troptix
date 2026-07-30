@@ -9,13 +9,19 @@
  */
 import { TicketStatus, type PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
-import { NotFoundError } from './_shared/errors';
+import { ConflictError, NotFoundError } from './_shared/errors';
 import { requireOwnedEvent } from './_shared/owned-event';
 import { resolveOrganizerScope } from './organizer-scope';
 
 // Un-checked-in is two statuses mid-cutover: legacy AVAILABLE and the
-// canonical VALID the reservation checkout mints.
-const UNCHECKED_STATUSES = [TicketStatus.AVAILABLE, TicketStatus.VALID];
+// canonical VALID the reservation checkout mints. Annotated as TicketStatus[]
+// so adding an enum member is a compile error at every allow-list below,
+// rather than something an `else` silently absorbs.
+const UNCHECKED_STATUSES: TicketStatus[] = [
+  TicketStatus.AVAILABLE,
+  TicketStatus.VALID,
+];
+const CHECKED_IN_STATUSES: TicketStatus[] = [TicketStatus.NOT_AVAILABLE];
 
 export type ScanTicketResult = {
   ticketName: string | undefined;
@@ -89,13 +95,30 @@ export async function toggleTicketCheckIn(
     throw new NotFoundError('Ticket not found');
   }
 
-  // Undo restores AVAILABLE, the legacy un-checked state, as it always has.
-  const checkingIn = (UNCHECKED_STATUSES as string[]).includes(ticket.status);
-  return prisma.tickets.update({
-    where: { id: ticket.id },
+  // Both directions are allow-listed: a void ticket (USED, CANCELLED,
+  // REFUNDED) is neither checkable-in nor checkable-out, so it can never be
+  // rewritten into a scannable state. Undo restores AVAILABLE, the legacy
+  // un-checked state, as it always has.
+  const checkingIn = UNCHECKED_STATUSES.includes(ticket.status);
+  const checkingOut = CHECKED_IN_STATUSES.includes(ticket.status);
+  if (!checkingIn && !checkingOut) {
+    throw new ConflictError('This ticket is not valid for entry');
+  }
+
+  // Atomic check-then-flip, matching scanTicket: the status the read saw is
+  // part of the write predicate, so two simultaneous toggles can't both win.
+  const [updated] = await prisma.tickets.updateManyAndReturn({
+    where: {
+      id: ticket.id,
+      status: { in: checkingIn ? UNCHECKED_STATUSES : CHECKED_IN_STATUSES },
+    },
     data: {
       status: checkingIn ? TicketStatus.NOT_AVAILABLE : TicketStatus.AVAILABLE,
       checkinTimestamp: checkingIn ? new Date() : null,
     },
   });
+  if (!updated) {
+    throw new ConflictError('Someone else just changed this ticket');
+  }
+  return updated;
 }
