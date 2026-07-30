@@ -2,7 +2,7 @@
 
 Point-in-time audit, 2026-07-28. Read-only queries against the production
 database and the persistent dev branch, run before merging the Phase 0
-migrations (`20260728100000` – `20260728100200`) to confirm what the
+migrations (`20260729090000` – `20260729090200`) to confirm what the
 backfill and dedupe steps would actually do. Frozen on write.
 
 ## What was checked

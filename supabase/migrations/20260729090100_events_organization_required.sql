@@ -7,7 +7,7 @@
 -- becomes RESTRICT. The backfill is repeated here in SQL so the invariant holds
 -- no matter what state the target database is in.
 --
--- Runs after 20260728100000 (one org per owner), so "the owner's org" is unambiguous.
+-- Runs after 20260729090000 (one org per owner), so "the owner's org" is unambiguous.
 
 -- Organizers who have events but no Organization: create one. Display name from
 -- their newest event's `organizer` label (the backfill script's pick); slug is
