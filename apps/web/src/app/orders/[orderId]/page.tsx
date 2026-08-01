@@ -8,7 +8,7 @@ import {
   MapPin,
   Ticket,
   ArrowUpRight,
-  Redo,
+  Loader2,
   AlertTriangle,
   Info,
 } from 'lucide-react';
@@ -62,7 +62,7 @@ export default async function OrderPage(props: {
   if (order.status === OrderStatus.PENDING) {
     return (
       <CenteredState>
-        <Redo className="h-6 w-6 animate-spin text-primary" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
         <h1 className="mt-4 text-xl font-extrabold tracking-tight">
           Your order is processing
         </h1>

@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { httpBatchLink } from '@trpc/client';
 import { trpc } from '@/lib/trpc';
 import { usePathname } from 'next/navigation';
-import { ConfigProvider } from 'antd';
 import { MotionConfig } from 'motion/react';
 import posthog from 'posthog-js';
 import { PostHogProvider as PHProvider } from 'posthog-js/react';
@@ -80,26 +79,18 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <ConfigProvider
-      theme={{
-        components: {
-          /* Ant Design component tokens */
-        },
-      }}
-    >
-      <PostHogProvider>
-        <QueryClientProvider client={queryClient}>
-          <trpc.Provider client={trpcClient} queryClient={queryClient}>
-            <AuthProvider>
-              {/* Honor the OS "Reduce Motion" setting app-wide: disables
-                  transform/layout animations while keeping opacity fades. */}
-              <MotionConfig reducedMotion="user">
-                <GlobalLayout>{children}</GlobalLayout>
-              </MotionConfig>
-            </AuthProvider>
-          </trpc.Provider>
-        </QueryClientProvider>
-      </PostHogProvider>
-    </ConfigProvider>
+    <PostHogProvider>
+      <QueryClientProvider client={queryClient}>
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <AuthProvider>
+            {/* Honor the OS "Reduce Motion" setting app-wide: disables
+                transform/layout animations while keeping opacity fades. */}
+            <MotionConfig reducedMotion="user">
+              <GlobalLayout>{children}</GlobalLayout>
+            </MotionConfig>
+          </AuthProvider>
+        </trpc.Provider>
+      </QueryClientProvider>
+    </PostHogProvider>
   );
 }
