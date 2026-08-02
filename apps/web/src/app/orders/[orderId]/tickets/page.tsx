@@ -16,7 +16,6 @@ async function getOrderWithTicketsData(orderId: string) {
           status: true,
           firstName: true,
           lastName: true,
-          email: true,
           event: {
             select: {
               name: true,
@@ -75,7 +74,6 @@ export default async function OrderTicketsPage(props: OrderTicketsPageProps) {
     status: ticket.status,
     firstName: ticket.firstName || '',
     lastName: ticket.lastName || '',
-    email: ticket.email || '',
     ticketType: { name: ticket.ticketType?.name ?? 'General Admission' },
     event: {
       name: ticket.event.name,

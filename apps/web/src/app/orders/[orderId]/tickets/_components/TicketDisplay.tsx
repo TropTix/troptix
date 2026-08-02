@@ -11,7 +11,6 @@ export type TicketInfo = {
   status: string;
   firstName: string;
   lastName: string;
-  email: string;
   ticketType: { name: string };
   event: {
     name: string;
