@@ -355,6 +355,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 15,
     color: colors.text,
+    letterSpacing: 0,
   },
   codeInput: {
     fontFamily: fonts.semiBold,

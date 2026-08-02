@@ -261,13 +261,23 @@ function GuestRow({
       </View>
 
       <View
-        style={[styles.checkCircle, guest.checkedIn && styles.checkCircleIn]}
+        style={[
+          styles.checkPill,
+          guest.checkedIn ? styles.checkPillIn : styles.checkPillOut,
+        ]}
       >
-        <Ionicons
-          name={guest.checkedIn ? 'checkmark' : 'add'}
-          size={15}
-          color={guest.checkedIn ? '#fff' : colors.textMuted}
-        />
+        {guest.checkedIn ? (
+          <>
+            <Ionicons
+              name="checkmark-circle"
+              size={14}
+              color={colors.success}
+            />
+            <Text style={styles.checkPillTextIn}>Checked In</Text>
+          </>
+        ) : (
+          <Text style={styles.checkPillTextOut}>Check In</Text>
+        )}
       </View>
     </Pressable>
   );
@@ -448,6 +458,13 @@ export default function EventDetailScreen() {
                     : g
                 )
               );
+              trpc.organizer.undoCheckInTicket
+                .mutate({ ticketId: guestId })
+                .catch(() => {
+                  trpc.organizer.event.query({ id }).then((data) => {
+                    setGuests(data.guests);
+                  });
+                });
             },
           },
         ]
@@ -957,16 +974,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  checkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.border2,
+  checkPill: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
   },
-  checkCircleIn: {
-    backgroundColor: colors.success,
+  checkPillOut: {
+    backgroundColor: colors.accent,
+  },
+  checkPillIn: {
+    backgroundColor: colors.successDim,
+    borderWidth: 1,
+    borderColor: `${colors.success}44`,
+  },
+  checkPillTextOut: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: '#fff',
+  },
+  checkPillTextIn: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    color: colors.success,
   },
   guestSep: {
     height: 1,

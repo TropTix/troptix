@@ -1,5 +1,28 @@
 {
   "permissions": {
-    "allow": ["Bash(node -e ' *)", "Bash(yarn workspace *)"]
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(yarn workspace *)",
+      "Bash(eas credentials *)",
+      "Bash(xargs -I{} sh -c 'echo {}; grep -m1 \"\\\\\"version\\\\\"\" {}')",
+      "Bash(yarn why *)",
+      "Bash(npx expo-doctor *)",
+      "Bash(xargs -I{} sh -c 'echo {}; file {}')",
+      "Bash(md5 apps/web/public/favicon.ico apps/web/public/logos/logo_v2.png apps/web/public/logos/logo_v1.png apps/organizer/assets/icon.png)",
+      "Bash(xargs -I{} grep -il \"troptix\\\\|letter\" {})",
+      "Bash(mkdir -p apps/mobile/assets)",
+      "Bash(sips -z 1024 1024 apps/web/public/logos/TroptixLetter.png --out apps/mobile/assets/icon.png)",
+      "Bash(sips -z 1024 1024 apps/web/public/logos/TroptixLetter.png --out apps/mobile/assets/adaptive-icon.png)",
+      "Bash(sips -g all apps/web/public/logos/TroptixLetter.png)",
+      "Bash(python3 -c ' *)",
+      "Bash(convert /Users/gaurnett/Programming/TechBrewery/troptix/apps/web/public/logos/TroptixLetter.png -format \"%[pixel:p{5,5}]\" info:)",
+      "Read(//private/tmp/**)",
+      "Bash(sips -c 2 2 -c 2 2 /Users/gaurnett/Programming/TechBrewery/troptix/apps/web/public/logos/TroptixLetter.png --out corner.png)",
+      "Bash(sips -s format bmp corner.png --out corner.bmp)",
+      "Bash(xxd corner.bmp)",
+      "Bash(sips -z 1 1 /Users/gaurnett/Programming/TechBrewery/troptix/apps/web/public/logos/TroptixLetter.png --out avg.png)",
+      "Bash(sips -s format bmp avg.png --out avg.bmp)",
+      "Bash(xxd avg.bmp)"
+    ]
   }
 }
