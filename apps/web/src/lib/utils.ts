@@ -15,6 +15,13 @@ export function getFormattedCurrency(price) {
   return formatter.format(price);
 }
 
+/** The public event page's price line; shared with its form preview. */
+export function priceLabelFor(fromPriceCents: number | null): string {
+  if (fromPriceCents == null) return 'No tickets available';
+  if (fromPriceCents === 0) return 'Free';
+  return `From ${getFormattedCurrency(fromPriceCents / 100)} USD`;
+}
+
 /**
  * Human-readable order reference derived from the id (which stays the real key
  * in URLs). Matches the `TT-` short code shown elsewhere in the app.

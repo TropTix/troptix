@@ -58,12 +58,12 @@ export const combineDateTime = (
   const [hours, minutes] = timePart.split(':').map(Number);
   const newDate = new Date(datePart);
   if (!isNaN(hours) && !isNaN(minutes)) {
-    newDate.setHours(hours, minutes, 0, 0); // Set hours and minutes, reset seconds/ms
+    newDate.setHours(hours, minutes, 0, 0);
   }
   return newDate;
 };
 
 export const formatTime = (date: Date | undefined): string => {
   if (!date) return '';
-  return date.toTimeString().slice(0, 5); // Extracts HH:MM
+  return date.toTimeString().slice(0, 5);
 };

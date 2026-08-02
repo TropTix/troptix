@@ -1,4 +1,3 @@
-// app/organizer/events/[eventId]/loading.tsx
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Card,
@@ -102,7 +101,7 @@ export default function EventOverviewLoading() {
           {/* View Event Page Button */}
         </div>
         <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5">
-          <Skeleton className="h-5 flex-grow" /> {/* Input for Event URL */}
+          <Skeleton className="h-5 grow" /> {/* Input for Event URL */}
           <Skeleton className="h-7 w-7 rounded-md" /> {/* Copy Button */}
           <Skeleton className="h-7 w-7 rounded-md" /> {/* Share Button */}
         </div>

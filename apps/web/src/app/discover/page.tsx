@@ -24,9 +24,9 @@ function DiscoverBackground() {
         className="absolute inset-0"
         style={{
           backgroundImage: [
-            'radial-gradient(55% 45% at 12% 6%, hsl(var(--primary) / 0.08), transparent 65%)',
-            'radial-gradient(60% 55% at 92% 96%, rgba(255, 190, 150, 0.28), transparent 65%)',
-            'linear-gradient(180deg, #fbfaf6 0%, #faf8f4 55%, #f4f0e8 100%)',
+            'radial-gradient(55% 45% at 12% 6%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 65%)',
+            'radial-gradient(60% 55% at 92% 96%, color-mix(in srgb, var(--primary) 6%, transparent), transparent 65%)',
+            'linear-gradient(180deg, var(--background) 0%, var(--background) 55%, var(--muted) 100%)',
           ].join(', '),
         }}
       />
@@ -47,32 +47,32 @@ export default async function DiscoverPage() {
   const events = await loadEvents();
 
   return (
-    <section className="relative isolate min-h-screen overflow-hidden bg-[#faf8f4] text-slate-900">
+    <section className="relative isolate min-h-screen overflow-hidden bg-background text-foreground">
       <DiscoverBackground />
 
       <div className="relative z-10 mx-auto max-w-6xl px-5 pb-20 pt-28 sm:px-6 sm:pt-32 lg:px-8">
         <header className="mb-12 sm:mb-16">
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+          <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
             Discover
           </h1>
         </header>
 
         {events.length === 0 ? (
-          <div className="mx-auto max-w-md rounded-[26px] bg-white/70 p-10 text-center shadow-[0_20px_50px_-30px_rgba(15,23,42,0.25)] ring-1 ring-slate-900/[0.05] backdrop-blur">
+          <div className="mx-auto max-w-md rounded-[26px] bg-card/70 p-10 text-center shadow-[0_20px_50px_-30px_rgba(15,23,42,0.25)] ring-1 ring-foreground/5 backdrop-blur-sm">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
               <Calendar className="h-8 w-8 text-primary" />
             </div>
-            <h2 className="mb-2 text-xl font-semibold text-slate-900">
+            <h2 className="mb-2 text-xl font-semibold text-foreground">
               No events yet
             </h2>
-            <p className="mb-6 text-slate-600">
+            <p className="mb-6 text-muted-foreground">
               There are no upcoming events right now. Check back soon —
               something unforgettable is on the way.
             </p>
             <Button
               asChild
               size="lg"
-              className="bg-primary text-primary-foreground shadow-[0_10px_28px_-12px_hsl(var(--primary)/0.45)] hover:bg-primary/90"
+              className="bg-primary text-primary-foreground shadow-[0_10px_28px_-12px] shadow-primary/45 hover:bg-primary/90"
             >
               <Link href="/">Back to Home</Link>
             </Button>

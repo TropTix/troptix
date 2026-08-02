@@ -34,7 +34,7 @@ export function GoogleSignInButton({
       variant="outline"
       onClick={handleGoogleSignIn}
       disabled={disabled || isLoading}
-      className="w-full h-12 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+      className="w-full h-12 bg-destructive hover:bg-destructive/90 text-white border-destructive"
     >
       {isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin" />

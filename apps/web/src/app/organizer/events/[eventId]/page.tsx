@@ -62,6 +62,8 @@ export default async function EventOverviewPage({
 
   const { event, vitals, revenueSeries, ticketTypes, checkIn, recentOrders } =
     overview;
+  // View-as rides the query string (ADR 0018); links must carry it forward.
+  const scope = viewAs ? `?viewAs=${encodeURIComponent(viewAs)}` : '';
 
   return (
     <div className="space-y-8">
@@ -69,7 +71,9 @@ export default async function EventOverviewPage({
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">{event.name}</h1>
-            <Badge variant={STATUS_VARIANT[event.status]}>{event.status}</Badge>
+            <Badge variant={STATUS_VARIANT[event.status]}>
+              {event.status === 'Draft' ? 'Unpublished' : event.status}
+            </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
             {getDateFormatter(new Date(event.startsAt), 'EEE, MMM d, yyyy')}
@@ -78,7 +82,7 @@ export default async function EventOverviewPage({
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/events/${event.id}`} target="_blank" rel="noopener">
+            <Link href={`/e/${event.id}`} target="_blank" rel="noopener">
               <Eye className="mr-2 h-4 w-4" />
               View public
             </Link>
@@ -137,8 +141,13 @@ export default async function EventOverviewPage({
             checkedIn={checkIn.checkedIn}
             total={checkIn.total}
             eventId={event.id}
+            scope={scope}
           />
-          <RecentOrders orders={recentOrders} eventId={event.id} />
+          <RecentOrders
+            orders={recentOrders}
+            eventId={event.id}
+            scope={scope}
+          />
         </section>
       </div>
     </div>
@@ -221,10 +230,12 @@ function CheckInCard({
   checkedIn,
   total,
   eventId,
+  scope,
 }: {
   checkedIn: number;
   total: number;
   eventId: string;
+  scope: string;
 }) {
   const percent = total > 0 ? (checkedIn / total) * 100 : 0;
   return (
@@ -232,7 +243,7 @@ function CheckInCard({
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-base">Check-in</CardTitle>
         <Link
-          href={`/organizer/events/${eventId}/attendees`}
+          href={`/organizer/events/${eventId}/attendees${scope}`}
           className="text-sm text-muted-foreground hover:text-foreground"
         >
           <ScanLine className="h-4 w-4" />
@@ -254,16 +265,18 @@ function CheckInCard({
 function RecentOrders({
   orders,
   eventId,
+  scope,
 }: {
   orders: DashboardRecentOrder[];
   eventId: string;
+  scope: string;
 }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base">Recent orders</CardTitle>
         <Link
-          href={`/organizer/events/${eventId}/orders`}
+          href={`/organizer/events/${eventId}/orders${scope}`}
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
         >
           View all
@@ -282,7 +295,7 @@ function RecentOrders({
             {orders.map((order) => (
               <li key={order.id}>
                 <Link
-                  href={`/organizer/events/${order.eventId}/orders/${order.id}`}
+                  href={`/organizer/events/${order.eventId}/orders/${order.id}${scope}`}
                   className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-3 hover:bg-muted/50"
                 >
                   <div className="min-w-0">

@@ -1,18 +1,12 @@
-import { z } from 'zod';
-import { protectedProcedure, router } from '../trpc';
-import {
-  getEvents,
-  getEvent,
-  checkInTicket,
-  undoCheckinTicket,
-} from '../../services/organizer';
 import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import { checkInTicket, getEvent, getEvents } from '../../services/organizer';
+import { protectedProcedure, router } from '../trpc';
 
 export const organizerRouter = router({
   /**
-   * All events the signed-in organizer owns. Mobile has no View-as UI, so
-   * this is always scoped to the actor's own organizerUserId — including for
-   * @usetroptix.com platform-owner accounts (ADR 0018).
+   * All events the signed-in organizer owns. Ownership-only — the old
+   * platform-owner bypass was removed (ADR 0018).
    */
   events: protectedProcedure.query(async ({ ctx }) => {
     try {
@@ -50,9 +44,6 @@ export const organizerRouter = router({
       }
     }),
 
-  /**
-   * Check in a specific ticket.
-   */
   checkInTicket: protectedProcedure
     .input(z.object({ ticketId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -71,32 +62,10 @@ export const organizerRouter = router({
             message: 'Ticket already checked in',
           });
         }
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: e.message,
-        });
-      }
-    }),
-
-  /**
-   * Undo a ticket check-in.
-   */
-  undoCheckInTicket: protectedProcedure
-    .input(z.object({ ticketId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      try {
-        return await undoCheckinTicket(ctx.prisma, ctx.actor, input.ticketId);
-      } catch (e: any) {
-        if (e.message === 'NOT_FOUND') {
-          throw new TRPCError({ code: 'NOT_FOUND' });
-        }
-        if (e.message === 'UNAUTHORIZED') {
-          throw new TRPCError({ code: 'UNAUTHORIZED' });
-        }
-        if (e.message === 'NOT_CHECKED_IN') {
+        if (e.message === 'TICKET_NOT_VALID') {
           throw new TRPCError({
             code: 'CONFLICT',
-            message: 'Ticket is not checked in',
+            message: 'This ticket is not valid for entry',
           });
         }
         throw new TRPCError({

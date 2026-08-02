@@ -1,12 +1,13 @@
 import * as React from 'react';
-import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 
 interface StatusBadgeProps {
   status: string;
 }
 
-// Maps order status strings to Badge variants
-const getBadgeVariant = (status: string): BadgeProps['variant'] => {
+const getBadgeVariant = (
+  status: string
+): React.ComponentProps<typeof Badge>['variant'] => {
   switch (
     status.toUpperCase() // Use uppercase for case-insensitive matching
   ) {

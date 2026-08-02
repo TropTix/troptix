@@ -1,4 +1,3 @@
-// app/organizer/events/loading.tsx
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,10 +12,10 @@ import {
 
 const SkeletonEventCard = () => (
   <Card className="overflow-hidden flex flex-col">
-    <div className="relative w-full flex-shrink-0 aspect-video bg-muted">
+    <div className="relative w-full shrink-0 aspect-video bg-muted">
       {/* Image placeholder */}
       <div className="w-full h-full flex items-center justify-center">
-        <ImageIcon className="h-10 w-10 text-gray-400 dark:text-gray-500" />
+        <ImageIcon className="h-10 w-10 text-muted-foreground" />
       </div>
     </div>
     <div className="flex flex-1 flex-col p-4 md:p-6">
@@ -51,12 +50,6 @@ export default function AllEventsListLoading() {
         <Skeleton className="h-10 w-48 rounded-md" />{' '}
         {/* Create New Event Button */}
       </div>
-
-      {/* Placeholder for Filtering/Search controls if you plan to add them */}
-      {/* <div className="flex gap-2">
-        <Skeleton className="h-10 w-64 rounded-md" />
-        <Skeleton className="h-10 w-32 rounded-md" />
-      </div> */}
 
       <div className="space-y-8">
         {Array.from({ length: numberOfPlaceholderSections }).map(

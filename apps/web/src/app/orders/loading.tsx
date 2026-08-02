@@ -14,7 +14,7 @@ const SkeletonOrderCard = () => {
         <Skeleton className="h-4 w-1/4" />
         <Skeleton className="h-4 w-1/2" />
         <div className="flex items-center pt-1">
-          <Ticket className="w-4 h-4 mr-1 text-gray-300" />
+          <Ticket className="w-4 h-4 mr-1 text-muted-foreground/50" />
           <Skeleton className="h-4 w-16" />
         </div>
       </div>

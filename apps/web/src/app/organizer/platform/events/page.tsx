@@ -19,7 +19,6 @@ import {
 import {
   Settings,
   Eye,
-  Edit,
   Calendar,
   MapPin,
   User,
@@ -66,9 +65,8 @@ export default async function PlatformEventsPage() {
     redirect('/auth/signin');
   }
 
-  const events = await getAllPlatformEvents(user.uid, user.email);
+  const events = await getAllPlatformEvents(user);
 
-  // Calculate platform-wide stats
   const platformStats = events.reduce(
     (acc, event) => ({
       totalEvents: acc.totalEvents + 1,
@@ -106,7 +104,6 @@ export default async function PlatformEventsPage() {
         </Badge>
       </div>
 
-      {/* Platform Stats */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -170,7 +167,6 @@ export default async function PlatformEventsPage() {
         </Card>
       </div>
 
-      {/* Events Table */}
       <Card>
         <CardHeader>
           <CardTitle>All Platform Events</CardTitle>
@@ -257,14 +253,12 @@ export default async function PlatformEventsPage() {
 
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          {/* Read-only View-as; no edit link — writes never accept it. */}
                           <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/organizer/events/${event.id}`}>
+                            <Link
+                              href={`/organizer/events/${event.id}?viewAs=${event.organizer.id}`}
+                            >
                               <Settings className="h-3 w-3" />
-                            </Link>
-                          </Button>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/organizer/events/${event.id}/edit`}>
-                              <Edit className="h-3 w-3" />
                             </Link>
                           </Button>
                           <Button variant="ghost" size="sm" asChild>

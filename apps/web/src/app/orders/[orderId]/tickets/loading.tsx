@@ -1,7 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton';
 
 const SkeletonTicketCard = () => (
-  <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
+  <div className="bg-card shadow-lg rounded-lg overflow-hidden">
     <div className="p-6">
       <div className="flex flex-col sm:flex-row justify-between sm:items-start">
         <div className="mb-4 sm:mb-0">
@@ -11,7 +11,7 @@ const SkeletonTicketCard = () => (
         </div>
         <Skeleton className="h-10 w-24 rounded-md" />
       </div>
-      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="mt-4 pt-4 border-t border-border">
         <Skeleton className="h-4 w-full mb-1" />
         <Skeleton className="h-4 w-3/4" />
       </div>

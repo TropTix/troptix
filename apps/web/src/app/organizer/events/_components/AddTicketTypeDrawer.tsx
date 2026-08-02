@@ -279,7 +279,7 @@ export function AddTicketTypeDrawer({
           <form
             id="drawer-ticket-form"
             onSubmit={form.handleSubmit(onValidSubmit, onInvalidSubmit)}
-            className="px-4 py-2 space-y-4 overflow-y-auto flex-grow"
+            className="px-4 py-2 space-y-4 overflow-y-auto grow"
           >
             <FormField
               control={form.control}
@@ -453,7 +453,6 @@ export function AddTicketTypeDrawer({
                       <FormLabel>Sale Starts *</FormLabel>
                       <div className="flex items-center gap-2">
                         <FormControl>
-                          {/* DatePicker handles the date part */}
                           <DatePicker
                             date={field.value}
                             onDateChange={(newDate) => {
@@ -468,7 +467,6 @@ export function AddTicketTypeDrawer({
                           />
                         </FormControl>
                         <FormControl>
-                          {/* Separate input for time */}
                           <Input
                             type="time"
                             value={formatTime(field.value)}
@@ -498,7 +496,6 @@ export function AddTicketTypeDrawer({
                     <FormLabel>Sale Ends *</FormLabel>
                     <div className="flex items-center gap-2">
                       <FormControl>
-                        {/* DatePicker handles the date part */}
                         <DatePicker
                           date={field.value}
                           onDateChange={(newDate) => {
@@ -513,7 +510,6 @@ export function AddTicketTypeDrawer({
                         />
                       </FormControl>
                       <FormControl>
-                        {/* Separate input for time */}
                         <Input
                           type="time"
                           value={formatTime(field.value)}

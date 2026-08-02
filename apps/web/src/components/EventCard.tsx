@@ -31,19 +31,19 @@ export default function EventCard({ event }: { event: EventSummary }) {
       <motion.article
         whileHover={{ y: -6 }}
         transition={{ type: 'spring', stiffness: 200, damping: 22 }}
-        className="relative overflow-hidden rounded-[26px] shadow-[0_30px_70px_-25px_rgba(15,23,42,0.30),0_8px_20px_-8px_rgba(15,23,42,0.10)] ring-1 ring-slate-900/[0.05]"
+        className="relative overflow-hidden rounded-[26px] shadow-[0_30px_70px_-25px_rgba(15,23,42,0.30),0_8px_20px_-8px_rgba(15,23,42,0.10)] ring-1 ring-foreground/5"
       >
-        <div className="relative aspect-[4/5] w-full">
+        <div className="relative aspect-4/5 w-full">
           <Image
             src={displayImageUrl}
             alt={`${event.name} event flyer`}
             fill
             sizes="(min-width: 640px) 330px, 90vw"
-            className="object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.03]"
+            className="object-cover transition-transform duration-1200 ease-out group-hover:scale-[1.03]"
           />
 
           {/* Restrained bottom scrim for metadata legibility */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/10 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/10 to-transparent" />
 
           {/* Editorial metadata — floats on the artwork */}
           <div className="absolute inset-x-0 bottom-0 p-5 text-white">

@@ -16,7 +16,7 @@ const OWNER: Actor = { kind: 'user', userId: 'owner-1', role: 'PATRON' };
 const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 
 interface FakeOpts {
-  email?: string;
+  platformOwner?: boolean;
   subtotalSum?: number | null;
   sales?: { at: Date; tickets: bigint }[];
   events?: unknown[];
@@ -37,11 +37,7 @@ function fakePrisma(opts: FakeOpts = {}) {
     users: {
       findUnique: vi
         .fn()
-        .mockResolvedValue(
-          opts.email === undefined
-            ? { email: 'o@b.com' }
-            : { email: opts.email }
-        ),
+        .mockResolvedValue({ isPlatformOwner: opts.platformOwner ?? false }),
     },
     orders: { aggregate: ordersAggregate, findMany: ordersFindMany },
     events: { findMany: eventsFindMany },
@@ -73,7 +69,7 @@ describe('getDashboard — authorization', () => {
 
   it('ignores View-as for a non-platform-owner (pins them to themselves)', async () => {
     const { prisma, eventsFindMany } = fakePrisma({
-      email: 'someone@gmail.com',
+      platformOwner: false,
     });
 
     await getDashboard(
@@ -90,7 +86,7 @@ describe('getDashboard — authorization', () => {
 
   it('honors View-as for a platform owner', async () => {
     const { prisma, eventsFindMany } = fakePrisma({
-      email: 'staff@usetroptix.com',
+      platformOwner: true,
     });
 
     await getDashboard(

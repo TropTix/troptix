@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useCallback } from "react";
+import { useState, useCallback } from 'react';
 
 export function useCopyToClipboard() {
   const [isCopied, setIsCopied] = useState(false);
@@ -11,26 +11,25 @@ export function useCopyToClipboard() {
         await navigator.clipboard.writeText(text);
       } else {
         // Fallback for older browsers or non-secure contexts
-        const textArea = document.createElement("textarea");
+        const textArea = document.createElement('textarea');
         textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        document.execCommand("copy");
+        document.execCommand('copy');
         textArea.remove();
       }
-      
+
       setIsCopied(true);
-      
-      // Reset the copied state after 2 seconds
+
       setTimeout(() => setIsCopied(false), 2000);
-      
+
       return true;
     } catch (error) {
-      console.error("Failed to copy text:", error);
+      console.error('Failed to copy text:', error);
       return false;
     }
   }, []);

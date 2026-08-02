@@ -1,16 +1,9 @@
 'use client';
 
 import { User } from '@/hooks/types/User';
-import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { Inter } from 'next/font/google';
-import { createContext, useContext, useEffect, useState } from 'react';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
+import { usePostHog } from 'posthog-js/react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 const emptyUser: User = { id: '' };
 
@@ -37,6 +30,10 @@ export default function AuthProvider({
 }) {
   const [user, setUser] = useState<User>(emptyUser);
   const [loading, setLoading] = useState(true);
+  const posthog = usePostHog();
+  // Tracks whether we've identified this session, so sign-out resets exactly
+  // once — reset() on an already-anonymous visitor would rotate their id.
+  const identifiedId = useRef<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -46,7 +43,20 @@ export default function AuthProvider({
       try {
         const res = await fetch('/api/user/me', { cache: 'no-store' });
         const json = await res.json();
-        if (active) setUser(json.user ?? emptyUser);
+        if (active) {
+          const nextUser: User = json.user ?? emptyUser;
+          setUser(nextUser);
+          if (nextUser.id) {
+            posthog.identify(
+              nextUser.id,
+              nextUser.email ? { email: nextUser.email } : undefined
+            );
+            identifiedId.current = nextUser.id;
+          } else if (identifiedId.current) {
+            posthog.reset();
+            identifiedId.current = null;
+          }
+        }
       } catch (error) {
         console.error('Failed to load user:', error);
         if (active) setUser(emptyUser);
@@ -66,22 +76,13 @@ export default function AuthProvider({
       active = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [posthog]);
 
   return (
     <TropTixContext.Provider value={{ user, loading }}>
-      <div
-        className={cn(
-          'min-h-screen font-sans antialiased mx-auto',
-          inter.variable
-        )}
-      >
-        <div
-          className={`${inter.variable} font-inter antialiased text-gray-900 tracking-tight`}
-        >
-          <div className="flex flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
-            {children}
-          </div>
+      <div className="mx-auto min-h-screen font-sans tracking-tight antialiased">
+        <div className="flex flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
+          {children}
         </div>
       </div>
     </TropTixContext.Provider>

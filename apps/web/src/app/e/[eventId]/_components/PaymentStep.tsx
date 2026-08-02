@@ -132,8 +132,9 @@ function PaymentInner({
 
   if (checkoutState.type === 'loading') {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner text="Loading payment…" />
+      <div className="flex flex-1 flex-col items-center justify-center gap-3">
+        <Spinner className="size-12 text-primary" />
+        <p className="text-base">Loading payment…</p>
       </div>
     );
   }
@@ -186,7 +187,7 @@ function PaymentInner({
         <span
           className={
             secondsLeft <= 60
-              ? 'font-semibold text-red-600'
+              ? 'font-semibold text-destructive'
               : 'text-muted-foreground'
           }
         >
@@ -198,7 +199,7 @@ function PaymentInner({
 
       <PaymentElement />
 
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
       <button
         type="button"

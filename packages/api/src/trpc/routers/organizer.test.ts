@@ -4,19 +4,22 @@ import { createContext } from '../context';
 import { createCaller } from './index';
 
 type MockPrismaOptions = {
-  userEmail?: string;
   ticket?: any;
   events?: any[];
 };
 
 function fakePrisma(opts: MockPrismaOptions): PrismaClient {
   return {
-    users: {
-      findUnique: async () => ({ email: opts.userEmail ?? 'org@example.com' }),
-    },
     tickets: {
       findUnique: async () => opts.ticket ?? null,
-      update: async (args: any) => ({ ...opts.ticket, ...args.data }),
+      updateMany: async ({ where }: any) => ({
+        count:
+          opts.ticket &&
+          where.status.in.includes(opts.ticket.status) &&
+          !opts.ticket.checkinTimestamp
+            ? 1
+            : 0,
+      }),
     },
     events: {
       findMany: async () => opts.events ?? [],
@@ -36,7 +39,6 @@ describe('appRouter.organizer (via createCaller)', () => {
   it('checkInTicket returns success for a valid available ticket', async () => {
     const res = await caller(
       fakePrisma({
-        userEmail: 'org@example.com',
         ticket: {
           id: 't-1',
           status: 'AVAILABLE',
@@ -49,9 +51,6 @@ describe('appRouter.organizer (via createCaller)', () => {
   });
 
   it('rejects invalid input at the boundary (empty ticketId)', async () => {
-    // We expect Zod validation error for empty string if it's not a valid format
-    // Zod string() allows empty string unless min(1) is used, but assuming typical string validations
-    // If not, we test that it throws when undefined
     await expect(
       (caller(fakePrisma({})).organizer.checkInTicket as any)({})
     ).rejects.toThrow();
@@ -61,7 +60,6 @@ describe('appRouter.organizer (via createCaller)', () => {
     await expect(
       caller(
         fakePrisma({
-          userEmail: 'org@example.com',
           ticket: {
             id: 't-1',
             status: 'NOT_AVAILABLE',
@@ -76,7 +74,6 @@ describe('appRouter.organizer (via createCaller)', () => {
     await expect(
       caller(
         fakePrisma({
-          userEmail: 'org@example.com',
           ticket: {
             id: 't-1',
             status: 'AVAILABLE',

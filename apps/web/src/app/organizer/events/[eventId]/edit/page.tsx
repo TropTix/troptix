@@ -1,10 +1,10 @@
 import { BackButton } from '@/components/ui/back-button';
 import prisma from '@/server/prisma';
+import { parseStoredFlyerPalette } from '@troptix/api';
 import EventForm from '../../_components/EventForm';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
-import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 
 interface EditEventPageProps {
   params: Promise<{
@@ -12,13 +12,14 @@ interface EditEventPageProps {
   }>;
 }
 
-async function getEvent(eventId: string, userId: string, userEmail?: string) {
-  try {
-    // Verify access first
-    await verifyEventAccess(userId, userEmail, eventId);
+import type { ServerUser } from '@/server/authUser';
 
+// Ownership scoping in the query is the access check — null means 404.
+// Errors propagate to the error boundary; a DB failure is not a 404.
+async function getEvent(eventId: string, user: ServerUser) {
+  {
     const event = await prisma.events.findUnique({
-      where: getEventWhereClause(userId, userEmail, eventId),
+      where: { id: eventId, organizerUserId: user.uid, deletedAt: null },
       include: {
         ticketTypes: {
           select: {
@@ -36,9 +37,6 @@ async function getEvent(eventId: string, userId: string, userEmail?: string) {
       },
     });
     return event;
-  } catch (error) {
-    console.error(error);
-    return null;
   }
 }
 
@@ -46,16 +44,11 @@ export default async function EditEventPage(props: EditEventPageProps) {
   const params = await props.params;
   const { eventId } = params;
 
-  // Get user and verify authentication
   const user = await getUserFromIdTokenCookie();
   if (!user) {
     redirect('/auth/signin');
   }
-  const userId = user.uid;
-  const userEmail = user.email;
-  await verifyEventAccess(userId, userEmail, eventId);
-
-  const event = await getEvent(eventId, userId, userEmail);
+  const event = await getEvent(eventId, user);
 
   if (!event) {
     notFound();
@@ -74,12 +67,14 @@ export default async function EditEventPage(props: EditEventPageProps) {
     longitude: event?.longitude ?? null,
     imageUrl: event?.imageUrl ?? '',
     description: event?.description ?? '',
+    pageTheme: event.pageTheme,
+    flyerPalette: parseStoredFlyerPalette(event.flyerPalette),
   };
 
   // Host brand for the read-only "Hosted by" line on the form. Paid ticketing
   // is the Organization's approval — the same flag the write service enforces.
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: userId },
+    where: { ownerUserId: user.uid },
     select: { displayName: true, paidTicketingEnabled: true },
   });
   const paidEventsEnabled = org?.paidTicketingEnabled ?? false;

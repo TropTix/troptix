@@ -2,14 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  ChevronLeft,
-  ChevronRight,
-  CalendarDays,
-  MapPin,
-  Receipt,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, MapPin } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { formatOrderNumber } from '@/lib/utils';
 
 export type TicketInfo = {
   id: string;
@@ -39,11 +34,6 @@ function formatDate(date: Date | string) {
   });
 }
 
-/** Short, human-readable code shown under the QR (the QR itself encodes the id). */
-function shortCode(id: string) {
-  return `TT-${id.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
-}
-
 export default function TicketDisplayManager({
   tickets,
   ticketId,
@@ -69,7 +59,7 @@ export default function TicketDisplayManager({
   }
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col bg-white px-5 pb-8 pt-4">
+    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-white px-5 pb-8 pt-4">
       <div className="flex items-center justify-between">
         <Link
           href="/orders"
@@ -85,9 +75,9 @@ export default function TicketDisplayManager({
         <Link
           href={`/orders/${orderId}`}
           aria-label="Order details and receipt"
-          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-9 items-center rounded-full px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <Receipt className="h-[18px] w-[18px]" />
+          Receipt
         </Link>
       </div>
 
@@ -137,7 +127,7 @@ export default function TicketDisplayManager({
             )}
             {isVoid && (
               <div className="absolute inset-0 grid place-items-center">
-                <span className="rounded-md bg-destructive/10 px-3 py-1 font-mono text-sm font-bold uppercase tracking-[0.1em] text-destructive">
+                <span className="rounded-md bg-destructive/10 px-3 py-1 font-mono text-sm font-bold uppercase tracking-widest text-destructive">
                   {voidLabel}
                 </span>
               </div>
@@ -182,7 +172,7 @@ export default function TicketDisplayManager({
           </div>
 
           <div className="mt-4 font-mono text-[13px] font-semibold tracking-[0.2em] text-foreground">
-            {shortCode(ticket.id)}
+            {formatOrderNumber(ticket.id)}
           </div>
         </div>
       </div>

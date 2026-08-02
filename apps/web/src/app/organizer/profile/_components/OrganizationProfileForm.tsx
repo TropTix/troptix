@@ -4,13 +4,12 @@ import { useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
+import { ExternalLink, Globe } from 'lucide-react';
 import {
-  ExternalLink,
-  Globe,
-  Instagram,
-  Linkedin,
-  Twitter,
-} from 'lucide-react';
+  InstagramIcon as Instagram,
+  LinkedinIcon as Linkedin,
+  TwitterIcon as Twitter,
+} from '@/components/icons/brand';
 
 import {
   organizationProfileSchema,
@@ -36,7 +35,7 @@ const PROFILE_URL_BASE = 'troptix.com/o/';
 const SOCIAL_FIELDS: {
   name: 'instagram' | 'twitter' | 'linkedin' | 'website';
   label: string;
-  icon: typeof Globe;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   placeholder: string;
 }[] = [
   {
@@ -122,11 +121,17 @@ export default function OrganizationProfileForm({
             form.setValue('logoUrl', path ?? '', { shouldDirty: true })
           }
         />
-        <Button asChild variant="outline" size="sm" className="gap-1.5">
-          <a href={`/o/${savedSlug}`} target="_blank" rel="noopener noreferrer">
-            View profile <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        </Button>
+        {savedSlug && (
+          <Button asChild variant="outline" size="sm" className="gap-1.5">
+            <a
+              href={`/o/${savedSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View profile <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+        )}
       </div>
 
       <Form {...form}>

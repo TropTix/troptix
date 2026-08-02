@@ -1,0 +1,115 @@
+name: CI
+
+# Runs the test suites and typecheck on every PR.
+#
+# Path filtering happens at the JOB level, not the workflow level. A workflow
+# skipped by `paths:` never creates its check runs, which leaves required
+# checks "Pending" forever and blocks the merge. A job skipped by an `if:`
+# condition reports "skipped", which GitHub counts as passing ("success,
+# skipped, and neutral" all satisfy a required check). See
+# https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/troubleshooting-required-status-checks
+#
+# So: every job here is safe to mark as a required check.
+#
+# Lint is deliberately absent — apps/web has pre-existing eslint errors. Add
+# `yarn workspace web lint` to web-tests once those are fixed.
+
+on:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Detect which parts of the repo the PR touches. On pull_request events
+  # paths-filter reads the changed-file list from the API — no checkout needed.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          # These filters encode the workspace dependency graph by hand:
+          # @troptix/api depends on @troptix/db and the live schema (supabase/),
+          # web depends on every package. Root manifest/lockfile or workflow
+          # changes rerun everything.
+          filters: |
+            api:
+              - 'packages/api/**'
+              - 'packages/db/**'
+              - 'supabase/**'
+              - 'package.json'
+              - 'yarn.lock'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'yarn.lock'
+              - '.github/workflows/ci.yml'
+
+  # Always runs, unfiltered: its job is catching cross-workspace breakage
+  # (a type change in @troptix/db breaking apps/web), which path filters
+  # cannot predict.
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Typecheck all workspaces
+        run: yarn typecheck
+
+  web-tests:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Run web unit tests
+        run: yarn workspace web test
+
+  # The @troptix/api suite is integration tests against a real Postgres.
+  # `supabase db start` boots the local database container and applies every
+  # migration in supabase/migrations plus supabase/seed.sql — the same engine
+  # local dev uses. The local container has no SSL, hence sslmode=disable
+  # (honored by packages/db/src/index.ts).
+  api-tests:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PRISMA_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - uses: supabase/setup-cli@v1
+        with:
+          # Pinned: the action's default lags far behind. Keep roughly in step
+          # with the CLI version used for local dev.
+          version: 2.110.0
+      - name: Start local Postgres (migrations + seed)
+        run: supabase db start
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Run API integration tests
+        run: yarn workspace @troptix/api test

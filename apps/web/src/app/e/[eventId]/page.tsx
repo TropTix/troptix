@@ -4,10 +4,10 @@ import { getEventDetail, NotFoundError } from '@troptix/api/server';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
-import EventPageClean from './_components/EventPageClean';
+import EventDetailView from './_components/EventDetailView';
 
-// Parallel `/e/[eventId]` route (legacy `/events/[eventId]` stays live). See
-// docs/plans/2026-06-event-page-redesign.md.
+// The public event page. Legacy `/events/[eventId]` 308-redirects here
+// (next.config.js). See docs/plans/2026-06-event-page-redesign.md.
 
 // Deduped per request so generateMetadata + the page share one DB read.
 const loadEvent = cache((eventId: string) =>
@@ -57,5 +57,10 @@ export default async function EventDetailPage({
     notFound();
   }
 
-  return <EventPageClean event={event} />;
+  return (
+    <EventDetailView
+      event={event}
+      eventEnded={Date.now() > Date.parse(event.endsAt)}
+    />
+  );
 }

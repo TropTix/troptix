@@ -1,4 +1,3 @@
-// app/orders/page.tsx
 import prisma from '@/server/prisma';
 import { getDateFormatter, formatTime } from '@/lib/dateUtils';
 import Link from 'next/link';
@@ -136,9 +135,6 @@ export default async function OrdersPage() {
         <div className="max-w-7xl mx-auto space-y-12">
           {upcoming.length > 0 && (
             <section>
-              <h2 className="mb-5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Upcoming
-              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {upcoming.map((order) => (
                   <OrderCard key={order.id} order={toCardProps(order)} />
@@ -283,7 +279,7 @@ const OrderCard = ({ order }: OrderCardProps) => {
           <CardContent className="pt-0 space-y-3">
             <div className="space-y-2">
               <div className="flex items-center text-sm text-muted-foreground">
-                <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
+                <Calendar className="w-4 h-4 mr-2 shrink-0" />
                 <span className="font-medium">{getRelativeDate()}</span>
                 {!isPastEvent && !isToday && (
                   <span className="ml-2 text-xs">at {time}</span>
@@ -292,13 +288,13 @@ const OrderCard = ({ order }: OrderCardProps) => {
 
               {venue && (
                 <div className="flex items-center text-sm text-muted-foreground">
-                  <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <MapPin className="w-4 h-4 mr-2 shrink-0" />
                   <span className="truncate">{venue}</span>
                 </div>
               )}
 
               <div className="flex items-center text-sm text-muted-foreground">
-                <Ticket className="w-4 h-4 mr-2 flex-shrink-0" />
+                <Ticket className="w-4 h-4 mr-2 shrink-0" />
                 <span>
                   {ticketCount} {ticketCount === 1 ? 'ticket' : 'tickets'}
                 </span>

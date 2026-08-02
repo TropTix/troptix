@@ -27,7 +27,6 @@ export function PublishRequirements({
 }: PublishRequirementsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Create a mock validation object with defaults for missing fields
   const validationData: EventForValidation = {
     id: eventData.id || '',
     name: eventData.name || null,
@@ -175,9 +174,9 @@ export function PublishRequirements({
             />
             <CardTitle className="flex items-center gap-2">
               {validationResult.isValid ? (
-                <Check className="h-5 w-5 text-green-600" />
+                <Check className="h-5 w-5 text-success" />
               ) : (
-                <AlertCircle className="h-5 w-5 text-yellow-600" />
+                <AlertCircle className="h-5 w-5 text-warning" />
               )}
               Publish Requirements
             </CardTitle>
@@ -193,12 +192,11 @@ export function PublishRequirements({
             : `Complete ${totalCount - completedCount} more requirement${totalCount - completedCount === 1 ? '' : 's'} to publish.`}
         </CardDescription>
 
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+        <div className="w-full bg-muted rounded-full h-2">
           <div
             className={cn(
               'h-2 rounded-full transition-all duration-300',
-              validationResult.isValid ? 'bg-green-500' : 'bg-primary'
+              validationResult.isValid ? 'bg-success' : 'bg-primary'
             )}
             style={{ width: `${completionPercentage}%` }}
           />
@@ -222,15 +220,15 @@ export function PublishRequirements({
                     className="flex items-center gap-2 text-sm"
                   >
                     {item.completed ? (
-                      <Check className="h-4 w-4 text-green-600" />
+                      <Check className="h-4 w-4 text-success" />
                     ) : (
-                      <X className="h-4 w-4 text-gray-400" />
+                      <X className="h-4 w-4 text-muted-foreground/60" />
                     )}
                     <span
                       className={cn(
                         item.completed
-                          ? 'text-green-700 dark:text-green-300'
-                          : 'text-gray-600 dark:text-gray-400'
+                          ? 'text-success'
+                          : 'text-muted-foreground'
                       )}
                     >
                       {item.label}

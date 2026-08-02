@@ -1,4 +1,3 @@
-// app/orders/[orderId]/tickets/page.tsx
 import prisma from '@/server/prisma';
 import TicketDisplayManager from './_components/TicketDisplay';
 import { Button } from '@/components/ui/button';

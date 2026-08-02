@@ -13,57 +13,13 @@
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 
-const PLATFORM_OWNER_EMAIL_SUFFIX = '@usetroptix.com';
-
-// App Store review's fixed account. Every other @usetroptix.com admin keeps
-// unrestricted platform-owner access; this one is scoped down to admin-owned
-// events only so a reviewer never sees real organizers' live data.
-const REVIEW_ACCOUNT_EMAIL = 'test@usetroptix.com';
-
-/**
- * Ensures the actor has organizer privileges. Returns the events scope this
- * actor may access:
- *   - a regular organizer: only their own events (`organizerIds: [userId]`)
- *   - a platform-owner (@usetroptix.com) account: every event, unrestricted
- *     (`allEvents: true`) — unchanged legacy behavior
- *   - the App Store review account specifically: only events owned by
- *     platform-owner accounts (`organizerIds: [...admin userIds]`), so it
- *     never sees a real organizer's live data
- */
-async function authorizeOrganizer(prisma: PrismaClient, actor: Actor) {
+export async function getEvents(prisma: PrismaClient, actor: Actor) {
   if (actor.kind !== 'user') {
     throw new Error('UNAUTHORIZED');
   }
 
-  const user = await prisma.users.findUnique({
-    where: { id: actor.userId },
-    select: { email: true },
-  });
-
-  const isPlatformOwner =
-    user?.email?.endsWith(PLATFORM_OWNER_EMAIL_SUFFIX) ?? false;
-
-  if (!isPlatformOwner) {
-    return { allEvents: false, organizerIds: [actor.userId] };
-  }
-
-  if (user?.email !== REVIEW_ACCOUNT_EMAIL) {
-    return { allEvents: true, organizerIds: [] };
-  }
-
-  const admins = await prisma.users.findMany({
-    where: { email: { endsWith: PLATFORM_OWNER_EMAIL_SUFFIX } },
-    select: { id: true },
-  });
-
-  return { allEvents: false, organizerIds: admins.map((a) => a.id) };
-}
-
-export async function getEvents(prisma: PrismaClient, actor: Actor) {
-  const { allEvents, organizerIds } = await authorizeOrganizer(prisma, actor);
-
   const events = await prisma.events.findMany({
-    where: allEvents ? {} : { organizerUserId: { in: organizerIds } },
+    where: { organizerUserId: actor.userId },
     select: {
       id: true,
       name: true,
@@ -102,7 +58,9 @@ export async function getEvent(
   actor: Actor,
   eventId: string
 ) {
-  const { allEvents, organizerIds } = await authorizeOrganizer(prisma, actor);
+  if (actor.kind !== 'user') {
+    throw new Error('UNAUTHORIZED');
+  }
 
   const event = await prisma.events.findUnique({
     where: { id: eventId },
@@ -118,7 +76,7 @@ export async function getEvent(
     throw new Error('NOT_FOUND');
   }
 
-  if (!allEvents && !organizerIds.includes(event.organizerUserId)) {
+  if (event.organizerUserId !== actor.userId) {
     throw new Error('UNAUTHORIZED');
   }
 
@@ -146,65 +104,47 @@ export async function checkInTicket(
   actor: Actor,
   ticketId: string
 ) {
-  const { allEvents, organizerIds } = await authorizeOrganizer(prisma, actor);
+  if (actor.kind !== 'user') {
+    throw new Error('UNAUTHORIZED');
+  }
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: ticketId },
-    include: { event: true },
+    select: { status: true, event: { select: { organizerUserId: true } } },
   });
 
   if (!ticket) {
     throw new Error('NOT_FOUND');
   }
 
-  if (!allEvents && !organizerIds.includes(ticket.event.organizerUserId)) {
+  // Ownership-only: writes never carry platform-owner power (ADR 0018).
+  if (ticket.event.organizerUserId !== actor.userId) {
     throw new Error('UNAUTHORIZED');
   }
 
-  if (ticket.checkinTimestamp) {
-    throw new Error('ALREADY_CHECKED_IN');
-  }
-
-  await prisma.tickets.update({
-    where: { id: ticketId },
+  // Atomic check-then-flip is the only gate: only the request that finds the
+  // ticket still un-checked flips it, so two simultaneous scans can't both
+  // succeed. Un-checked means legacy AVAILABLE or the canonical VALID the
+  // reservation checkout mints (the lifecycle enums are mid-cutover).
+  const result = await prisma.tickets.updateMany({
+    where: {
+      id: ticketId,
+      status: { in: ['AVAILABLE', 'VALID'] },
+      checkinTimestamp: null,
+    },
     data: {
       checkinTimestamp: new Date(),
     },
   });
-
-  return { success: true };
-}
-
-export async function undoCheckinTicket(
-  prisma: PrismaClient,
-  actor: Actor,
-  ticketId: string
-) {
-  const { allEvents, organizerIds } = await authorizeOrganizer(prisma, actor);
-
-  const ticket = await prisma.tickets.findUnique({
-    where: { id: ticketId },
-    include: { event: true },
-  });
-
-  if (!ticket) {
-    throw new Error('NOT_FOUND');
+  if (result.count === 0) {
+    // A void ticket is not "already scanned" — telling door staff it was is
+    // what gets a refunded holder waved through.
+    throw new Error(
+      ['USED', 'CANCELLED', 'REFUNDED'].includes(ticket.status)
+        ? 'TICKET_NOT_VALID'
+        : 'ALREADY_CHECKED_IN'
+    );
   }
-
-  if (!allEvents && !organizerIds.includes(ticket.event.organizerUserId)) {
-    throw new Error('UNAUTHORIZED');
-  }
-
-  if (!ticket.checkinTimestamp) {
-    throw new Error('NOT_CHECKED_IN');
-  }
-
-  await prisma.tickets.update({
-    where: { id: ticketId },
-    data: {
-      checkinTimestamp: null,
-    },
-  });
 
   return { success: true };
 }

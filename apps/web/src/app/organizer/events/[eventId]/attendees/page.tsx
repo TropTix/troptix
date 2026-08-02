@@ -1,9 +1,8 @@
 import React from 'react';
 import prisma from '@/server/prisma';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
-import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 import { TicketStatus, TicketTypes, Orders } from '@troptix/db';
 import {
   Card,
@@ -18,11 +17,14 @@ import {
 } from '@/components/ui/mobile-stats-card';
 import { Users, UserCheck, UserX, Ticket } from 'lucide-react';
 
-// Define the structure of the data we expect to fetch
 export interface FetchedTicketData {
   id: string;
   createdAt: Date | null;
   status: TicketStatus;
+  // Whether they are through the door. The status enum is mid-cutover
+  // (AVAILABLE/VALID both mean un-checked-in), so the timestamp is the one
+  // field every check-in path stamps and clears.
+  checkinTimestamp: Date | null;
   email: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -30,19 +32,17 @@ export interface FetchedTicketData {
   order: Pick<Orders, 'id'> | null;
 }
 
-async function fetchTickets(
-  eventId: string,
-  userId: string,
-  userEmail?: string
-) {
-  try {
-    // Verify access first
-    await verifyEventAccess(userId, userEmail, eventId);
+import type { ServerUser } from '@/server/authUser';
 
+// Layout and page fetch in parallel, so every read here carries its own
+// ownership scope — the layout's 404 is not protection. Errors propagate: a
+// DB failure must not render as an empty attendee list.
+async function fetchTickets(eventId: string, user: ServerUser) {
+  {
     const tickets = await prisma.tickets.findMany({
       where: {
         eventId: eventId,
-        event: getEventWhereClause(userId, userEmail, eventId),
+        event: { organizerUserId: user.uid, deletedAt: null },
         order: {
           status: 'COMPLETED',
         },
@@ -51,6 +51,7 @@ async function fetchTickets(
         id: true,
         createdAt: true,
         status: true,
+        checkinTimestamp: true,
         email: true,
         firstName: true,
         lastName: true,
@@ -70,29 +71,20 @@ async function fetchTickets(
       },
     });
     return tickets;
-  } catch (error) {
-    console.error('Failed to fetch tickets:', error);
-    return [];
   }
 }
 
-async function fetchEventName(
-  eventId: string,
-  userId: string,
-  userEmail?: string
-) {
-  try {
-    const event = await prisma.events.findUnique({
-      where: getEventWhereClause(userId, userEmail, eventId),
-      select: {
-        name: true,
-      },
-    });
-    return event?.name || 'Unknown Event';
-  } catch (error) {
-    console.error('Failed to fetch event name:', error);
-    return 'Unknown Event';
+async function fetchEventName(eventId: string, user: ServerUser) {
+  const event = await prisma.events.findUnique({
+    where: { id: eventId, organizerUserId: user.uid, deletedAt: null },
+    select: {
+      name: true,
+    },
+  });
+  if (!event) {
+    notFound();
   }
+  return event.name;
 }
 
 interface EventAttendeesPageProps {
@@ -108,21 +100,18 @@ export default async function EventAttendeesPage(
   const { eventId } = params;
   const user = await getUserFromIdTokenCookie();
 
-  // Redirect to signin if user is not authenticated
   if (!user) {
     redirect('/auth/signin');
   }
 
-  // Fetch the initial list of attendees (tickets) and event info
   const [initialAttendees, eventName] = await Promise.all([
-    fetchTickets(eventId, user.uid, user.email),
-    fetchEventName(eventId, user.uid, user.email),
+    fetchTickets(eventId, user),
+    fetchEventName(eventId, user),
   ]);
 
-  // Calculate statistics
   const totalAttendees = initialAttendees.length;
   const checkedInAttendees = initialAttendees.filter(
-    (ticket) => ticket.status === 'NOT_AVAILABLE'
+    (ticket) => ticket.checkinTimestamp !== null
   ).length;
   const notCheckedInAttendees = totalAttendees - checkedInAttendees;
   const checkInRate =
@@ -153,10 +142,10 @@ export default async function EventAttendeesPage(
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Checked In</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-600" />
+            <UserCheck className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-success">
               {checkedInAttendees}
             </div>
             <p className="text-xs text-muted-foreground">Currently present</p>
@@ -168,10 +157,10 @@ export default async function EventAttendeesPage(
             <CardTitle className="text-sm font-medium">
               Not Checked In
             </CardTitle>
-            <UserX className="h-4 w-4 text-orange-600" />
+            <UserX className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-warning">
               {notCheckedInAttendees}
             </div>
             <p className="text-xs text-muted-foreground">Awaiting check-in</p>
@@ -199,16 +188,16 @@ export default async function EventAttendeesPage(
         />
         <MobileStatsCard
           icon={UserCheck}
-          iconColor="text-green-600"
+          iconColor="text-success"
           value={checkedInAttendees}
-          valueColor="text-xl font-bold text-green-600"
+          valueColor="text-xl font-bold text-success"
           label="Checked In"
         />
         <MobileStatsCard
           icon={UserX}
-          iconColor="text-orange-600"
+          iconColor="text-warning"
           value={notCheckedInAttendees}
-          valueColor="text-xl font-bold text-orange-600"
+          valueColor="text-xl font-bold text-warning"
           label="Not Checked In"
         />
         <MobileStatsCard

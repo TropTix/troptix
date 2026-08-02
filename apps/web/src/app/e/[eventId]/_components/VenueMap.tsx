@@ -46,7 +46,7 @@ export default function VenueMap({ event }: { event: EventDetail }) {
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-border bg-background/95 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted',
+        'inline-flex items-center gap-1.5 rounded-full border border-border bg-background/95 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-muted',
         // Overlaid on the map when it renders; a plain chip when it doesn't.
         apiKey && 'absolute left-3 top-3'
       )}
@@ -70,7 +70,7 @@ export default function VenueMap({ event }: { event: EventDetail }) {
             className="h-60 w-full overflow-hidden rounded-2xl border border-border"
           >
             <AdvancedMarker position={center}>
-              <span className="block h-4 w-4 rounded-full bg-orange-500 ring-4 ring-orange-500/30" />
+              <span className="block h-4 w-4 rounded-full bg-primary ring-4 ring-primary/30" />
             </AdvancedMarker>
           </Map>
         </APIProvider>

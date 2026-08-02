@@ -1,17 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import {
   ArrowLeft,
   Settings,
   Ticket,
   Users,
-  Percent,
-  ScanLine,
   ClipboardList,
-  FileText,
+  LayoutDashboard,
   Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -28,6 +26,11 @@ export function EventManagementNav({
   isDraft: boolean;
 }) {
   const pathname = usePathname();
+  // View-as rides the query string (ADR 0018); every tab must carry it or a
+  // Platform Owner's session re-scopes to themselves one click in.
+  const viewAs = useSearchParams().get('viewAs');
+  const withScope = (href: string) =>
+    viewAs ? `${href}?viewAs=${encodeURIComponent(viewAs)}` : href;
   const router = useRouter();
   const [isPublished, setIsPublished] = useState(!isDraft);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,7 +51,6 @@ export function EventManagementNav({
         setIsPublished(!checked);
 
         if (response.status === 400 && data.validationErrors) {
-          // Handle validation errors specifically
           const requirements = data.missingRequirements || [];
           console.log('requirements', requirements);
           const errorMessage =
@@ -71,7 +73,7 @@ export function EventManagementNav({
 
       setIsPublished(!data.isDraft);
       toast.success(
-        data.isDraft ? 'Event set to draft' : 'Event published successfully'
+        data.isDraft ? 'Event unpublished' : 'Event published successfully'
       );
     } catch (error) {
       // Revert optimistic update on error
@@ -85,7 +87,11 @@ export function EventManagementNav({
   };
 
   const links = [
-    { name: 'Summary', href: `/organizer/events/${eventId}`, icon: FileText },
+    {
+      name: 'Dashboard',
+      href: `/organizer/events/${eventId}`,
+      icon: LayoutDashboard,
+    },
     {
       name: 'Edit',
       href: `/organizer/events/${eventId}/edit`,
@@ -106,17 +112,7 @@ export function EventManagementNav({
       href: `/organizer/events/${eventId}/orders`,
       icon: ClipboardList,
     },
-    // {
-    //   name: 'Promotions',
-    //   href: `/organizer/events/${eventId}/promotions`,
-    //   icon: Percent,
-    // },
-    // {
-    //   name: 'Check-in',
-    //   href: `/organizer/events/${eventId}/check-in`,
-    //   icon: ScanLine,
-    // },
-  ];
+  ].map((link) => ({ ...link, href: withScope(link.href) }));
 
   return (
     <div className="border-b bg-card rounded-xl sticky top-0 z-10">
@@ -137,8 +133,8 @@ export function EventManagementNav({
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground w-16 text-right">
-              {isPublished ? 'Published' : 'Draft'}
+            <span className="text-sm text-muted-foreground w-24 text-right">
+              {isPublished ? 'Published' : 'Unpublished'}
             </span>
             <Switch
               checked={isPublished}

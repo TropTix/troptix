@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { eventPageThemeSchema, flyerPaletteSchema } from './events';
 
 // Organizer dashboard contracts, derived from
 // docs/plans/2026-07-organizer-dashboard-ux.md. Each screen's DTOs land with
@@ -295,6 +296,9 @@ const eventFieldsSchema = z.object({
   longitude: z.number().nullable().optional(),
   /** Stored flyer path, not a URL (ADR 0016). Empty/null means no image. */
   imageUrl: z.string().nullable().optional(),
+  /** Page treatment + palette extracted from the flyer at upload (see contracts/events.ts). */
+  pageTheme: eventPageThemeSchema.optional(),
+  flyerPalette: flyerPaletteSchema.nullable().optional(),
 });
 
 // One home for the temporal rule, so create and update can't drift apart.
