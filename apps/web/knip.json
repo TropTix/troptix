@@ -5,7 +5,8 @@
     "scripts/*.ts",
     "jest.config.ts",
     "src/**/*.test.{ts,tsx}",
-    "src/**/__tests__/**/*.{ts,tsx}"
+    "src/**/__tests__/**/*.{ts,tsx}",
+    "src/app/_components/social-proof.tsx"
   ],
   "ignore": ["src/server/lib/featureFlags.ts"],
   "ignoreDependencies": [
