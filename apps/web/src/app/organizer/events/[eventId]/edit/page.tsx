@@ -5,7 +5,6 @@ import EventForm from '../../_components/EventForm';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
-import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
 
 interface EditEventPageProps {
   params: Promise<{
@@ -15,12 +14,12 @@ interface EditEventPageProps {
 
 import type { ServerUser } from '@/server/authUser';
 
+// Ownership scoping in the query is the access check — null means 404.
+// Errors propagate to the error boundary; a DB failure is not a 404.
 async function getEvent(eventId: string, user: ServerUser) {
-  try {
-    await verifyEventAccess(user, eventId);
-
+  {
     const event = await prisma.events.findUnique({
-      where: getEventWhereClause(user, eventId),
+      where: { id: eventId, organizerUserId: user.uid, deletedAt: null },
       include: {
         ticketTypes: {
           select: {
@@ -38,9 +37,6 @@ async function getEvent(eventId: string, user: ServerUser) {
       },
     });
     return event;
-  } catch (error) {
-    console.error(error);
-    return null;
   }
 }
 
@@ -52,8 +48,6 @@ export default async function EditEventPage(props: EditEventPageProps) {
   if (!user) {
     redirect('/auth/signin');
   }
-  await verifyEventAccess(user, eventId);
-
   const event = await getEvent(eventId, user);
 
   if (!event) {

@@ -4,15 +4,18 @@ import prisma from '@/server/prisma';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
-import { verifyEventAccess, getEventWhereClause } from '@/server/accessControl';
-
 import type { ServerUser } from '@/server/authUser';
 
+// Ownership-scoped: null is a 404. Platform Owners pass this nav shell —
+// layouts can't read ?viewAs, and blocking here would kill View-as on every
+// page below; the pages themselves authorize.
 async function getEvent(eventId: string, user: ServerUser) {
-  await verifyEventAccess(user, eventId);
-
   const event = await prisma.events.findUnique({
-    where: getEventWhereClause(user, eventId),
+    where: {
+      id: eventId,
+      deletedAt: null,
+      ...(user.isPlatformOwner ? {} : { organizerUserId: user.uid }),
+    },
     select: { name: true, isDraft: true },
   });
   if (!event) {

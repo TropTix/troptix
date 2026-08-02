@@ -19,7 +19,6 @@ import {
 import {
   Settings,
   Eye,
-  Edit,
   Calendar,
   MapPin,
   User,
@@ -254,14 +253,12 @@ export default async function PlatformEventsPage() {
 
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          {/* Read-only View-as; no edit link — writes never accept it. */}
                           <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/organizer/events/${event.id}`}>
+                            <Link
+                              href={`/organizer/events/${event.id}?viewAs=${event.organizer.id}`}
+                            >
                               <Settings className="h-3 w-3" />
-                            </Link>
-                          </Button>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/organizer/events/${event.id}/edit`}>
-                              <Edit className="h-3 w-3" />
                             </Link>
                           </Button>
                           <Button variant="ghost" size="sm" asChild>
