@@ -16,7 +16,7 @@ export async function GET(
   }
 
   try {
-    const event = await prisma.events.findUnique({
+    const event = await prisma.events.findFirst({
       select: {
         id: true,
         name: true,
@@ -26,6 +26,8 @@ export async function GET(
       },
       where: {
         id: eventId,
+        isDraft: false,
+        deletedAt: null,
       },
     });
 
