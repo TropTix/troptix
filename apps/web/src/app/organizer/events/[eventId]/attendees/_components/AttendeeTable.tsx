@@ -23,11 +23,11 @@ interface AttendeeTableProps {
 
 const CheckInButton = ({
   ticketId,
-  currentStatus,
+  checkedIn,
   eventId,
 }: {
   ticketId: string;
-  currentStatus: string;
+  checkedIn: boolean;
   eventId: string;
 }) => {
   const [isPending, startTransition] = useTransition();
@@ -39,9 +39,9 @@ const CheckInButton = ({
 
         if (result.success) {
           toast.success(
-            currentStatus === 'AVAILABLE'
-              ? 'Attendee checked in successfully!'
-              : 'Attendee checked out successfully!'
+            checkedIn
+              ? 'Attendee checked out successfully!'
+              : 'Attendee checked in successfully!'
           );
         } else {
           toast.error(result.error || 'Failed to update check-in status');
@@ -55,7 +55,7 @@ const CheckInButton = ({
 
   return (
     <Button
-      variant={currentStatus === 'AVAILABLE' ? 'default' : 'outline'}
+      variant={checkedIn ? 'outline' : 'default'}
       size="sm"
       onClick={handleToggleStatus}
       disabled={isPending}
@@ -66,14 +66,14 @@ const CheckInButton = ({
       ) : (
         <>
           <span className="md:hidden">
-            {currentStatus === 'AVAILABLE' ? (
-              <Check className="h-4 w-4" />
-            ) : (
+            {checkedIn ? (
               <X className="h-4 w-4" />
+            ) : (
+              <Check className="h-4 w-4" />
             )}
           </span>
           <span className="hidden md:block whitespace-nowrap">
-            {currentStatus === 'AVAILABLE' ? 'Check In' : 'Check Out'}
+            {checkedIn ? 'Check Out' : 'Check In'}
           </span>
         </>
       )}
@@ -104,7 +104,7 @@ const MobileAttendeeView = ({
               [attendee.firstName, attendee.lastName]
                 .filter(Boolean)
                 .join(' ') || 'N/A';
-            const status = attendee.status;
+            const checkedIn = attendee.checkinTimestamp !== null;
 
             return (
               <Card key={attendee.id} className="w-full overflow-hidden">
@@ -127,21 +127,17 @@ const MobileAttendeeView = ({
 
                       <div className="flex items-center gap-2">
                         <Badge
-                          variant={
-                            status === 'NOT_AVAILABLE' ? 'default' : 'secondary'
-                          }
+                          variant={checkedIn ? 'default' : 'secondary'}
                           className="text-sm px-3 py-1"
                         >
-                          {status === 'NOT_AVAILABLE'
-                            ? 'Checked In'
-                            : 'Available'}
+                          {checkedIn ? 'Checked In' : 'Not Checked In'}
                         </Badge>
                       </div>
                     </div>
 
                     <CheckInButton
                       ticketId={attendee.id}
-                      currentStatus={attendee.status}
+                      checkedIn={checkedIn}
                       eventId={eventId}
                     />
                   </div>
@@ -193,13 +189,13 @@ const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }) => {
-        const status = row.original.status;
+        const checkedIn = row.original.checkinTimestamp !== null;
         return (
           <Badge
-            variant={status === 'NOT_AVAILABLE' ? 'default' : 'secondary'}
+            variant={checkedIn ? 'default' : 'secondary'}
             className="whitespace-nowrap"
           >
-            {status === 'NOT_AVAILABLE' ? 'Checked In' : 'Available'}
+            {checkedIn ? 'Checked In' : 'Not Checked In'}
           </Badge>
         );
       },
@@ -209,12 +205,12 @@ const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
       header: 'Action',
       cell: ({ row }) => {
         const ticketId = row.original.id;
-        const currentStatus = row.original.status;
+        const checkedIn = row.original.checkinTimestamp !== null;
 
         return (
           <CheckInButton
             ticketId={ticketId}
-            currentStatus={currentStatus}
+            checkedIn={checkedIn}
             eventId={eventId}
           />
         );
