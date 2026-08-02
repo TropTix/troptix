@@ -35,7 +35,7 @@ const CheckInButton = ({
   const handleToggleStatus = async () => {
     startTransition(async () => {
       try {
-        const result = await toggleTicketStatus(ticketId, eventId);
+        const result = await toggleTicketStatus(ticketId);
 
         if (result.success) {
           toast.success(

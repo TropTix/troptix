@@ -19,8 +19,8 @@ import {
   type CreateEventInput,
   type UpdateEventInput,
 } from '../contracts/organizer';
-import { NotFoundError } from './_shared/errors';
 import { generateId } from './_shared/ids';
+import { requireOwnedEvent } from './_shared/owned-event';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
 import { ticketTypeWriteFields } from './_shared/ticket-type-fields';
 import { resolveOrganizerScope } from './organizer-scope';
@@ -81,16 +81,10 @@ export async function updateEvent(
   // Ownership check and the org lookup are independent reads — one wave.
   // Provisioning (a write) waits until ownership has passed, so probing a
   // foreign event id can't leave side effects.
-  const [owned, existingOrg] = await Promise.all([
-    prisma.events.findFirst({
-      where: { id: eventId, organizerUserId, deletedAt: null },
-      select: { id: true },
-    }),
+  const [, existingOrg] = await Promise.all([
+    requireOwnedEvent(prisma, organizerUserId, eventId),
     findOrganizationForOwner(prisma, organizerUserId),
   ]);
-  if (!owned) {
-    throw new NotFoundError('Event not found');
-  }
   // Keep the event pointed at the organizer's Organization + name mirror.
   const org =
     existingOrg ?? (await provisionOrganization(prisma, organizerUserId));

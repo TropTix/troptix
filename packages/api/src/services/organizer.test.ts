@@ -4,20 +4,21 @@ import type { Actor } from '../trpc/context';
 import { checkInTicket } from './organizer';
 
 type MockPrismaOptions = {
-  platformOwner?: boolean;
   ticket?: any;
 };
 
 function fakePrisma(opts: MockPrismaOptions): PrismaClient {
   return {
-    users: {
-      findUnique: async () => ({
-        isPlatformOwner: opts.platformOwner ?? false,
-      }),
-    },
     tickets: {
       findUnique: async () => opts.ticket ?? null,
-      update: async (args: any) => ({ ...opts.ticket, ...args.data }),
+      updateMany: async ({ where }: any) => ({
+        count:
+          opts.ticket &&
+          where.status.in.includes(opts.ticket.status) &&
+          !opts.ticket.checkinTimestamp
+            ? 1
+            : 0,
+      }),
     },
   } as unknown as PrismaClient;
 }
@@ -32,7 +33,7 @@ describe('checkInTicket', () => {
     );
   });
 
-  it('throws UNAUTHORIZED if actor is not the event organizer or platform owner', async () => {
+  it('throws UNAUTHORIZED if actor is not the event organizer', async () => {
     const prisma = fakePrisma({
       ticket: {
         id: 't-1',
@@ -45,17 +46,17 @@ describe('checkInTicket', () => {
     );
   });
 
-  it('allows platform owner to check in any ticket', async () => {
+  it('throws UNAUTHORIZED for an anonymous actor', async () => {
     const prisma = fakePrisma({
-      platformOwner: true,
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
-        event: { organizerUserId: 'org-2' }, // different org
+        event: { organizerUserId: 'org-1' },
       },
     });
-    const res = await checkInTicket(prisma, mockActor, 't-1');
-    expect(res).toEqual({ success: true });
+    await expect(
+      checkInTicket(prisma, { kind: 'anonymous' }, 't-1')
+    ).rejects.toThrow('UNAUTHORIZED');
   });
 
   it('throws ALREADY_CHECKED_IN if ticket is NOT_AVAILABLE', async () => {
@@ -90,6 +91,33 @@ describe('checkInTicket', () => {
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
+        event: { organizerUserId: 'org-1' },
+      },
+    });
+    const res = await checkInTicket(prisma, mockActor, 't-1');
+    expect(res).toEqual({ success: true });
+  });
+
+  it('reports a void ticket as not valid, not as already checked in', async () => {
+    for (const voidStatus of ['REFUNDED', 'CANCELLED', 'USED'] as const) {
+      const prisma = fakePrisma({
+        ticket: {
+          id: 't-1',
+          status: voidStatus,
+          event: { organizerUserId: 'org-1' },
+        },
+      });
+      await expect(checkInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
+        'TICKET_NOT_VALID'
+      );
+    }
+  });
+
+  it('successfully checks in a VALID ticket (the status the checkout mints)', async () => {
+    const prisma = fakePrisma({
+      ticket: {
+        id: 't-1',
+        status: 'VALID',
         event: { organizerUserId: 'org-1' },
       },
     });

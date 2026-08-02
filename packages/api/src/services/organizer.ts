@@ -120,32 +120,48 @@ export async function checkInTicket(
   actor: Actor,
   ticketId: string
 ) {
-  const { userId, isPlatformOwner } = await authorizeOrganizer(prisma, actor);
+  if (actor.kind !== 'user') {
+    throw new Error('UNAUTHORIZED');
+  }
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: ticketId },
-    include: { event: true },
+    select: { status: true, event: { select: { organizerUserId: true } } },
   });
 
   if (!ticket) {
     throw new Error('NOT_FOUND');
   }
 
-  if (!isPlatformOwner && ticket.event.organizerUserId !== userId) {
+  // Ownership-only: writes never carry platform-owner power (ADR 0018).
+  if (ticket.event.organizerUserId !== actor.userId) {
     throw new Error('UNAUTHORIZED');
   }
 
-  if (ticket.status === 'NOT_AVAILABLE' || ticket.checkinTimestamp) {
-    throw new Error('ALREADY_CHECKED_IN');
-  }
-
-  await prisma.tickets.update({
-    where: { id: ticketId },
+  // Atomic check-then-flip is the only gate: only the request that finds the
+  // ticket still un-checked flips it, so two simultaneous scans can't both
+  // succeed. Un-checked means legacy AVAILABLE or the canonical VALID the
+  // reservation checkout mints (the lifecycle enums are mid-cutover).
+  const result = await prisma.tickets.updateMany({
+    where: {
+      id: ticketId,
+      status: { in: ['AVAILABLE', 'VALID'] },
+      checkinTimestamp: null,
+    },
     data: {
       status: 'NOT_AVAILABLE',
       checkinTimestamp: new Date(),
     },
   });
+  if (result.count === 0) {
+    // A void ticket is not "already scanned" — telling door staff it was is
+    // what gets a refunded holder waved through.
+    throw new Error(
+      ['USED', 'CANCELLED', 'REFUNDED'].includes(ticket.status)
+        ? 'TICKET_NOT_VALID'
+        : 'ALREADY_CHECKED_IN'
+    );
+  }
 
   return { success: true };
 }

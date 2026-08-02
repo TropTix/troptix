@@ -5,8 +5,8 @@ import { TRPCError } from '@trpc/server';
 
 export const organizerRouter = router({
   /**
-   * All events the signed-in organizer owns. Platform owners
-   * (@usetroptix.com) receive every event regardless of organizerUserId.
+   * All events the signed-in organizer owns. Ownership-only — the old
+   * platform-owner bypass was removed (ADR 0018).
    */
   events: protectedProcedure.query(async ({ ctx }) => {
     try {
@@ -60,6 +60,12 @@ export const organizerRouter = router({
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'Ticket already checked in',
+          });
+        }
+        if (e.message === 'TICKET_NOT_VALID') {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'This ticket is not valid for entry',
           });
         }
         throw new TRPCError({
