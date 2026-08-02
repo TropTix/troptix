@@ -105,13 +105,13 @@ export function EmailAuthForm() {
   if (sentTo) {
     return (
       <div className="max-w-md mx-auto text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-foreground mb-2">
           Check your email
         </h2>
-        <p className="text-gray-600 mb-8">
+        <p className="text-muted-foreground mb-8">
           We sent a 6-digit code and a sign-in link to{' '}
-          <span className="font-medium text-gray-900">{sentTo}</span>. Enter the
-          code below, or just tap the link in the email.
+          <span className="font-medium text-foreground">{sentTo}</span>. Enter
+          the code below, or just tap the link in the email.
         </p>
 
         <Form {...codeForm}>
@@ -174,7 +174,7 @@ export function EmailAuthForm() {
 
             <Button
               type="submit"
-              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+              className="w-full h-12 font-medium"
               disabled={codeForm.formState.isSubmitting}
             >
               {codeForm.formState.isSubmitting ? 'Verifying...' : 'Verify code'}
@@ -182,7 +182,7 @@ export function EmailAuthForm() {
           </form>
         </Form>
 
-        <p className="text-sm text-gray-600 mt-6">
+        <p className="text-sm text-muted-foreground mt-6">
           Didn&apos;t get it? Check your spam folder
           {resendIn > 0 ? (
             <>, or resend in {resendIn}s.</>
@@ -191,7 +191,7 @@ export function EmailAuthForm() {
               , or{' '}
               <button
                 type="button"
-                className="text-blue-600 hover:underline font-medium"
+                className="text-primary hover:underline font-medium"
                 onClick={() => sendLink(sentTo)}
               >
                 resend the code
@@ -202,7 +202,7 @@ export function EmailAuthForm() {
         </p>
         <button
           type="button"
-          className="text-sm text-gray-500 hover:text-gray-700 hover:underline mt-3"
+          className="text-sm text-muted-foreground hover:text-foreground hover:underline mt-3"
           onClick={() => {
             setSentTo(null);
             setResendIn(0);
@@ -233,9 +233,7 @@ export function EmailAuthForm() {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-gray-800 font-medium">
-                  Email
-                </FormLabel>
+                <FormLabel className="font-medium">Email</FormLabel>
                 <FormControl>
                   <Input
                     type="email"
@@ -251,7 +249,7 @@ export function EmailAuthForm() {
 
           <Button
             type="submit"
-            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+            className="w-full h-12 font-medium"
             disabled={emailForm.formState.isSubmitting}
           >
             {emailForm.formState.isSubmitting

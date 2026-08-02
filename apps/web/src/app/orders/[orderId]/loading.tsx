@@ -21,16 +21,16 @@ export default function OrderDetailsLoading() {
             </div>
             <div className="md:w-3/5 p-6 sm:p-8 flex flex-col justify-center">
               <div className="flex items-center text-primary mb-2">
-                <PartyPopper className="h-6 w-6 mr-2 text-gray-300" />
+                <PartyPopper className="h-6 w-6 mr-2 text-muted-foreground/50" />
                 <Skeleton className="h-5 w-24" />
               </div>
               <Skeleton className="h-9 w-3/4 mb-3" /> {/* Event Name */}
               <div className="flex items-center text-muted-foreground mb-1 text-sm sm:text-base">
-                <CalendarDays className="h-4 w-4 mr-2 text-gray-300" />
+                <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground/50" />
                 <Skeleton className="h-4 w-32" /> {/* Event Date */}
               </div>
               <div className="flex items-center text-muted-foreground text-sm sm:text-base mb-4">
-                <MapPin className="h-4 w-4 mr-2 text-gray-300" />
+                <MapPin className="h-4 w-4 mr-2 text-muted-foreground/50" />
                 <Skeleton className="h-4 w-40" /> {/* Event Venue */}
               </div>
               <Skeleton className="h-10 w-full sm:w-48 mt-2 mb-4" />{' '}
@@ -48,7 +48,7 @@ export default function OrderDetailsLoading() {
             <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center">
-                  <CheckCircle className="h-5 w-5 mr-2 text-gray-300" />
+                  <CheckCircle className="h-5 w-5 mr-2 text-muted-foreground/50" />
                   <Skeleton className="h-6 w-40" />{' '}
                   {/* Order Confirmed Title */}
                 </CardTitle>

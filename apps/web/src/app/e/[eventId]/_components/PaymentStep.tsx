@@ -187,7 +187,7 @@ function PaymentInner({
         <span
           className={
             secondsLeft <= 60
-              ? 'font-semibold text-red-600'
+              ? 'font-semibold text-destructive'
               : 'text-muted-foreground'
           }
         >
@@ -199,7 +199,7 @@ function PaymentInner({
 
       <PaymentElement />
 
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
       <button
         type="button"

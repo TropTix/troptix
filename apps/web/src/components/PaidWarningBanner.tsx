@@ -1,20 +1,16 @@
-import { Banner } from '@/components/ui/banner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
 export function PaidWarningBannerForm() {
   return (
-    <Banner
-      type="info"
-      title="Want to create paid events?"
-      message={
-        <>
-          Schedule a meeting with our team to get organizer verification and
-          unlock paid ticketing features.
-        </>
-      }
-    >
-      <div className="flex gap-2 mt-2">
+    <Alert variant="info">
+      <AlertTitle>Want to create paid events?</AlertTitle>
+      <AlertDescription>
+        Schedule a meeting with our team to get organizer verification and
+        unlock paid ticketing features.
+      </AlertDescription>
+      <div className="col-start-2 flex gap-2 mt-2">
         <Button variant="outline" size="sm" asChild>
           <Link
             href="mailto:info@usetroptix.com?subject=Organizer Verification Request"
@@ -34,16 +30,15 @@ export function PaidWarningBannerForm() {
           </Link>
         </Button>
       </div>
-    </Banner>
+    </Alert>
   );
 }
 
 export function PaidWarningBannerOrganizer() {
   return (
-    <Banner
-      type="info"
-      title="Schedule a Meeting to Unlock Paid Events"
-      message={
+    <Alert variant="info">
+      <AlertTitle>Schedule a Meeting to Unlock Paid Events</AlertTitle>
+      <AlertDescription>
         <div className="space-y-2">
           <p>
             You can create unlimited free events right now. To create paid
@@ -70,7 +65,7 @@ export function PaidWarningBannerOrganizer() {
             </Button>
           </div>
         </div>
-      }
-    />
+      </AlertDescription>
+    </Alert>
   );
 }
