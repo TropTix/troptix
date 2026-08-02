@@ -15,7 +15,7 @@ const SkeletonEventCard = () => (
     <div className="relative w-full shrink-0 aspect-video bg-muted">
       {/* Image placeholder */}
       <div className="w-full h-full flex items-center justify-center">
-        <ImageIcon className="h-10 w-10 text-gray-400 dark:text-gray-500" />
+        <ImageIcon className="h-10 w-10 text-muted-foreground" />
       </div>
     </div>
     <div className="flex flex-1 flex-col p-4 md:p-6">

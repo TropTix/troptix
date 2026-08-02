@@ -147,10 +147,10 @@ export default async function EventAttendeesPage(
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Checked In</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-600" />
+            <UserCheck className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-success">
               {checkedInAttendees}
             </div>
             <p className="text-xs text-muted-foreground">Currently present</p>
@@ -162,10 +162,10 @@ export default async function EventAttendeesPage(
             <CardTitle className="text-sm font-medium">
               Not Checked In
             </CardTitle>
-            <UserX className="h-4 w-4 text-orange-600" />
+            <UserX className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-warning">
               {notCheckedInAttendees}
             </div>
             <p className="text-xs text-muted-foreground">Awaiting check-in</p>
@@ -193,16 +193,16 @@ export default async function EventAttendeesPage(
         />
         <MobileStatsCard
           icon={UserCheck}
-          iconColor="text-green-600"
+          iconColor="text-success"
           value={checkedInAttendees}
-          valueColor="text-xl font-bold text-green-600"
+          valueColor="text-xl font-bold text-success"
           label="Checked In"
         />
         <MobileStatsCard
           icon={UserX}
-          iconColor="text-orange-600"
+          iconColor="text-warning"
           value={notCheckedInAttendees}
-          valueColor="text-xl font-bold text-orange-600"
+          valueColor="text-xl font-bold text-warning"
           label="Not Checked In"
         />
         <MobileStatsCard

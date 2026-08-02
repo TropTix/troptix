@@ -8,7 +8,7 @@ export default function EventNotFound() {
       <TypographyH1 text="Event Not Found" classes="mb-4" />
       <TypographyP
         text="Sorry, we couldn't find the event you were looking for."
-        classes="mb-6 text-gray-600"
+        classes="mb-6 text-muted-foreground"
       />
       <Button asChild>
         <Link href="/discover">Back to All Events</Link>

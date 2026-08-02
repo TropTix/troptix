@@ -83,7 +83,7 @@ export default function SuccessTicket({
       <div className="absolute inset-x-0 bottom-0 flex gap-2.5 bg-linear-to-t from-accent via-accent/90 to-transparent px-4 pb-5 pt-6">
         <Link
           href={ticketsHref}
-          className="flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-neutral-900 font-bold text-white shadow-lg transition-transform hover:scale-[1.01]"
+          className="flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground font-bold text-background shadow-lg transition-transform hover:scale-[1.01]"
         >
           <Ticket className="h-5 w-5" /> View tickets
         </Link>

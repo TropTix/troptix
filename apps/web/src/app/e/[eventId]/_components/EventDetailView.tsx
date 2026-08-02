@@ -17,7 +17,7 @@ import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { priceLabelFor, cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
-import { Banner } from '@/components/ui/banner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { OrgAvatar } from '@/components/OrgAvatar';
 import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import type { EventDetail } from '@troptix/api';
@@ -207,11 +207,14 @@ export default function EventDetailView({
   return (
     <div style={themeVars} className="text-foreground">
       {event.isDraft && (
-        <Banner
-          title="Draft Mode: Event Not Published"
-          message="This event is currently a draft. Only you, as the organizer, can view it. Make any changes you need, then publish when you're ready to go live."
-          type="warning"
-        />
+        <Alert variant="warning" className="rounded-none border-x-0 border-t-0">
+          <AlertTitle>Draft Mode: Event Not Published</AlertTitle>
+          <AlertDescription>
+            This event is currently a draft. Only you, as the organizer, can
+            view it. Make any changes you need, then publish when you&apos;re
+            ready to go live.
+          </AlertDescription>
+        </Alert>
       )}
 
       <main className="min-h-screen bg-background pb-32 text-foreground">
@@ -234,7 +237,7 @@ export default function EventDetailView({
                 onClick={handleBack}
                 className={cn(
                   ROUND_BTN,
-                  'bg-white/90 text-slate-900 shadow-md backdrop-blur-sm'
+                  'bg-card/90 text-foreground shadow-md backdrop-blur-sm'
                 )}
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -245,7 +248,7 @@ export default function EventDetailView({
                 onClick={onShare}
                 className={cn(
                   ROUND_BTN,
-                  'bg-white/90 text-slate-900 shadow-md backdrop-blur-sm'
+                  'bg-card/90 text-foreground shadow-md backdrop-blur-sm'
                 )}
               >
                 {shareIcon}
@@ -255,7 +258,7 @@ export default function EventDetailView({
               <span
                 className={cn(
                   'h-1.5 w-1.5 rounded-full',
-                  eventEnded ? 'bg-white/50' : 'bg-emerald-400'
+                  eventEnded ? 'bg-card/50' : 'bg-success'
                 )}
               />
               {heroChip}

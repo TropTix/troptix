@@ -9,7 +9,7 @@ export default function OrderNotFound() {
       <TypographyH1 text="Order Not Found" classes="mb-4" />
       <TypographyP
         text="Sorry, we couldn't find the tickets you were looking for."
-        classes="mb-6 text-gray-600"
+        classes="mb-6 text-muted-foreground"
       />
       <Button asChild>
         <Link href="/orders">Back to Orders</Link>

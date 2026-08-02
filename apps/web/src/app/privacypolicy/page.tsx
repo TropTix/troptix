@@ -6,7 +6,7 @@ export default function PrivacyPolicy() {
           className="mx-4 text-center text-4xl md:text-5xl font-extrabold leading-tighter tracking-tighter mb-4"
           data-aos="zoom-y-out"
         >
-          <span className="bg-clip-text text-transparent bg-linear-to-r from-blue-500 to-teal-400">
+          <span className="bg-clip-text text-transparent bg-linear-to-r from-primary to-chart-3">
             Privacy Policy
           </span>
         </h1>

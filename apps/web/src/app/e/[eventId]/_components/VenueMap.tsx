@@ -70,7 +70,7 @@ export default function VenueMap({ event }: { event: EventDetail }) {
             className="h-60 w-full overflow-hidden rounded-2xl border border-border"
           >
             <AdvancedMarker position={center}>
-              <span className="block h-4 w-4 rounded-full bg-orange-500 ring-4 ring-orange-500/30" />
+              <span className="block h-4 w-4 rounded-full bg-primary ring-4 ring-primary/30" />
             </AdvancedMarker>
           </Map>
         </APIProvider>
