@@ -86,9 +86,9 @@ function contrast(a: HSL, b: HSL): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-function parseTriplet(triplet: string): HSL {
-  const m = triplet.match(/^(-?[\d.]+) ([\d.]+)% ([\d.]+)%$/);
-  if (!m) throw new Error(`not an HSL triplet: "${triplet}"`);
+function parseTriplet(value: string): HSL {
+  const m = value.match(/^(?:hsl\()?(-?[\d.]+) ([\d.]+)% ([\d.]+)%\)?$/);
+  if (!m) throw new Error(`not an HSL color: "${value}"`);
   return {
     h: parseFloat(m[1]),
     s: parseFloat(m[2]) / 100,
@@ -96,7 +96,7 @@ function parseTriplet(triplet: string): HSL {
   };
 }
 
-/** WCAG contrast between two `"H S% L%"` triplets (as emitted in ThemeVars). */
+/** WCAG contrast between two `"hsl(H S% L%)"` colors (as emitted in ThemeVars). */
 export function tripletContrast(a: string, b: string): number {
   return contrast(parseTriplet(a), parseTriplet(b));
 }
@@ -236,10 +236,12 @@ export function extractFlyerPaletteFromUrl(
 
 // --- derivation (pure; server-safe) --------------------------------------------
 
+// Full hsl() colors: the v4 token wiring maps utilities to var(--x) directly,
+// so a bare "H S% L%" triplet would be an invalid color and silently no-op.
 const t = ({ h, s, l }: HSL) =>
-  `${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+  `hsl(${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
 
-/** shadcn CSS variable overrides, as `--var: "H S% L%"` triplets. */
+/** shadcn CSS variable overrides, as full `--var: "hsl(H S% L%)"` colors. */
 export type ThemeVars = Record<string, string>;
 
 /** The color that leads the theme: the organizer's pick, else the auto-pick. */
@@ -283,9 +285,9 @@ function deriveWash(
   return {
     '--background': t(bg),
     '--foreground': t(ink),
-    '--card': '0 0% 100%',
+    '--card': 'hsl(0 0% 100%)',
     '--card-foreground': t(ink),
-    '--popover': '0 0% 100%',
+    '--popover': 'hsl(0 0% 100%)',
     '--popover-foreground': t(ink),
     '--primary': t(cta.fill),
     '--primary-foreground': t(cta.ink),
