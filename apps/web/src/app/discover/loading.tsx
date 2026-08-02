@@ -2,7 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DiscoverLoading() {
   return (
-    <section className="relative isolate min-h-screen overflow-hidden bg-[#faf8f4]">
+    <section className="relative isolate min-h-screen overflow-hidden ">
       <div className="relative z-10 mx-auto max-w-6xl px-5 pb-20 pt-28 sm:px-6 sm:pt-32 lg:px-8">
         <header className="mb-12 sm:mb-16">
           <Skeleton className="h-12 w-56 sm:h-16 sm:w-72" />
