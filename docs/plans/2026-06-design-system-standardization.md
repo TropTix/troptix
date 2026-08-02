@@ -1,9 +1,18 @@
 ---
 title: Web Design System Standardization
-status: proposed
+status: done
 created: 2026-06-02
-tracking-issue: "#277"
+tracking-issue: '#277'
 ---
+
+> **Done 2026-08-02.** Shipped as four PRs following the collapsed roadmap in
+> [the 2026-08-01 re-audit](../audits/2026-08-01-shadcn-design-system-review.md):
+> #501 (shrink & clean), #502 (Tailwind v4 + shadcn refresh), #503 (semantic
+> sweep, `--success`/`--warning`), and the guardrail PR (token lint in CI, one
+> typography system). Owner decisions along the way: the homepage art
+> (`hero.tsx`/`flyers.tsx`) keeps its bespoke palette and is the lint rule's
+> only exemption; cream was removed per ADR 0003. The roadmap below is the
+> original 7-phase plan, kept for history.
 
 # Web Design System Standardization
 
@@ -20,6 +29,7 @@ This document is the audit findings, the standards spec we're consolidating on, 
 ## Current State (verified)
 
 **What's solid (keep):**
+
 - Semantic token set in `apps/web/src/styles/globals.css` (`--primary`, `--foreground`, `--muted`, `--border`, `--card`, `--destructive`, chart + sidebar tokens), correctly wired into `apps/web/tailwind.config.ts` via `hsl(var(--*))`.
 - `Button` is canonical — 47 import sites vs only 3 raw `<button>`. Good CVA variants in `apps/web/src/components/ui/button.tsx`.
 - `lucide-react` is the de-facto icon system (~60 sites); `sonner` is the single toast system.
@@ -27,7 +37,7 @@ This document is the audit findings, the standards spec we're consolidating on, 
 
 **Gaps & inconsistencies (fix):**
 
-1. **Color fragmentation — the headline problem.** **~572** raw palette-color utilities across `.tsx` bypass the token system. Two competing neutral ramps (`slate-*` *and* `gray-*`), ad-hoc `green-*` for success and `blue-*` for primary. Worst offenders: `apps/web/src/app/orders/[orderId]/receipt/page.tsx` (39), `apps/web/src/app/orders/[orderId]/confirmation/page.tsx` (33), loading skeletons, `apps/web/src/app/_components/cta.tsx` (29), `apps/web/src/components/ui/footer.tsx` (17), auth forms.
+1. **Color fragmentation — the headline problem.** **~572** raw palette-color utilities across `.tsx` bypass the token system. Two competing neutral ramps (`slate-*` _and_ `gray-*`), ad-hoc `green-*` for success and `blue-*` for primary. Worst offenders: `apps/web/src/app/orders/[orderId]/receipt/page.tsx` (39), `apps/web/src/app/orders/[orderId]/confirmation/page.tsx` (33), loading skeletons, `apps/web/src/app/_components/cta.tsx` (29), `apps/web/src/components/ui/footer.tsx` (17), auth forms.
 
 2. **Inert / broken config:**
    - A Tailwind **v4** `@theme inline { … }` block sits in `globals.css` inside a Tailwind **v3.3.3** project — entirely inert.
@@ -46,7 +56,7 @@ This document is the audit findings, the standards spec we're consolidating on, 
    - `apps/web/src/components/ui/spinner.tsx` is the only thing pulling in `antd` + `@ant-design/icons`.
    - `apps/web/src/components/ui/logo.tsx` hardcodes the brand HSL inline.
 
-5. **Typography:** `apps/web/src/components/ui/typography.tsx` components are barely adopted (~4 sites) vs ~100+ raw `<h1 className="text-4xl …">`. The components use a `text` prop (not `children`), carry no color tokens, and `DividerWithText` misuses `text-white` on an `<hr>`. There's *also* a parallel `.h1` – `.h4` CSS class set in `globals.css` — a third heading system.
+5. **Typography:** `apps/web/src/components/ui/typography.tsx` components are barely adopted (~4 sites) vs ~100+ raw `<h1 className="text-4xl …">`. The components use a `text` prop (not `children`), carry no color tokens, and `DividerWithText` misuses `text-white` on an `<hr>`. There's _also_ a parallel `.h1` – `.h4` CSS class set in `globals.css` — a third heading system.
 
 6. **Layout:** public pages each pick their own max-width (`max-w-7xl`, `max-w-5xl`, `max-w-3xl`, `max-w-6xl`) and padding, while organizer pages consistently use `md:container px-4 py-8`. Spacing mixes `gap-3/4/6/8` and `space-y-4/6` with no scale.
 
@@ -59,8 +69,8 @@ This document is the audit findings, the standards spec we're consolidating on, 
 ### 1. Color — one source of truth: semantic tokens
 
 - **Rule:** UI colors come from semantic tokens only (`bg-background`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-card`, `bg-primary`, `text-destructive`, `bg-accent`). No raw `slate-*` / `gray-*` / `blue-*` / `green-*` in app code.
-- **Neutral ramp:** collapse both `slate-*` and `gray-*` onto `foreground` / `muted-foreground` / `border` / `muted` / `card`. Pick the token by *role*, not shade.
-- **Add missing semantic tokens:** introduce `--success` (replaces `green-*` for metrics / positive states) and `--warning`. This is the one *additive* token change.
+- **Neutral ramp:** collapse both `slate-*` and `gray-*` onto `foreground` / `muted-foreground` / `border` / `muted` / `card`. Pick the token by _role_, not shade.
+- **Add missing semantic tokens:** introduce `--success` (replaces `green-*` for metrics / positive states) and `--warning`. This is the one _additive_ token change.
 - **Brand:** indigo `--primary` is canonical (see [ADR 0003](../adr/0003-indigo-canonical-brand.md)).
 
 ### 2. Typography — one system
@@ -72,7 +82,7 @@ This document is the audit findings, the standards spec we're consolidating on, 
 
 - Post-upgrade, define these in CSS `@theme inline` (the block that's currently inert): `--font-sans: var(--font-inter)` applied on `<html>` / `<body>`; delete the no-op `font-inter` class; drop unused Merriweather / JetBrains references.
 - Shadows (`--shadow-*`) and radius (`--radius`) become real tokens consumed natively by v4 — no hand-wiring into a JS config.
-- **Migration gotcha:** today the color vars store *raw HSL channels* (`238.73 83.53% 66.67%`) and the v3 config wraps them with `hsl(...)`. The orphan `@theme inline` maps `--color-primary: var(--primary)`, which would be invalid (no `hsl()` wrapper). On upgrade, decide once: either keep channel vars and wrap in `@theme` (`--color-primary: hsl(var(--primary))`), or convert vars to full color values (HSL or OKLCH, the v4-shadcn default). Pick OKLCH-or-full-HSL for cleanliness.
+- **Migration gotcha:** today the color vars store _raw HSL channels_ (`238.73 83.53% 66.67%`) and the v3 config wraps them with `hsl(...)`. The orphan `@theme inline` maps `--color-primary: var(--primary)`, which would be invalid (no `hsl()` wrapper). On upgrade, decide once: either keep channel vars and wrap in `@theme` (`--color-primary: hsl(var(--primary))`), or convert vars to full color values (HSL or OKLCH, the v4-shadcn default). Pick OKLCH-or-full-HSL for cleanliness.
 
 ### 4. Layout & spacing — standard page shell
 
@@ -95,12 +105,13 @@ This document is the audit findings, the standards spec we're consolidating on, 
 ## Roadmap (phased)
 
 **Phase 0 — Tailwind v4 upgrade (own PR, foundation).** See [ADR 0001](../adr/0001-tailwind-v4-first.md).
+
 - **Pre-check (gating):** confirm buyer browser mix supports v4's baseline (Safari 16.4+ / Chrome 111+ / Firefox 128+) via PostHog analytics, especially on the checkout flow. If a meaningful slice is older, reconsider before proceeding.
 - Run `npx @tailwindcss/upgrade` (handles `@tailwind` → `@import "tailwindcss"`, config → CSS, template utility renames).
 - Invert config to CSS-first: move the `tailwind.config.ts` color/radius mapping into `@theme` in `globals.css`; fix the token var format per §3 so `@theme inline` resolves; remove the inert/duplicate block.
 - Build chain: swap to `@tailwindcss/postcss` (drop `autoprefixer` + manual import handling — Lightning CSS covers both); replace `tailwindcss-animate` → `tw-animate-css`.
 - Sweep v4 breaking renames in templates the codemod can't fully infer: shadow scale (`shadow` → `shadow-sm`, `shadow-sm` → `shadow-xs`), `ring` default width, `outline-none` → `outline-hidden`, opacity-utility → slash syntax. The global `* { @apply border-border }` already neutralizes the gray-200 → currentColor default-border change.
-- This phase *also* closes the font-wiring and shadow-wiring findings natively.
+- This phase _also_ closes the font-wiring and shadow-wiring findings natively.
 
 **Phase 1 — Dead code & vestigial deps.** Delete `header.tsx`; remove Ant Design end-to-end (`ConfigProvider`, `Spin` → lucide `Loader2` spinner, antd icons → lucide, drop `antd` + `@ant-design/icons` deps, delete `ant.css` + the antd overrides in `buttons.css`); migrate ErrorFallback off `.btn` to `Button` and delete `buttons.css`; fix the root wrapper `text-gray-900` → `text-foreground`; convert `.form-*` classes to tokens or delete in favor of `Input`.
 
