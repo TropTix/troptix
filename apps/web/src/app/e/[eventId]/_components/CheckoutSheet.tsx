@@ -304,7 +304,7 @@ export default function CheckoutSheet({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="bottom"
-        className="flex h-[100dvh] w-full flex-col gap-0 border-0 p-0 sm:inset-0 sm:m-auto sm:h-[85vh] sm:max-w-md sm:overflow-hidden sm:rounded-2xl sm:border sm:border-border"
+        className="flex h-dvh w-full flex-col gap-0 border-0 p-0 sm:inset-0 sm:m-auto sm:h-[85vh] sm:max-w-md sm:overflow-hidden sm:rounded-2xl sm:border sm:border-border"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <SheetTitle className="sr-only">{STEP_TITLE[step]}</SheetTitle>
@@ -358,7 +358,8 @@ export default function CheckoutSheet({
               )}
             {step === 'finalizing' && (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-                <Spinner text="Finalizing your tickets…" />
+                <Spinner className="size-12 text-primary" />
+                <p className="text-base">Finalizing your tickets…</p>
                 {slowFinalize && (
                   <p className="text-sm text-muted-foreground">
                     This is taking longer than expected — your tickets will

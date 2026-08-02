@@ -217,7 +217,7 @@ export default function EventDetailView({
       <main className="min-h-screen bg-background pb-32 text-foreground">
         {/* Mobile: immersive poster hero with floating controls + date chip. */}
         <div className="px-4 pt-3 md:hidden">
-          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl shadow-sm">
+          <div className="relative aspect-4/5 w-full overflow-hidden rounded-2xl shadow-sm">
             <Image
               src={imageUrl}
               alt={event.name}
@@ -226,7 +226,7 @@ export default function EventDetailView({
               className="object-cover"
               priority
             />
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/35 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-linear-to-b from-black/35 to-transparent" />
             <div className="absolute inset-x-3 top-3 flex items-center justify-between">
               <button
                 type="button"
@@ -234,7 +234,7 @@ export default function EventDetailView({
                 onClick={handleBack}
                 className={cn(
                   ROUND_BTN,
-                  'bg-white/90 text-slate-900 shadow-md backdrop-blur'
+                  'bg-white/90 text-slate-900 shadow-md backdrop-blur-sm'
                 )}
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -245,13 +245,13 @@ export default function EventDetailView({
                 onClick={onShare}
                 className={cn(
                   ROUND_BTN,
-                  'bg-white/90 text-slate-900 shadow-md backdrop-blur'
+                  'bg-white/90 text-slate-900 shadow-md backdrop-blur-sm'
                 )}
               >
                 {shareIcon}
               </button>
             </div>
-            <span className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">
+            <span className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm">
               <span
                 className={cn(
                   'h-1.5 w-1.5 rounded-full',

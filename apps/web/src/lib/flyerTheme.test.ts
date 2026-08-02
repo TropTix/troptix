@@ -95,7 +95,7 @@ describe('deriveThemeVars contrast guardrails', () => {
     expect(leadColor(palette)).toBe('#2EE6FF');
     for (const theme of THEMES) {
       const hue = parseFloat(
-        deriveThemeVars(theme, palette)!['--primary'].split(' ')[0]
+        deriveThemeVars(theme, palette)!['--primary'].match(/-?[\d.]+/)![0]
       );
       expect(Math.abs(hue - 189)).toBeLessThan(25); // #2EE6FF cyan, not pink
     }
@@ -104,7 +104,7 @@ describe('deriveThemeVars contrast guardrails', () => {
   it('a grayscale-dominant poster still themes in its art color, not red', () => {
     // Grayscale reports hue 0 (red) — without the guard, a maroon stage.
     const vars = deriveThemeVars('dark', PALETTES['black poster + blue art'])!;
-    const hue = parseFloat(vars['--background'].split(' ')[0]);
+    const hue = parseFloat(vars['--background'].match(/-?[\d.]+/)![0]);
     expect(Math.abs(hue - 213)).toBeLessThan(30); // #2F80ED's hue family
   });
 

@@ -279,7 +279,7 @@ const OrderCard = ({ order }: OrderCardProps) => {
           <CardContent className="pt-0 space-y-3">
             <div className="space-y-2">
               <div className="flex items-center text-sm text-muted-foreground">
-                <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
+                <Calendar className="w-4 h-4 mr-2 shrink-0" />
                 <span className="font-medium">{getRelativeDate()}</span>
                 {!isPastEvent && !isToday && (
                   <span className="ml-2 text-xs">at {time}</span>
@@ -288,13 +288,13 @@ const OrderCard = ({ order }: OrderCardProps) => {
 
               {venue && (
                 <div className="flex items-center text-sm text-muted-foreground">
-                  <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <MapPin className="w-4 h-4 mr-2 shrink-0" />
                   <span className="truncate">{venue}</span>
                 </div>
               )}
 
               <div className="flex items-center text-sm text-muted-foreground">
-                <Ticket className="w-4 h-4 mr-2 flex-shrink-0" />
+                <Ticket className="w-4 h-4 mr-2 shrink-0" />
                 <span>
                   {ticketCount} {ticketCount === 1 ? 'ticket' : 'tickets'}
                 </span>

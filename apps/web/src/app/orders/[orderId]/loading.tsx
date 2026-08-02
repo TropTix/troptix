@@ -11,7 +11,7 @@ import { CalendarDays, MapPin, CheckCircle, PartyPopper } from 'lucide-react';
 
 export default function OrderDetailsLoading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-background">
+    <div className="min-h-screen bg-linear-to-br from-primary/10 via-background to-background">
       <div className="max-w-5xl mx-auto py-8 md:py-12 px-4 sm:px-6 lg:px-8">
         {/* Event Details Card Skeleton */}
         <Card className="mb-10 md:mb-12 shadow-xl overflow-hidden">

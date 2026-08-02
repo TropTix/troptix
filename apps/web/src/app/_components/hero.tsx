@@ -34,11 +34,11 @@ export default function LandingHero() {
         className="absolute inset-0 -z-10"
         style={{
           backgroundImage:
-            'radial-gradient(60% 40% at 50% 0%, hsl(var(--primary) / 0.07), transparent 70%)',
+            'radial-gradient(60% 40% at 50% 0%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 70%)',
         }}
       />
 
-      <div className="relative flex min-h-[100svh] flex-col items-center justify-center px-5 pt-24 pb-10 sm:pt-28 lg:min-h-[min(100svh,56rem)]">
+      <div className="relative flex min-h-svh flex-col items-center justify-center px-5 pt-24 pb-10 sm:pt-28 lg:min-h-[min(100svh,56rem)]">
         <SparkleField prefersReduced={prefersReduced} />
         <FlyerField prefersReduced={prefersReduced} />
 
@@ -55,7 +55,7 @@ const ROTATING_WORDS = [
   {
     text: 'fete',
     gradient:
-      'linear-gradient(100deg, hsl(var(--primary)) 0%, #d6407e 55%, #f58b2e 100%)',
+      'linear-gradient(100deg, var(--primary) 0%, #d6407e 55%, #f58b2e 100%)',
   },
   {
     text: 'concert',
@@ -75,7 +75,7 @@ const ROTATING_WORDS = [
   },
   {
     text: 'conference',
-    gradient: 'linear-gradient(100deg, hsl(var(--primary)) 0%, #0ea5e9 100%)',
+    gradient: 'linear-gradient(100deg, var(--primary) 0%, #0ea5e9 100%)',
   },
   {
     text: 'networking event',
@@ -182,7 +182,7 @@ function HeroCopy({ prefersReduced }: { prefersReduced: boolean }) {
       >
         <Link
           href="/organizer/events/new"
-          className="inline-flex h-14 items-center justify-center rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground shadow-[0_12px_32px_-12px_hsl(var(--primary)/0.55)] transition-all hover:bg-primary/90 hover:shadow-[0_16px_40px_-14px_hsl(var(--primary)/0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="inline-flex h-14 items-center justify-center rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground shadow-[0_12px_32px_-12px] shadow-primary/55 transition-all hover:bg-primary/90 hover:shadow-[0_16px_40px_-14px] hover:shadow-primary/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Create your event
         </Link>
@@ -224,7 +224,7 @@ const SPARKS: Spark[] = [
     y: 13,
     size: 10,
     kind: 'star',
-    color: 'hsl(var(--primary))',
+    color: 'var(--primary)',
     duration: 4.5,
     delay: 0,
   },
@@ -242,7 +242,7 @@ const SPARKS: Spark[] = [
     y: 7,
     size: 2,
     kind: 'pixel',
-    color: 'hsl(var(--primary))',
+    color: 'var(--primary)',
     duration: 5.2,
     delay: 0.7,
   },
@@ -269,7 +269,7 @@ const SPARKS: Spark[] = [
     y: 19,
     size: 3,
     kind: 'pixel',
-    color: 'hsl(var(--primary))',
+    color: 'var(--primary)',
     duration: 3.6,
     delay: 2.8,
   },
@@ -287,7 +287,7 @@ const SPARKS: Spark[] = [
     y: 56,
     size: 10,
     kind: 'star',
-    color: 'hsl(var(--primary))',
+    color: 'var(--primary)',
     duration: 5.4,
     delay: 1.8,
   },
@@ -305,7 +305,7 @@ const SPARKS: Spark[] = [
     y: 85,
     size: 2,
     kind: 'pixel',
-    color: 'hsl(var(--primary))',
+    color: 'var(--primary)',
     duration: 5.0,
     delay: 0.9,
   },
@@ -341,7 +341,7 @@ const SPARKS: Spark[] = [
     y: 46,
     size: 2,
     kind: 'pixel',
-    color: 'hsl(var(--primary))',
+    color: 'var(--primary)',
     duration: 4.7,
     delay: 2.0,
   },

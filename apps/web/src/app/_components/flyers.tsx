@@ -12,11 +12,11 @@ export function FlyerFrame({
   aspect?: 'square' | 'portrait';
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-card shadow-[0_18px_40px_-18px_rgba(15,23,42,0.28),0_4px_12px_-6px_rgba(15,23,42,0.12)] ring-1 ring-foreground/[0.06]">
+    <div className="overflow-hidden rounded-2xl bg-card shadow-[0_18px_40px_-18px_rgba(15,23,42,0.28),0_4px_12px_-6px_rgba(15,23,42,0.12)] ring-1 ring-foreground/6">
       <div
         className={cn(
           'w-full',
-          aspect === 'square' ? 'aspect-square' : 'aspect-[4/5]'
+          aspect === 'square' ? 'aspect-square' : 'aspect-4/5'
         )}
       >
         {children}

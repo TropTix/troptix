@@ -24,7 +24,7 @@ function GlobalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div>
       <UnifiedHeader />
-      <div className={`flex-grow border-x ${offsetContent ? 'mt-16' : ''}`}>
+      <div className={`grow border-x ${offsetContent ? 'mt-16' : ''}`}>
         {children}
       </div>
     </div>

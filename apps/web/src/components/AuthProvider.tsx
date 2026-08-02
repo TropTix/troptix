@@ -1,17 +1,9 @@
 'use client';
 
 import { User } from '@/hooks/types/User';
-import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { Inter } from 'next/font/google';
 import { usePostHog } from 'posthog-js/react';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
 
 const emptyUser: User = { id: '' };
 
@@ -88,18 +80,9 @@ export default function AuthProvider({
 
   return (
     <TropTixContext.Provider value={{ user, loading }}>
-      <div
-        className={cn(
-          'min-h-screen font-sans antialiased mx-auto',
-          inter.variable
-        )}
-      >
-        <div
-          className={`${inter.variable} font-inter antialiased text-gray-900 tracking-tight`}
-        >
-          <div className="flex flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
-            {children}
-          </div>
+      <div className="mx-auto min-h-screen font-sans tracking-tight antialiased">
+        <div className="flex flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
+          {children}
         </div>
       </div>
     </TropTixContext.Provider>

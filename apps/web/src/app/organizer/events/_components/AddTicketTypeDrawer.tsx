@@ -279,7 +279,7 @@ export function AddTicketTypeDrawer({
           <form
             id="drawer-ticket-form"
             onSubmit={form.handleSubmit(onValidSubmit, onInvalidSubmit)}
-            className="px-4 py-2 space-y-4 overflow-y-auto flex-grow"
+            className="px-4 py-2 space-y-4 overflow-y-auto grow"
           >
             <FormField
               control={form.control}

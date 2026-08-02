@@ -12,7 +12,7 @@ import {
 
 const SkeletonEventCard = () => (
   <Card className="overflow-hidden flex flex-col">
-    <div className="relative w-full flex-shrink-0 aspect-video bg-muted">
+    <div className="relative w-full shrink-0 aspect-video bg-muted">
       {/* Image placeholder */}
       <div className="w-full h-full flex items-center justify-center">
         <ImageIcon className="h-10 w-10 text-gray-400 dark:text-gray-500" />

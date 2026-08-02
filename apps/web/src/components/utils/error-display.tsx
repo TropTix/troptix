@@ -61,7 +61,7 @@ export function ErrorDisplay({
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="pt-32 pb-12 md:pt-40 md:pb-12">
           <div className="text-center pb-12 md:pb-16">
-            <h1 className="text-3xl md:text-6xl font-extrabold leading-tighter tracking-tighter mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-teal-400">
+            <h1 className="text-3xl md:text-6xl font-extrabold leading-tighter tracking-tighter mb-4 bg-clip-text text-transparent bg-linear-to-r from-blue-500 to-teal-400">
               {title}
             </h1>
 

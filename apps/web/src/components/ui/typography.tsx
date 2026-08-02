@@ -41,9 +41,9 @@ export function TypographyMuted({ text, classes = '' }) {
 export function DividerWithText({ text, classes = '' }) {
   return (
     <div className="flex items-center">
-      <hr className="flex-grow mr-4 text-white" />
+      <hr className="grow mr-4 text-white" />
       <TypographyMuted text={text} classes={classes} />
-      <hr className="flex-grow ml-4 text-white" />
+      <hr className="grow ml-4 text-white" />
     </div>
   );
 }
