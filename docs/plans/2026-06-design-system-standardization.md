@@ -8,10 +8,11 @@ tracking-issue: '#277'
 > **Done 2026-08-02.** Shipped as four PRs following the collapsed roadmap in
 > [the 2026-08-01 re-audit](../audits/2026-08-01-shadcn-design-system-review.md):
 > #501 (shrink & clean), #502 (Tailwind v4 + shadcn refresh), #503 (semantic
-> sweep, `--success`/`--warning`), and the guardrail PR (token lint in CI, one
-> typography system). Owner decisions along the way: the homepage art
-> (`hero.tsx`/`flyers.tsx`) keeps its bespoke palette and is the lint rule's
-> only exemption; cream was removed per ADR 0003. The roadmap below is the
+> sweep, `--success`/`--warning`), and #504 (one typography system). Owner
+> decisions along the way: the homepage art (`hero.tsx`/`flyers.tsx`) keeps its
+> bespoke palette; cream was removed per ADR 0003; the planned lint guardrail
+> was dropped as not needed at this stage — the token convention is enforced by
+> review, like the date-time standard (ADR 0021). The roadmap below is the
 > original 7-phase plan, kept for history.
 
 # Web Design System Standardization

@@ -216,7 +216,7 @@ Add a database-backed email queue instead of sending emails inline during reques
 
 ## Priority 5 — Design System Standardization (Web) — DONE
 
-**Completed 2026-08-02** in four PRs (#501–#503 plus the guardrail PR), per the collapsed roadmap in [the 2026-08-01 re-audit](audits/2026-08-01-shadcn-design-system-review.md). The app now runs Tailwind v4 with current-generation shadcn components on semantic tokens only; a CI lint rule blocks raw palette classes (the homepage art is the one sanctioned exemption). The original framing follows for history.
+**Completed 2026-08-02** in four PRs (#501–#504), per the collapsed roadmap in [the 2026-08-01 re-audit](audits/2026-08-01-shadcn-design-system-review.md). The app now runs Tailwind v4 with current-generation shadcn components on semantic tokens only (the homepage art is the one sanctioned exemption). The token convention is enforced by review — the planned lint rule was dropped as not needed at this stage. The original framing follows for history.
 
 The web app (`apps/web`) already has a solid foundation: a shadcn/ui component library, a complete set of semantic design tokens (brand color, text, background, border, etc.), Lucide icons, and a single toast system. The problem is **drift away from that foundation**, not its absence. Most pages hand-roll raw Tailwind colors instead of using the tokens (~570 instances, including two competing "gray" palettes used interchangeably), several styling config layers are inert or broken, and some dead/duplicate code lingers. The result is a UI that looks subtly inconsistent across the homepage, event pages, checkout, and organizer dashboard, and that is hard to restyle or theme because there is no single source of truth.
 
