@@ -79,7 +79,7 @@ export function DailyRevenueChart({ data }: DailyRevenueChartProps) {
           cursor={true}
           content={
             <ChartTooltipContent
-              labelFormatter={formatDate}
+              labelFormatter={(label) => formatDate(String(label))}
               formatter={(value, name) => {
                 if (name === 'revenue' && typeof value === 'number') {
                   return formatCurrency(value);

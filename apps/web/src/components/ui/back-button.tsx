@@ -2,12 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { Button, ButtonProps } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-interface BackButtonProps extends ButtonProps {
+type BackButtonProps = React.ComponentProps<typeof Button> & {
   href?: string;
-}
+};
 
 export function BackButton({
   href,

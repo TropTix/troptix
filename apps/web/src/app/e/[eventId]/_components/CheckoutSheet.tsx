@@ -358,7 +358,8 @@ export default function CheckoutSheet({
               )}
             {step === 'finalizing' && (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-                <Spinner text="Finalizing your tickets…" />
+                <Spinner className="size-12 text-primary" />
+                <p className="text-base">Finalizing your tickets…</p>
                 {slowFinalize && (
                   <p className="text-sm text-muted-foreground">
                     This is taking longer than expected — your tickets will

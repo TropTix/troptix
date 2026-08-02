@@ -132,8 +132,9 @@ function PaymentInner({
 
   if (checkoutState.type === 'loading') {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner text="Loading payment…" />
+      <div className="flex flex-1 flex-col items-center justify-center gap-3">
+        <Spinner className="size-12 text-primary" />
+        <p className="text-base">Loading payment…</p>
       </div>
     );
   }

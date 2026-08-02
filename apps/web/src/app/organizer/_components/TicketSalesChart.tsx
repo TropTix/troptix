@@ -56,7 +56,11 @@ export function TicketSalesChart({ data, bucket }: TicketSalesChartProps) {
         />
         <ChartTooltip
           cursor={false}
-          content={<ChartTooltipContent labelFormatter={formatBucket} />}
+          content={
+            <ChartTooltipContent
+              labelFormatter={(label) => formatBucket(String(label))}
+            />
+          }
         />
         <Area
           dataKey="tickets"
