@@ -134,7 +134,7 @@ export default async function OrderPage(props: {
 
         <div className="space-y-4">
           <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
-            <div className="relative h-[76px] w-[62px] flex-shrink-0 overflow-hidden rounded-xl">
+            <div className="relative h-[76px] w-[62px] shrink-0 overflow-hidden rounded-xl">
               <Image
                 src={poster}
                 alt={order.event.name || 'Event'}

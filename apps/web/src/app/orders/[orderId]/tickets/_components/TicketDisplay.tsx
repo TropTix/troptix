@@ -59,7 +59,7 @@ export default function TicketDisplayManager({
   }
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col bg-white px-5 pb-8 pt-4">
+    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-white px-5 pb-8 pt-4">
       <div className="flex items-center justify-between">
         <Link
           href="/orders"
@@ -127,7 +127,7 @@ export default function TicketDisplayManager({
             )}
             {isVoid && (
               <div className="absolute inset-0 grid place-items-center">
-                <span className="rounded-md bg-destructive/10 px-3 py-1 font-mono text-sm font-bold uppercase tracking-[0.1em] text-destructive">
+                <span className="rounded-md bg-destructive/10 px-3 py-1 font-mono text-sm font-bold uppercase tracking-widest text-destructive">
                   {voidLabel}
                 </span>
               </div>

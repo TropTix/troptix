@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function EventDetailPageLoading() {
   return (
     <main className="min-h-screen bg-background">
-      <Skeleton className="aspect-[4/5] w-full rounded-b-3xl md:hidden" />
+      <Skeleton className="aspect-4/5 w-full rounded-b-3xl md:hidden" />
 
       <div className="mx-auto w-full max-w-5xl px-5 py-6 md:px-8 md:py-14">
         <div className="md:grid md:grid-cols-[minmax(0,380px)_1fr] md:items-start md:gap-12">

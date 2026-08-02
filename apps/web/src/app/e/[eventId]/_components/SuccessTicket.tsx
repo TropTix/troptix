@@ -69,7 +69,7 @@ export default function SuccessTicket({
           {qty === 1 ? 'ticket' : 'tickets'}
         </p>
 
-        <div className="relative mx-auto mt-5 aspect-[4/5] w-full max-w-[300px] overflow-hidden rounded-3xl shadow-2xl duration-500 animate-in fade-in zoom-in-95">
+        <div className="relative mx-auto mt-5 aspect-4/5 w-full max-w-[300px] overflow-hidden rounded-3xl shadow-2xl duration-500 animate-in fade-in zoom-in-95">
           <Image
             src={poster}
             alt={event.name}
@@ -80,7 +80,7 @@ export default function SuccessTicket({
         </div>
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 flex gap-2.5 bg-gradient-to-t from-accent via-accent/90 to-transparent px-4 pb-5 pt-6">
+      <div className="absolute inset-x-0 bottom-0 flex gap-2.5 bg-linear-to-t from-accent via-accent/90 to-transparent px-4 pb-5 pt-6">
         <Link
           href={ticketsHref}
           className="flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-neutral-900 font-bold text-white shadow-lg transition-transform hover:scale-[1.01]"

@@ -58,7 +58,7 @@ export default function SocialProof() {
   return (
     <section
       aria-labelledby="social-proof-heading"
-      className="border-t border-foreground/[0.06] bg-background py-20 sm:py-24"
+      className="border-t border-foreground/6 bg-background py-20 sm:py-24"
     >
       <div className="container mx-auto px-5 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
@@ -81,7 +81,7 @@ export default function SocialProof() {
           <CarouselContent>
             {STORIES.map((story) => (
               <CarouselItem key={story.id}>
-                <div className="grid items-center gap-8 px-4 py-8 sm:gap-10 md:grid-cols-[auto,1fr] md:px-10">
+                <div className="grid items-center gap-8 px-4 py-8 sm:gap-10 md:grid-cols-[auto_1fr] md:px-10">
                   <div
                     className="mx-auto w-44 sm:w-52 md:w-56"
                     style={{ transform: `rotate(${story.rotate}deg)` }}

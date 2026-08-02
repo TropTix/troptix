@@ -20,7 +20,7 @@ interface DailyRevenueChartProps {
 const revenueChartConfig = {
   revenue: {
     label: 'Revenue',
-    color: 'hsl(var(--chart-2))',
+    color: 'var(--chart-2)',
   },
 } satisfies ChartConfig;
 

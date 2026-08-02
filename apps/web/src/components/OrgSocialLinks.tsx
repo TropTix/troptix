@@ -1,4 +1,9 @@
-import { Globe, Instagram, Linkedin, Twitter } from 'lucide-react';
+import { Globe } from 'lucide-react';
+import {
+  InstagramIcon as Instagram,
+  LinkedinIcon as Linkedin,
+  TwitterIcon as Twitter,
+} from '@/components/icons/brand';
 import { cn } from '@/lib/utils';
 
 // Organization social links, shared by the org page and the event "Hosted by".

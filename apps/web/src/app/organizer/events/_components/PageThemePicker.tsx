@@ -35,7 +35,7 @@ export function PreviewDots({
     ? [vars['--background'], vars['--primary'], vars['--accent']].map(
         (v) => `hsl(${v})`
       )
-    : ['hsl(var(--background))', 'hsl(var(--primary))', 'hsl(var(--accent))'];
+    : ['var(--background)', 'var(--primary)', 'var(--accent)'];
   return (
     <span className="flex gap-1" aria-hidden>
       {colors.map((c, i) => (

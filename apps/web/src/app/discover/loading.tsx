@@ -11,7 +11,7 @@ export default function DiscoverLoading() {
         <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
           {Array.from({ length: 8 }).map((_, index) => (
             <div key={index} className="w-full sm:w-[330px]">
-              <Skeleton className="aspect-[4/5] w-full rounded-[26px] bg-slate-200" />
+              <Skeleton className="aspect-4/5 w-full rounded-[26px] bg-slate-200" />
             </div>
           ))}
         </div>

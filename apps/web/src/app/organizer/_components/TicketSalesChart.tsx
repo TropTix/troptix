@@ -18,7 +18,7 @@ interface TicketSalesChartProps {
 const chartConfig = {
   tickets: {
     label: 'Tickets Sold',
-    color: 'hsl(var(--chart-1))',
+    color: 'var(--chart-1)',
   },
 } satisfies ChartConfig;
 
