@@ -1,7 +1,7 @@
 /**
  * Unit tests for Organization provisioning over a stateful hand-rolled fake
  * prisma (no Postgres, ADR 0010). Covers lazy-create idempotency, unique-slug
- * generation, and the empty-name fallback.
+ * generation, the empty-name fallback, and the ownerUserId unique-race recovery.
  */
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
@@ -19,16 +19,9 @@ type OrgRow = {
   slug: string;
   createdAt: number;
 };
-type EventRow = {
-  organizerUserId: string;
-  organizer: string;
-  organizationId: string | null;
-  createdAt: number;
-};
 
-function makeFakePrisma(seedEvents: EventRow[] = []) {
+function makeFakePrisma() {
   const orgs: OrgRow[] = [];
-  const events = seedEvents.map((e) => ({ ...e }));
   let clock = 0;
 
   const prisma = {
@@ -39,6 +32,10 @@ function makeFakePrisma(seedEvents: EventRow[] = []) {
           .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
       findMany: async () => orgs.map((o) => ({ slug: o.slug })),
       create: async ({ data }: any) => {
+        // The DB enforces one org per owner (ADR 0022) — mirror it.
+        if (orgs.some((o) => o.ownerUserId === data.ownerUserId)) {
+          throw { code: 'P2002' };
+        }
         const row: OrgRow = {
           id: `org-${orgs.length}`,
           createdAt: clock++,
@@ -48,35 +45,9 @@ function makeFakePrisma(seedEvents: EventRow[] = []) {
         return row;
       },
     },
-    events: {
-      findMany: async ({ where, orderBy }: any) => {
-        let rows = events.filter((e) =>
-          where?.organizationId === null ? e.organizationId === null : true
-        );
-        if (orderBy?.createdAt === 'desc') {
-          rows = [...rows].sort((a, b) => b.createdAt - a.createdAt);
-        }
-        return rows.map((e) => ({
-          organizerUserId: e.organizerUserId,
-          organizer: e.organizer,
-        }));
-      },
-      updateMany: async ({ where, data }: any) => {
-        let count = 0;
-        for (const e of events) {
-          const matchNull =
-            where.organizationId === null ? e.organizationId === null : true;
-          if (e.organizerUserId === where.organizerUserId && matchNull) {
-            e.organizationId = data.organizationId;
-            count++;
-          }
-        }
-        return { count };
-      },
-    },
   } as unknown as PrismaClient;
 
-  return { prisma, orgs, events };
+  return { prisma, orgs };
 }
 
 describe('ensureOrganizationForUser', () => {
@@ -146,6 +117,33 @@ describe('ensureOrganizationForUser', () => {
     });
     expect(org.displayName).toBe('Island Vibes');
     expect(org.slug).toBe('island-vibes');
+  });
+
+  it('recovers the winner when a concurrent create hits the owner unique index', async () => {
+    const { prisma, orgs } = makeFakePrisma();
+    const winner = await ensureOrganizationForUser(prisma, {
+      ownerUserId: 'u1',
+      displayName: 'Island Vibes',
+    });
+    // Simulate the race: the loser's pre-create findFirst saw nothing.
+    const raced = { ...prisma } as any;
+    raced.organization = {
+      ...(prisma as any).organization,
+      findFirst: (() => {
+        let calls = 0;
+        return async (args: any) => {
+          calls += 1;
+          if (calls === 1) return null; // the ensure's own existence check
+          return (prisma as any).organization.findFirst(args); // the recovery read
+        };
+      })(),
+    };
+    const b = await ensureOrganizationForUser(raced, {
+      ownerUserId: 'u1',
+      displayName: 'Late Arrival',
+    });
+    expect(b.id).toBe(winner.id);
+    expect(orgs).toHaveLength(1);
   });
 });
 
@@ -252,6 +250,22 @@ describe('updateOrganizationProfile', () => {
           Object.assign(o, data);
           return o;
         },
+        create: async ({ data }: any) => {
+          if (
+            orgs.some(
+              (o) => o.ownerUserId === data.ownerUserId || o.slug === data.slug
+            )
+          ) {
+            throw { code: 'P2002' };
+          }
+          const row = {
+            id: `org-${orgs.length}`,
+            createdAt: orgs.length,
+            ...data,
+          };
+          orgs.push(row);
+          return row;
+        },
       },
     } as unknown as PrismaClient;
     return { prisma, orgs };
@@ -325,13 +339,36 @@ describe('updateOrganizationProfile', () => {
     expect(result).toEqual({ ok: false, reason: 'slug_invalid' });
   });
 
-  it('returns not_found when the user has no org', async () => {
-    const { prisma } = makeFake(seed());
+  it('creates the Organization on a first save, with the validated slug', async () => {
+    const { prisma, orgs } = makeFake(seed());
     const result = await updateOrganizationProfile(prisma, {
       ...base,
-      ownerUserId: 'nobody',
+      ownerUserId: 'newbie',
+      slug: 'fresh-crew',
+      displayName: 'Fresh Crew',
     });
-    expect(result).toEqual({ ok: false, reason: 'not_found' });
+    expect(result).toEqual({ ok: true, slug: 'fresh-crew' });
+    const created = orgs.find((o) => o.ownerUserId === 'newbie')!;
+    expect(created.slug).toBe('fresh-crew');
+    expect(created.displayName).toBe('Fresh Crew');
+  });
+
+  it('writes nothing when a first save fails slug validation (no phantom org)', async () => {
+    const { prisma, orgs } = makeFake(seed());
+    const before = orgs.length;
+    const invalid = await updateOrganizationProfile(prisma, {
+      ...base,
+      ownerUserId: 'newbie',
+      slug: 'ab',
+    });
+    const taken = await updateOrganizationProfile(prisma, {
+      ...base,
+      ownerUserId: 'newbie',
+      slug: 'sunset',
+    });
+    expect(invalid).toEqual({ ok: false, reason: 'slug_invalid' });
+    expect(taken).toEqual({ ok: false, reason: 'slug_taken' });
+    expect(orgs).toHaveLength(before);
   });
 
   it('maps a slug unique-constraint violation (race) to slug_taken', async () => {

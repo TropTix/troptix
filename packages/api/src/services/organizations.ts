@@ -1,9 +1,10 @@
 /**
- * Organization provisioning: lazy-create on first event.
+ * Organization provisioning: lazy-create on first explicit write (event save or
+ * profile save — never on a page view).
  *
- * Prisma is injected (unit-testable, ADR 0013 — no authorization here). v1 is
- * "model for multi, expose one": each user owns exactly one Organization, keyed
- * by `ownerUserId` (== `Events.organizerUserId`). See
+ * Prisma is injected (unit-testable, ADR 0013 — no authorization here). Each
+ * user owns exactly one Organization, keyed by `ownerUserId`
+ * (== `Events.organizerUserId`) and enforced by a unique index (ADR 0022). See
  * docs/plans/2026-06-event-spotlight-and-organizer-brand.md (2, 2b).
  */
 import type { PrismaClient } from '@troptix/db';
@@ -44,33 +45,35 @@ export function findOrganizationForOwner(
 }
 
 /**
- * The user's Organization, creating it on first need. Idempotent: returns the
- * existing org if the user already owns one (v1 exposes exactly one). Called on
- * first event save so ownership can be dual-written (`organizerUserId` ==
- * `ownerUserId`).
- *
- * Pass `takenSlugs` when creating many orgs in a loop to avoid a
- * per-call full-table slug read; the new slug is added to it so later calls stay
- * unique. The DB `slug` unique constraint is the real concurrency backstop.
+ * The user's Organization, created on first need with a generated slug.
+ * Idempotent. Event-save path only — the profile save creates via
+ * `updateOrganizationProfile` with the user's chosen slug instead.
  */
 export async function ensureOrganizationForUser(
   prisma: PrismaClient,
-  { ownerUserId, displayName }: { ownerUserId: string; displayName: string },
-  takenSlugs?: Set<string>
+  { ownerUserId, displayName }: { ownerUserId: string; displayName: string }
 ): Promise<OrganizationRow> {
   const existing = await findOrganizationForOwner(prisma, ownerUserId);
   if (existing) return existing;
 
-  const taken = takenSlugs ?? (await loadTakenSlugs(prisma));
+  const taken = await loadTakenSlugs(prisma);
   // trim() so a padded name is cleaned and a whitespace-only one falls back
   // (a bare `|| FALLBACK_NAME` treats "   " as a valid display name).
   const name = displayName.trim() || FALLBACK_NAME;
   const slug = generateUniqueSlug(name, (s) => taken.has(s));
-  const org = await prisma.organization.create({
-    data: { ownerUserId, displayName: name, slug },
-  });
-  taken.add(slug);
-  return org;
+  try {
+    return await prisma.organization.create({
+      data: { ownerUserId, displayName: name, slug },
+    });
+  } catch (err) {
+    // ownerUserId is unique (one org per owner): a concurrent ensure lost the
+    // race — the winner's row is the org. Slug collisions rethrow.
+    if ((err as { code?: string }).code === 'P2002') {
+      const winner = await findOrganizationForOwner(prisma, ownerUserId);
+      if (winner) return winner;
+    }
+    throw err;
+  }
 }
 
 export type UpdateOrganizationProfileInput = {
@@ -87,7 +90,7 @@ export type UpdateOrganizationProfileInput = {
 
 export type UpdateOrganizationProfileResult =
   | { ok: true; slug: string }
-  | { ok: false; reason: 'not_found' | 'slug_invalid' | 'slug_taken' };
+  | { ok: false; reason: 'slug_invalid' | 'slug_taken' };
 
 const blankToNull = (value: string | null): string | null => {
   const trimmed = value?.trim() ?? '';
@@ -95,50 +98,61 @@ const blankToNull = (value: string | null): string | null => {
 };
 
 /**
- * Update the caller's Organization brand (the Profile Info editor, F6). Slug is
- * only re-validated when it changes: format/reserved via `isValidSlug`, then a
- * uniqueness check excluding the org itself. Returns a discriminated result for
- * the expected slug failures (the caller maps them to form errors); the DB
- * `slug` unique index is the final backstop. `ownerUserId` scopes the write.
+ * Save the Organization brand (Profile Info editor, F6) — create-or-update.
+ * Validation runs before any write, so a rejected slug never leaves a
+ * half-created Organization behind. The unique indexes are the backstop:
+ * a slug race maps to `slug_taken`; losing the owner race retries as update.
  */
 export async function updateOrganizationProfile(
   prisma: PrismaClient,
   input: UpdateOrganizationProfileInput
 ): Promise<UpdateOrganizationProfileResult> {
-  const org = await prisma.organization.findFirst({
-    where: { ownerUserId: input.ownerUserId },
-    orderBy: { createdAt: 'asc' },
-  });
-  if (!org) return { ok: false, reason: 'not_found' };
+  const org = await findOrganizationForOwner(prisma, input.ownerUserId);
 
   const nextSlug = input.slug.trim().toLowerCase();
-  if (nextSlug !== org.slug) {
+  if (nextSlug !== org?.slug) {
     if (!isValidSlug(nextSlug)) return { ok: false, reason: 'slug_invalid' };
     const taken = await prisma.organization.findUnique({
       where: { slug: nextSlug },
     });
-    if (taken && taken.id !== org.id)
+    if (taken && taken.id !== org?.id)
       return { ok: false, reason: 'slug_taken' };
   }
 
+  const data = {
+    displayName:
+      input.displayName.trim() || (org?.displayName ?? FALLBACK_NAME),
+    slug: nextSlug,
+    logoUrl: blankToNull(input.logoUrl),
+    bio: blankToNull(input.bio),
+    website: blankToNull(input.website),
+    instagram: blankToNull(input.instagram),
+    twitter: blankToNull(input.twitter),
+    linkedin: blankToNull(input.linkedin),
+  };
+
   try {
-    await prisma.organization.update({
-      where: { id: org.id },
-      data: {
-        displayName: input.displayName.trim() || org.displayName,
-        slug: nextSlug,
-        logoUrl: blankToNull(input.logoUrl),
-        bio: blankToNull(input.bio),
-        website: blankToNull(input.website),
-        instagram: blankToNull(input.instagram),
-        twitter: blankToNull(input.twitter),
-        linkedin: blankToNull(input.linkedin),
-      },
-    });
+    if (org) {
+      await prisma.organization.update({ where: { id: org.id }, data });
+    } else {
+      // Owner-only today. Phase 1 must scope this to the acting Organization
+      // before Admins get the form, or an Admin's first save mints them an org.
+      await prisma.organization.create({
+        data: { ownerUserId: input.ownerUserId, ...data },
+      });
+    }
   } catch (err) {
-    // Lost a race for the slug between the check above and this write — the DB
-    // unique index is the real arbiter; map it back to the discriminated result.
     if ((err as { code?: string }).code === 'P2002') {
+      // Two uniques can fire. Losing the one-org-per-owner race means a
+      // concurrent first save won — its row exists now, so retry as an update.
+      // Otherwise it's the slug race, and the index is the arbiter.
+      if (!org) {
+        const winner = await findOrganizationForOwner(
+          prisma,
+          input.ownerUserId
+        );
+        if (winner) return updateOrganizationProfile(prisma, input);
+      }
       return { ok: false, reason: 'slug_taken' };
     }
     throw err;
