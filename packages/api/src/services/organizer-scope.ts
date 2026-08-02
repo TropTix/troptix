@@ -15,9 +15,6 @@ import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { UnauthorizedError } from './_shared/errors';
 
-/** Stopgap until a real admin role/grant lands (ADR 0013 successor). */
-const PLATFORM_OWNER_EMAIL_SUFFIX = '@usetroptix.com';
-
 /**
  * The organizer this read is scoped to — the actor, or a View-as target when
  * the actor is a Platform Owner. The platform-owner lookup is only paid for
@@ -43,13 +40,14 @@ export async function resolveOrganizerScope(
     : actor.userId;
 }
 
+/** The explicit grant (`Users.isPlatformOwner`, ADR 0022) — never an email. */
 async function isPlatformOwner(
   prisma: PrismaClient,
   userId: string
 ): Promise<boolean> {
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { email: true },
+    select: { isPlatformOwner: true },
   });
-  return user?.email?.endsWith(PLATFORM_OWNER_EMAIL_SUFFIX) ?? false;
+  return user?.isPlatformOwner ?? false;
 }

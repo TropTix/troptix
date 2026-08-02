@@ -29,18 +29,16 @@ export interface FetchedTicketData {
   order: Pick<Orders, 'id'> | null;
 }
 
-async function fetchTickets(
-  eventId: string,
-  userId: string,
-  userEmail?: string
-) {
+import type { ServerUser } from '@/server/authUser';
+
+async function fetchTickets(eventId: string, user: ServerUser) {
   try {
-    await verifyEventAccess(userId, userEmail, eventId);
+    await verifyEventAccess(user, eventId);
 
     const tickets = await prisma.tickets.findMany({
       where: {
         eventId: eventId,
-        event: getEventWhereClause(userId, userEmail, eventId),
+        event: getEventWhereClause(user, eventId),
         order: {
           status: 'COMPLETED',
         },
@@ -74,14 +72,10 @@ async function fetchTickets(
   }
 }
 
-async function fetchEventName(
-  eventId: string,
-  userId: string,
-  userEmail?: string
-) {
+async function fetchEventName(eventId: string, user: ServerUser) {
   try {
     const event = await prisma.events.findUnique({
-      where: getEventWhereClause(userId, userEmail, eventId),
+      where: getEventWhereClause(user, eventId),
       select: {
         name: true,
       },
@@ -111,8 +105,8 @@ export default async function EventAttendeesPage(
   }
 
   const [initialAttendees, eventName] = await Promise.all([
-    fetchTickets(eventId, user.uid, user.email),
-    fetchEventName(eventId, user.uid, user.email),
+    fetchTickets(eventId, user),
+    fetchEventName(eventId, user),
   ]);
 
   const totalAttendees = initialAttendees.length;

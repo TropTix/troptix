@@ -4,14 +4,16 @@ import type { Actor } from '../trpc/context';
 import { checkInTicket } from './organizer';
 
 type MockPrismaOptions = {
-  userEmail?: string;
+  platformOwner?: boolean;
   ticket?: any;
 };
 
 function fakePrisma(opts: MockPrismaOptions): PrismaClient {
   return {
     users: {
-      findUnique: async () => ({ email: opts.userEmail ?? 'org@example.com' }),
+      findUnique: async () => ({
+        isPlatformOwner: opts.platformOwner ?? false,
+      }),
     },
     tickets: {
       findUnique: async () => opts.ticket ?? null,
@@ -32,7 +34,6 @@ describe('checkInTicket', () => {
 
   it('throws UNAUTHORIZED if actor is not the event organizer or platform owner', async () => {
     const prisma = fakePrisma({
-      userEmail: 'random@example.com',
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
@@ -46,7 +47,7 @@ describe('checkInTicket', () => {
 
   it('allows platform owner to check in any ticket', async () => {
     const prisma = fakePrisma({
-      userEmail: 'admin@usetroptix.com', // platform owner
+      platformOwner: true,
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
@@ -59,7 +60,6 @@ describe('checkInTicket', () => {
 
   it('throws ALREADY_CHECKED_IN if ticket is NOT_AVAILABLE', async () => {
     const prisma = fakePrisma({
-      userEmail: 'org@example.com',
       ticket: {
         id: 't-1',
         status: 'NOT_AVAILABLE',
@@ -73,7 +73,6 @@ describe('checkInTicket', () => {
 
   it('throws ALREADY_CHECKED_IN if ticket has a checkinTimestamp', async () => {
     const prisma = fakePrisma({
-      userEmail: 'org@example.com',
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
@@ -88,7 +87,6 @@ describe('checkInTicket', () => {
 
   it('successfully checks in an available ticket', async () => {
     const prisma = fakePrisma({
-      userEmail: 'org@example.com',
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',

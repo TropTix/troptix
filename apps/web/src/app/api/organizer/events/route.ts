@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const whereClause = isPlatformOwner(organizerId.email)
+    const whereClause = isPlatformOwner(organizerId)
       ? {}
       : { organizerUserId: organizerId.uid };
 

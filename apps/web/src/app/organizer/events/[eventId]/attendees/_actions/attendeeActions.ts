@@ -12,15 +12,13 @@ export async function toggleTicketStatus(ticketId: string, eventId: string) {
     if (!user) {
       throw new Error('User not authenticated');
     }
-    const userId = user.uid;
-    const userEmail = user.email;
-    await verifyEventAccess(userId, userEmail, eventId);
+    await verifyEventAccess(user, eventId);
 
     const ticket = await prisma.tickets.findFirst({
       where: {
         id: ticketId,
         eventId: eventId,
-        event: getEventWhereClause(userId, userEmail, eventId),
+        event: getEventWhereClause(user, eventId),
       },
       select: {
         id: true,

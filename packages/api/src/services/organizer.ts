@@ -24,12 +24,13 @@ async function authorizeOrganizer(prisma: PrismaClient, actor: Actor) {
 
   const user = await prisma.users.findUnique({
     where: { id: actor.userId },
-    select: { email: true },
+    select: { isPlatformOwner: true },
   });
 
-  const isPlatformOwner = user?.email?.endsWith('@usetroptix.com') ?? false;
-
-  return { userId: actor.userId, isPlatformOwner };
+  return {
+    userId: actor.userId,
+    isPlatformOwner: user?.isPlatformOwner ?? false,
+  };
 }
 
 export async function getEvents(prisma: PrismaClient, actor: Actor) {
