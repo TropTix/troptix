@@ -31,6 +31,9 @@ model Users {
   lastName            String?
   stripeId            String?
   role                Role                  @default(PATRON)
+  // Platform Owner (TropTix staff, cross-organizer visibility) as an explicit
+  // grant — replaces the @usetroptix.com email-suffix inference (ADR 0022).
+  isPlatformOwner     Boolean               @default(false)
   tickets             Tickets[]
   orders              Orders[]
   socialMediaAccounts SocialMediaAccounts[]
@@ -64,11 +67,11 @@ model SocialMediaAccounts {
   @@index([userId])
 }
 
-// The organizer's brand: a real, linkable entity that powers "Hosted by" and a
-// public page at /o/[slug]. A user may OWN many (one-to-many via ownerUserId),
-// but v1 exposes exactly one — "model for multi, expose one". Events carry
-// `organizationId`, but ownership/auth still keys on `Events.organizerUserId`
-// (dual-written == ownerUserId). See docs/plans/2026-06-event-spotlight-and-organizer-brand.md.
+// The organizer's brand and (per ADR 0022) the home for teams: a real, linkable
+// entity that powers "Hosted by" and a public page at /o/[slug]. Exactly one
+// per owner (`ownerUserId` unique). Events carry `organizationId`, but
+// ownership/auth still keys on `Events.organizerUserId` (dual-written ==
+// ownerUserId). See docs/plans/2026-06-event-spotlight-and-organizer-brand.md.
 //
 // Socials are a fixed, small set → plain columns, not the SocialMediaAccounts
 // join table (custom links are out of scope; the table's dormant + dual-FK).
@@ -85,7 +88,7 @@ model Organization {
   instagram   String?
   twitter     String?
   linkedin    String?
-  ownerUserId String
+  ownerUserId String   @unique
   verified    Boolean  @default(false)
 
   paidTicketingEnabled     Boolean   @default(false)
@@ -93,8 +96,6 @@ model Organization {
 
   owner  Users    @relation(fields: [ownerUserId], references: [id])
   events Events[]
-
-  @@index([ownerUserId])
 }
 
 // A per-event spotlight card (DJ, artist, speaker, sponsor, collaborator): just
@@ -276,9 +277,10 @@ model Events {
   summary         String?
   organizer       String
   organizerUserId String
-  // The owning Organization (brand). Nullable + backfilled; ownership/auth still
-  // keys on organizerUserId (dual-written == organization.ownerUserId).
-  organizationId  String?
+  // The owning Organization (ADR 0022: the Organization owns every event).
+  // Auth still keys on organizerUserId — a derived legacy key, dual-written ==
+  // organization.ownerUserId — until the query-key flip to organizationId.
+  organizationId  String
 
   // Date and Time Details. Full timestamps — the event form folds the time
   // input into these before submitting, so there is no separate time column
@@ -307,7 +309,7 @@ model Events {
   orders       Orders[]
   reservations Reservation[]
 
-  organization Organization? @relation(fields: [organizationId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
   spotlight    Spotlight[]
 
   @@index([organizationId])

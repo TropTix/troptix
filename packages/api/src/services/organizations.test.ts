@@ -1,14 +1,12 @@
 /**
  * Unit tests for Organization provisioning over a stateful hand-rolled fake
  * prisma (no Postgres, ADR 0010). Covers lazy-create idempotency, unique-slug
- * generation, the empty-name fallback, and the backfill mapping (one org per
- * organizer, most-recent display name, event linking, re-run idempotency).
+ * generation, and the empty-name fallback.
  */
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import {
   ensureOrganizationForUser,
-  backfillOrganizations,
   getOrganizationBySlug,
   updateOrganizationProfile,
 } from './organizations';
@@ -148,59 +146,6 @@ describe('ensureOrganizationForUser', () => {
     });
     expect(org.displayName).toBe('Island Vibes');
     expect(org.slug).toBe('island-vibes');
-  });
-});
-
-describe('backfillOrganizations', () => {
-  it('creates one org per organizer using the most-recent name and links events', async () => {
-    const { prisma, orgs, events } = makeFakePrisma([
-      {
-        organizerUserId: 'u1',
-        organizer: 'Old Name',
-        organizationId: null,
-        createdAt: 1,
-      },
-      {
-        organizerUserId: 'u1',
-        organizer: 'New Name',
-        organizationId: null,
-        createdAt: 5,
-      },
-      {
-        organizerUserId: 'u2',
-        organizer: 'Solo Fetes',
-        organizationId: null,
-        createdAt: 3,
-      },
-    ]);
-
-    const result = await backfillOrganizations(prisma);
-
-    expect(result).toEqual({ organizationsEnsured: 2, eventsLinked: 3 });
-    expect(orgs).toHaveLength(2);
-    const u1 = orgs.find((o) => o.ownerUserId === 'u1')!;
-    expect(u1.displayName).toBe('New Name'); // most-recent wins
-    expect(u1.slug).toBe('new-name');
-    expect(events.every((e) => e.organizationId !== null)).toBe(true);
-    expect(
-      events
-        .filter((e) => e.organizerUserId === 'u1')
-        .every((e) => e.organizationId === u1.id)
-    ).toBe(true);
-  });
-
-  it('is idempotent — a second run links nothing new', async () => {
-    const { prisma } = makeFakePrisma([
-      {
-        organizerUserId: 'u1',
-        organizer: 'Vibes',
-        organizationId: null,
-        createdAt: 1,
-      },
-    ]);
-    await backfillOrganizations(prisma);
-    const second = await backfillOrganizations(prisma);
-    expect(second).toEqual({ organizationsEnsured: 0, eventsLinked: 0 });
   });
 });
 

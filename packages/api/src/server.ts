@@ -51,7 +51,6 @@ export {
 } from './services/organizer-ticket-type-write';
 export {
   ensureOrganizationForUser,
-  backfillOrganizations,
   findOrganizationForOwner,
   getOrganizationBySlug,
   updateOrganizationProfile,
