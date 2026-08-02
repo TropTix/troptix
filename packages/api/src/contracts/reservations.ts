@@ -6,7 +6,13 @@ import { z } from 'zod';
 export const reservationContactSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
   lastName: z.string().trim().min(1, 'Last name is required.'),
-  email: z.string().trim().email('Enter a valid email.'),
+  // Stored lowercase so an order matches the signed-in user's address, which the
+  // provisioning trigger always lowercases.
+  email: z
+    .string()
+    .trim()
+    .email('Enter a valid email.')
+    .transform((value) => value.toLowerCase()),
 });
 export type ReservationContact = z.infer<typeof reservationContactSchema>;
 

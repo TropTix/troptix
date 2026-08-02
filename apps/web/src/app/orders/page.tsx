@@ -45,7 +45,7 @@ async function fetchUserOrders(): Promise<UserOrder[]> {
   try {
     const userOrders = await prisma.orders.findMany({
       where: {
-        email: user.email,
+        email: { equals: user.email, mode: 'insensitive' },
         status: 'COMPLETED',
       },
       select: {
