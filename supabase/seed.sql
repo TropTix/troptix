@@ -41,6 +41,16 @@ insert into public."Organization" (
   false, true
 );
 
+-- Demo Admin: holds a Membership in the demo Organization (teams Phase 1).
+-- Nothing reads Membership yet. To claim any seeded persona, set its email
+-- to yours BEFORE first sign-in — the provisioning trigger links by email
+-- and the row's grants come along. (.test addresses get no magic links.)
+insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName")
+values ('seed_admin_1', now(), now(), 'demo-admin@troptix.test', 'Demo Admin', 'Demo', 'Admin');
+
+insert into public."Membership" (id, "createdAt", "updatedAt", role, "organizationId", "userId")
+values ('seed_membership_1', now(), now(), 'ADMIN', 'seed_organization_1', 'seed_admin_1');
+
 -- Published events, owned by the demo organizer. `startsAt`/`endsAt` are full
 -- timestamps — the only date columns Events has (ADR 0020).
 insert into public."Events" (
