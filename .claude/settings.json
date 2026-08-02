@@ -22,7 +22,9 @@
       "Bash(xxd corner.bmp)",
       "Bash(sips -z 1 1 /Users/gaurnett/Programming/TechBrewery/troptix/apps/web/public/logos/TroptixLetter.png --out avg.png)",
       "Bash(sips -s format bmp avg.png --out avg.bmp)",
-      "Bash(xxd avg.bmp)"
+      "Bash(xxd avg.bmp)",
+      "Bash(npx eas-cli *)",
+      "Bash(xargs -I{} plutil -p {})"
     ]
   }
 }
