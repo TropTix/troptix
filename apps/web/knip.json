@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/app/**/{page,layout,loading,error,not-found,route,template,default}.{ts,tsx}",
+    "scripts/*.ts",
+    "jest.config.ts",
+    "src/**/*.test.{ts,tsx}",
+    "src/**/__tests__/**/*.{ts,tsx}",
+    "src/app/_components/social-proof.tsx"
+  ],
+  "ignore": ["src/server/lib/featureFlags.ts"],
+  "ignoreDependencies": [
+    "@troptix/api",
+    "@troptix/db",
+    "@troptix/transactional",
+    "posthog-node",
+    "ts-node",
+    "tsx"
+  ],
+  "ignoreBinaries": ["next", "tsx", "tsc", "eslint", "jest"],
+  "rules": {
+    "exports": "warn",
+    "types": "warn"
+  }
+}
