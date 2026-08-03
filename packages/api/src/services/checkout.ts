@@ -34,7 +34,6 @@ const TICKET_TYPE_SELECT = {
   maxPurchasePerUser: true,
   ticketingFees: true,
   ticketType: true,
-  // Inventory counters.
   capacity: true,
   reserved: true,
   sold: true,
@@ -127,7 +126,6 @@ export async function getCheckoutConfig(
   const tickets = ticketTypes
     .map((tt) => toCheckoutTicket(tt, now))
     .sort((a, b) => {
-      // Available (maxAllowedToAdd > 0) first, then by price ascending.
       const aAvailable = a.maxAllowedToAdd > 0 ? 0 : 1;
       const bAvailable = b.maxAllowedToAdd > 0 ? 0 : 1;
       if (aAvailable !== bAvailable) return aAvailable - bAvailable;

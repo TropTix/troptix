@@ -57,8 +57,6 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-// ─── Scanner ──────────────────────────────────────────────────────────────────
-
 function ScanResultBanner({
   result,
   onDismiss,
@@ -176,7 +174,6 @@ function ScannerTab({
         barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128', 'code39'] }}
         onBarcodeScanned={handleScan}
       />
-      {/* Overlay */}
       <View style={styles.overlay}>
         <View style={styles.overlayTop} />
         <View style={styles.overlayRow}>
@@ -202,8 +199,6 @@ function ScannerTab({
     </View>
   );
 }
-
-// ─── Guest List ───────────────────────────────────────────────────────────────
 
 const TICKET_COLORS: Record<string, string> = {
   VIP: '#F59E0B',
@@ -335,8 +330,6 @@ function GuestListTab({
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
-
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -432,8 +425,7 @@ export default function EventDetailScreen() {
             text: 'Remove',
             style: 'destructive',
             onPress: () => {
-              // Wait, the backend doesn't have an undo-checkin mutation yet.
-              // We'll just update local state for now until the undo backend is implemented.
+              // The backend has no undo-checkin mutation yet; local state only.
               setGuests((prev) =>
                 prev.map((g) =>
                   g.id === guestId
@@ -471,7 +463,6 @@ export default function EventDetailScreen() {
         </View>
       )}
 
-      {/* Header */}
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={colors.text} />
@@ -492,7 +483,6 @@ export default function EventDetailScreen() {
         </Pressable>
       </View>
 
-      {/* Event info */}
       <View style={styles.eventInfo}>
         <Text style={styles.eventInfoText}>
           {event.venue} · {event.city}
@@ -502,7 +492,6 @@ export default function EventDetailScreen() {
         </Text>
       </View>
 
-      {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.statCol}>
           <Text style={[styles.statNum, { color: colors.accent }]}>
@@ -522,7 +511,6 @@ export default function EventDetailScreen() {
         </View>
       </View>
 
-      {/* Underline tab switcher */}
       <View style={styles.tabBar}>
         <Pressable
           style={[styles.tab, activeTab === 'scanner' && styles.tabActive]}
@@ -562,7 +550,6 @@ export default function EventDetailScreen() {
         </Pressable>
       </View>
 
-      {/* Content */}
       <View style={styles.flex}>
         {activeTab === 'scanner' ? (
           <ScannerTab guests={guests} onCheckIn={handleCheckInByScan} />
@@ -574,8 +561,6 @@ export default function EventDetailScreen() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const CORNER = 20;
 const CORNER_W = 3;
 
@@ -584,7 +569,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -609,7 +593,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  // Event info
   eventInfo: {
     paddingHorizontal: 20,
     paddingTop: 14,
@@ -627,7 +610,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Stats
   statsRow: {
     flexDirection: 'row',
     marginHorizontal: 20,
@@ -661,7 +643,6 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
 
-  // Underline tab bar
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -691,7 +672,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
 
-  // Scanner
   scannerWrap: {
     flex: 1,
     backgroundColor: '#000',
@@ -766,7 +746,6 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
 
-  // Scan result
   resultBanner: {
     position: 'absolute',
     bottom: 16,
@@ -793,7 +772,6 @@ const styles = StyleSheet.create({
   },
   resultBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, color: '#fff' },
 
-  // Permission
   permissionWrap: {
     flex: 1,
     alignItems: 'center',
@@ -827,7 +805,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Guest list
   guestHeader: {
     flexDirection: 'row',
     alignItems: 'center',

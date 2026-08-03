@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { eventSummarySchema } from './events';
 
-// --- OrganizationDetail -------------------------------------------------------
 // The public organization-page DTO (/o/[slug]): brand header + the org's
 // published events, split into upcoming and past. Socials are plain columns
 // (instagram/twitter are usernames; linkedin/website are URLs — the web layer

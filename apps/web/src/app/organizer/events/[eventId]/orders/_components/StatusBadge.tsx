@@ -8,17 +8,15 @@ interface StatusBadgeProps {
 const getBadgeVariant = (
   status: string
 ): React.ComponentProps<typeof Badge>['variant'] => {
-  switch (
-    status.toUpperCase() // Use uppercase for case-insensitive matching
-  ) {
+  switch (status.toUpperCase()) {
     case 'COMPLETED':
-      return 'default'; // Or 'secondary', or a custom 'success' variant
+      return 'default';
     case 'PENDING':
       return 'outline';
     case 'CANCELLED':
       return 'destructive';
     default:
-      return 'secondary'; // Fallback for unknown statuses
+      return 'secondary';
   }
 };
 

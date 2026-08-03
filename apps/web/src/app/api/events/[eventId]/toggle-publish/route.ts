@@ -69,7 +69,6 @@ export async function PATCH(
       );
     }
 
-    // If trying to publish (isDraft is currently true), validate requirements
     if (event.isDraft) {
       const validationResult = validateEventForPublish(
         event,

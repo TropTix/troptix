@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { prodUrl } from './constants';
 
-// fetch the events for a specific event currently
 export function useFetchEventOrders(eventId: string, jwtToken?: string) {
   return useQuery({
     queryKey: ['order', eventId],

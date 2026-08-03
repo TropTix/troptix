@@ -14,7 +14,7 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  Table as ReactTable, // Alias to avoid naming conflict
+  Table as ReactTable,
   RowData,
   TableMeta,
 } from '@tanstack/react-table';
@@ -40,19 +40,15 @@ import { ChevronDownIcon } from 'lucide-react';
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  /** Optional: ID of the column to use for the primary search input */
+  /** ID of the column to use for the primary search input */
   filterColumnId?: string;
-  /** Optional: Placeholder text for the search input */
   filterInputPlaceholder?: string;
-  /** Optional: Render custom actions/filters in the toolbar */
+  /** Render custom actions/filters in the toolbar */
   renderToolbarActions?: (table: ReactTable<TData>) => React.ReactNode;
-  /** Optional: Enable/disable pagination */
   enablePagination?: boolean;
-  /** Optional: Enable/disable column visibility toggle */
   enableColumnVisibility?: boolean;
-  /** Optional: Initial sorting state */
   initialSorting?: SortingState;
-  /** Optional: Pass custom metadata accessible in cells/headers */
+  /** Custom metadata accessible in cells/headers */
   meta?: TableMeta<TData>;
 }
 
@@ -84,7 +80,7 @@ export function DataTable<TData, TValue>({
       rowSelection,
       columnFilters,
     },
-    meta, // Pass meta down
+    meta,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
@@ -100,7 +96,6 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
       <div className="flex items-center justify-between">
         <div className="flex flex-1 items-center space-x-2">
           {filterColumnId && (
@@ -118,11 +113,9 @@ export function DataTable<TData, TValue>({
               className="h-8 w-[150px] lg:w-[250px]"
             />
           )}
-          {/* Render Custom Toolbar Actions */}
           {renderToolbarActions?.(table)}
         </div>
 
-        {/* Column Visibility Toggle */}
         {enableColumnVisibility && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -162,7 +155,6 @@ export function DataTable<TData, TValue>({
         )}
       </div>
 
-      {/* Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -214,7 +206,6 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      {/* Pagination */}
       {enablePagination && (
         <div className="flex items-center justify-between px-2">
           <div className="flex-1 text-sm text-muted-foreground">
@@ -222,7 +213,6 @@ export function DataTable<TData, TValue>({
             {table.getFilteredRowModel().rows.length} row(s) selected.
           </div>
           <div className="flex items-center space-x-6 lg:space-x-8">
-            {/* Rows per page selector - Can be added if needed */}
             <div className="flex items-center space-x-2">
               <p className="text-sm font-medium">
                 Page {table.getState().pagination.pageIndex + 1} of{' '}
@@ -237,7 +227,6 @@ export function DataTable<TData, TValue>({
                 disabled={!table.getCanPreviousPage()}
               >
                 <span className="sr-only">Go to first page</span>
-                {/* Use appropriate icons */}
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="16"
@@ -262,7 +251,6 @@ export function DataTable<TData, TValue>({
                 disabled={!table.getCanPreviousPage()}
               >
                 <span className="sr-only">Go to previous page</span>
-                {/* Use appropriate icons */}
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="16"
@@ -283,7 +271,6 @@ export function DataTable<TData, TValue>({
                 disabled={!table.getCanNextPage()}
               >
                 <span className="sr-only">Go to next page</span>
-                {/* Use appropriate icons */}
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="16"
@@ -304,7 +291,6 @@ export function DataTable<TData, TValue>({
                 disabled={!table.getCanNextPage()}
               >
                 <span className="sr-only">Go to last page</span>
-                {/* Use appropriate icons */}
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="16"

@@ -256,7 +256,6 @@ export default function CheckoutSheet({
         return;
       }
 
-      // Paid: open a Checkout Session and move to the Payment Element.
       setReservationId(reservation.reservationId);
       setReservationParam(reservation.reservationId);
       const payment = await beginPayment.mutateAsync({

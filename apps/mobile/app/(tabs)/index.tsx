@@ -119,7 +119,6 @@ export default function EventsScreen() {
       ]);
       setEvents(eventsData);
 
-      // Use the database firstName, fallback to Supabase name, then empty
       setProfileName(profileData.firstName || user?.name?.split(' ')[0] || '');
 
       setError(null);
@@ -138,7 +137,6 @@ export default function EventsScreen() {
     setRefreshing(false);
   }, [fetchData]);
 
-  // Group by month/year section header.
   const sections = useMemo(() => {
     const grouped: Record<string, OrganizerEvent[]> = {};
     events.forEach((event) => {

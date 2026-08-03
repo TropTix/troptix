@@ -18,7 +18,6 @@
 import { z } from 'zod';
 import type { TicketFeeStructure, TicketType } from '@troptix/db/types';
 
-// --- Prisma enums mirrored as zod string enums --------------------------------
 // We can't import the enum *values* from `@troptix/db` (runtime entry) without
 // breaking RN-safety, and `@troptix/db/types` is type-only. So the values are
 // re-declared here; the parity guards below fail to compile if they ever drift
@@ -47,8 +46,6 @@ const _ticketTypeParity: AssertEqual<
   z.infer<typeof ticketTypeSchema>,
   TicketType
 > = true;
-
-// --- Validation / message enums (ported from types/checkout.ts) ---------------
 
 export const validationResponseMessageSchema = z.enum([
   'Some tickets were unavailable or sold out and cart was adjusted',
@@ -127,7 +124,6 @@ export const checkoutConfigInputSchema = z.object({
 });
 export type CheckoutConfigInput = z.infer<typeof checkoutConfigInputSchema>;
 
-// --- Validation (initiate path) ----------------------------------------------
 // Frozen here so the Stage 3 initiate rewrite (PR 2c) has the target shape;
 // the service is built in a later PR. Cents + reservation-id, not the legacy
 // dollar/orderId shape.

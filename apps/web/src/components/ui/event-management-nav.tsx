@@ -37,7 +37,7 @@ export function EventManagementNav({
 
   const handleTogglePublish = async (checked: boolean) => {
     setIsLoading(true);
-    setIsPublished(checked); // Optimistic update
+    setIsPublished(checked);
 
     try {
       const response = await fetch(`/api/events/${eventId}/toggle-publish`, {
@@ -47,7 +47,6 @@ export function EventManagementNav({
       const data = await response.json();
 
       if (!response.ok) {
-        // Revert optimistic update on error
         setIsPublished(!checked);
 
         if (response.status === 400 && data.validationErrors) {
@@ -76,7 +75,6 @@ export function EventManagementNav({
         data.isDraft ? 'Event unpublished' : 'Event published successfully'
       );
     } catch (error) {
-      // Revert optimistic update on error
       setIsPublished(!checked);
       toast.error(
         error instanceof Error ? error.message : 'Failed to update event status'
