@@ -67,7 +67,9 @@ export const checkoutRouter = router({
 
   completeFree: publicProcedure
     .input(completeFreeInputSchema)
-    .mutation(({ ctx, input }) => completeFree(ctx.prisma, input)),
+    .mutation(({ ctx, input }) =>
+      completeFree(ctx.prisma, input, ctx.analytics)
+    ),
 
   // Hand a held reservation's inventory back (e.g. the buyer abandons or the
   // commit fails after the hold was taken).
@@ -91,8 +93,11 @@ export const checkoutRouter = router({
     .input(getCheckoutStateInputSchema)
     .query(({ ctx, input }) => {
       const { stripe } = requireStripe(ctx);
-      return getCheckoutState(ctx.prisma, stripe, {
-        reservationId: input.reservationId,
-      });
+      return getCheckoutState(
+        ctx.prisma,
+        stripe,
+        { reservationId: input.reservationId },
+        ctx.analytics
+      );
     }),
 });

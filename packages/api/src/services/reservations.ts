@@ -26,6 +26,7 @@ import type {
   CompleteFreeInput,
   CompleteFreeResponse,
 } from '../contracts/reservations';
+import type { CheckoutAnalytics } from '../contracts/analytics';
 import { generateId } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
@@ -54,6 +55,10 @@ export interface ReserveInput {
     email?: string | null;
     firstName?: string | null;
     lastName?: string | null;
+  };
+  analytics?: {
+    distinctId?: string | null;
+    sessionId?: string | null;
   };
   userId?: string | null;
   ttlMinutes?: number;
@@ -170,6 +175,8 @@ export async function reserve(
         email: input.contact?.email ?? null,
         firstName: input.contact?.firstName ?? null,
         lastName: input.contact?.lastName ?? null,
+        posthogDistinctId: input.analytics?.distinctId ?? null,
+        posthogSessionId: input.analytics?.sessionId ?? null,
         subtotalCents,
         feesCents,
         totalCents,
@@ -314,6 +321,7 @@ export async function createReservation(
     eventId: input.eventId,
     items: reserveItems,
     contact: input.contact,
+    analytics: input.analytics,
     userId,
   });
 
@@ -591,6 +599,40 @@ export async function settle(
 }
 
 /**
+ * Fire the server-side `order_completed` capture for a freshly converted
+ * reservation. Called after the converting transaction commits — never inside
+ * it — and swallows every error: analytics must never affect checkout.
+ */
+export async function captureOrderCompleted(
+  prisma: PrismaClient,
+  analytics: CheckoutAnalytics,
+  reservationId: string,
+  orderId: string
+): Promise<void> {
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { items: { select: { quantity: true } } },
+    });
+    if (!reservation) return;
+    await analytics.orderCompleted({
+      orderId,
+      reservationId,
+      eventId: reservation.eventId,
+      orderType: reservation.totalCents === 0 ? 'FREE' : 'PAID',
+      totalCents: reservation.totalCents,
+      subtotalCents: reservation.subtotalCents,
+      feesCents: reservation.feesCents,
+      ticketCount: reservation.items.reduce((sum, i) => sum + i.quantity, 0),
+      distinctId: reservation.posthogDistinctId,
+      sessionId: reservation.posthogSessionId,
+    });
+  } catch {
+    // Swallow — a failed capture must not surface to the buyer.
+  }
+}
+
+/**
  * Finalize a FREE reservation (no PaymentIntent) by id. Guards that it is HELD
  * and actually free, then materializes the order. Idempotent — a second call for
  * an already-CONVERTED reservation returns the existing order. Returns enough to
@@ -598,9 +640,10 @@ export async function settle(
  */
 export async function completeFree(
   prisma: PrismaClient,
-  input: CompleteFreeInput
+  input: CompleteFreeInput,
+  analytics?: CheckoutAnalytics
 ): Promise<CompleteFreeResponse> {
-  const orderId = await prisma.$transaction(async (tx) => {
+  const { orderId, fresh } = await prisma.$transaction(async (tx) => {
     const reservation = await tx.reservation.findUnique({
       where: { id: input.reservationId },
       include: { items: true },
@@ -616,7 +659,7 @@ export async function completeFree(
           `Reservation ${reservation.id} is CONVERTED but has no orderId`
         );
       }
-      return reservation.orderId;
+      return { orderId: reservation.orderId, fresh: false };
     }
 
     if (reservation.status !== ReservationStatus.HELD) {
@@ -631,8 +674,17 @@ export async function completeFree(
       );
     }
 
-    return materializeOrder(tx, reservation);
+    return { orderId: await materializeOrder(tx, reservation), fresh: true };
   });
+
+  if (fresh && analytics) {
+    await captureOrderCompleted(
+      prisma,
+      analytics,
+      input.reservationId,
+      orderId
+    );
+  }
 
   const tickets = await prisma.tickets.findMany({
     where: { orderId },

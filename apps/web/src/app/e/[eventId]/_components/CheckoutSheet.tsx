@@ -1,11 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePostHog } from 'posthog-js/react';
+import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/components/AuthProvider';
 import { trpc } from '@/lib/trpc';
-import type { EventDetail, ReservationContact } from '@troptix/api';
+import type {
+  BeginPaymentResponse,
+  EventDetail,
+  ReservationContact,
+} from '@troptix/api';
 import SelectStep from './SelectStep';
 import ContactStep from './ContactStep';
 import PaymentStep from './PaymentStep';
@@ -60,6 +66,7 @@ export default function CheckoutSheet({
   resumeReservationId?: string | null;
 }) {
   const { user } = useAuth();
+  const posthog = usePostHog();
   const [step, setStep] = useState<Step>('select');
   const [selection, setSelection] = useState<Record<string, number>>({});
   const [localError, setLocalError] = useState<string | null>(null);
@@ -84,6 +91,80 @@ export default function CheckoutSheet({
   // Guards the one-shot "resume found an unpaid hold → reopen payment" branch.
   const resumeReopenRef = useRef(false);
 
+  // The browser's PostHog identity, sent with the hold so the server-side
+  // conversion capture joins this person/session (see contracts/analytics.ts).
+  function analyticsIds() {
+    try {
+      const distinctId = posthog.get_distinct_id();
+      const sessionId = posthog.get_session_id();
+      return {
+        ...(distinctId ? { distinctId } : {}),
+        ...(sessionId ? { sessionId } : {}),
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  function capture(name: string, props?: Record<string, unknown>) {
+    posthog.capture(name, { event_id: event.id, ...props });
+  }
+
+  // One entry per funnel step: the fresh contact→payment path and the resume
+  // reopen both land here, so the payment_started capture keeps one shape
+  // (`resumed` always present as a boolean — an absent key doesn't match
+  // `resumed = false` filters in PostHog).
+  function openPayment(
+    payment: BeginPaymentResponse,
+    forReservationId: string,
+    resumed: boolean
+  ) {
+    setClientSecret(payment.clientSecret);
+    setExpiresAt(payment.expiresAt);
+    setPaymentSummary({
+      items: payment.items,
+      subtotalCents: payment.subtotalCents,
+      feesCents: payment.feesCents,
+      totalCents: payment.totalCents,
+    });
+    capture(ANALYTICS_EVENTS.checkoutPaymentStarted, {
+      reservation_id: forReservationId,
+      total_cents: payment.totalCents,
+      resumed,
+    });
+    setStep('payment');
+  }
+
+  // Shared success landing for the paid (poll) and free paths. The success URL
+  // keeps ?reservation= (resume-on-refresh), so the paid path replays on every
+  // reload — capture only the first sighting of the order, mirroring the
+  // server's alreadyProcessed gate.
+  function finishCheckout(order: SuccessData, orderType: 'FREE' | 'PAID') {
+    setSuccessData(order);
+    const dedupeKey = `tt_checkout_completed_${order.orderId}`;
+    let alreadyCaptured = false;
+    try {
+      alreadyCaptured = !!localStorage.getItem(dedupeKey);
+      localStorage.setItem(dedupeKey, '1');
+    } catch {
+      // Storage unavailable (private mode) — fall back to capturing.
+    }
+    if (!alreadyCaptured) {
+      capture(ANALYTICS_EVENTS.checkoutCompleted, {
+        order_id: order.orderId,
+        order_type: orderType,
+        ticket_count: order.tickets.length,
+      });
+    }
+    setStep('success');
+    // Nudge the confirmation email (idempotent server-side).
+    void fetch('/api/checkout/confirmation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: order.orderId }),
+    }).catch(() => {});
+  }
+
   const createReservation = trpc.checkout.createReservation.useMutation();
   const completeFree = trpc.checkout.completeFree.useMutation();
   const beginPayment = trpc.checkout.beginPayment.useMutation();
@@ -101,8 +182,8 @@ export default function CheckoutSheet({
   // whatever the URL held at mount). Consume-once ref rather than reacting to
   // the live searchParam: reaching the payment step writes ?reservation= via
   // replaceState, which Next syncs back into useSearchParams — reacting to
-  // that echo bounces the buyer payment → finalizing → payment. A consumed
-  // target also can't re-fire when the sheet reopens.
+  // that echo would bounce the buyer payment → finalizing → payment. A
+  // consumed target also can't re-fire when the sheet reopens.
   const resumeTargetRef = useRef(resumeReservationId ?? null);
   useEffect(() => {
     if (!open || !resumeTargetRef.current) return;
@@ -116,14 +197,10 @@ export default function CheckoutSheet({
     if (step !== 'finalizing' || !stateQuery.data) return;
     const state = stateQuery.data;
     if (state.kind === 'order') {
-      setSuccessData({ orderId: state.orderId, tickets: state.tickets });
-      setStep('success');
-      // Mirror the free flow: nudge the confirmation email (idempotent).
-      void fetch('/api/checkout/confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: state.orderId }),
-      }).catch(() => {});
+      finishCheckout(
+        { orderId: state.orderId, tickets: state.tickets },
+        'PAID'
+      );
     } else if (state.kind === 'refunded') {
       setStep('refunded');
       // The webhook normally sends this, but the sync-fulfillment poll can be
@@ -149,20 +226,35 @@ export default function CheckoutSheet({
       resumeReopenRef.current = true;
       beginPayment
         .mutateAsync({ reservationId })
-        .then((payment) => {
-          setClientSecret(payment.clientSecret);
-          setExpiresAt(payment.expiresAt);
-          setPaymentSummary({
-            items: payment.items,
-            subtotalCents: payment.subtotalCents,
-            feesCents: payment.feesCents,
-            totalCents: payment.totalCents,
-          });
-          setStep('payment');
-        })
-        .catch(() => setStep('expired'));
+        .then((payment) => openPayment(payment, reservationId, true))
+        .catch(() => {
+          // Not necessarily a real expiry — a transient beginPayment failure
+          // lands here too. Tag the capture so expiry metrics can tell them apart.
+          expiredReasonRef.current = 'payment_reopen_failed';
+          setStep('expired');
+        });
     }
   }, [step, stateQuery.data, reservationId]);
+
+  // Terminal failure states are set from several places (poll, countdown,
+  // resume errors) — capture them on the step transition so every path counts
+  // once, whatever set it.
+  const capturedStepRef = useRef<Step | null>(null);
+  // Why the sheet landed on 'expired': a real hold expiry, or a transient
+  // beginPayment failure on the resume path routed to the same screen.
+  const expiredReasonRef = useRef<'hold_expired' | 'payment_reopen_failed'>(
+    'hold_expired'
+  );
+  useEffect(() => {
+    if (capturedStepRef.current === step) return;
+    capturedStepRef.current = step;
+    if (step === 'expired') {
+      capture(ANALYTICS_EVENTS.checkoutExpired, {
+        reason: expiredReasonRef.current,
+      });
+    }
+    if (step === 'refunded') capture(ANALYTICS_EVENTS.checkoutRefunded);
+  }, [step]);
 
   // After ~20s still finalizing, reassure the buyer without stopping the poll.
   useEffect(() => {
@@ -185,6 +277,7 @@ export default function CheckoutSheet({
     setSuccessData(null);
     setSlowFinalize(false);
     resumeReopenRef.current = false;
+    expiredReasonRef.current = 'hold_expired';
     createReservation.reset();
     completeFree.reset();
     beginPayment.reset();
@@ -193,6 +286,11 @@ export default function CheckoutSheet({
   function handleOpenChange(next: boolean) {
     onOpenChange(next);
     if (!next) {
+      // Closing mid-funnel is abandonment; closing from a terminal step
+      // (success/expired/refunded) is just dismissal.
+      if (step === 'select' || step === 'contact' || step === 'payment') {
+        capture(ANALYTICS_EVENTS.checkoutAbandoned, { checkout_step: step });
+      }
       setReservationParam(null);
       setTimeout(resetState, 250);
     }
@@ -232,27 +330,33 @@ export default function CheckoutSheet({
           quantity: selection[t.id],
         })),
         contact,
+        analytics: analyticsIds(),
       });
       heldReservationId = reservation.reservationId;
       if (reservation.items.every((g) => g.granted === 0)) {
+        capture(ANALYTICS_EVENTS.checkoutSoldOut, { ticket_count: qty });
         setLocalError('Sorry — these tickets just sold out.');
         if (heldReservationId) {
           releaseReservation.mutate({ reservationId: heldReservationId });
         }
         return;
       }
+      capture(ANALYTICS_EVENTS.checkoutReservationCreated, {
+        reservation_id: reservation.reservationId,
+        ticket_count: reservation.items.reduce((sum, g) => sum + g.granted, 0),
+        total_cents: reservation.totalCents,
+        was_adjusted: reservation.wasAdjusted,
+        is_free: isFree,
+      });
 
       if (isFree) {
         const order = await completeFree.mutateAsync({
           reservationId: reservation.reservationId,
         });
-        setSuccessData({ orderId: order.orderId, tickets: order.tickets });
-        setStep('success');
-        void fetch('/api/checkout/confirmation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId: order.orderId }),
-        }).catch(() => {});
+        finishCheckout(
+          { orderId: order.orderId, tickets: order.tickets },
+          'FREE'
+        );
         return;
       }
 
@@ -261,15 +365,7 @@ export default function CheckoutSheet({
       const payment = await beginPayment.mutateAsync({
         reservationId: reservation.reservationId,
       });
-      setClientSecret(payment.clientSecret);
-      setExpiresAt(payment.expiresAt);
-      setPaymentSummary({
-        items: payment.items,
-        subtotalCents: payment.subtotalCents,
-        feesCents: payment.feesCents,
-        totalCents: payment.totalCents,
-      });
-      setStep('payment');
+      openPayment(payment, reservation.reservationId, false);
     } catch {
       // Errors surface via the mutation error banners below. Hand back the hold
       // if we took one but never reached payment (no-op if it converted).
@@ -330,7 +426,15 @@ export default function CheckoutSheet({
                 totalCents={totalCents}
                 feesCents={feesCents}
                 eventName={event.name}
-                onContinue={() => setStep('contact')}
+                onContinue={() => {
+                  capture(ANALYTICS_EVENTS.checkoutTicketsSelected, {
+                    ticket_count: qty,
+                    total_cents: totalCents,
+                    fees_cents: feesCents,
+                    is_free: isFree,
+                  });
+                  setStep('contact');
+                }}
               />
             )}
             {step === 'contact' && (

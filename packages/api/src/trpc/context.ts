@@ -1,5 +1,6 @@
 import type { PrismaClient, Role } from '@troptix/db';
 import type Stripe from 'stripe';
+import type { CheckoutAnalytics } from '../contracts/analytics';
 
 /**
  * Who is making the request (ADR 0013). Authorization is enforced in the
@@ -23,6 +24,11 @@ export interface Context {
    */
   stripe?: Stripe;
   siteUrl?: string;
+  /**
+   * Server-side PostHog capture port for the conversion event. Optional —
+   * missing means analytics is off (no key, tests) and captures are skipped.
+   */
+  analytics?: CheckoutAnalytics;
 }
 
 /**
@@ -36,11 +42,13 @@ export function createContext(opts: {
   actor?: Actor;
   stripe?: Stripe;
   siteUrl?: string;
+  analytics?: CheckoutAnalytics;
 }): Context {
   return {
     prisma: opts.prisma,
     actor: opts.actor ?? { kind: 'anonymous' },
     stripe: opts.stripe,
     siteUrl: opts.siteUrl,
+    analytics: opts.analytics,
   };
 }
