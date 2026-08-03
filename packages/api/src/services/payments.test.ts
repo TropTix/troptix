@@ -14,8 +14,32 @@ import {
   beginPayment,
   confirmPaid,
   getCheckoutState,
+  statementDescriptorSuffix,
   sweepExpiredHolds,
 } from './payments';
+
+describe('statementDescriptorSuffix', () => {
+  it('uppercases and cuts at 13 characters without a trailing space', () => {
+    expect(statementDescriptorSuffix('Sunset Cruise 2026')).toBe(
+      'SUNSET CRUISE'
+    );
+    // A cut landing on a space is trimmed.
+    expect(statementDescriptorSuffix('Island Vibes Live')).toBe('ISLAND VIBES');
+  });
+
+  it('strips characters Stripe rejects', () => {
+    expect(statementDescriptorSuffix(`D'Yard <Live> "Vibes"*`)).toBe(
+      'DYARD LIVE VI'
+    );
+    expect(statementDescriptorSuffix('Fête à Montréal')).toBe('FTE MONTRAL');
+  });
+
+  it('returns null when nothing legible survives', () => {
+    expect(statementDescriptorSuffix('***')).toBeNull();
+    expect(statementDescriptorSuffix('   ')).toBeNull();
+    expect(statementDescriptorSuffix('日本語')).toBeNull();
+  });
+});
 
 const TEST_EVENT_ID = `test-pay-${generateId()}`;
 // Events.organizationId is NOT NULL (ADR 0022) — the fixture needs the full
@@ -402,6 +426,12 @@ describe('beginPayment — session creation + reuse', () => {
     // Line items: a tier line + a single service-fee line.
     expect((fake.calls.create[0].params as any).line_items).toHaveLength(2);
     expect((fake.calls.create[0].params as any).ui_mode).toBe('elements');
+    // Event name lands on the card statement: 'Payments Test Event' cleaned,
+    // uppercased, and cut at 13 characters (22 minus the TROPTIX* prefix).
+    expect(
+      (fake.calls.create[0].params as any).payment_intent_data
+        .statement_descriptor_suffix
+    ).toBe('PAYMENTS TEST');
 
     const res = await prisma.reservation.findUnique({
       where: { id: reservationId },
