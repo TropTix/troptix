@@ -147,10 +147,14 @@ export async function applyCode(
   prisma: PrismaClient,
   input: ApplyCodeInput
 ): Promise<ApplyCodeResponse> {
+  // mode:'insensitive' compiles to ILIKE, which Prisma does not escape — a
+  // submitted `%` would otherwise match every gated code on the event.
+  const code = input.code.replace(/[\\%_]/g, '\\$&');
+
   const match = await prisma.ticketTypes.findFirst({
     where: {
       eventId: input.eventId,
-      discountCode: { equals: input.code, mode: 'insensitive' },
+      discountCode: { equals: code, mode: 'insensitive' },
     },
     select: TICKET_TYPE_SELECT,
   });
