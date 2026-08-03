@@ -25,6 +25,7 @@ export async function generateMetadata(props: {
     return {
       title: event.name,
       description: event.description,
+      robots: event.isPrivate ? { index: false, follow: false } : undefined,
       openGraph: {
         title: event.name,
         description: event.description,

@@ -10,6 +10,7 @@
 --   • seed_event_1 — happy-path paid festival (GA + VIP, plenty available)
 --   • seed_event_2 — free RSVP event
 --   • seed_event_3 — edge cases: near-capacity, sold-out, upcoming-sale, gated
+--   • seed_event_4 — private: published but hidden from /discover and /o/[slug]
 --
 -- Inventory is one counter standard: availability = capacity - reserved - sold.
 --  - `capacity` is NOT NULL — the hold SQL reads it raw (GREATEST(capacity-reserved-sold, 0)).
@@ -43,13 +44,13 @@ insert into public."Organization" (
 -- Published events, owned by the demo organizer. `startsAt`/`endsAt` are full
 -- timestamps — the only date columns Events has (ADR 0020).
 insert into public."Events" (
-  id, "createdAt", "updatedAt", "isDraft", name, description, summary,
+  id, "createdAt", "updatedAt", "isDraft", "isPrivate", name, description, summary,
   organizer, "organizerUserId", "startsAt", "endsAt",
   venue, address, country, "countryCode", "organizationId",
   "pageTheme", "flyerPalette"
 ) values
   (
-    'seed_event_1', now(), now(), false,
+    'seed_event_1', now(), now(), false, false,
     'TropTix Demo Festival', 'A sample paid event seeded for preview branches.', 'Happy-path paid checkout',
     'Demo Organizer', 'seed_org_1',
     '2026-08-15 18:00:00', '2026-08-15 23:00:00',
@@ -57,7 +58,7 @@ insert into public."Events" (
     'wash', '{"dominant": "#7A1E2B", "candidates": ["#FF4757", "#FFD23F", "#7A1E2B"], "chosenAccent": null}'
   ),
   (
-    'seed_event_2', now(), now(), false,
+    'seed_event_2', now(), now(), false, false,
     'TropTix Free Community Day', 'A free RSVP event seeded for preview branches.', 'Free RSVP path',
     'Demo Organizer', 'seed_org_1',
     '2026-09-05 12:00:00', '2026-09-05 18:00:00',
@@ -65,15 +66,23 @@ insert into public."Events" (
     'dark', '{"dominant": "#131020", "candidates": ["#FF4D97", "#FFB454", "#2EE6FF"], "chosenAccent": null}'
   ),
   (
-    'seed_event_3', now(), now(), false,
+    'seed_event_3', now(), now(), false, false,
     'TropTix Edge-Case Showcase', 'Tiers in unusual states for testing the checkout UI.', 'Near-capacity, sold-out, upcoming, gated',
     'Demo Organizer', 'seed_org_1',
     '2026-09-20 19:00:00', '2026-09-21 01:00:00',
     'Demo Hall', '9 Edge Lane, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
     'off', null
+  ),
+  (
+    'seed_event_4', now(), now(), false, true,
+    'TropTix Private Preview', 'A private event: published, but only reachable by direct link (/e/seed_event_4).', 'Private — hidden from listings',
+    'Demo Organizer', 'seed_org_1',
+    '2026-10-10 20:00:00', '2026-10-11 00:00:00',
+    'Demo Loft', '7 Hidden Row, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
+    'off', null
   );
 
--- Ticket types across the three events, one row per state we want to test.
+-- Ticket types across the four events, one row per state we want to test.
 insert into public."TicketTypes" (
   id, "ticketType", "createdAt", "updatedAt", name, description,
   "maxPurchasePerUser", capacity, reserved, sold,
@@ -95,4 +104,7 @@ insert into public."TicketTypes" (
   --   upcoming: sale window opens in the future → not yet on sale
   ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', '2026-09-20 19:00:00', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   gated: non-empty discountCode → hidden until 'UNLOCK2026' is entered
-  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), '2026-09-20 19:00:00', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3');
+  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), '2026-09-20 19:00:00', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3'),
+
+  -- seed_event_4: private event still sells by direct link
+  ('seed_tt_priv',   'PAID', now(), now(), 'Invite Ticket', 'For link holders',        10, 150, 0,  0, now(), '2026-10-10 20:00:00', 35.00, 3500, 'PASS_TICKET_FEES', null, 'seed_event_4');

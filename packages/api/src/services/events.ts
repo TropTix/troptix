@@ -18,6 +18,7 @@ import type {
 } from '../contracts/events';
 import { parseStoredFlyerPalette } from '../contracts/events';
 import { calculateFeesCents } from './_shared/fees';
+import { publicEventsWhere } from './_shared/publicEvents';
 import { toEventSummary } from './_shared/eventSummary';
 import { getSaleState } from './_shared/saleState';
 import { NotFoundError } from './_shared/errors';
@@ -29,7 +30,7 @@ const SALE_STATUS = {
 } as const;
 
 /**
- * Public discovery listing: upcoming, non-draft events shaped for the cards on
+ * Public discovery listing: upcoming, non-draft, non-private events shaped for the cards on
  * `/discover`. Soonest-first. The cheapest public price is pre-derived here
  * (`fromPriceCents`) so no tier rows or discount codes reach the browser. New
  * `priceCents` column falls back to legacy `price * 100` until the backfill.
@@ -39,7 +40,7 @@ export async function listPublicEvents(
 ): Promise<EventSummary[]> {
   const events = await prisma.events.findMany({
     where: {
-      isDraft: false,
+      ...publicEventsWhere,
       endsAt: { gt: new Date() },
     },
     orderBy: { startsAt: Prisma.SortOrder.asc },
@@ -81,6 +82,7 @@ export async function getEventDetail(
       summary: true,
       imageUrl: true,
       isDraft: true,
+      isPrivate: true,
       organizer: true,
       organizerUserId: true,
       // The hosting Organization (brand) for the "Hosted by" block → /o/[slug].
@@ -178,6 +180,7 @@ export async function getEventDetail(
     summary: event.summary,
     imageUrl: event.imageUrl,
     isDraft: event.isDraft,
+    isPrivate: event.isPrivate,
     organizer: event.organizer,
     organizerUserId: event.organizerUserId,
     hostedBy: event.organization

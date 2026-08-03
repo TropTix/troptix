@@ -71,6 +71,7 @@ function fakeEvent(
     summary: 'Island brunch',
     imageUrl: 'flyer.jpg',
     isDraft: false,
+    isPrivate: false,
     organizer: 'Island Brunch Co.',
     organizerUserId: 'user-1',
     organization: overrides.organization ?? null,
@@ -260,9 +261,17 @@ function summaryRow(overrides: Partial<SummaryRow> = {}): SummaryRow {
   };
 }
 
-function fakeListPrisma(rows: SummaryRow[]): PrismaClient {
+function fakeListPrisma(
+  rows: SummaryRow[],
+  onQuery?: (args: { where?: Record<string, unknown> }) => void
+): PrismaClient {
   return {
-    events: { findMany: async () => rows },
+    events: {
+      findMany: async (args: { where?: Record<string, unknown> }) => {
+        onQuery?.(args);
+        return rows;
+      },
+    },
   } as unknown as PrismaClient;
 }
 
@@ -310,6 +319,15 @@ describe('listPublicEvents', () => {
   it('returns an empty list when there are no events', async () => {
     const prisma = fakeListPrisma([]);
     expect(await listPublicEvents(prisma)).toEqual([]);
+  });
+
+  it('queries only published, non-private events', async () => {
+    let captured: { where?: Record<string, unknown> } | undefined;
+    const prisma = fakeListPrisma([], (args) => {
+      captured = args;
+    });
+    await listPublicEvents(prisma);
+    expect(captured?.where).toMatchObject({ isDraft: false, isPrivate: false });
   });
 });
 

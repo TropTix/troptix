@@ -91,6 +91,7 @@ export const eventDetailSchema = z.object({
   /** Stored flyer path (resolved to an absolute URL by the web layer). */
   imageUrl: z.string().nullable(),
   isDraft: z.boolean(),
+  isPrivate: z.boolean(),
   organizer: z.string(),
   /** The owning user — used by the page's draft-visibility guard. */
   organizerUserId: z.string(),

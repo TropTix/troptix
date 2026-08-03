@@ -74,7 +74,7 @@ export async function updateEvent(
   actor: Actor,
   eventId: string,
   input: UpdateEventInput
-): Promise<void> {
+): Promise<{ organizationSlug: string }> {
   const data = updateEventInputSchema.parse(input);
   const organizerUserId = await resolveOrganizerScope(prisma, actor);
 
@@ -97,6 +97,8 @@ export async function updateEvent(
       ...eventFields(data),
     },
   });
+
+  return { organizationSlug: org.slug };
 }
 
 /**
@@ -130,6 +132,7 @@ function eventFields(data: UpdateEventInput) {
   return {
     name: data.name,
     description: data.description ?? '',
+    isPrivate: data.isPrivate,
     startsAt: data.startsAt,
     endsAt: data.endsAt,
     venue: data.venue,
