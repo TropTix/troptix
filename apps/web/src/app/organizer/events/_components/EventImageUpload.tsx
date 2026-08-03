@@ -126,7 +126,6 @@ export function EventImageUploader({
     if (previous) {
       try {
         await deleteEventFlyer(previous);
-        console.log('Existing image deleted from Supabase Storage.');
       } catch (deleteError: unknown) {
         console.error('Failed to delete existing image:', deleteError);
         setError(
