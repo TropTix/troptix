@@ -1,0 +1,18 @@
+{
+  "name": "@troptix/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser E2E for the checkout flow. Runs against a Vercel preview in CI (see .github/workflows/e2e.yml) or a local next dev + supabase stack.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.0",
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
+    "typescript": "^5.9.2"
+  }
+}

@@ -1,0 +1,110 @@
+name: E2E
+
+# Browser E2E for the checkout flow, run against each PR's Vercel preview
+# deploy and its Supabase preview-branch database. See
+# docs/plans/2026-08-checkout-e2e.md.
+#
+# Fires when Vercel reports a deployment via the GitHub integration. Only
+# successful Preview deploys run; every other deployment_status event reports
+# "skipped", which satisfies a required check. Caveat: if the Vercel BUILD
+# fails, no success event ever fires and a required `checkout-e2e` stays
+# "Expected" — which is correct, since the PR is unshippable anyway.
+#
+# Repo secrets required:
+#   SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF — resolve the preview branch DB
+#   E2E_STRIPE_SECRET_KEY — test-mode key, verifies the PaymentIntent
+#   VERCEL_AUTOMATION_BYPASS_SECRET — only if Deployment Protection is on
+
+on: deployment_status
+
+# Each test creates and deletes its own uniquely-id'd event, so concurrent
+# runs against the shared dev database cannot interfere — only same-SHA reruns
+# need collapsing.
+concurrency:
+  group: e2e-${{ github.event.deployment.sha }}
+  cancel-in-progress: true
+
+jobs:
+  checkout-e2e:
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      startsWith(github.event.deployment_status.environment, 'Preview')
+    runs-on: ubuntu-latest
+    env:
+      E2E_BASE_URL: ${{ github.event.deployment_status.environment_url }}
+      E2E_VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      STRIPE_SECRET_KEY: ${{ secrets.E2E_STRIPE_SECRET_KEY }}
+    steps:
+      # Test the code that was deployed, not the branch tip.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.deployment.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      # deployment_status events don't carry the branch name reliably (the
+      # deployment ref is often the SHA), so resolve it through the PR list.
+      - name: Resolve PR branch
+        id: branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch=$(gh api "repos/${{ github.repository }}/commits/${{ github.event.deployment.sha }}/pulls" --jq '.[0].head.ref // empty')
+          if [ -z "$branch" ]; then
+            echo "No PR found for ${{ github.event.deployment.sha }} — nothing to test."
+          fi
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@v1
+        if: steps.branch.outputs.name != ''
+        with:
+          version: 2.110.0
+
+      # Resolve the database the deployment actually points at. Only PRs that
+      # touch the schema get their own Supabase preview branch (named after the
+      # git branch); every other preview uses the persistent dev branch, so
+      # fall back to it. The suite creates its own per-test events there and
+      # cleans them up, so no pre-seeded fixture is required.
+      - name: Resolve database
+        if: steps.branch.outputs.name != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          resolve() {
+            supabase --experimental branches get "$1" --project-ref "$SUPABASE_PROJECT_REF" -o env 2>/dev/null \
+              | grep '^POSTGRES_PRISMA_URL=' | cut -d= -f2- | tr -d '"'
+          }
+          url=$(resolve "${{ steps.branch.outputs.name }}")
+          if [ -z "$url" ]; then
+            echo "No preview branch for '${{ steps.branch.outputs.name }}' — using the persistent dev branch."
+            url=$(resolve dev)
+          fi
+          if [ -z "$url" ]; then
+            echo "::error::Could not resolve a database (PR branch or dev)"
+            exit 1
+          fi
+          echo "::add-mask::$url"
+          echo "E2E_DATABASE_URL=$url" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        if: steps.branch.outputs.name != ''
+        run: yarn install --frozen-lockfile
+
+      - name: Install Playwright browser
+        if: steps.branch.outputs.name != ''
+        run: yarn workspace @troptix/e2e playwright install --with-deps chromium
+
+      - name: Run checkout E2E
+        if: steps.branch.outputs.name != ''
+        run: yarn workspace @troptix/e2e test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 14

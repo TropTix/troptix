@@ -7,7 +7,7 @@
     "test": "yarn workspace web test",
     "next": "yarn --cwd apps/web dev",
     "dev": "npm-run-all --parallel next",
-    "typecheck": "yarn workspace web typecheck && yarn workspace @troptix/db typecheck && yarn workspace @troptix/api typecheck && yarn workspace @troptix/transactional typecheck",
+    "typecheck": "yarn workspace web typecheck && yarn workspace @troptix/db typecheck && yarn workspace @troptix/api typecheck && yarn workspace @troptix/transactional typecheck && yarn workspace @troptix/e2e typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"
@@ -17,7 +17,8 @@
   },
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "e2e"
   ],
   "keywords": [],
   "author": "",

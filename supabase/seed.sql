@@ -1,9 +1,18 @@
--- Seed fixture for FRESH preview branches (per-PR, schema-change DBs).
+-- Seed fixture for FRESH preview branches (per-PR, schema-change DBs) — and
+-- the E2E fixture for every environment.
 --
 -- This is intentionally small + synthetic. Real dev data lives in the persistent
 -- dev branch, loaded once via a pg_dump/pg_restore from the dev DB (see
 -- docs/adr/0006-hosted-branching-persistent-dev-branch.md) — NOT here.
 -- Keep this file free of any production PII; it is committed and runs on every branch.
+--
+-- Every insert is idempotent (ON CONFLICT), so the file is safe to re-apply
+-- to a database that already has it (e.g. refreshing the demo events on the
+-- persistent dev branch after their dates go stale). On conflict the upserts
+-- refresh dates and restore each tier's intended AVAILABILITY
+-- (excluded.capacity - excluded.sold) on top of the live sold/reserved
+-- counters, which are never touched. The checkout E2E suite (e2e/) does NOT
+-- depend on these rows — it creates and deletes its own per-test events.
 --
 -- It seeds a spread of event/tier STATES so a reviewer can exercise the whole
 -- checkout UI on the PR's preview deploy without hand-editing rows:
@@ -24,11 +33,13 @@
 
 -- Demo organizer
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
-values ('seed_org_1', now(), now(), 'demo-organizer@troptix.test', 'Demo Organizer', 'Demo', 'Organizer', 'ORGANIZER');
+values ('seed_org_1', now(), now(), 'demo-organizer@troptix.test', 'Demo Organizer', 'Demo', 'Organizer', 'ORGANIZER')
+on conflict (id) do nothing;
 
 -- Platform Owner grant so preview branches can exercise Platform View/View-as.
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", "isPlatformOwner")
-values ('seed_staff_1', now(), now(), 'demo-staff@troptix.test', 'Demo Staff', 'Demo', 'Staff', true);
+values ('seed_staff_1', now(), now(), 'demo-staff@troptix.test', 'Demo Staff', 'Demo', 'Staff', true)
+on conflict (id) do nothing;
 
 -- Demo organizer's Organization (brand). Approved for paid ticketing to match
 -- the paid festival below (seed_event_1); not verified.
@@ -38,10 +49,14 @@ insert into public."Organization" (
 ) values (
   'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer', 'seed_org_1',
   false, true
-);
+)
+on conflict (id) do update set "paidTicketingEnabled" = excluded."paidTicketingEnabled", "updatedAt" = now();
 
 -- Published events, owned by the demo organizer. `startsAt`/`endsAt` are full
--- timestamps — the only date columns Events has (ADR 0020).
+-- timestamps — the only date columns Events has (ADR 0020). All dates are
+-- now()-relative: a past `startsAt` flips the page to "No longer on sale" and
+-- silently kills checkout (and the E2E suite in e2e/) on any branch seeded
+-- from an older commit. Never seed absolute dates.
 insert into public."Events" (
   id, "createdAt", "updatedAt", "isDraft", name, description, summary,
   organizer, "organizerUserId", "startsAt", "endsAt",
@@ -52,7 +67,7 @@ insert into public."Events" (
     'seed_event_1', now(), now(), false,
     'TropTix Demo Festival', 'A sample paid event seeded for preview branches.', 'Happy-path paid checkout',
     'Demo Organizer', 'seed_org_1',
-    '2026-08-15 18:00:00', '2026-08-15 23:00:00',
+    now() + interval '60 days', now() + interval '60 days 5 hours',
     'Demo Arena', '123 Demo Street, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
     'wash', '{"dominant": "#7A1E2B", "candidates": ["#FF4757", "#FFD23F", "#7A1E2B"], "chosenAccent": null}'
   ),
@@ -60,7 +75,7 @@ insert into public."Events" (
     'seed_event_2', now(), now(), false,
     'TropTix Free Community Day', 'A free RSVP event seeded for preview branches.', 'Free RSVP path',
     'Demo Organizer', 'seed_org_1',
-    '2026-09-05 12:00:00', '2026-09-05 18:00:00',
+    now() + interval '75 days', now() + interval '75 days 6 hours',
     'Demo Park', '45 Community Ave, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
     'dark', '{"dominant": "#131020", "candidates": ["#FF4D97", "#FFB454", "#2EE6FF"], "chosenAccent": null}'
   ),
@@ -68,10 +83,15 @@ insert into public."Events" (
     'seed_event_3', now(), now(), false,
     'TropTix Edge-Case Showcase', 'Tiers in unusual states for testing the checkout UI.', 'Near-capacity, sold-out, upcoming, gated',
     'Demo Organizer', 'seed_org_1',
-    '2026-09-20 19:00:00', '2026-09-21 01:00:00',
+    now() + interval '90 days', now() + interval '90 days 6 hours',
     'Demo Hall', '9 Edge Lane, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
     'off', null
-  );
+  )
+on conflict (id) do update set
+  "startsAt" = excluded."startsAt",
+  "endsAt" = excluded."endsAt",
+  "isDraft" = excluded."isDraft",
+  "updatedAt" = now();
 
 -- Ticket types across the three events, one row per state we want to test.
 insert into public."TicketTypes" (
@@ -81,18 +101,33 @@ insert into public."TicketTypes" (
   price, "priceCents", "ticketingFees", "discountCode", "eventId"
 ) values
   -- seed_event_1: happy-path paid tiers, on sale now, plenty available
-  ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 0, now(), '2026-08-15 18:00:00', 25.00, 2500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
-  ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks',  4,  50, 0, 0, now(), '2026-08-15 18:00:00', 75.00, 7500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
+  ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 0, now(), now() + interval '60 days', 25.00, 2500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
+  ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks',  4,  50, 0, 0, now(), now() + interval '60 days', 75.00, 7500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
 
   -- seed_event_2: free RSVP tier, on sale now, organizer absorbs fees
-  ('seed_tt_rsvp', 'FREE', now(), now(), 'Free RSVP', 'Reserve a free spot',          6, 300, 0, 0, now(), '2026-09-05 12:00:00', 0.00, 0, 'ABSORB_TICKET_FEES', null, 'seed_event_2'),
+  ('seed_tt_rsvp', 'FREE', now(), now(), 'Free RSVP', 'Reserve a free spot',          6, 300, 0, 0, now(), now() + interval '75 days', 0.00, 0, 'ABSORB_TICKET_FEES', null, 'seed_event_2'),
 
   -- seed_event_3: edge-case tiers
   --   near-capacity: capacity - reserved - sold = 2  → "Only 2 left"
-  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity tier',      10, 100, 0, 98, now(), '2026-09-20 19:00:00', 30.00, 3000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity tier',      10, 100, 0, 98, now(), now() + interval '90 days', 30.00, 3000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   sold-out: capacity == sold → availability 0
-  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold tier',          4,  50, 0, 50, now(), '2026-09-20 19:00:00', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold tier',          4,  50, 0, 50, now(), now() + interval '90 days', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   upcoming: sale window opens in the future → not yet on sale
-  ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', '2026-09-20 19:00:00', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', now() + interval '90 days', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   gated: non-empty discountCode → hidden until 'UNLOCK2026' is entered
-  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), '2026-09-20 19:00:00', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3');
+  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), now() + interval '90 days', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3')
+-- Live counters (sold/reserved) are never overwritten. Capacity is rebuilt as
+-- live counters + the tier's intended availability, so "Almost Gone" always
+-- has 2 left, "Sold Out" stays at 0, and the purchasable tiers never run dry
+-- no matter how many E2E orders have accumulated.
+on conflict (id) do update set
+  capacity = public."TicketTypes".sold + public."TicketTypes".reserved
+             + (excluded.capacity - excluded.sold),
+  "maxPurchasePerUser" = excluded."maxPurchasePerUser",
+  "saleStartsAt" = excluded."saleStartsAt",
+  "saleEndsAt" = excluded."saleEndsAt",
+  price = excluded.price,
+  "priceCents" = excluded."priceCents",
+  "ticketingFees" = excluded."ticketingFees",
+  "discountCode" = excluded."discountCode",
+  "updatedAt" = now();

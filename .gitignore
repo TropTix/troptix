@@ -30,3 +30,7 @@ docs/web-codebase-audit-and-plan.md
 docs/technical-roadmap.md
 
 .claude/worktrees/
+
+# Playwright (e2e workspace)
+e2e/test-results/
+e2e/playwright-report/
