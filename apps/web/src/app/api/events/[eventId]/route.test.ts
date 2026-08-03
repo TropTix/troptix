@@ -5,13 +5,13 @@
 // not jsdom.
 jest.mock('@/server/prisma', () => ({
   __esModule: true,
-  default: { events: { findFirst: jest.fn() } },
+  default: { events: { findUnique: jest.fn() } },
 }));
 
 import prisma from '@/server/prisma';
 import { GET } from './route';
 
-const mockFindFirst = prisma.events.findFirst as jest.Mock;
+const mockFindUnique = prisma.events.findUnique as jest.Mock;
 
 const req = () => ({}) as any;
 const props = (eventId?: string) => ({
@@ -32,7 +32,7 @@ describe('GET /api/events/[eventId]', () => {
       organizer: 'Acme',
       address: '123 Main St',
     };
-    mockFindFirst.mockResolvedValue(event);
+    mockFindUnique.mockResolvedValue(event);
 
     const res = await GET(req(), props('e1'));
     const body = await res.json();
@@ -44,18 +44,18 @@ describe('GET /api/events/[eventId]', () => {
   // Asserts the query asks for the filters, not that a draft is excluded — the
   // database enforces that, so it needs a db-backed test to cover for real.
   it('queries with the draft and soft-delete filters', async () => {
-    mockFindFirst.mockResolvedValue(null);
+    mockFindUnique.mockResolvedValue(null);
 
     await GET(req(), props('e1'));
 
-    expect(mockFindFirst.mock.calls[0][0].where).toMatchObject({
+    expect(mockFindUnique.mock.calls[0][0].where).toMatchObject({
       isDraft: false,
       deletedAt: null,
     });
   });
 
   it('returns 404 for an unknown id', async () => {
-    mockFindFirst.mockResolvedValue(null);
+    mockFindUnique.mockResolvedValue(null);
 
     const res = await GET(req(), props('does-not-exist'));
 
@@ -66,6 +66,6 @@ describe('GET /api/events/[eventId]', () => {
     const res = await GET(req(), props(''));
 
     expect(res.status).toBe(400);
-    expect(mockFindFirst).not.toHaveBeenCalled();
+    expect(mockFindUnique).not.toHaveBeenCalled();
   });
 });
