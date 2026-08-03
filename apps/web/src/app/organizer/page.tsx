@@ -203,9 +203,10 @@ function ActiveEventCard({ event }: { event: OrganizerEventSummary }) {
               <p className="truncate font-medium" title={event.name}>
                 {event.name}
               </p>
-              <Badge variant="outline" className="shrink-0">
-                {event.status}
-              </Badge>
+              <div className="flex shrink-0 gap-1">
+                {event.isPrivate && <Badge variant="secondary">Private</Badge>}
+                <Badge variant="outline">{event.status}</Badge>
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">
               {getDateFormatter(new Date(event.startsAt), 'MMM d, yyyy')}

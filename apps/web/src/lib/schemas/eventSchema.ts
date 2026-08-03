@@ -37,6 +37,7 @@ export const eventFormSchema = z
     // Page treatment + palette extracted at upload (see @/lib/flyerTheme).
     pageTheme: eventPageThemeSchema.optional(),
     flyerPalette: flyerPaletteSchema.nullable().optional(),
+    isPrivate: z.boolean(),
   })
   // Strictly after — must match the service's createEventInputSchema, or input
   // that passes here dies deeper in the stack with a generic error.

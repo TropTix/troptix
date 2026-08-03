@@ -166,11 +166,17 @@ describe('getOrganizationBySlug', () => {
     };
   }
 
-  const fakePrisma = (events: unknown[] | null) =>
+  const fakePrisma = (
+    events: unknown[] | null,
+    onQuery?: (args: {
+      select?: { events?: { where?: Record<string, unknown> } };
+    }) => void
+  ) =>
     ({
       organization: {
-        findUnique: async ({ where }: any) =>
-          events === null || where.slug !== 'island-vibes'
+        findUnique: async ({ where, ...args }: any) => {
+          onQuery?.(args);
+          return events === null || where.slug !== 'island-vibes'
             ? null
             : {
                 slug: 'island-vibes',
@@ -183,7 +189,8 @@ describe('getOrganizationBySlug', () => {
                 linkedin: null,
                 verified: true,
                 events,
-              },
+              };
+        },
       },
     }) as unknown as PrismaClient;
 
@@ -218,6 +225,20 @@ describe('getOrganizationBySlug', () => {
     ]);
     expect(result.upcomingEvents[0].fromPriceCents).toBe(2500);
     expect(result.upcomingEvents[1].fromPriceCents).toBeNull();
+  });
+
+  it('queries only published, non-private events', async () => {
+    let captured:
+      | { select?: { events?: { where?: Record<string, unknown> } } }
+      | undefined;
+    const prisma = fakePrisma([], (args) => {
+      captured = args;
+    });
+    await getOrganizationBySlug(prisma, { slug: 'island-vibes' });
+    expect(captured?.select?.events?.where).toEqual({
+      isDraft: false,
+      isPrivate: false,
+    });
   });
 });
 

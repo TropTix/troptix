@@ -66,6 +66,7 @@ export const organizerEventSummarySchema = z.object({
   sold: z.number().int(),
   capacity: z.number().int(),
   status: eventStatusSchema,
+  isPrivate: z.boolean(),
 });
 export type OrganizerEventSummary = z.infer<typeof organizerEventSummarySchema>;
 
@@ -286,6 +287,7 @@ export type TicketTypeInput = z.infer<typeof ticketTypeInputSchema>;
 const eventFieldsSchema = z.object({
   name: z.string().min(3),
   description: z.string().optional(),
+  isPrivate: z.boolean().optional(),
   startsAt: z.date(),
   endsAt: z.date(),
   venue: z.string().min(1),

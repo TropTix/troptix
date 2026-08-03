@@ -21,6 +21,7 @@ import {
 } from '@/lib/schemas/ticketSchema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { AddTicketTypeDrawer } from '../_components/AddTicketTypeDrawer';
 import { DateTimeRangeFields } from '@/components/DateTimeField';
@@ -123,6 +124,7 @@ function defaultEventValues(): EventFormValues {
     imageUrl: null,
     pageTheme: 'off',
     flyerPalette: null,
+    isPrivate: false,
   };
 }
 
@@ -581,6 +583,31 @@ export default function EventForm({
                         </FormControl>
 
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="isPrivate"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-3 space-y-0 rounded-md border px-3 py-3">
+                        <div className="flex-1 space-y-1">
+                          <FormLabel>Private event</FormLabel>
+                          <FormDescription>
+                            Hidden from Discover and your organization page.
+                            Anyone with the link can still view it and get
+                            tickets.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={isPending}
+                            aria-label="Private event"
+                          />
+                        </FormControl>
                       </FormItem>
                     )}
                   />

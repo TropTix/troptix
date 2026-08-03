@@ -14,6 +14,7 @@ import type {
   OrganizationDetailInput,
 } from '../contracts/organizations';
 import { generateUniqueSlug, isValidSlug } from './_shared/slug';
+import { publicEventsWhere } from './_shared/publicEvents';
 import { toEventSummary } from './_shared/eventSummary';
 import { NotFoundError } from './_shared/errors';
 
@@ -164,7 +165,8 @@ export async function updateOrganizationProfile(
 /**
  * The public organization page read (/o/[slug]): brand header + the org's
  * published events, split into upcoming (soonest first) and past (most-recent
- * first). No authorization (ADR 0013) — always public; drafts are never included.
+ * first). No authorization (ADR 0013) — always public; drafts and private
+ * events are never included.
  */
 export async function getOrganizationBySlug(
   prisma: PrismaClient,
@@ -183,7 +185,7 @@ export async function getOrganizationBySlug(
       linkedin: true,
       verified: true,
       events: {
-        where: { isDraft: false },
+        where: publicEventsWhere,
         orderBy: { startsAt: 'asc' },
         select: {
           id: true,

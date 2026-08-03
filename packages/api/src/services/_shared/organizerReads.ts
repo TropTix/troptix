@@ -23,6 +23,7 @@ export const eventCardSelect = {
   name: true,
   imageUrl: true,
   isDraft: true,
+  isPrivate: true,
   startsAt: true,
   endsAt: true,
   ticketTypes: { select: { capacity: true } },
@@ -48,6 +49,7 @@ export function toEventSummary(
       0
     ),
     status: getEventStatus(event, now),
+    isPrivate: event.isPrivate,
   };
 }
 

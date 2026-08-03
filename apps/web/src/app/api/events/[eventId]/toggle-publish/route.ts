@@ -4,6 +4,7 @@ import {
 } from '@/lib/validations/publishValidation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
+import { revalidateEventPublicPages } from '@/server/revalidateEventPages';
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 
@@ -95,12 +96,7 @@ export async function PATCH(
     });
 
     revalidatePath(`/organizer/events/${eventId}`);
-    revalidatePath(`/e/${eventId}`);
-    revalidatePath('/discover');
-    // Publishing/unpublishing changes the org's public event list.
-    if (event.organization?.slug) {
-      revalidatePath(`/o/${event.organization.slug}`);
-    }
+    revalidateEventPublicPages(eventId, event.organization?.slug);
 
     return NextResponse.json(
       {

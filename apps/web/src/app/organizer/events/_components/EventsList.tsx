@@ -106,9 +106,12 @@ function EventCard({ event }: { event: OrganizerEventSummary }) {
             <h3 className="font-semibold leading-tight" title={event.name}>
               {event.name}
             </h3>
-            <Badge variant={STATUS_VARIANT[event.status]} className="shrink-0">
-              {event.status}
-            </Badge>
+            <div className="flex shrink-0 gap-1">
+              {event.isPrivate && <Badge variant="secondary">Private</Badge>}
+              <Badge variant={STATUS_VARIANT[event.status]}>
+                {event.status}
+              </Badge>
+            </div>
           </div>
 
           <p className="text-sm text-muted-foreground">

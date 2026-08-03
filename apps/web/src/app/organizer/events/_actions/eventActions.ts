@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import prisma from '@/server/prisma';
+import { revalidateEventPublicPages } from '@/server/revalidateEventPages';
 import { eventFormSchema, EventFormValues } from '@/lib/schemas/eventSchema';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
@@ -91,7 +92,7 @@ export async function updateEvent(
 
   try {
     // Event fields only — ticket-type editing is Screen E's seam (#465).
-    await updateEventService(
+    const { organizationSlug } = await updateEventService(
       prisma,
       userToActor(user),
       eventId,
@@ -100,10 +101,7 @@ export async function updateEvent(
 
     revalidatePath('/organizer/events');
     revalidatePath(`/organizer/events/${eventId}`);
-    // Public listing is ISR-cached (revalidate = 86400) — bust it on edit so
-    // organizer changes aren't stale for up to 24h.
-    revalidatePath('/discover');
-    revalidatePath(`/e/${eventId}`);
+    revalidateEventPublicPages(eventId, organizationSlug);
 
     return { success: true, eventId };
   } catch (error) {
@@ -126,6 +124,7 @@ function toEventFields(data: EventFormValues) {
     imageUrl: data.imageUrl,
     pageTheme: data.pageTheme,
     flyerPalette: data.flyerPalette,
+    isPrivate: data.isPrivate,
   };
 }
 
