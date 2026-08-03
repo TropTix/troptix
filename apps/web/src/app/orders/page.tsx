@@ -38,7 +38,6 @@ type UserOrder = {
 async function fetchUserOrders(): Promise<UserOrder[]> {
   const user = await getUserFromIdTokenCookie();
   if (!user?.email) {
-    console.log('User not found or user ID missing for fetching orders.');
     return [];
   }
 

@@ -52,7 +52,6 @@ export function EventManagementNav({
 
         if (response.status === 400 && data.validationErrors) {
           const requirements = data.missingRequirements || [];
-          console.log('requirements', requirements);
           const errorMessage =
             requirements.length > 0
               ? `Missing requirements: ${requirements.slice(0, 3).join(', ')}${requirements.length > 3 ? '...' : ''}`
