@@ -2,6 +2,18 @@ import { NextResponse } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 
+// Parse, then compare origins. A string check like startsWith('/') misses the
+// shapes a URL parser folds into the authority component.
+function resolveNext(next: string | null, origin: string): string {
+  if (!next) return `${origin}/`;
+  try {
+    const target = new URL(next, origin);
+    return target.origin === origin ? target.toString() : `${origin}/`;
+  } catch {
+    return `${origin}/`;
+  }
+}
+
 /**
  * Auth callback for both OAuth (Google) and email magic-links. Handles either
  * shape the provider/email template sends:
@@ -34,7 +46,9 @@ export async function GET(request: Request) {
   }
 
   if (!failed) {
-    return NextResponse.redirect(`${origin}${next}`);
+    return NextResponse.redirect(resolveNext(next, origin));
   }
-  return NextResponse.redirect(`${origin}/auth/signin?error=auth`);
+  return NextResponse.redirect(
+    new URL('/auth/signin?error=auth', origin).toString()
+  );
 }
