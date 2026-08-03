@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 
-/**
- * Resolve the post-auth destination. Parsing against `origin` and then comparing
- * the parsed origin is what makes this safe — string checks on the raw value
- * miss shapes the URL parser folds into the authority component.
- */
+// Parse, then compare origins. A string check like startsWith('/') misses the
+// shapes a URL parser folds into the authority component.
 function resolveNext(next: string | null, origin: string): string {
   if (!next) return `${origin}/`;
   try {
