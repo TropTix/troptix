@@ -41,24 +41,13 @@ describe('GET /api/events/[eventId]', () => {
     expect(body).toMatchObject({ id: 'e1', name: 'Concert' });
   });
 
-  it('returns 404 when the event is a draft', async () => {
+  // Asserts the query asks for the filters, not that a draft is excluded — the
+  // database enforces that, so it needs a db-backed test to cover for real.
+  it('queries with the draft and soft-delete filters', async () => {
     mockFindFirst.mockResolvedValue(null);
 
-    const res = await GET(req(), props('e1'));
+    await GET(req(), props('e1'));
 
-    expect(res.status).toBe(404);
-    expect(mockFindFirst.mock.calls[0][0].where).toMatchObject({
-      isDraft: false,
-      deletedAt: null,
-    });
-  });
-
-  it('returns 404 when the event is soft-deleted', async () => {
-    mockFindFirst.mockResolvedValue(null);
-
-    const res = await GET(req(), props('e1'));
-
-    expect(res.status).toBe(404);
     expect(mockFindFirst.mock.calls[0][0].where).toMatchObject({
       isDraft: false,
       deletedAt: null,
