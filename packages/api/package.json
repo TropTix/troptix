@@ -10,6 +10,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./analytics": {
+      "types": "./src/contracts/analytics.ts",
+      "default": "./src/contracts/analytics.ts"
+    },
     "./server": {
       "types": "./src/server.ts",
       "default": "./src/server.ts"

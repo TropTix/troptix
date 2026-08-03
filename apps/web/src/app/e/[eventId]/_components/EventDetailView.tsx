@@ -13,6 +13,8 @@ import {
   ArrowRight,
   BadgeCheck,
 } from 'lucide-react';
+import { usePostHog } from 'posthog-js/react';
+import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { priceLabelFor, cn } from '@/lib/utils';
@@ -139,6 +141,7 @@ export default function EventDetailView({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const posthog = usePostHog();
   const resumeReservationId = searchParams?.get('reservation') ?? null;
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
@@ -364,7 +367,13 @@ export default function EventDetailView({
           <button
             type="button"
             disabled={eventEnded}
-            onClick={() => setSheetOpen(true)}
+            onClick={() => {
+              posthog.capture(ANALYTICS_EVENTS.checkoutOpened, {
+                event_id: event.id,
+                has_paid_tickets: hasPaidTickets,
+              });
+              setSheetOpen(true);
+            }}
             className="flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
           >
             {eventEnded

@@ -16,6 +16,10 @@ import {
   getCheckoutState,
   sweepExpiredHolds,
 } from './payments';
+import type {
+  CheckoutAnalytics,
+  OrderCompletedProps,
+} from '../contracts/analytics';
 
 const TEST_EVENT_ID = `test-pay-${generateId()}`;
 // Events.organizationId is NOT NULL (ADR 0022) — the fixture needs the full
@@ -586,5 +590,79 @@ describe('sweepExpiredHolds — cancel-then-release', () => {
     expect(res?.status).toBe(ReservationStatus.EXPIRED);
     // No session on this hold → it was not passed to sessions.expire.
     expect(fake.calls.expire).not.toContain(reservationId);
+  });
+});
+
+describe('confirmPaid — order_completed capture', () => {
+  it('captures exactly once with the stored browser identity', async () => {
+    const tt = await makeTicketType(5);
+    const r = await reserve(prisma, {
+      eventId: TEST_EVENT_ID,
+      items: [
+        {
+          ticketTypeId: tt.id,
+          quantity: 2,
+          unitPriceCents: 1000,
+          feesCents: 200,
+        },
+      ],
+      analytics: { distinctId: 'ph-distinct', sessionId: 'ph-session' },
+    });
+    const pi = `pi_test_${generateId()}`;
+    const fake = fakeStripe();
+    const captured: OrderCompletedProps[] = [];
+    const analytics: CheckoutAnalytics = {
+      orderCompleted: (props) => {
+        captured.push(props);
+      },
+    };
+
+    const first = await confirmPaid(
+      prisma,
+      fake.stripe,
+      { reservationId: r.reservationId, paymentIntentId: pi },
+      analytics
+    );
+    expect(first.kind).toBe('order');
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatchObject({
+      reservationId: r.reservationId,
+      eventId: TEST_EVENT_ID,
+      orderType: 'PAID',
+      totalCents: 2400,
+      subtotalCents: 2000,
+      feesCents: 400,
+      ticketCount: 2,
+      distinctId: 'ph-distinct',
+      sessionId: 'ph-session',
+    });
+
+    // Redelivery (webhook retry / racing poll): already converted → no recount.
+    const second = await confirmPaid(
+      prisma,
+      fake.stripe,
+      { reservationId: r.reservationId, paymentIntentId: pi },
+      analytics
+    );
+    expect(second.kind).toBe('order');
+    expect(captured).toHaveLength(1);
+  });
+
+  it('never fails the checkout when the capture throws', async () => {
+    const tt = await makeTicketType(1);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+    const analytics: CheckoutAnalytics = {
+      orderCompleted: () => {
+        throw new Error('analytics down');
+      },
+    };
+
+    const state = await confirmPaid(
+      prisma,
+      fakeStripe().stripe,
+      { reservationId, paymentIntentId: `pi_test_${generateId()}` },
+      analytics
+    );
+    expect(state.kind).toBe('order');
   });
 });

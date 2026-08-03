@@ -3,6 +3,7 @@ import type Stripe from 'stripe';
 import { confirmPaid } from '@troptix/api/server';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
+import { serverAnalytics } from '@/server/lib/analytics';
 import {
   sendEmailConfirmationEmailToUser,
   sendRefundNoticeEmail,
@@ -96,10 +97,12 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
         return;
       }
 
-      const state = await confirmPaid(prisma, stripe, {
-        reservationId,
-        paymentIntentId,
-      });
+      const state = await confirmPaid(
+        prisma,
+        stripe,
+        { reservationId, paymentIntentId },
+        serverAnalytics()
+      );
       if (state.kind === 'order') {
         // Resend dedupes on `confirmation-${orderId}`, so this is safe to send
         // here even though the client may also fire it on the success screen.

@@ -388,6 +388,12 @@ model Reservation {
   firstName String?
   lastName  String?
 
+  // Buyer's PostHog browser identity, captured at hold time so the server-side
+  // conversion event (webhook-fulfilled) joins the same person and session
+  // replay. Nullable — the buyer may block analytics.
+  posthogDistinctId String?
+  posthogSessionId  String?
+
   totalCents    Int @default(0)
   subtotalCents Int @default(0)
   feesCents     Int @default(0)

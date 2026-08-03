@@ -33,6 +33,8 @@ export {
   type SweepResult,
 } from './services/payments';
 
+export { captureOrderCompleted } from './services/reservations';
+
 export { getCheckoutConfig, applyCode } from './services/checkout';
 export { getEventDetail, listPublicEvents } from './services/events';
 export { getDashboard } from './services/organizer-dashboard';

@@ -10,12 +10,18 @@
 import { ReservationStatus } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
-import { HOLD_TTL_MINUTES, expireHold, settle } from './reservations';
+import {
+  HOLD_TTL_MINUTES,
+  captureOrderCompleted,
+  expireHold,
+  settle,
+} from './reservations';
 import { NotFoundError } from './_shared/errors';
 import type {
   BeginPaymentResponse,
   CheckoutState,
 } from '../contracts/payments';
+import type { CheckoutAnalytics } from '../contracts/analytics';
 
 async function orderCheckoutState(
   prisma: PrismaClient,
@@ -198,7 +204,8 @@ export async function confirmPaid(
     paymentIntentId: string;
     cardType?: string | null;
     cardLast4?: string | null;
-  }
+  },
+  analytics?: CheckoutAnalytics
 ): Promise<CheckoutState> {
   const result = await settle(prisma, {
     reservationId: input.reservationId,
@@ -208,6 +215,16 @@ export async function confirmPaid(
   });
 
   if (result.kind === 'converted') {
+    // `alreadyProcessed` gates the capture to the first converter, so webhook
+    // retries and racing polls can't double-count the conversion.
+    if (!result.alreadyProcessed && analytics) {
+      await captureOrderCompleted(
+        prisma,
+        analytics,
+        input.reservationId,
+        result.orderId
+      );
+    }
     return orderCheckoutState(prisma, result.orderId);
   }
   if (result.kind === 'already_refunded') {
@@ -235,7 +252,8 @@ export async function confirmPaid(
 export async function getCheckoutState(
   prisma: PrismaClient,
   stripe: Stripe,
-  input: { reservationId: string }
+  input: { reservationId: string },
+  analytics?: CheckoutAnalytics
 ): Promise<CheckoutState> {
   const reservation = await prisma.reservation.findUnique({
     where: { id: input.reservationId },
@@ -280,10 +298,12 @@ export async function getCheckoutState(
           ? session.payment_intent
           : session.payment_intent?.id;
       if (paymentIntentId) {
-        return confirmPaid(prisma, stripe, {
-          reservationId: reservation.id,
-          paymentIntentId,
-        });
+        return confirmPaid(
+          prisma,
+          stripe,
+          { reservationId: reservation.id, paymentIntentId },
+          analytics
+        );
       }
     }
   }

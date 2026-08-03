@@ -4,6 +4,7 @@ import type { Actor } from '@troptix/api/server';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
+import { serverAnalytics } from '@/server/lib/analytics';
 import { getAppBaseUrl } from '@/lib/appUrl';
 
 /**
@@ -41,7 +42,13 @@ async function handler(req: Request) {
     req,
     router: appRouter,
     createContext: () =>
-      createContext({ prisma, actor, stripe, siteUrl: getAppBaseUrl() }),
+      createContext({
+        prisma,
+        actor,
+        stripe,
+        siteUrl: getAppBaseUrl(),
+        analytics: serverAnalytics(),
+      }),
   });
 }
 
