@@ -41,10 +41,15 @@ async function fetchUserOrders(): Promise<UserOrder[]> {
     return [];
   }
 
+  // mode:'insensitive' compiles to ILIKE, which Prisma does not escape — an
+  // unescaped `_` in an address matches any character and would surface another
+  // buyer's orders.
+  const email = user.email.replace(/[\\%_]/g, '\\$&');
+
   try {
     const userOrders = await prisma.orders.findMany({
       where: {
-        email: user.email,
+        email: { equals: email, mode: 'insensitive' },
         status: 'COMPLETED',
       },
       select: {
