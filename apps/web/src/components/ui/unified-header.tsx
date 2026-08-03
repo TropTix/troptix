@@ -55,11 +55,10 @@ export default function UnifiedHeader() {
       setHasScrolled(window.scrollY > 10);
     };
     window.addEventListener('scroll', handleScroll);
-    handleScroll(); // Check on mount
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Don't render the header on authentication pages
   if (pathname?.startsWith('/auth')) {
     return null;
   }
@@ -68,7 +67,6 @@ export default function UnifiedHeader() {
   // The explicit grant from /api/user/me — display only; the server enforces.
   const userIsPlatformOwner = user?.isPlatformOwner ?? false;
 
-  // Organizer-specific navigation, shown contextually
   const organizerNavItems = [
     { label: 'Dashboard', href: '/organizer', icon: Home },
     { label: 'My Events', href: '/organizer/events', icon: Calendar },

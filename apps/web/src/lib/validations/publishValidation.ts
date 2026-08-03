@@ -37,7 +37,6 @@ export function validateEventForPublish(
   const errors: PublishValidationError[] = [];
   const missingRequirements: string[] = [];
 
-  // Basic Event Information Validation
   if (!event.name || event.name.trim().length < 3) {
     errors.push({
       field: 'name',
@@ -92,7 +91,6 @@ export function validateEventForPublish(
     missingRequirements.push('Event image');
   }
 
-  // Date and Timing Validation
   if (!event.startsAt) {
     errors.push({
       field: 'startsAt',
@@ -132,7 +130,6 @@ export function validateEventForPublish(
     }
   }
 
-  // Ticket Types Validation
   if (!event.ticketTypes || event.ticketTypes.length === 0) {
     errors.push({
       field: 'ticketTypes',

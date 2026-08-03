@@ -65,9 +65,7 @@ function MetaRow({
   );
 }
 
-// The "Hosted by" / "Presented by" block: organization logo + name (→ /o/[slug])
-// + verified tick + social links. Used in the desktop poster aside and the mobile
-// section. Falls back to the legacy organizer name when there's no linked brand.
+// Falls back to the legacy organizer name when there's no linked brand.
 function HostedBy({ event }: { event: EventDetail }) {
   if (!event.hostedBy) {
     return <p className="mt-3 font-semibold">{event.organizer}</p>;
@@ -99,8 +97,6 @@ function HostedBy({ event }: { event: EventDetail }) {
   );
 }
 
-// Compact inline variant for the top of the mobile layout: a small logo + name
-// (+ tick), no socials. Falls back to the plain organizer name.
 function HostedByInline({ event }: { event: EventDetail }) {
   if (!event.hostedBy) {
     return (
@@ -218,7 +214,6 @@ export default function EventDetailView({
       )}
 
       <main className="min-h-screen bg-background pb-32 text-foreground">
-        {/* Mobile: immersive poster hero with floating controls + date chip. */}
         <div className="px-4 pt-3 md:hidden">
           <div className="relative aspect-4/5 w-full overflow-hidden rounded-2xl shadow-sm">
             <Image

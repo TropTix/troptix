@@ -1,36 +1,10 @@
-/**
- * ---------------------------------------------------------
- * Dev Server + Mobile Tunnel Script (using `tsx`)
- * ---------------------------------------------------------
- *
- * This script starts your Next.js dev server and exposes it
- * to your local network (or mobile device) via an ngrok tunnel.
- * It also prints a QR code so you can scan and open the app
- * on your phone.
- *
- * 🛠 Setup Instructions:
- * 1. Install dependencies:
- *    yarn add -D tsx ngrok qrcode dotenv
- *
- * 2. Create a `.env` file in the root of your project:
- *    NGROK_AUTH_TOKEN=your_ngrok_token_here
- *
- * 3. Add this script to package.json:
- *    "scripts": {
- *      "dev": "next dev",
- *      "dev:mobile": "tsx scripts/dev-mobile.ts"
- *    }
- *
- * 4. Run with:
- *    yarn dev:mobile
- * ---------------------------------------------------------
- */
+// Requires NGROK_AUTH_TOKEN in .env; run via `yarn dev:mobile`.
 import 'dotenv/config';
 import { spawn, ChildProcess } from 'child_process';
 import ngrok from 'ngrok';
 import qrcode from 'qrcode';
 
-const TIMEOUT_MS = 30000; // 30 seconds timeout for dev server detection
+const TIMEOUT_MS = 30000;
 
 async function run() {
   console.log('🚀 Starting Next.js dev server...');
@@ -45,7 +19,6 @@ async function run() {
   let ngrokConnected = false;
   let shutdownInProgress = false;
 
-  // Timeout for dev server detection
   const timeout = setTimeout(() => {
     if (!resolved) {
       console.error(
@@ -59,7 +32,6 @@ async function run() {
     const text = data.toString();
     process.stdout.write(text);
 
-    // Detect dev server URL from stdout (more robust pattern)
     const match = text.match(/(?:Local:|http:\/\/localhost:)(\d+)/);
     if (match && !resolved) {
       clearTimeout(timeout);
@@ -131,7 +103,6 @@ async function run() {
     if (devServer && !devServer.killed) {
       devServer.kill('SIGTERM');
 
-      // Force kill after 5 seconds if it doesn't exit gracefully
       setTimeout(() => {
         if (!devServer.killed) {
           devServer.kill('SIGKILL');
@@ -142,7 +113,6 @@ async function run() {
     process.exit(0);
   }
 
-  // Handle various exit signals
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
   process.on('SIGHUP', cleanup);

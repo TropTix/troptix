@@ -179,7 +179,6 @@ export type EventOverview = z.infer<typeof eventOverviewSchema>;
 
 // --- Screen G — orders (`/organizer/events/[id]/orders`) ---
 
-/** A row in the orders list. */
 export const eventOrderRowSchema = z.object({
   id: z.string(),
   customerDisplay: z.string(),

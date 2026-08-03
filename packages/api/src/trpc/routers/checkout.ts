@@ -75,7 +75,6 @@ export const checkoutRouter = router({
     .input(releaseInputSchema)
     .mutation(({ ctx, input }) => release(ctx.prisma, input.reservationId)),
 
-  // Create/reuse the Checkout Session for a held paid reservation.
   beginPayment: publicProcedure
     .input(beginPaymentInputSchema)
     .mutation(({ ctx, input }) => {

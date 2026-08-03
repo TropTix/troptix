@@ -1,14 +1,5 @@
 import { ConfigContext, ExpoConfig } from 'expo/config';
 
-// const APP_ENVIRONMENT = process.env.APP_VARIANT;
-// let googleServicesPlist: string | undefined = './GoogleService-Info.plist';
-
-// if (APP_ENVIRONMENT === 'development') {
-//   googleServicesPlist = process.env.GOOGLE_SERVICE_INFO_IOS_DEV;
-// } else if (APP_ENVIRONMENT === 'production') {
-//   googleServicesPlist = process.env.GOOGLE_SERVICE_INFO_IOS_PROD;
-// }
-
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   owner: 'troptix',

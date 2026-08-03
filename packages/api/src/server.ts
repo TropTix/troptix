@@ -69,7 +69,6 @@ export {
   PaidTicketingNotEnabledError,
 } from './services/_shared/errors';
 
-// tRPC adapter — router value, server-side caller, and per-request context.
 export { appRouter, createCaller } from './trpc/routers';
 export type { AppRouter } from './trpc/routers';
 export { createContext } from './trpc/context';

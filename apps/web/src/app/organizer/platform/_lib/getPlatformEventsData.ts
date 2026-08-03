@@ -2,7 +2,6 @@ import prisma from '@/server/prisma';
 import type { ServerUser } from '@/server/authUser';
 import { notFound } from 'next/navigation';
 
-// Extended event data for platform admins
 export type PlatformEventData = {
   id: string;
   name: string;

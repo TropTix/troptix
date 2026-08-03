@@ -50,8 +50,7 @@ export const ORGANIZATION_LOGOS_BUCKET = 'organization-logos';
 /**
  * Resolve a stored `Organization.logoUrl` to a renderable URL — same
  * path-not-URL contract as `eventFlyerUrl` (ADR 0016), for the org-logos bucket.
- * Falsy → `null` (callers fall back to a monogram). The upload counterpart lands
- * with the logo editor; until then every logoUrl is null and this returns null.
+ * Falsy → `null` (callers fall back to a monogram).
  */
 export function organizationLogoUrl(
   value: string | null | undefined

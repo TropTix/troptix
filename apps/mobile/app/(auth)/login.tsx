@@ -157,7 +157,6 @@ export default function LoginScreen() {
                 value={code}
                 onChangeText={(v) => {
                   setCode(v);
-                  // Auto-submit when the 6th digit is entered.
                   if (v.length === 6) handleVerify(v);
                 }}
                 returnKeyType="done"
