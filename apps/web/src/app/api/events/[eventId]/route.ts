@@ -26,6 +26,8 @@ export async function GET(
       },
       where: {
         id: eventId,
+        isDraft: false,
+        deletedAt: null,
       },
     });
 
