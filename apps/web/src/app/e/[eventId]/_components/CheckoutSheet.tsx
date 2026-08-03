@@ -97,13 +97,19 @@ export default function CheckoutSheet({
   );
 
   // Resume an in-flight checkout when opened with ?reservation= (post-payment
-  // redirect, refresh, or 3DS return).
+  // redirect, refresh, or 3DS return — all full page loads, so the target is
+  // whatever the URL held at mount). Consume-once ref rather than reacting to
+  // the live searchParam: reaching the payment step writes ?reservation= via
+  // replaceState, which Next syncs back into useSearchParams — reacting to
+  // that echo bounces the buyer payment → finalizing → payment. A consumed
+  // target also can't re-fire when the sheet reopens.
+  const resumeTargetRef = useRef(resumeReservationId ?? null);
   useEffect(() => {
-    if (open && resumeReservationId) {
-      setReservationId(resumeReservationId);
-      setStep('finalizing');
-    }
-  }, [open, resumeReservationId]);
+    if (!open || !resumeTargetRef.current) return;
+    setReservationId(resumeTargetRef.current);
+    resumeTargetRef.current = null;
+    setStep('finalizing');
+  }, [open]);
 
   // Map the polled state onto the step machine.
   useEffect(() => {
