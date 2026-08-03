@@ -13,7 +13,11 @@ jest.mock('@/server/prisma', () => ({
 
 import { createClient } from '@/lib/supabase/server';
 import prisma from '@/server/prisma';
-import { getServerUser, getUserFromIdTokenCookie } from './authUser';
+import {
+  getCurrentUserProfile,
+  getServerUser,
+  getUserFromIdTokenCookie,
+} from './authUser';
 
 const mockCreateClient = createClient as jest.Mock;
 const mockFindUnique = prisma.users.findUnique as jest.Mock;
@@ -21,6 +25,10 @@ const mockGetClaims = jest.fn();
 
 const AUTH_SUB = '11111111-1111-1111-1111-111111111111';
 const APP_USER_ID = 'app-user-1';
+
+// process.env is shared across every file in a Jest worker, so restore rather
+// than delete — same pattern as lib/supabase/storage.test.ts.
+const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -31,7 +39,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  jest.restoreAllMocks();
+  if (ORIGINAL_SUPABASE_URL === undefined) {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  } else {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = ORIGINAL_SUPABASE_URL;
+  }
 });
 
 describe('getServerUser', () => {
@@ -123,5 +136,36 @@ describe('getUserFromIdTokenCookie', () => {
     await getUserFromIdTokenCookie();
 
     expect(mockGetClaims).toHaveBeenCalledWith(undefined);
+  });
+});
+
+// The profile /api/user/me hands to the browser. Its `id` becomes user.id on the
+// client, and it resolves through its own query rather than resolveByAuthUserId.
+describe('getCurrentUserProfile', () => {
+  it('returns the profile keyed on the app Users.id, not the auth sub (ADR 0011/0015)', async () => {
+    mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });
+    mockFindUnique.mockResolvedValue({
+      id: APP_USER_ID,
+      email: 'a@example.com',
+      firstName: 'A',
+      lastName: 'B',
+      role: 'PATRON',
+      stripeId: null,
+      isPlatformOwner: false,
+    });
+
+    const profile = await getCurrentUserProfile();
+
+    expect(profile?.id).toBe(APP_USER_ID);
+    expect(profile?.id).not.toBe(AUTH_SUB);
+  });
+
+  it('returns null when the auth sub has no linked Users row', async () => {
+    mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });
+    mockFindUnique.mockResolvedValue(null);
+
+    const profile = await getCurrentUserProfile();
+
+    expect(profile).toBeNull();
   });
 });
