@@ -39,6 +39,7 @@ model Users {
   socialMediaAccounts SocialMediaAccounts[]
   reservations        Reservation[]
   organizations       Organization[]
+  memberships         Membership[]
 
   telephoneNumber String?
   billingAddress1 String?
@@ -94,8 +95,34 @@ model Organization {
   paidTicketingEnabled     Boolean   @default(false)
   paidTicketingRequestedAt DateTime?
 
-  owner  Users    @relation(fields: [ownerUserId], references: [id])
-  events Events[]
+  owner       Users        @relation(fields: [ownerUserId], references: [id])
+  events      Events[]
+  memberships Membership[]
+}
+
+// Membership roles (ADR 0024). The Owner is never a row here — the
+// `ownerUserId` scalar is the one answer to "who owns this". Scanner lands
+// with the mobile rebuild as a one-line ADD VALUE; dropping an enum value
+// needs a type rebuild, so nothing ships early.
+enum MembershipRole {
+  ADMIN
+}
+
+// An org-level grant tying a User to an Organization (ADR 0024). The role
+// covers every event the Organization owns — there are no per-event grants.
+model Membership {
+  id        String         @id @default(uuid())
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  role      MembershipRole
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  user           Users        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+
+  @@unique([organizationId, userId])
+  @@index([userId])
 }
 
 // A per-event spotlight card (DJ, artist, speaker, sponsor, collaborator): just
