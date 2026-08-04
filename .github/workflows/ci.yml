@@ -113,3 +113,46 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Run API integration tests
         run: yarn workspace @troptix/api test
+
+  # Supabase Branching's merge-time `supabase db push` (no --include-all) only
+  # applies migrations whose filenames sort above the newest already-applied
+  # one, so a migration that sorts at or below main's head is silently skipped
+  # on merge. This bit twice (e7dc6b76, #505). `yarn db:new` stamps new files
+  # correctly; this catches hand-named files and branches that went stale
+  # after generation. Always runs — it's seconds, and needs no path filter.
+  migration-order:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check new migrations sort above main's head
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          git fetch --quiet --depth=1 origin main
+          list() { git ls-tree -r --name-only "$1" -- supabase/migrations | sort; }
+          main_head=$(list origin/main | tail -n1)
+          new_files=$(comm -13 <(list origin/main) <(list HEAD))
+          if [ -z "$new_files" ]; then
+            echo "No new migrations in this PR."
+            exit 0
+          fi
+          if [ -z "$main_head" ]; then
+            echo "No migrations on main yet — nothing to sort against."
+            exit 0
+          fi
+          bad=0
+          while IFS= read -r f; do
+            if [[ "$f" > "$main_head" ]]; then
+              echo "ok: $f"
+            else
+              echo "FAIL: $f sorts at or below main's newest migration ($main_head)"
+              bad=1
+            fi
+          done <<< "$new_files"
+          if [ "$bad" -eq 1 ]; then
+            echo
+            echo "Merge-time 'supabase db push' silently skips migrations that do not"
+            echo "sort above the newest applied filename. Rename the file with a newer"
+            echo "timestamp ('yarn db:new' stamps one correctly)."
+            exit 1
+          fi
