@@ -62,6 +62,20 @@ export function organizationLogoUrl(
 }
 
 /**
+ * The bucket policies gate writes on the first path segment, so every upload is
+ * namespaced by the uploader. This is the Supabase auth id (the JWT `sub`) and
+ * never `Users.id` — ADR 0011 keeps those permanently different, and the app id
+ * yields a path no policy can match.
+ */
+async function uploadPrefix(
+  supabase: ReturnType<typeof createClient>
+): Promise<string> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error('Not signed in.');
+  return data.user.id;
+}
+
+/**
  * Upload an org logo to the `organization-logos` bucket; returns the stored PATH
  * (what goes into `Organization.logoUrl`). Governed by the bucket's authenticated
  * RLS policy — the caller must be signed in. Throws on failure.
@@ -71,7 +85,7 @@ export async function uploadOrganizationLogo(file: File): Promise<string> {
   const ext = file.name.includes('.')
     ? file.name.split('.').pop()!.toLowerCase()
     : 'bin';
-  const path = `${crypto.randomUUID()}.${ext}`;
+  const path = `${await uploadPrefix(supabase)}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(ORGANIZATION_LOGOS_BUCKET)
@@ -108,7 +122,7 @@ export async function uploadEventFlyer(file: File): Promise<string> {
   const ext = file.name.includes('.')
     ? file.name.split('.').pop()!.toLowerCase()
     : 'bin';
-  const path = `${crypto.randomUUID()}.${ext}`;
+  const path = `${await uploadPrefix(supabase)}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(EVENT_FLYERS_BUCKET)
