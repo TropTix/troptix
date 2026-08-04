@@ -130,22 +130,30 @@ jobs:
           export LC_ALL=C
           git fetch --quiet --depth=1 origin main
           list() { git ls-tree -r --name-only "$1" -- supabase/migrations | sort; }
-          main_head=$(list origin/main | tail -n1)
+          # Compare what `supabase db push` compares: the digit version prefix
+          # of <version>_<name>.sql files. Full-path comparison would pass a
+          # file whose version ties main's head, and a stray non-migration
+          # file on main would poison the baseline.
+          pattern='^supabase/migrations/[0-9]+_[^/]+\.sql$'
+          main_head=$(list origin/main | grep -E "$pattern" | tail -n1 || true)
+          main_version=${main_head##*/}; main_version=${main_version%%_*}
           new_files=$(comm -13 <(list origin/main) <(list HEAD))
           if [ -z "$new_files" ]; then
             echo "No new migrations in this PR."
             exit 0
           fi
-          if [ -z "$main_head" ]; then
-            echo "No migrations on main yet — nothing to sort against."
-            exit 0
-          fi
           bad=0
           while IFS= read -r f; do
-            if [[ "$f" > "$main_head" ]]; then
+            if [[ ! "$f" =~ $pattern ]]; then
+              echo "FAIL: $f does not match <version>_<name>.sql — 'supabase db push' would never apply it"
+              bad=1
+              continue
+            fi
+            version=${f##*/}; version=${version%%_*}
+            if [[ "$version" > "$main_version" ]]; then
               echo "ok: $f"
             else
-              echo "FAIL: $f sorts at or below main's newest migration ($main_head)"
+              echo "FAIL: $f (version $version) sorts at or below main's newest migration ($main_head)"
               bad=1
             fi
           done <<< "$new_files"
