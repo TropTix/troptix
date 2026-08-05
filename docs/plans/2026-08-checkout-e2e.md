@@ -51,7 +51,7 @@ Alternatives considered:
 | #   | Requirement                     | Spec                                                                                                                                                                                                                                                                                                                    |
 | --- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Event page loads                | `event-page.spec.ts` — a per-test paid event renders name and CTA                                                                                                                                                                                                                                                       |
-| 2   | Tickets visible                 | tier names, prices, fee labels; edge states (sold out, on sale soon, gated hidden) on a per-test edge event                                                                                                                                                                                                             |
+| 2   | Tickets visible                 | ticket type names, prices, fee labels; edge states (sold out, on sale soon, gated hidden) on a per-test edge event                                                                                                                                                                                                      |
 | 3   | Tickets selectable              | stepper add/remove, `maxPurchasePerUser` clamp, running total                                                                                                                                                                                                                                                           |
 | 4   | Paid checkout charges + records | `paid-checkout.spec.ts` — 2× GA with card `4242…`, survive the redirect, then assert in the DB: one COMPLETED/PAID order with correct cents, N VALID tickets, reservation CONVERTED, `sold` up by N, `reserved` back to baseline; then retrieve the PaymentIntent from Stripe and assert `succeeded`, amount, test mode |
 |     | Free checkout                   | `free-checkout.spec.ts` — RSVP completes inline, FREE order, no Stripe id                                                                                                                                                                                                                                               |
@@ -89,28 +89,47 @@ Event → TicketTypes` chain — the same shape and delete order as
 
 ## Setup required (GitHub repo secrets)
 
-| Secret                            | Purpose                                             |
-| --------------------------------- | --------------------------------------------------- |
-| `SUPABASE_ACCESS_TOKEN`           | resolve the preview branch DB URL                   |
-| `SUPABASE_PROJECT_REF`            | same                                                |
-| `E2E_STRIPE_SECRET_KEY`           | test-mode key; verify the PaymentIntent server-side |
-| `VERCEL_AUTOMATION_BYPASS_SECRET` | only if Deployment Protection is on for previews    |
+| Secret                  | Purpose                                             |
+| ----------------------- | --------------------------------------------------- |
+| `SUPABASE_ACCESS_TOKEN` | resolve the preview branch DB URL                   |
+| `SUPABASE_PROJECT_REF`  | same                                                |
+| `E2E_STRIPE_SECRET_KEY` | test-mode key; verify the PaymentIntent server-side |
 
-Stripe note: use a dedicated sandbox for previews/CI so automated runs never
-mix with manual test data. Stripe's docs warn that its hosted surfaces resist
-automation; the embedded Payment Element on our own domain works with
+Deployment Protection is off for previews (checked 2026-08-05), so no bypass
+secret is needed; the workflow still honors `VERCEL_AUTOMATION_BYPASS_SECRET`
+if protection is ever turned on.
+
+Stripe: one shared test key across dev, previews, and CI (decided 2026-08-05
+— the separation a dedicated sandbox buys isn't worth previews diverging from
+dev for a one-person team). Test PaymentIntents are identifiable by their
+`e2e-` reservation metadata. Stripe's docs warn that its hosted surfaces
+resist automation; the embedded Payment Element on our own domain works with
 `frameLocator`, but treat it as the suite's flake budget and keep the paid
 spec singular.
 
+Test-run side effects, decided 2026-08-05:
+
+- Order emails go to `delivered@resend.dev` (Resend's test inbox) so runs
+  never hard-bounce and hurt sender reputation.
+- The suite blocks PostHog ingestion (`/ingest` proxy + direct host) so E2E
+  runs stay out of the checkout funnel; server-side events still leak and
+  that is accepted for now.
+- Test Events are published and may appear on dev's discover page for the
+  ~minute they exist. Accepted — dev has no real audience, and test-aware
+  product queries would be worse.
+
 ## Rollout
 
-1. Land the suite with the check **not required**; burn in for flakes across
-   real PRs.
-2. Promote `checkout-e2e` to a required check.
-3. Follow-ups: signed-webhook replay test in `packages/api`; scheduled run
-   against production (Checkly free tier or Actions cron); 3DS card variant.
+1. Land the suite with the check **not required**.
+2. Promote `checkout-e2e` to a required check after a couple of clean runs on
+   real PRs (decided 2026-08-05 — no formal burn-in window).
+3. Committed direction, not scheduled: a post-deploy smoke against production
+   and Vercel Deployment Checks (hold prod aliasing until checks pass). Both
+   need the synthetic-monitoring design (test-mode toggle or
+   charge-and-refund) before they can exist.
+4. Other follow-ups: signed-webhook replay test in `packages/api`; gated
+   ticket type unlock spec; 3DS card variant.
 
 Known limits accepted for v1: the check only fires when Vercel reports a
-deployment (a failed build means no E2E check); analytics events from test
-runs land in PostHog; test orders accumulate in the Stripe sandbox and are
-periodically wiped by hand.
+deployment (a failed build means no E2E check); test orders accumulate in
+Stripe test data and are periodically wiped by hand.

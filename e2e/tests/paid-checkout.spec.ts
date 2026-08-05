@@ -25,7 +25,7 @@ test('paid checkout charges the card and records the order', async ({
   const QTY = 2;
   const TOTAL_CENTS = QTY * (GA.priceCents + GA.feesCents);
   const event = await factory.createPaidEvent();
-  const ga = event.tiers.ga;
+  const ga = event.ticketTypes.ga;
 
   await openCheckout(page, event.id, /Get Tickets/);
   await addTickets(page, ga.id, QTY);
@@ -66,7 +66,7 @@ test('paid checkout charges the card and records the order', async ({
   expect(reservation?.status).toBe('CONVERTED');
   expect(reservation?.stripePaymentIntentId).toBe(order!.stripePaymentId);
 
-  // Fresh per-test tier: hold fully released, exactly QTY sold.
+  // Fresh per-test ticket type: hold fully released, exactly QTY sold.
   const inventory = await getInventory(ga.id);
   expect(inventory.sold).toBe(QTY);
   expect(inventory.reserved).toBe(0);

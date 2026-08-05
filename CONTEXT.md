@@ -97,3 +97,14 @@ The attendee's ticket surface (`/orders/[orderId]/tickets`) — one scannable QR
 
 **Order page**:
 The attendee's money surface (`/orders/[orderId]`) — order summary plus the itemized receipt in one page. The receipt is a **section** of this page, not a separate surface. _Avoid_: "receipt page" (no longer its own route), "confirmation page" (deleted — the live post-checkout confirmation is the in-checkout success screen plus the email, not a page).
+
+### Environments & testing
+
+**Preview deployment**:
+Vercel's per-PR deploy of the web app — the URL a reviewer (and the E2E suite) exercises before merge. Every PR gets one. Distinct from a Preview branch, which is about the database. _Avoid_: bare "preview" where the deploy/database distinction matters.
+
+**Preview branch**:
+Supabase's per-PR copy of the database, created **only for schema-change PRs** and seeded fresh. Every other Preview deployment points at the persistent **dev branch** instead. _Avoid_: assuming each PR has its own database — most share dev.
+
+**Test Event**:
+A synthetic Event the checkout E2E suite creates for one test and deletes when the test ends, pass or fail. Published (drafts can't be checked out), so one may flash on dev's public surfaces while a test runs. Distinct from the **demo seed events**, the hand-testable fixtures a fresh Preview branch is seeded with — those persist; a Test Event never outlives its test.

@@ -101,7 +101,7 @@ export default function SelectStep({
           return (
             <div
               key={t.id}
-              data-testid={`tier-${t.id}`}
+              data-testid={`ticket-type-${t.id}`}
               className={cn(
                 'rounded-xl border p-4 transition-colors',
                 q > 0 ? 'border-primary bg-primary/5' : 'border-border',

@@ -35,17 +35,19 @@ export const EDGE = {
 export const CONTACT = {
   firstName: 'E2E',
   lastName: 'Buyer',
-  email: 'e2e-buyer@troptix.test',
+  // Resend's test inbox: accepts every message, never bounces. A made-up
+  // domain here would hard-bounce on each run and erode sender reputation.
+  email: 'delivered@resend.dev',
 };
 
-export type TestTier = { id: string; name: string };
+export type TestTicketType = { id: string; name: string };
 export type TestEvent = {
   id: string;
   name: string;
-  tiers: Record<string, TestTier>;
+  ticketTypes: Record<string, TestTicketType>;
 };
 
-type TierInsert = {
+type TicketTypeInsert = {
   key: string;
   name: string;
   description: string;
@@ -70,7 +72,7 @@ export class EventFactory {
 
   private async createEvent(
     name: string,
-    tiers: TierInsert[]
+    ticketTypes: TicketTypeInsert[]
   ): Promise<TestEvent> {
     const eventId = this.uid('event');
     const orgId = this.uid('org');
@@ -98,9 +100,9 @@ export class EventFactory {
       [eventId, name, userId, orgId, starts, ends]
     );
 
-    const out: TestEvent = { id: eventId, name, tiers: {} };
-    for (const t of tiers) {
-      const tierId = this.uid('tier');
+    const out: TestEvent = { id: eventId, name, ticketTypes: {} };
+    for (const t of ticketTypes) {
+      const insertedTicketTypeId = this.uid('ticket-type');
       const saleStarts = new Date(
         Date.now() + (t.saleStartsInDays ?? -1) * DAY_MS
       );
@@ -112,7 +114,7 @@ export class EventFactory {
             "discountCode", "eventId")
          values ($1, $2, now(), now(), $3, $4, $5, $6, 0, $7, $8, $9, $10, $11, $12, $13, $14)`,
         [
-          tierId,
+          insertedTicketTypeId,
           t.ticketType,
           t.name,
           t.description,
@@ -128,7 +130,7 @@ export class EventFactory {
           eventId,
         ]
       );
-      out.tiers[t.key] = { id: tierId, name: t.name };
+      out.ticketTypes[t.key] = { id: insertedTicketTypeId, name: t.name };
     }
 
     this.created.push({ eventId, orgId, userId });
@@ -174,7 +176,7 @@ export class EventFactory {
       {
         key: 'near',
         name: EDGE.nearCapacity,
-        description: 'Near-capacity tier',
+        description: 'Near-capacity ticket type',
         ticketType: 'PAID',
         priceCents: 3000,
         maxPerUser: 10,
@@ -184,7 +186,7 @@ export class EventFactory {
       {
         key: 'sold',
         name: EDGE.soldOut,
-        description: 'Fully sold tier',
+        description: 'Fully sold ticket type',
         ticketType: 'PAID',
         priceCents: 4000,
         maxPerUser: 4,
@@ -243,6 +245,14 @@ export const test = base.extend<{ factory: EventFactory }>({
     const factory = new EventFactory();
     await use(factory);
     await factory.cleanup();
+  },
+  // Keep E2E runs out of the checkout funnel analytics. PostHog ships through
+  // the app's /ingest reverse proxy, so block that path (and the direct host
+  // as belt-and-braces). Server-side events still leak; accepted for now.
+  page: async ({ page }, use) => {
+    await page.route('**/ingest/**', (route) => route.abort());
+    await page.route('https://*.posthog.com/**', (route) => route.abort());
+    await use(page);
   },
 });
 

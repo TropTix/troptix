@@ -17,7 +17,7 @@ test('free RSVP completes inline and records a FREE order', async ({
   factory,
 }) => {
   const event = await factory.createFreeEvent();
-  const rsvp = event.tiers.rsvp;
+  const rsvp = event.ticketTypes.rsvp;
 
   await openCheckout(page, event.id, /RSVP/);
   await addTickets(page, rsvp.id, 1);
@@ -47,7 +47,7 @@ test('free RSVP completes inline and records a FREE order', async ({
   const reservation = await getReservationForOrder(orderId);
   expect(reservation?.status).toBe('CONVERTED');
 
-  // Fresh per-test tier, so counters are absolute.
+  // Fresh per-test ticket type, so counters are absolute.
   const inventory = await getInventory(rsvp.id);
   expect(inventory.sold).toBe(1);
   expect(inventory.reserved).toBe(0);

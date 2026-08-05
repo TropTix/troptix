@@ -10,9 +10,9 @@ export async function openCheckout(page: Page, eventId: string, cta: RegExp) {
   ).toBeVisible();
 }
 
-/** A tier card in the select step, located by its data-testid. */
-export function tierCard(page: Page, ticketTypeId: string) {
-  return page.getByTestId(`tier-${ticketTypeId}`);
+/** A Ticket type card in the select step, located by its data-testid. */
+export function ticketTypeCard(page: Page, ticketTypeId: string) {
+  return page.getByTestId(`ticket-type-${ticketTypeId}`);
 }
 
 export async function addTickets(
@@ -20,7 +20,7 @@ export async function addTickets(
   ticketTypeId: string,
   count: number
 ) {
-  const add = tierCard(page, ticketTypeId).getByRole('button', {
+  const add = ticketTypeCard(page, ticketTypeId).getByRole('button', {
     name: 'Add one',
   });
   for (let i = 0; i < count; i++) await add.click();
