@@ -17,7 +17,7 @@
     "knip": "knip"
   },
   "engines": {
-    "node": "24.x"
+    "node": ">=22"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",

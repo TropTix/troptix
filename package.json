@@ -15,10 +15,19 @@
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,json,css,scss,md,yml,yaml}": "prettier --write"
   },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "nohoist": [
+      "**/expo",
+      "**/expo/**",
+      "**/@expo",
+      "**/@expo/**",
+      "**/expo-modules-autolinking"
+    ]
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
