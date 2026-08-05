@@ -1,38 +1,63 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# @troptix/web
 
-## Getting Started
+The TropTix web application — a [Next.js](https://nextjs.org/) app for browsing
+events and buying tickets. It is one workspace in the TropTix Yarn monorepo and
+depends on the shared `@troptix/db`, `@troptix/api`, and `@troptix/transactional`
+packages.
 
-First, run the development server:
+## Prerequisites
+
+- **Node.js 24.x** (see the `engines` field in `package.json`).
+- **Yarn Classic (v1)** — this repo is a Yarn workspaces monorepo. Use Yarn, not
+  npm. See the root [`CLAUDE.md`](../../CLAUDE.md) for the package-management rules.
+
+## Setup
+
+Install dependencies from the **repo root** (Yarn hoists the whole workspace):
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+yarn install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then create your local environment file from the template and fill in real
+values:
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+```bash
+cp apps/web/.env.example apps/web/.env
+```
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+See [`.env.example`](./.env.example) for the full list of variables, grouped by
+service (App URL, Supabase, Postgres, Stripe, Resend, Google Maps, PostHog).
+`.env` is gitignored — never commit real secrets. On Vercel, the `VERCEL_*` and
+`NODE_ENV` variables are injected automatically and do not need to be set.
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+## Running
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+All commands below are run from this workspace (`apps/web`). Run them with
+`yarn workspace web <script>` from the repo root, or `cd apps/web` first.
 
-## Learn More
+| Command           | What it does                                                            |
+| ----------------- | ----------------------------------------------------------------------- |
+| `yarn dev`        | Start the Next.js dev server at http://localhost:3000.                  |
+| `yarn dev:mobile` | Start the dev server configured for mobile-device testing.              |
+| `yarn build`      | Production build (runs `prebuild` → generates the Prisma client first). |
+| `yarn start`      | Serve the production build (run `yarn build` first).                    |
+| `yarn typecheck`  | Type-check with `tsc --noEmit`.                                         |
+| `yarn lint`       | Run ESLint.                                                             |
+| `yarn test`       | Run the Jest test suite.                                                |
+| `yarn test:watch` | Run Jest in watch mode.                                                 |
+| `yarn knip`       | Find unused files, dependencies, and exports.                           |
 
-To learn more about Next.js, take a look at the following resources:
+### Database migrations
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+These scripts read the Postgres connection strings from `.env`:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+| Command         | What it does              |
+| --------------- | ------------------------- |
+| `yarn db:new`   | Scaffold a new migration. |
+| `yarn db:apply` | Apply pending migrations. |
 
-## Deploy on Vercel
+## Learn more
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+- Repo-wide conventions: [`CLAUDE.md`](../../CLAUDE.md) at the monorepo root.
+- Project documentation: [`docs/`](../../docs).
