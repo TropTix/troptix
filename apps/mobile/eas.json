@@ -7,17 +7,17 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": "22.22.1"
+      "node": "24.16.0"
     },
     "preview": {
       "distribution": "internal",
-      "node": "22.22.1",
+      "node": "24.16.0",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://www.usetroptix.com"
       }
     },
     "production": {
-      "node": "22.22.1",
+      "node": "24.16.0",
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://www.usetroptix.com"
