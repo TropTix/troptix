@@ -18,10 +18,7 @@ import type {
 } from '../contracts/events';
 import { parseStoredFlyerPalette } from '../contracts/events';
 import { calculateFeesCents } from './_shared/fees';
-import {
-  publicEventsWhere,
-  REVIEW_ACCOUNT_EMAIL,
-} from './_shared/publicEvents';
+import { publicEventsWhere } from './_shared/publicEvents';
 import { toEventSummary } from './_shared/eventSummary';
 import { getSaleState } from './_shared/saleState';
 import { NotFoundError } from './_shared/errors';
@@ -37,32 +34,15 @@ const SALE_STATUS = {
  * `/discover`. Soonest-first. The cheapest public price is pre-derived here
  * (`fromPriceCents`) so no tier rows or discount codes reach the browser. New
  * `priceCents` column falls back to legacy `price * 100` until the backfill.
- *
- * The review account's own events are excluded for everyone except that
- * account itself (`viewerEmail`), so App/Play Store reviewers can see their
- * test event in the live listing without it showing up for real visitors.
  */
 export async function listPublicEvents(
-  prisma: PrismaClient,
-  viewerEmail?: string | null
+  prisma: PrismaClient
 ): Promise<EventSummary[]> {
-  const where: Prisma.EventsWhereInput = {
-    ...publicEventsWhere,
-    endsAt: { gt: new Date() },
-  };
-
-  if (viewerEmail !== REVIEW_ACCOUNT_EMAIL) {
-    const reviewAccount = await prisma.users.findUnique({
-      where: { email: REVIEW_ACCOUNT_EMAIL },
-      select: { id: true },
-    });
-    if (reviewAccount) {
-      where.organizerUserId = { not: reviewAccount.id };
-    }
-  }
-
   const events = await prisma.events.findMany({
-    where,
+    where: {
+      ...publicEventsWhere,
+      endsAt: { gt: new Date() },
+    },
     orderBy: { startsAt: Prisma.SortOrder.asc },
     select: {
       id: true,

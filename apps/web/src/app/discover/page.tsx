@@ -5,16 +5,12 @@ import { listPublicEvents } from '@troptix/api/server';
 
 import { Button } from '@/components/ui/button';
 import prisma from '@/server/prisma';
-import { getServerUser } from '@/server/authUser';
 import EventCard from '@/components/EventCard';
 
-// Reads the session cookie (to exclude the review account's events for
-// everyone but that account), so this page renders dynamically per request —
-// no full-route ISR cache here.
-const loadEvents = cache(async () => {
-  const viewer = await getServerUser();
-  return listPublicEvents(prisma, viewer?.email);
-});
+export const revalidate = 86400; // 24 hours in seconds
+
+// Deduped per request, mirroring the /e/[eventId] read pattern.
+const loadEvents = cache(() => listPublicEvents(prisma));
 
 export const metadata = {
   title: 'Discover Events',
