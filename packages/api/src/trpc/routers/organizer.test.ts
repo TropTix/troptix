@@ -12,14 +12,21 @@ function fakePrisma(opts: MockPrismaOptions): PrismaClient {
   return {
     tickets: {
       findUnique: async () => opts.ticket ?? null,
-      updateMany: async ({ where }: any) => ({
-        count:
-          opts.ticket &&
-          where.status.in.includes(opts.ticket.status) &&
-          !opts.ticket.checkinTimestamp
-            ? 1
-            : 0,
-      }),
+      updateMany: async ({ where }: any) => {
+        if (where.checkinTimestamp?.not !== undefined) {
+          return {
+            count: opts.ticket && opts.ticket.checkinTimestamp ? 1 : 0,
+          };
+        }
+        return {
+          count:
+            opts.ticket &&
+            where.status?.in?.includes(opts.ticket.status) &&
+            !opts.ticket.checkinTimestamp
+              ? 1
+              : 0,
+        };
+      },
     },
     events: {
       findMany: async () => opts.events ?? [],
@@ -81,5 +88,35 @@ describe('appRouter.organizer (via createCaller)', () => {
         })
       ).organizer.checkInTicket({ ticketId: 't-1' })
     ).rejects.toThrow('UNAUTHORIZED');
+  });
+
+  it('undoCheckInTicket returns success for a checked in ticket', async () => {
+    const res = await caller(
+      fakePrisma({
+        ticket: {
+          id: 't-1',
+          status: 'AVAILABLE',
+          checkinTimestamp: new Date(),
+          event: { organizerUserId: 'org-1' },
+        },
+      })
+    ).organizer.undoCheckInTicket({ ticketId: 't-1' });
+
+    expect(res).toEqual({ success: true });
+  });
+
+  it('undoCheckInTicket throws CONFLICT when ticket is not checked in', async () => {
+    await expect(
+      caller(
+        fakePrisma({
+          ticket: {
+            id: 't-1',
+            status: 'AVAILABLE',
+            checkinTimestamp: null,
+            event: { organizerUserId: 'org-1' },
+          },
+        })
+      ).organizer.undoCheckInTicket({ ticketId: 't-1' })
+    ).rejects.toThrow('Ticket is not checked in');
   });
 });
