@@ -14,6 +14,7 @@ apps/web/node_modules
 apps/web/.expo
 apps/web/.env
 apps/mobile/ios
+apps/mobile/.expo
 .vercel
 
 # Documentation
