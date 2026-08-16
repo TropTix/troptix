@@ -160,59 +160,60 @@ export default function EventsScreen() {
         </View>
       </View>
 
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.accent} />
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <Ionicons
-            name="cloud-offline-outline"
-            size={40}
-            color={colors.textMuted}
+      <FlatList
+        style={styles.listContainer}
+        data={loading || (error && events.length === 0) ? [] : sections}
+        keyExtractor={(item) => item.title}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
           />
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable
-            style={styles.retryButton}
-            onPress={() => {
-              setLoading(true);
-              fetchData().finally(() => setLoading(false));
-            }}
-          >
-            <Text style={styles.retryText}>Retry</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <FlatList
-          data={sections}
-          keyExtractor={(item) => item.title}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.accent}
-            />
-          }
-          renderItem={({ item }) => (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{item.title}</Text>
-              <View style={styles.sectionCard}>
-                {item.data.map((event, index) => (
-                  <React.Fragment key={event.id}>
-                    <EventCard
-                      event={event}
-                      onPress={() => router.push(`/event/${event.id}`)}
-                    />
-                    {index < item.data.length - 1 && (
-                      <View style={styles.divider} />
-                    )}
-                  </React.Fragment>
-                ))}
-              </View>
+        }
+        renderItem={({ item }) => (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{item.title}</Text>
+            <View style={styles.sectionCard}>
+              {item.data.map((event, index) => (
+                <React.Fragment key={event.id}>
+                  <EventCard
+                    event={event}
+                    onPress={() => router.push(`/event/${event.id}`)}
+                  />
+                  {index < item.data.length - 1 && (
+                    <View style={styles.divider} />
+                  )}
+                </React.Fragment>
+              ))}
             </View>
-          )}
-          ListEmptyComponent={
+          </View>
+        )}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color={colors.accent} />
+            </View>
+          ) : error ? (
+            <View style={styles.center}>
+              <Ionicons
+                name="cloud-offline-outline"
+                size={40}
+                color={colors.textMuted}
+              />
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable
+                style={styles.retryButton}
+                onPress={() => {
+                  setLoading(true);
+                  fetchData().finally(() => setLoading(false));
+                }}
+              >
+                <Text style={styles.retryText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : (
             <View style={styles.center}>
               <Ionicons
                 name="calendar-outline"
@@ -221,9 +222,9 @@ export default function EventsScreen() {
               />
               <Text style={styles.emptyText}>No events yet</Text>
             </View>
-          }
-        />
-      )}
+          )
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -264,7 +265,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  list: { paddingHorizontal: 16, paddingBottom: 24 },
+  listContainer: { flex: 1 },
+  list: { paddingHorizontal: 16, paddingBottom: 24, flexGrow: 1 },
   section: { marginBottom: 24 },
   sectionTitle: {
     fontFamily: fonts.semiBold,

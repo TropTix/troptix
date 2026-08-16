@@ -8,6 +8,7 @@ import {
   FlatList,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -281,9 +282,13 @@ function GuestRow({
 function GuestListTab({
   guests,
   onToggle,
+  refreshing,
+  onRefresh,
 }: {
   guests: Guest[];
   onToggle: (id: string) => void;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }) {
   const [query, setQuery] = useState('');
 
@@ -333,6 +338,15 @@ function GuestListTab({
         data={filtered}
         keyExtractor={(g) => g.id}
         contentContainerStyle={styles.guestList}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={Boolean(refreshing)}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+            />
+          ) : undefined
+        }
         renderItem={({ item }) => <GuestRow guest={item} onToggle={onToggle} />}
         ItemSeparatorComponent={() => <View style={styles.guestSep} />}
         ListEmptyComponent={
@@ -442,7 +456,6 @@ export default function EventDetailScreen() {
             text: 'Remove',
             style: 'destructive',
             onPress: () => {
-              // The backend has no undo-checkin mutation yet; local state only.
               setGuests((prev) =>
                 prev.map((g) =>
                   g.id === guestId
@@ -578,7 +591,12 @@ export default function EventDetailScreen() {
         {activeTab === 'scanner' ? (
           <ScannerTab guests={guests} onCheckIn={handleCheckInByScan} />
         ) : (
-          <GuestListTab guests={guests} onToggle={handleToggleGuest} />
+          <GuestListTab
+            guests={guests}
+            onToggle={handleToggleGuest}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+          />
         )}
       </View>
     </SafeAreaView>
@@ -900,6 +918,7 @@ const styles = StyleSheet.create({
   guestList: {
     paddingHorizontal: 16,
     paddingBottom: 32,
+    flexGrow: 1,
   },
   guestRow: {
     flexDirection: 'row',

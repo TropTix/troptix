@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@troptix/db';
 import { describe, expect, it } from 'vitest';
 import type { Actor } from '../trpc/context';
-import { checkInTicket } from './organizer';
+import { checkInTicket, undoCheckInTicket } from './organizer';
 
 type MockPrismaOptions = {
   ticket?: any;
@@ -11,14 +11,21 @@ function fakePrisma(opts: MockPrismaOptions): PrismaClient {
   return {
     tickets: {
       findUnique: async () => opts.ticket ?? null,
-      updateMany: async ({ where }: any) => ({
-        count:
-          opts.ticket &&
-          where.status.in.includes(opts.ticket.status) &&
-          !opts.ticket.checkinTimestamp
-            ? 1
-            : 0,
-      }),
+      updateMany: async ({ where }: any) => {
+        if (where.checkinTimestamp?.not !== undefined) {
+          return {
+            count: opts.ticket && opts.ticket.checkinTimestamp ? 1 : 0,
+          };
+        }
+        return {
+          count:
+            opts.ticket &&
+            where.status?.in?.includes(opts.ticket.status) &&
+            !opts.ticket.checkinTimestamp
+              ? 1
+              : 0,
+        };
+      },
     },
   } as unknown as PrismaClient;
 }
@@ -122,6 +129,55 @@ describe('checkInTicket', () => {
       },
     });
     const res = await checkInTicket(prisma, mockActor, 't-1');
+    expect(res).toEqual({ success: true });
+  });
+});
+
+describe('undoCheckInTicket', () => {
+  it('throws NOT_FOUND if ticket does not exist', async () => {
+    const prisma = fakePrisma({ ticket: null });
+    await expect(undoCheckInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
+      'NOT_FOUND'
+    );
+  });
+
+  it('throws UNAUTHORIZED if actor is not the event organizer', async () => {
+    const prisma = fakePrisma({
+      ticket: {
+        id: 't-1',
+        status: 'AVAILABLE',
+        event: { organizerUserId: 'org-2' },
+      },
+    });
+    await expect(undoCheckInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
+      'UNAUTHORIZED'
+    );
+  });
+
+  it('throws NOT_CHECKED_IN if ticket has no checkinTimestamp', async () => {
+    const prisma = fakePrisma({
+      ticket: {
+        id: 't-1',
+        status: 'AVAILABLE',
+        checkinTimestamp: null,
+        event: { organizerUserId: 'org-1' },
+      },
+    });
+    await expect(undoCheckInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
+      'NOT_CHECKED_IN'
+    );
+  });
+
+  it('successfully clears checkinTimestamp for a checked-in ticket', async () => {
+    const prisma = fakePrisma({
+      ticket: {
+        id: 't-1',
+        status: 'AVAILABLE',
+        checkinTimestamp: new Date(),
+        event: { organizerUserId: 'org-1' },
+      },
+    });
+    const res = await undoCheckInTicket(prisma, mockActor, 't-1');
     expect(res).toEqual({ success: true });
   });
 });

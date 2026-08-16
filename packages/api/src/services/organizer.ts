@@ -148,3 +148,42 @@ export async function checkInTicket(
 
   return { success: true };
 }
+
+export async function undoCheckInTicket(
+  prisma: PrismaClient,
+  actor: Actor,
+  ticketId: string
+) {
+  if (actor.kind !== 'user') {
+    throw new Error('UNAUTHORIZED');
+  }
+
+  const ticket = await prisma.tickets.findUnique({
+    where: { id: ticketId },
+    select: { status: true, event: { select: { organizerUserId: true } } },
+  });
+
+  if (!ticket) {
+    throw new Error('NOT_FOUND');
+  }
+
+  if (ticket.event.organizerUserId !== actor.userId) {
+    throw new Error('UNAUTHORIZED');
+  }
+
+  const result = await prisma.tickets.updateMany({
+    where: {
+      id: ticketId,
+      checkinTimestamp: { not: null },
+    },
+    data: {
+      checkinTimestamp: null,
+    },
+  });
+
+  if (result.count === 0) {
+    throw new Error('NOT_CHECKED_IN');
+  }
+
+  return { success: true };
+}
