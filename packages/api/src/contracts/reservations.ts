@@ -6,7 +6,13 @@ import { z } from 'zod';
 export const reservationContactSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
   lastName: z.string().trim().min(1, 'Last name is required.'),
-  email: z.string().trim().email('Enter a valid email.'),
+  // Stored lowercase so an order matches the signed-in user's address, which the
+  // provisioning trigger always lowercases.
+  email: z
+    .string()
+    .trim()
+    .email('Enter a valid email.')
+    .transform((value) => value.toLowerCase()),
 });
 export type ReservationContact = z.infer<typeof reservationContactSchema>;
 
@@ -22,6 +28,15 @@ export const createReservationInputSchema = z.object({
     .min(1)
     .max(20),
   contact: reservationContactSchema,
+  // PostHog browser identity, stored on the hold so the server-side conversion
+  // capture joins the buyer's person/session. Optional — analytics may be
+  // blocked, and non-web clients don't send it.
+  analytics: z
+    .object({
+      distinctId: z.string().min(1).max(200).optional(),
+      sessionId: z.string().min(1).max(200).optional(),
+    })
+    .optional(),
 });
 export type CreateReservationInput = z.infer<
   typeof createReservationInputSchema

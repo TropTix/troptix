@@ -66,6 +66,7 @@ export const organizerEventSummarySchema = z.object({
   sold: z.number().int(),
   capacity: z.number().int(),
   status: eventStatusSchema,
+  isPrivate: z.boolean(),
 });
 export type OrganizerEventSummary = z.infer<typeof organizerEventSummarySchema>;
 
@@ -178,7 +179,6 @@ export type EventOverview = z.infer<typeof eventOverviewSchema>;
 
 // --- Screen G — orders (`/organizer/events/[id]/orders`) ---
 
-/** A row in the orders list. */
 export const eventOrderRowSchema = z.object({
   id: z.string(),
   customerDisplay: z.string(),
@@ -286,6 +286,7 @@ export type TicketTypeInput = z.infer<typeof ticketTypeInputSchema>;
 const eventFieldsSchema = z.object({
   name: z.string().min(3),
   description: z.string().optional(),
+  isPrivate: z.boolean().optional(),
   startsAt: z.date(),
   endsAt: z.date(),
   venue: z.string().min(1),

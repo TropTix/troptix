@@ -23,9 +23,15 @@
  * commit where the previous migration was added.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 const rawName = process.argv[2];
 const isInit = process.argv.includes('--init');
@@ -44,19 +50,39 @@ const name = rawName
   .replace(/[^a-z0-9]+/g, '_')
   .replace(/^_|_$/g, '');
 
-// Supabase migration filename convention: <YYYYMMDDHHMMSS>_<name>.sql
-const d = new Date();
-const pad = (n: number) => String(n).padStart(2, '0');
-const timestamp =
-  `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
-  `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
-
 const webDir = join(__dirname, '..');
 const repoRoot = join(webDir, '..', '..');
 const dbDir = join(repoRoot, 'packages', 'db');
 const relSchema = join('packages', 'db', 'prisma', 'schema.prisma');
 const schemaPath = join(repoRoot, relSchema);
 const migrationsDir = join(repoRoot, 'supabase', 'migrations');
+
+// Supabase migration filename convention: <YYYYMMDDHHMMSS>_<name>.sql.
+// The version must sort above every migration on the base ref and on disk:
+// `supabase db push` refuses versions below the remote head, so an older
+// stamp merges green and silently never applies to prod (bit twice).
+const d = new Date();
+const pad = (n: number) => String(n).padStart(2, '0');
+let timestamp =
+  `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
+  `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
+let baseFiles: string[] = [];
+try {
+  baseFiles = execFileSync(
+    'git',
+    ['ls-tree', '--name-only', baseRef, 'supabase/migrations/'],
+    { cwd: repoRoot, encoding: 'utf8' }
+  ).split('\n');
+} catch {
+  // No usable baseRef (fresh clone, --init): clamp against disk alone.
+}
+const head = baseFiles
+  .concat(existsSync(migrationsDir) ? readdirSync(migrationsDir) : [])
+  .map((f) => basename(f).match(/^(\d{14})_/)?.[1])
+  .filter((v): v is string => !!v)
+  .sort()
+  .pop();
+if (head && timestamp <= head) timestamp = String(Number(head) + 1);
 const outFile = join(migrationsDir, `${timestamp}_${name}.sql`);
 
 // Baseline: `--from-empty` for the first migration, else the schema file as of

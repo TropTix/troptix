@@ -45,7 +45,6 @@ export default function EventCard({ event }: { event: EventSummary }) {
           {/* Restrained bottom scrim for metadata legibility */}
           <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/10 to-transparent" />
 
-          {/* Editorial metadata — floats on the artwork */}
           <div className="absolute inset-x-0 bottom-0 p-5 text-white">
             <h3 className="line-clamp-2 text-[1.4rem] font-semibold leading-[1.1] tracking-tight">
               {event.name}

@@ -39,7 +39,6 @@ const SkeletonEventCard = () => (
 );
 
 export default function AllEventsListLoading() {
-  // We'll show a couple of sections with a few cards each to represent loading
   const numberOfPlaceholderSections = 2;
   const cardsPerSection = 3;
 

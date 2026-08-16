@@ -47,6 +47,7 @@ function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
   const org = {
     id: 'org-1',
     ownerUserId: 'owner-1',
+    slug: 'eman-events',
     displayName: 'Eman Events',
     paidTicketingEnabled: opts.paidEnabled ?? false,
   };
@@ -129,7 +130,11 @@ describe('createEvent', () => {
 
   it('creates the event owned by the actor, as a draft, with the org brand mirrored', async () => {
     const { prisma, eventsCreate } = fakePrisma();
-    const { eventId } = await createEvent(prisma, OWNER, baseInput());
+    const { eventId } = await createEvent(
+      prisma,
+      OWNER,
+      baseInput({ isPrivate: true })
+    );
 
     const data = eventsCreate.mock.calls[0][0].data;
     expect(data).toMatchObject({
@@ -138,6 +143,7 @@ describe('createEvent', () => {
       organizationId: 'org-1',
       organizer: 'Eman Events',
       isDraft: true,
+      isPrivate: true,
       name: 'Sunset Cruise',
     });
     // The matched pair: the instants the caller sent are stored verbatim
@@ -204,6 +210,7 @@ describe('updateEvent', () => {
     await updateEvent(prisma, OWNER, 'e1', {
       ...updateInput,
       name: 'Renamed Cruise',
+      isPrivate: true,
     });
 
     const call = eventsUpdate.mock.calls[0][0];
@@ -212,10 +219,17 @@ describe('updateEvent', () => {
       name: 'Renamed Cruise',
       organizationId: 'org-1',
       organizer: 'Eman Events',
+      isPrivate: true,
     });
     expect(call.data.startsAt).toStrictEqual(STARTS);
     expect(call.data.endsAt).toStrictEqual(ENDS);
     // Event fields only — ticket writes belong to Screen E's seam.
     expect(call.data.ticketTypes).toBeUndefined();
+  });
+
+  it('leaves isPrivate untouched when omitted', async () => {
+    const { prisma, eventsUpdate } = fakePrisma();
+    await updateEvent(prisma, OWNER, 'e1', updateInput);
+    expect(eventsUpdate.mock.calls[0][0].data.isPrivate).toBeUndefined();
   });
 });

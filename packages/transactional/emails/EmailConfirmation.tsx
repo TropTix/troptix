@@ -144,7 +144,6 @@ export default function EmailConfirmationTemplate({
                 </Text>
               </Section>
 
-              {/* TICKET DETAILS */}
               <Section className="mt-6">
                 <Text className="text-sm font-bold text-black mb-4">
                   TICKET DETAILS

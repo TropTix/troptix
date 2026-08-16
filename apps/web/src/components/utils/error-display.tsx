@@ -5,13 +5,9 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 interface ErrorDisplayProps {
-  /** Heading text. Defaults to the branded "UH OH !!". */
   title?: string;
-  /** Supporting copy shown under the heading. */
   message?: string;
-  /** Label for the primary recovery button. */
   resetLabel?: string;
-  /** Invoked when the user clicks the primary recovery button. */
   onReset?: () => void;
 }
 

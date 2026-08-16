@@ -10,8 +10,8 @@
  * actually charged drops (no tax) when the app moves onto this service.
  */
 export const FeeConfig = {
-  PERCENTAGE: 0.08, // 8% base fee
-  FIXED_CENTS: 50, // $0.50 fixed fee
+  PERCENTAGE: 0.08,
+  FIXED_CENTS: 50,
 } as const;
 
 /**

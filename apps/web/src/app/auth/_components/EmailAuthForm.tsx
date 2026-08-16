@@ -101,7 +101,6 @@ export function EmailAuthForm() {
   };
   const submitCode = codeForm.handleSubmit(onVerifyCode);
 
-  // Step 2 — check email + enter code.
   if (sentTo) {
     return (
       <div className="max-w-md mx-auto text-center">
@@ -215,7 +214,6 @@ export function EmailAuthForm() {
     );
   }
 
-  // Step 1 — email + Google.
   return (
     <div className="max-w-md mx-auto">
       <GoogleSignInButton />

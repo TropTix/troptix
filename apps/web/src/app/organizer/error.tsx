@@ -10,7 +10,6 @@ interface ErrorProps {
   reset: () => void;
 }
 
-/** Segment-scoped error boundary for the organizer dashboard. */
 export default function Error({ error, reset }: ErrorProps) {
   useEffect(() => {
     posthog.captureException(error);

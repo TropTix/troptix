@@ -202,10 +202,6 @@ function HeroCopy({ prefersReduced }: { prefersReduced: boolean }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Sparkle field — faint pixels and stars twinkling in the background  */
-/* ------------------------------------------------------------------ */
-
 type Spark = {
   /** Position, % of the hero. */
   x: number;
@@ -433,10 +429,6 @@ function SparkleField({ prefersReduced }: { prefersReduced: boolean }) {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* The flyer wall — hand-built Caribbean party flyers, no stock photos */
-/* ------------------------------------------------------------------ */
 
 type FlyerSpec = {
   id: string;

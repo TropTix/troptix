@@ -92,7 +92,6 @@ export function buildCalendarLinks(
   return { google: google.toString(), outlook: outlook.toString() };
 }
 
-/** Filename for the `.ics` attachment. */
 export function calendarFileName(order: EmailOrder): string {
   const slug = order.event.name
     .toLowerCase()

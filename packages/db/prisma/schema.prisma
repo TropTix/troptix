@@ -39,6 +39,7 @@ model Users {
   socialMediaAccounts SocialMediaAccounts[]
   reservations        Reservation[]
   organizations       Organization[]
+  memberships         Membership[]
 
   telephoneNumber String?
   billingAddress1 String?
@@ -94,8 +95,34 @@ model Organization {
   paidTicketingEnabled     Boolean   @default(false)
   paidTicketingRequestedAt DateTime?
 
-  owner  Users    @relation(fields: [ownerUserId], references: [id])
-  events Events[]
+  owner       Users        @relation(fields: [ownerUserId], references: [id])
+  events      Events[]
+  memberships Membership[]
+}
+
+// Membership roles (ADR 0024). The Owner is never a row here — the
+// `ownerUserId` scalar is the one answer to "who owns this". Scanner lands
+// with the mobile rebuild as a one-line ADD VALUE; dropping an enum value
+// needs a type rebuild, so nothing ships early.
+enum MembershipRole {
+  ADMIN
+}
+
+// An org-level grant tying a User to an Organization (ADR 0024). The role
+// covers every event the Organization owns — there are no per-event grants.
+model Membership {
+  id        String         @id @default(uuid())
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  role      MembershipRole
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  user           Users        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+
+  @@unique([organizationId, userId])
+  @@index([userId])
 }
 
 // A per-event spotlight card (DJ, artist, speaker, sponsor, collaborator): just
@@ -175,7 +202,6 @@ model Tickets {
   lastName    String?
   email       String?
 
-  // Reservation rebuild (Phase A — additive)
   checkinTimestamp DateTime? // set when scanned/checked in at the door (roadmap 2.11)
 
   event        Events       @relation(fields: [eventId], references: [id])
@@ -235,7 +261,7 @@ model Orders {
 
   // Reservation rebuild (Phase A — additive). Nullable until backfilled +
   // the cutover writes them; old Float columns retained until cleanup.
-  type          OrderType? // roadmap 2.4 — transaction kind at the order level
+  type          OrderType?
   totalCents    Int?
   subtotalCents Int?
   feesCents     Int?
@@ -268,9 +294,9 @@ model Events {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   isDraft   Boolean   @default(true)
+  isPrivate Boolean   @default(false)
   deletedAt DateTime?
 
-  // Event Details
   imageUrl        String? @db.VarChar(2000)
   name            String
   description     String  @db.VarChar(4000)
@@ -282,13 +308,12 @@ model Events {
   // organization.ownerUserId — until the query-key flip to organizationId.
   organizationId  String
 
-  // Date and Time Details. Full timestamps — the event form folds the time
-  // input into these before submitting, so there is no separate time column
-  // and no separate atomic column (ADR 0020).
+  // Full timestamps — the event form folds the time input into these before
+  // submitting, so there is no separate time column and no separate atomic
+  // column (ADR 0020).
   startsAt DateTime
   endsAt   DateTime
 
-  // Location Details
   venue       String?
   address     String
   country     String?
@@ -303,7 +328,6 @@ model Events {
   pageTheme    EventPageTheme @default(off)
   flyerPalette Json?
 
-  // Ticket Details
   tickets      Tickets[]
   ticketTypes  TicketTypes[]
   orders       Orders[]
@@ -331,7 +355,6 @@ model TicketTypes {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
-  // Ticket Details
   name               String
   description        String
   maxPurchasePerUser Int
@@ -341,13 +364,12 @@ model TicketTypes {
   reserved Int @default(0) // held by active, unexpired reservations
   sold     Int @default(0) // confirmed/paid
 
-  // Sale Date Details. Full timestamps — the ticket form folds the time input
-  // into these before submitting, so there is no separate time column and no
-  // separate atomic column (ADR 0020).
+  // Full timestamps — the ticket form folds the time input into these before
+  // submitting, so there is no separate time column and no separate atomic
+  // column (ADR 0020).
   saleStartsAt DateTime
   saleEndsAt   DateTime
 
-  // Price Details
   price         Float
   priceCents    Int? // integer cents (roadmap 2.12), ← round(price * 100)
   ticketingFees TicketFeeStructure @default(PASS_TICKET_FEES)
@@ -361,11 +383,9 @@ model TicketTypes {
   @@index([eventId])
 }
 
-// ---------------------------------------------------------------------------
 // Reservation rebuild (Phase A — additive). New tables; not yet written to by
 // app code until the Phase B cutover. RLS is enabled on each in the migration
 // (per the #281 convention); the app connects as a bypassrls role.
-// ---------------------------------------------------------------------------
 
 // An explicit, time-boxed hold on inventory. Replaces "a PENDING Orders row is
 // the reservation". The Order is materialized only when the hold is confirmed.
@@ -386,6 +406,12 @@ model Reservation {
   email     String?
   firstName String?
   lastName  String?
+
+  // Buyer's PostHog browser identity, captured at hold time so the server-side
+  // conversion event (webhook-fulfilled) joins the same person and session
+  // replay. Nullable — the buyer may block analytics.
+  posthogDistinctId String?
+  posthogSessionId  String?
 
   totalCents    Int @default(0)
   subtotalCents Int @default(0)

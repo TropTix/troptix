@@ -33,6 +33,8 @@ export {
   type SweepResult,
 } from './services/payments';
 
+export { captureOrderCompleted } from './services/reservations';
+
 export { getCheckoutConfig, applyCode } from './services/checkout';
 export { getEventDetail, listPublicEvents } from './services/events';
 export { getDashboard } from './services/organizer-dashboard';
@@ -69,7 +71,6 @@ export {
   PaidTicketingNotEnabledError,
 } from './services/_shared/errors';
 
-// tRPC adapter — router value, server-side caller, and per-request context.
 export { appRouter, createCaller } from './trpc/routers';
 export type { AppRouter } from './trpc/routers';
 export { createContext } from './trpc/context';

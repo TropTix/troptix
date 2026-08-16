@@ -34,7 +34,6 @@ const TICKET_TYPE_SELECT = {
   maxPurchasePerUser: true,
   ticketingFees: true,
   ticketType: true,
-  // Inventory counters.
   capacity: true,
   reserved: true,
   sold: true,
@@ -127,7 +126,6 @@ export async function getCheckoutConfig(
   const tickets = ticketTypes
     .map((tt) => toCheckoutTicket(tt, now))
     .sort((a, b) => {
-      // Available (maxAllowedToAdd > 0) first, then by price ascending.
       const aAvailable = a.maxAllowedToAdd > 0 ? 0 : 1;
       const bAvailable = b.maxAllowedToAdd > 0 ? 0 : 1;
       if (aAvailable !== bAvailable) return aAvailable - bAvailable;
@@ -147,10 +145,14 @@ export async function applyCode(
   prisma: PrismaClient,
   input: ApplyCodeInput
 ): Promise<ApplyCodeResponse> {
+  // mode:'insensitive' compiles to ILIKE, which Prisma does not escape — a
+  // submitted `%` would otherwise match every gated code on the event.
+  const code = input.code.replace(/[\\%_]/g, '\\$&');
+
   const match = await prisma.ticketTypes.findFirst({
     where: {
       eventId: input.eventId,
-      discountCode: { equals: input.code, mode: 'insensitive' },
+      discountCode: { equals: code, mode: 'insensitive' },
     },
     select: TICKET_TYPE_SELECT,
   });

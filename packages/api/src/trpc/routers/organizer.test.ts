@@ -28,7 +28,6 @@ function fakePrisma(opts: MockPrismaOptions): PrismaClient {
 }
 
 function caller(prisma: PrismaClient) {
-  // Use a mocked context holding an actor
   return createCaller({
     ...createContext({ prisma }),
     actor: { kind: 'user', userId: 'org-1', role: 'ORGANIZER' },

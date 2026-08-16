@@ -13,6 +13,8 @@ import {
   ArrowRight,
   BadgeCheck,
 } from 'lucide-react';
+import { usePostHog } from 'posthog-js/react';
+import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { getDateRangeFormatter, getTimeRangeFormatter } from '@/lib/dateUtils';
 import { priceLabelFor, cn } from '@/lib/utils';
@@ -65,9 +67,7 @@ function MetaRow({
   );
 }
 
-// The "Hosted by" / "Presented by" block: organization logo + name (→ /o/[slug])
-// + verified tick + social links. Used in the desktop poster aside and the mobile
-// section. Falls back to the legacy organizer name when there's no linked brand.
+// Falls back to the legacy organizer name when there's no linked brand.
 function HostedBy({ event }: { event: EventDetail }) {
   if (!event.hostedBy) {
     return <p className="mt-3 font-semibold">{event.organizer}</p>;
@@ -99,8 +99,6 @@ function HostedBy({ event }: { event: EventDetail }) {
   );
 }
 
-// Compact inline variant for the top of the mobile layout: a small logo + name
-// (+ tick), no socials. Falls back to the plain organizer name.
 function HostedByInline({ event }: { event: EventDetail }) {
   if (!event.hostedBy) {
     return (
@@ -139,6 +137,7 @@ export default function EventDetailView({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const posthog = usePostHog();
   const resumeReservationId = searchParams?.get('reservation') ?? null;
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
@@ -218,7 +217,6 @@ export default function EventDetailView({
       )}
 
       <main className="min-h-screen bg-background pb-32 text-foreground">
-        {/* Mobile: immersive poster hero with floating controls + date chip. */}
         <div className="px-4 pt-3 md:hidden">
           <div className="relative aspect-4/5 w-full overflow-hidden rounded-2xl shadow-sm">
             <Image
@@ -364,7 +362,13 @@ export default function EventDetailView({
           <button
             type="button"
             disabled={eventEnded}
-            onClick={() => setSheetOpen(true)}
+            onClick={() => {
+              posthog.capture(ANALYTICS_EVENTS.checkoutOpened, {
+                event_id: event.id,
+                has_paid_tickets: hasPaidTickets,
+              });
+              setSheetOpen(true);
+            }}
             className="flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
           >
             {eventEnded

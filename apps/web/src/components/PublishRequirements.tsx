@@ -40,8 +40,6 @@ export function PublishRequirements({
     ticketTypes: eventData.ticketTypes || [],
   };
 
-  console.log('validationData', validationData);
-
   const validationResult = validateEventForPublish(validationData);
 
   const requirementCategories = [

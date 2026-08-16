@@ -14,8 +14,36 @@ import {
   beginPayment,
   confirmPaid,
   getCheckoutState,
+  statementDescriptorSuffix,
   sweepExpiredHolds,
 } from './payments';
+import type {
+  CheckoutAnalytics,
+  OrderCompletedProps,
+} from '../contracts/analytics';
+
+describe('statementDescriptorSuffix', () => {
+  it('uppercases and cuts at 13 characters without a trailing space', () => {
+    expect(statementDescriptorSuffix('Sunset Cruise 2026')).toBe(
+      'SUNSET CRUISE'
+    );
+    // A cut landing on a space is trimmed.
+    expect(statementDescriptorSuffix('Island Vibes Live')).toBe('ISLAND VIBES');
+  });
+
+  it('strips characters Stripe rejects', () => {
+    expect(statementDescriptorSuffix(`D'Yard <Live> "Vibes"*`)).toBe(
+      'DYARD LIVE VI'
+    );
+    expect(statementDescriptorSuffix('Fête à Montréal')).toBe('FTE MONTRAL');
+  });
+
+  it('returns null when nothing legible survives', () => {
+    expect(statementDescriptorSuffix('***')).toBeNull();
+    expect(statementDescriptorSuffix('   ')).toBeNull();
+    expect(statementDescriptorSuffix('日本語')).toBeNull();
+  });
+});
 
 const TEST_EVENT_ID = `test-pay-${generateId()}`;
 // Events.organizationId is NOT NULL (ADR 0022) — the fixture needs the full
@@ -402,6 +430,12 @@ describe('beginPayment — session creation + reuse', () => {
     // Line items: a tier line + a single service-fee line.
     expect((fake.calls.create[0].params as any).line_items).toHaveLength(2);
     expect((fake.calls.create[0].params as any).ui_mode).toBe('elements');
+    // Event name lands on the card statement: 'Payments Test Event' cleaned,
+    // uppercased, and cut at 13 characters (22 minus the TROPTIX* prefix).
+    expect(
+      (fake.calls.create[0].params as any).payment_intent_data
+        .statement_descriptor_suffix
+    ).toBe('PAYMENTS TEST');
 
     const res = await prisma.reservation.findUnique({
       where: { id: reservationId },
@@ -586,5 +620,79 @@ describe('sweepExpiredHolds — cancel-then-release', () => {
     expect(res?.status).toBe(ReservationStatus.EXPIRED);
     // No session on this hold → it was not passed to sessions.expire.
     expect(fake.calls.expire).not.toContain(reservationId);
+  });
+});
+
+describe('confirmPaid — order_completed capture', () => {
+  it('captures exactly once with the stored browser identity', async () => {
+    const tt = await makeTicketType(5);
+    const r = await reserve(prisma, {
+      eventId: TEST_EVENT_ID,
+      items: [
+        {
+          ticketTypeId: tt.id,
+          quantity: 2,
+          unitPriceCents: 1000,
+          feesCents: 200,
+        },
+      ],
+      analytics: { distinctId: 'ph-distinct', sessionId: 'ph-session' },
+    });
+    const pi = `pi_test_${generateId()}`;
+    const fake = fakeStripe();
+    const captured: OrderCompletedProps[] = [];
+    const analytics: CheckoutAnalytics = {
+      orderCompleted: (props) => {
+        captured.push(props);
+      },
+    };
+
+    const first = await confirmPaid(
+      prisma,
+      fake.stripe,
+      { reservationId: r.reservationId, paymentIntentId: pi },
+      analytics
+    );
+    expect(first.kind).toBe('order');
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatchObject({
+      reservationId: r.reservationId,
+      eventId: TEST_EVENT_ID,
+      orderType: 'PAID',
+      totalCents: 2400,
+      subtotalCents: 2000,
+      feesCents: 400,
+      ticketCount: 2,
+      distinctId: 'ph-distinct',
+      sessionId: 'ph-session',
+    });
+
+    // Redelivery (webhook retry / racing poll): already converted → no recount.
+    const second = await confirmPaid(
+      prisma,
+      fake.stripe,
+      { reservationId: r.reservationId, paymentIntentId: pi },
+      analytics
+    );
+    expect(second.kind).toBe('order');
+    expect(captured).toHaveLength(1);
+  });
+
+  it('never fails the checkout when the capture throws', async () => {
+    const tt = await makeTicketType(1);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+    const analytics: CheckoutAnalytics = {
+      orderCompleted: () => {
+        throw new Error('analytics down');
+      },
+    };
+
+    const state = await confirmPaid(
+      prisma,
+      fakeStripe().stripe,
+      { reservationId, paymentIntentId: `pi_test_${generateId()}` },
+      analytics
+    );
+    expect(state.kind).toBe('order');
   });
 });

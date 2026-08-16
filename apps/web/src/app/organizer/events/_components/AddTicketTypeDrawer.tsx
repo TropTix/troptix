@@ -18,7 +18,7 @@ import {
   SheetClose,
   SheetFooter,
 } from '@/components/ui/sheet';
-import { DatePicker } from '@/components/DatePicker';
+import { DateTimeField } from '@/components/DateTimeField';
 import { HelpCircle } from 'lucide-react';
 import {
   Form,
@@ -40,8 +40,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { combineDateTime } from '@/lib/dateUtils';
-import { formatTime } from '@/lib/dateUtils';
 import {
   Tooltip,
   TooltipContent,
@@ -451,38 +449,12 @@ export function AddTicketTypeDrawer({
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Sale Starts *</FormLabel>
-                      <div className="flex items-center gap-2">
-                        <FormControl>
-                          <DatePicker
-                            date={field.value}
-                            onDateChange={(newDate) => {
-                              const currentTime = formatTime(field.value);
-                              const combined = combineDateTime(
-                                newDate,
-                                currentTime
-                              );
-                              field.onChange(combined);
-                            }}
-                            placeholder="Select start date"
-                          />
-                        </FormControl>
-                        <FormControl>
-                          <Input
-                            type="time"
-                            value={formatTime(field.value)}
-                            onChange={(e) => {
-                              const time = e.target.value;
-                              const currentDate = field.value;
-                              const combined = combineDateTime(
-                                currentDate,
-                                time
-                              );
-                              field.onChange(combined);
-                            }}
-                            className="w-[120px]"
-                          />
-                        </FormControl>
-                      </div>
+                      <FormControl>
+                        <DateTimeField
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -494,35 +466,13 @@ export function AddTicketTypeDrawer({
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Sale Ends *</FormLabel>
-                    <div className="flex items-center gap-2">
-                      <FormControl>
-                        <DatePicker
-                          date={field.value}
-                          onDateChange={(newDate) => {
-                            const currentTime = formatTime(field.value);
-                            const combined = combineDateTime(
-                              newDate,
-                              currentTime
-                            );
-                            field.onChange(combined);
-                          }}
-                          placeholder="Select end date"
-                        />
-                      </FormControl>
-                      <FormControl>
-                        <Input
-                          type="time"
-                          value={formatTime(field.value)}
-                          onChange={(e) => {
-                            const time = e.target.value;
-                            const currentDate = field.value;
-                            const combined = combineDateTime(currentDate, time);
-                            field.onChange(combined);
-                          }}
-                          className="w-[120px]"
-                        />
-                      </FormControl>
-                    </div>
+                    <FormControl>
+                      <DateTimeField
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabledBefore={form.watch('saleStartsAt')}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

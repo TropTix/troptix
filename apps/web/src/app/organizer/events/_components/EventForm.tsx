@@ -3,7 +3,12 @@
 import React, { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useForm, useFieldArray, FieldErrors, Control } from 'react-hook-form';
+import {
+  useForm,
+  useFieldArray,
+  useController,
+  FieldErrors,
+} from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDown, Edit, Loader2, PlusCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,10 +21,10 @@ import {
 } from '@/lib/schemas/ticketSchema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { AddTicketTypeDrawer } from '../_components/AddTicketTypeDrawer';
-import { DatePicker } from '@/components/DatePicker';
-import { formatTime, combineDateTime } from '@/lib/dateUtils';
+import { DateTimeRangeFields } from '@/components/DateTimeField';
 import {
   Card,
   CardContent,
@@ -119,6 +124,7 @@ function defaultEventValues(): EventFormValues {
     imageUrl: null,
     pageTheme: 'off',
     flyerPalette: null,
+    isPrivate: false,
   };
 }
 
@@ -152,6 +158,15 @@ export default function EventForm({
     control: form.control,
     name: 'tickets',
   });
+
+  // Registered controllers (not watch/setValue) so both fields report errors,
+  // and submit's focus-on-error can reach the trigger buttons via field.ref.
+  const startsAtCtl = useController({
+    control: form.control,
+    name: 'startsAt',
+  });
+  const endsAtCtl = useController({ control: form.control, name: 'endsAt' });
+  const datesError = startsAtCtl.fieldState.error ?? endsAtCtl.fieldState.error;
 
   // Extraction runs once per flyer, on the in-memory File when available. The
   // token discards runs superseded by a newer flyer, and `isExtracting` gates
@@ -496,19 +511,37 @@ export default function EventForm({
                     </FormDescription>
                   </FormItem>
 
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <DateTimeField
-                      control={form.control}
-                      name="startsAt"
-                      label="Start Date"
-                      placeholder="Select start date"
+                  <div>
+                    <DateTimeRangeFields
+                      start={startsAtCtl.field.value}
+                      end={endsAtCtl.field.value}
+                      onChange={({ start, end }) => {
+                        startsAtCtl.field.onChange(start);
+                        endsAtCtl.field.onChange(end);
+                      }}
+                      startFieldProps={{
+                        ref: startsAtCtl.field.ref,
+                        'aria-invalid': !!startsAtCtl.fieldState.error,
+                        'aria-describedby': datesError
+                          ? 'event-dates-error'
+                          : undefined,
+                      }}
+                      endFieldProps={{
+                        ref: endsAtCtl.field.ref,
+                        'aria-invalid': !!endsAtCtl.fieldState.error,
+                        'aria-describedby': datesError
+                          ? 'event-dates-error'
+                          : undefined,
+                      }}
                     />
-                    <DateTimeField
-                      control={form.control}
-                      name="endsAt"
-                      label="End Date"
-                      placeholder="Select end date"
-                    />
+                    {datesError ? (
+                      <p
+                        id="event-dates-error"
+                        className="mt-2 text-sm text-destructive"
+                      >
+                        {datesError.message}
+                      </p>
+                    ) : null}
                   </div>
 
                   <FormField
@@ -550,6 +583,31 @@ export default function EventForm({
                         </FormControl>
 
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="isPrivate"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-3 space-y-0 rounded-md border px-3 py-3">
+                        <div className="flex-1 space-y-1">
+                          <FormLabel>Private event</FormLabel>
+                          <FormDescription>
+                            Hidden from Discover and your organization page.
+                            Anyone with the link can still view it and get
+                            tickets.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={isPending}
+                            aria-label="Private event"
+                          />
+                        </FormControl>
                       </FormItem>
                     )}
                   />
@@ -690,59 +748,5 @@ export default function EventForm({
         />
       )}
     </div>
-  );
-}
-
-/**
- * One date+time control writing a single Date field. Reading the time out
- * (`formatTime`) and folding it back in (`combineDateTime`) is a matched pair
- * (CLAUDE.md "Dates and times") — keeping both halves here, used by start and
- * end alike, is what stops the pair from drifting apart per-field.
- */
-function DateTimeField({
-  control,
-  name,
-  label,
-  placeholder,
-}: {
-  control: Control<EventFormValues>;
-  name: 'startsAt' | 'endsAt';
-  label: string;
-  placeholder: string;
-}) {
-  return (
-    <FormField
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
-          <div className="flex flex-row gap-2 items-center">
-            <FormControl>
-              <DatePicker
-                date={field.value}
-                onDateChange={(newDate) =>
-                  field.onChange(
-                    combineDateTime(newDate, formatTime(field.value))
-                  )
-                }
-                placeholder={placeholder}
-              />
-            </FormControl>
-            <FormControl>
-              <Input
-                type="time"
-                value={formatTime(field.value)}
-                onChange={(e) =>
-                  field.onChange(combineDateTime(field.value, e.target.value))
-                }
-                className="w-full sm:w-[120px]"
-              />
-            </FormControl>
-          </div>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
   );
 }

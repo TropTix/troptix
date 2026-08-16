@@ -10,12 +10,37 @@
 import { ReservationStatus } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
-import { HOLD_TTL_MINUTES, expireHold, settle } from './reservations';
+import {
+  HOLD_TTL_MINUTES,
+  captureOrderCompleted,
+  expireHold,
+  settle,
+} from './reservations';
 import { NotFoundError } from './_shared/errors';
 import type {
   BeginPaymentResponse,
   CheckoutState,
 } from '../contracts/payments';
+import type { CheckoutAnalytics } from '../contracts/analytics';
+
+/**
+ * Card statements show `PREFIX* SUFFIX`, truncated by Stripe at 22 characters
+ * total. Our account prefix is TROPTIX (7) plus the `* ` separator (2), which
+ * leaves 13 for the event name. Stripe rejects `<>\'"*` and non-Latin
+ * characters, so strip them rather than fail the Session create; return null
+ * (omit the suffix) when nothing legible survives.
+ */
+export function statementDescriptorSuffix(eventName: string): string | null {
+  const cleaned = eventName
+    .replace(/[<>\\'"*]/g, '')
+    .replace(/[^\x20-\x7e]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+    .slice(0, 13)
+    .trim();
+  return /[A-Z0-9]/.test(cleaned) ? cleaned : null;
+}
 
 async function orderCheckoutState(
   prisma: PrismaClient,
@@ -72,10 +97,16 @@ export async function beginPayment(
 
   // Order summary for the payment screen, built from the reservation's tiers so
   // it survives a resumed/refreshed payment step (where the client cart is gone).
-  const tiers = await prisma.ticketTypes.findMany({
-    where: { id: { in: reservation.items.map((i) => i.ticketTypeId) } },
-    select: { id: true, name: true },
-  });
+  const [tiers, event] = await Promise.all([
+    prisma.ticketTypes.findMany({
+      where: { id: { in: reservation.items.map((i) => i.ticketTypeId) } },
+      select: { id: true, name: true },
+    }),
+    prisma.events.findUnique({
+      where: { id: reservation.eventId },
+      select: { name: true },
+    }),
+  ]);
   const nameById = new Map(tiers.map((t) => [t.id, t.name]));
   const summary = {
     totalCents: reservation.totalCents,
@@ -137,6 +168,8 @@ export async function beginPayment(
     });
   }
 
+  const descriptorSuffix = event ? statementDescriptorSuffix(event.name) : null;
+
   const session = await stripe.checkout.sessions.create(
     {
       ui_mode: 'elements',
@@ -150,6 +183,13 @@ export async function beginPayment(
       // sessions the sweep never reaches (e.g. cron down). 2h clears our longest
       // realistic hold-refresh, avoiding a resume onto an auto-expired session.
       expires_at: Math.floor(Date.now() / 1000) + 2 * 60 * 60,
+      ...(descriptorSuffix
+        ? {
+            payment_intent_data: {
+              statement_descriptor_suffix: descriptorSuffix,
+            },
+          }
+        : {}),
       ...(reservation.email ? { customer_email: reservation.email } : {}),
     },
     {
@@ -198,7 +238,8 @@ export async function confirmPaid(
     paymentIntentId: string;
     cardType?: string | null;
     cardLast4?: string | null;
-  }
+  },
+  analytics?: CheckoutAnalytics
 ): Promise<CheckoutState> {
   const result = await settle(prisma, {
     reservationId: input.reservationId,
@@ -208,6 +249,16 @@ export async function confirmPaid(
   });
 
   if (result.kind === 'converted') {
+    // `alreadyProcessed` gates the capture to the first converter, so webhook
+    // retries and racing polls can't double-count the conversion.
+    if (!result.alreadyProcessed && analytics) {
+      await captureOrderCompleted(
+        prisma,
+        analytics,
+        input.reservationId,
+        result.orderId
+      );
+    }
     return orderCheckoutState(prisma, result.orderId);
   }
   if (result.kind === 'already_refunded') {
@@ -235,7 +286,8 @@ export async function confirmPaid(
 export async function getCheckoutState(
   prisma: PrismaClient,
   stripe: Stripe,
-  input: { reservationId: string }
+  input: { reservationId: string },
+  analytics?: CheckoutAnalytics
 ): Promise<CheckoutState> {
   const reservation = await prisma.reservation.findUnique({
     where: { id: input.reservationId },
@@ -280,10 +332,12 @@ export async function getCheckoutState(
           ? session.payment_intent
           : session.payment_intent?.id;
       if (paymentIntentId) {
-        return confirmPaid(prisma, stripe, {
-          reservationId: reservation.id,
-          paymentIntentId,
-        });
+        return confirmPaid(
+          prisma,
+          stripe,
+          { reservationId: reservation.id, paymentIntentId },
+          analytics
+        );
       }
     }
   }

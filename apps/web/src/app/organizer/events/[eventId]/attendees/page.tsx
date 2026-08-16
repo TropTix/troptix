@@ -124,7 +124,6 @@ export default async function EventAttendeesPage(
         <p className="text-muted-foreground">{eventName}</p>
       </div>
 
-      {/* Desktop Statistics Cards */}
       <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -179,7 +178,6 @@ export default async function EventAttendeesPage(
         </Card>
       </div>
 
-      {/* Mobile Statistics Cards - Horizontal Scroll */}
       <MobileStatsContainer>
         <MobileStatsCard
           icon={Users}
@@ -207,7 +205,6 @@ export default async function EventAttendeesPage(
         />
       </MobileStatsContainer>
 
-      {/* Attendee Table */}
       <Card>
         <CardHeader>
           <CardTitle>Attendee List</CardTitle>

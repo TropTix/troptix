@@ -2,6 +2,16 @@
 
 Conventions for Codex (and other AI agents) working in this repo.
 
+## Engineering principles
+
+- Do not preserve backward compatibility. Remove obsolete paths instead of adding compatibility layers, fallbacks, or migrations.
+- Choose the simplest implementation that fully meets the current requirements. Avoid speculative abstractions, configuration, and indirection.
+- Grow the system in layers. Start from the smallest version that works end to end, and add each new capability on top of a product that already works. Never trade a working product for unfinished complexity.
+- Keep components modular and concerns clearly separated.
+- Prefer established, well-maintained libraries when they reduce overall complexity or improve reliability. Do not reimplement common functionality without a clear reason.
+- Lean on the dependencies already in the project before writing your own implementation or adding packages. Do not assume a library lacks a capability without checking its documentation and types.
+- Make architectural decisions for the long term. Do not accept a stopgap that only works for now and is meant to be replaced later.
+
 ## Writing
 
 Writing rules, from Orwell, 1946. These govern prose: docs, PR text, messages. Never touch code or technical terms; swap in everyday words only where precision survives.
@@ -14,6 +24,19 @@ Writing rules, from Orwell, 1946. These govern prose: docs, PR text, messages. N
 6. Break any of these rules sooner than say anything outright barbarous.
 
 Review every prose output against these rules before delivering.
+
+## Code comments
+
+Default to none. Write a comment only for what the code cannot say — an invariant, a gotcha, the why behind a non-obvious choice. Keep the rare needed comment to a line or two; long rationale belongs in an ADR.
+
+Never write:
+
+- Comments that narrate what the next line does or restate a name (`// fetch the user`, `// loop over tickets`).
+- Comments that describe the change instead of the code (`// now uses the shared formatter`, `// changed to handle nulls`). The diff and PR description carry that.
+- Section banners (`// --- helpers ---`) or JSDoc that only repeats the signature.
+- Comments addressed to the reviewer justifying your edit.
+
+When editing a file, match its existing comment density — do not add comments to code that had none. Before finishing any change, reread your diff and delete every comment that fails this test.
 
 ## Where artifacts live
 

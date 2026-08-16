@@ -38,14 +38,13 @@ type UserOrder = {
 async function fetchUserOrders(): Promise<UserOrder[]> {
   const user = await getUserFromIdTokenCookie();
   if (!user?.email) {
-    console.log('User not found or user ID missing for fetching orders.');
     return [];
   }
 
   try {
     const userOrders = await prisma.orders.findMany({
       where: {
-        email: user.email,
+        email: user.email.toLowerCase(),
         status: 'COMPLETED',
       },
       select: {

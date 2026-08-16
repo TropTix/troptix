@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-// --- EventDetail --------------------------------------------------------------
 // The public event-page DTO: event meta + a server-computed "From $X" price.
 // Client-safe by construction — no ticket rows, no discount codes, no gated-tier
 // data ever reaches the browser; the cheapest public price is pre-derived here.
@@ -10,7 +9,6 @@ export const eventDetailInputSchema = z.object({
 });
 export type EventDetailInput = z.infer<typeof eventDetailInputSchema>;
 
-// --- Flyer theming ------------------------------------------------------------
 // The organizer-chosen page treatment plus the colors extracted once from the
 // flyer at upload. Stored raw (hex) so the derivation — which lives in the web
 // layer — can evolve without a data backfill.
@@ -65,7 +63,6 @@ export const eventTicketSchema = z.object({
 });
 export type EventTicket = z.infer<typeof eventTicketSchema>;
 
-// --- EventSummary -------------------------------------------------------------
 // The discovery-listing DTO: just what an event card renders. The cheapest
 // public price is pre-derived server-side (`fromPriceCents`); no tier rows or
 // discount codes reach the browser.
@@ -91,6 +88,7 @@ export const eventDetailSchema = z.object({
   /** Stored flyer path (resolved to an absolute URL by the web layer). */
   imageUrl: z.string().nullable(),
   isDraft: z.boolean(),
+  isPrivate: z.boolean(),
   organizer: z.string(),
   /** The owning user — used by the page's draft-visibility guard. */
   organizerUserId: z.string(),
