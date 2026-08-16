@@ -1,0 +1,30 @@
+{
+  "cli": {
+    "version": ">= 21.2.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "node": "24.16.0"
+    },
+    "preview": {
+      "distribution": "internal",
+      "node": "24.16.0",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://www.usetroptix.com"
+      }
+    },
+    "production": {
+      "node": "24.16.0",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://www.usetroptix.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

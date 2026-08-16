@@ -35,8 +35,8 @@ function accentForId(id: string) {
 type OrganizerEvent = {
   id: string;
   name: string;
-  startDate: string;
-  endDate: string;
+  startsAt: string | null;
+  endsAt: string | null;
   venue: string;
   address: string;
   imageUrl: string | null;
@@ -51,7 +51,7 @@ function EventCard({
   event: OrganizerEvent;
   onPress: () => void;
 }) {
-  const d = new Date(event.startDate);
+  const d = new Date(event.startsAt ?? 0);
   const monthStr = d
     .toLocaleDateString('en-US', { month: 'short' })
     .toUpperCase();
@@ -140,7 +140,7 @@ export default function EventsScreen() {
   const sections = useMemo(() => {
     const grouped: Record<string, OrganizerEvent[]> = {};
     events.forEach((event) => {
-      const key = new Date(event.startDate)
+      const key = new Date(event.startsAt ?? 0)
         .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
         .toUpperCase();
       if (!grouped[key]) grouped[key] = [];

@@ -14,6 +14,12 @@ apps/web/node_modules
 apps/web/.expo
 apps/web/.env
 apps/mobile/ios
+apps/mobile/.expo
+
+# Stray output from running eas/expo commands from the repo root instead of
+# apps/mobile. Real config lives in apps/mobile/app.json and eas.json.
+/app.json
+/eas.json
 .vercel
 
 # Documentation
@@ -31,3 +37,4 @@ docs/web-codebase-audit-and-plan.md
 docs/technical-roadmap.md
 
 .claude/worktrees/
+.claude/settings.json

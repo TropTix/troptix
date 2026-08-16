@@ -1,21 +1,31 @@
 {
   "expo": {
     "name": "TropTix Organizer",
-    "slug": "troptix-organizer-v2",
-    "version": "1.0.0",
+    "slug": "troptix-mobile",
+    "owner": "troptix",
+    "version": "1.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.troptix.organizer",
+      "bundleIdentifier": "com.usetroptix.organizerapp",
       "infoPlist": {
-        "NSCameraUsageDescription": "Camera is used to scan event ticket QR codes."
+        "NSCameraUsageDescription": "Camera is used to scan event ticket QR codes.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.troptix.organizer",
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F2EEE7"
+      }
     },
     "plugins": [
       "expo-router",
@@ -31,6 +41,12 @@
     "scheme": "troptix-organizer",
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "54ec09c0-18c7-4c98-835e-cb78f686a6d4"
+      }
     }
   }
 }

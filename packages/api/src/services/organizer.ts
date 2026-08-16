@@ -3,11 +3,12 @@
  * not extend, and do not copy `authorizeOrganizer` into new code.
  *
  * The web organizer surface uses `organizer-scope.ts` +
- * `organizer-dashboard.ts` instead. This file still carries the
- * `isPlatformOwner ? {} : { organizerUserId }` cross-organizer bypass that
- * ADR 0018 removes, and throws string errors the tRPC router matches on rather
- * than the typed errors in `_shared/errors.ts`. Both are retired when v2 moves
- * onto the new seam (see docs/plans/2026-07-organizer-dashboard-migration.md).
+ * `organizer-dashboard.ts` instead, which handle the platform-owner bypass
+ * via an explicit View-as target (ADR 0018) rather than the implicit
+ * "@usetroptix.com sees admin-owned events" scoping here. This file still
+ * throws string errors the tRPC router matches on rather than the typed
+ * errors in `_shared/errors.ts`. Both are retired when v2 moves onto the new
+ * seam (see docs/plans/2026-07-organizer-dashboard-migration.md).
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -93,6 +94,7 @@ export async function getEvent(
       ticketId: t.id,
       checkedIn: !!t.checkinTimestamp,
       checkedInAt: t.checkinTimestamp?.toISOString(),
+      email: t.email ?? undefined,
     })),
   };
 }
@@ -131,7 +133,6 @@ export async function checkInTicket(
       checkinTimestamp: null,
     },
     data: {
-      status: 'NOT_AVAILABLE',
       checkinTimestamp: new Date(),
     },
   });
