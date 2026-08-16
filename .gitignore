@@ -32,3 +32,4 @@ docs/web-codebase-audit-and-plan.md
 docs/technical-roadmap.md
 
 .claude/worktrees/
+.claude/settings.json

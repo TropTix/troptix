@@ -263,13 +263,24 @@ function summaryRow(overrides: Partial<SummaryRow> = {}): SummaryRow {
 
 function fakeListPrisma(
   rows: SummaryRow[],
-  onQuery?: (args: { where?: Record<string, unknown> }) => void
+  options: {
+    onQuery?: (args: { where?: Record<string, unknown> }) => void;
+    reviewAccountUserId?: string | null;
+    onUsersQuery?: () => void;
+  } = {}
 ): PrismaClient {
+  const { onQuery, reviewAccountUserId = null, onUsersQuery } = options;
   return {
     events: {
       findMany: async (args: { where?: Record<string, unknown> }) => {
         onQuery?.(args);
         return rows;
+      },
+    },
+    users: {
+      findUnique: async () => {
+        onUsersQuery?.();
+        return reviewAccountUserId ? { id: reviewAccountUserId } : null;
       },
     },
   } as unknown as PrismaClient;
@@ -323,11 +334,56 @@ describe('listPublicEvents', () => {
 
   it('queries only published, non-private events', async () => {
     let captured: { where?: Record<string, unknown> } | undefined;
-    const prisma = fakeListPrisma([], (args) => {
-      captured = args;
+    const prisma = fakeListPrisma([], {
+      onQuery: (args) => {
+        captured = args;
+      },
     });
     await listPublicEvents(prisma);
     expect(captured?.where).toMatchObject({ isDraft: false, isPrivate: false });
+  });
+
+  it("excludes the review account's events for a regular viewer", async () => {
+    let captured: { where?: Record<string, unknown> } | undefined;
+    const prisma = fakeListPrisma([], {
+      reviewAccountUserId: 'review-user-1',
+      onQuery: (args) => {
+        captured = args;
+      },
+    });
+    await listPublicEvents(prisma, 'someone@example.com');
+    expect(captured?.where).toMatchObject({
+      organizerUserId: { not: 'review-user-1' },
+    });
+  });
+
+  it('does not exclude anything when the review account is browsing itself', async () => {
+    let captured: { where?: Record<string, unknown> } | undefined;
+    let usersQueried = false;
+    const prisma = fakeListPrisma([], {
+      reviewAccountUserId: 'review-user-1',
+      onQuery: (args) => {
+        captured = args;
+      },
+      onUsersQuery: () => {
+        usersQueried = true;
+      },
+    });
+    await listPublicEvents(prisma, 'test@usetroptix.com');
+    expect(usersQueried).toBe(false);
+    expect(captured?.where).not.toHaveProperty('organizerUserId');
+  });
+
+  it('skips the exclusion when the review account has no Users row', async () => {
+    let captured: { where?: Record<string, unknown> } | undefined;
+    const prisma = fakeListPrisma([], {
+      reviewAccountUserId: null,
+      onQuery: (args) => {
+        captured = args;
+      },
+    });
+    await listPublicEvents(prisma, 'someone@example.com');
+    expect(captured?.where).not.toHaveProperty('organizerUserId');
   });
 });
 
