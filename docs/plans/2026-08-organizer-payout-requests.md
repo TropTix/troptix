@@ -22,6 +22,9 @@ money movement.
 - No bank details in the database. The request carries a free-text note; the
   destination is settled off-platform. (Public repo; no encryption story yet.)
 - No Stripe integration, no automatic transfers.
+- No bank APIs. The transfer itself happens in the bank's own dashboard
+  (Mercury today); the request row records the rail and the transfer
+  reference, and nothing in the codebase talks to the bank.
 - No refund netting — refunds are still unmodeled (`OrderStatus` has no
   `REFUNDED`). When refunds land, they subtract from earned; the math below
   has one place to add that term.
@@ -131,6 +134,15 @@ enum PayoutRequestStatus {
   PAID
 }
 
+// Where the money actually moved. MERCURY = manual transfer from the ops
+// account; STRIPE joins when the Global Payouts phase lands (reference = the
+// OutboundPayment id), so the paid-trail schema doesn't change at cutover.
+enum PayoutRail {
+  MERCURY
+  STRIPE
+  OTHER
+}
+
 model PayoutRequest {
   id          String              @id @default(uuid())
   createdAt   DateTime            @default(now())
@@ -143,7 +155,12 @@ model PayoutRequest {
   // Set when an admin resolves (PAID or REJECTED).
   resolvedAt       DateTime?
   resolvedByUserId String?
-  // Admin-side note / manual-transfer reference (bank ref, reason for rejection).
+  // The paid trail: which rail the money left on and the bank's transfer id
+  // (Mercury transaction reference today; OutboundPayment id under Stripe).
+  // Both null unless status is PAID.
+  rail             PayoutRail?
+  reference        String?     @db.VarChar(200)
+  // Admin-side note (context for a payment, reason for a rejection).
   adminNote        String?  @db.VarChar(500)
 
   organization      Organization @relation(fields: [organizationId], references: [id])
@@ -162,7 +179,8 @@ convention; the app connects as bypassrls.
 `supabase/seed.sql` additions, so a preview branch can exercise both screens:
 an **ended** event (endsAt in the past, > 20 days) with `COMPLETED` orders
 under the demo Organization, plus one `REQUESTED` and one `PAID`
-`PayoutRequest` row (explicit column lists).
+`PayoutRequest` row — the paid one with rail + reference filled, so both
+resolution renderings are visible (explicit column lists).
 
 ## Service layer
 
@@ -197,10 +215,11 @@ new seam.
   (the Platform View gate; this is a third door only in the sense that
   Platform View grows a page — same grant, same gate shape as
   `getAllPlatformEvents`).
-- `resolvePayoutRequest(prisma, actor, { id, outcome: 'PAID' | 'REJECTED', adminNote })`
-  — flips `REQUESTED → PAID/REJECTED`, stamps `resolvedAt`/`resolvedByUserId`.
-  Guarded `updateMany({ where: { id, status: 'REQUESTED' } })` so a double
-  click or an organizer cancel racing the admin resolves exactly once.
+- `resolvePayoutRequest(prisma, actor, { id, outcome: 'PAID' | 'REJECTED', rail?, reference?, adminNote? })`
+  — flips `REQUESTED → PAID/REJECTED`, stamps `resolvedAt`/`resolvedByUserId`,
+  and on `PAID` records the rail (required, default `MERCURY`) and transfer
+  reference. Guarded `updateMany({ where: { id, status: 'REQUESTED' } })` so a
+  double click or an organizer cancel racing the admin resolves exactly once.
 
 Contracts in `packages/api/src/contracts/payouts.ts` (zod schemas + types),
 re-exported from `index.ts`. Unit tests beside each service, per convention.
@@ -215,8 +234,9 @@ the rest of `/organizer`):
 - "Request payout" button (disabled at $0 or while a request is open) opening a
   dialog: amount (default = full available, editable down), optional note, and
   a line stating the holdback rule so Pending is explicable.
-- Requests table: date, amount, status badge, note, resolution
-  (date + admin note). `REQUESTED` rows get a Cancel action.
+- Requests table: date, amount, status badge, note, resolution — for `PAID`
+  rows, the date plus "via bank transfer, ref …" so the organizer can match it
+  against their bank statement. `REQUESTED` rows get a Cancel action.
 - Server actions in `_actions/payoutActions.ts` follow `eventActions.ts`:
   validate, `userToActor`, call service, map typed errors to messages,
   `revalidatePath`.
@@ -225,9 +245,17 @@ the rest of `/organizer`):
 **Platform View: `/organizer/platform/payouts`**:
 
 - Table of all requests (organization, owner email, amount, note, age,
-  status), `REQUESTED` first.
-- Per open row: **Mark paid** (with optional reference note) and **Reject**
-  (note required). Both confirm before writing.
+  status), `REQUESTED` first. `PAID` rows show rail + reference.
+- Per open row: **Mark paid** and **Reject** (note required). Both confirm
+  before writing.
+- The Mark-paid dialog is the manual-transfer cockpit: the amount and a
+  suggested payee memo (`TropTix payout — <org slug> — <request id prefix>`)
+  as copy-to-clipboard fields, an "Open Mercury" link
+  (`https://app.mercury.com`, plain link — no API, nothing prefilled), a rail
+  select (default `MERCURY`), and a reference field for the bank's transaction
+  id pasted back after sending. Confirming writes the resolve. The memo going
+  out with the transfer and the reference coming back in is what makes the
+  request row and the bank statement reconcile both ways.
 - Page-level gate identical to Platform Events (`notFound()` unless
   `isPlatformOwner`).
 
