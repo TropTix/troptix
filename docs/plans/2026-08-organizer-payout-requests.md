@@ -49,6 +49,36 @@ gets rewritten — it currently says "not computed"):
 - **Payout request**: the Organizer's ask to withdraw some amount of Available.
   Lifecycle: `REQUESTED → PAID` (admin marks done) or `→ REJECTED` (admin, with
   a note) or `→ CANCELLED` (organizer, while still `REQUESTED`).
+- **Payout setup**: the per-Organization checklist that must be complete before
+  the first request — done together with TropTix and checked off manually by a
+  Platform Owner. Distinct from **paid ticketing enabled**: that capability
+  gates _selling_, setup gates _withdrawing_ (one meeting can cover both).
+
+## Payout setup
+
+Two steps, both performed off-platform and checked off by a Platform Owner:
+
+1. **Payout meeting** — the organizer talks to TropTix (terms, timing, the
+   holdback, destination account).
+2. **Bank linked** — the organizer's bank details are collected during setup
+   and entered as a recipient in the ops bank (Mercury). The details live in
+   the bank, never in our database.
+
+Modeled as two timestamps on `Organization` — not a task engine. The
+onboarding plan explicitly deferred a general checklist "until there is a real
+second onboarding task"; this is that task, and two nullable timestamps keep
+the same lightweight shape as `paidTicketingRequestedAt`:
+
+```prisma
+// On Organization — payout setup (checked off manually by a Platform Owner).
+payoutMeetingAt    DateTime?
+payoutBankLinkedAt DateTime?
+```
+
+Setup is complete when both are set. `requestPayout` rejects with
+`PayoutSetupIncompleteError` until then; balances are always visible — on the
+organizer screen the checklist card stands in for the request button until
+setup completes.
 
 ## Earnings math
 
@@ -172,15 +202,19 @@ model PayoutRequest {
 }
 ```
 
-Requests hang off the **Organization** (money is org-level, ADR 0019/0024);
-`requestedByUserId` records who clicked. RLS enabled in the migration per the
-convention; the app connects as bypassrls.
+The same migration adds the two payout-setup timestamps to `Organization`
+(above). Requests hang off the **Organization** (money is org-level, ADR
+0019/0024); `requestedByUserId` records who clicked. RLS enabled in the
+migration per the convention; the app connects as bypassrls.
 
 `supabase/seed.sql` additions, so a preview branch can exercise both screens:
 an **ended** event (endsAt in the past, > 20 days) with `COMPLETED` orders
 under the demo Organization, plus one `REQUESTED` and one `PAID`
 `PayoutRequest` row — the paid one with rail + reference filled, so both
-resolution renderings are visible (explicit column lists).
+resolution renderings are visible (explicit column lists). The demo
+Organization gets both setup timestamps set (so the request flow is
+exercisable); a second organization with setup incomplete shows the checklist
+state on both screens.
 
 ## Service layer
 
@@ -190,10 +224,12 @@ injected `prisma`, authorization via the scope seam):
 **`packages/api/src/services/organizer-payouts.ts`**
 
 - `getPayouts(prisma, actor, input)` → `OrganizerPayouts`:
-  `{ availableCents, pendingCents, paidOutCents, requests[] }`. Scoped through
+  `{ availableCents, pendingCents, paidOutCents, setup, requests[] }` where
+  `setup` is `{ meetingDone, bankLinked, complete }`. Scoped through
   `resolveOrganizerScope` (View-as works, read-only), then
   `organization.findFirst({ ownerUserId })`.
-- `requestPayout(prisma, actor, { amountCents, note })`: recomputes
+- `requestPayout(prisma, actor, { amountCents, note })`: rejects with
+  `PayoutSetupIncompleteError` unless payout setup is complete; recomputes
   `availableCents` **inside a transaction** and rejects
   `amountCents > available` or `≤ 0` (`InvalidPayoutAmountError`). At most one
   open (`REQUESTED`) request per Organization — a second ask fails with
@@ -220,6 +256,10 @@ new seam.
   and on `PAID` records the rail (required, default `MERCURY`) and transfer
   reference. Guarded `updateMany({ where: { id, status: 'REQUESTED' } })` so a
   double click or an organizer cancel racing the admin resolves exactly once.
+- `setPayoutSetupStep(prisma, actor, { organizationId, step: 'meeting' | 'bank', done })`
+  — sets or clears the matching timestamp. Clearing is allowed (a checkbox
+  mis-click shouldn't be permanent), but clearing never invalidates existing
+  requests — the gate applies only at request time.
 
 Contracts in `packages/api/src/contracts/payouts.ts` (zod schemas + types),
 re-exported from `index.ts`. Unit tests beside each service, per convention.
@@ -231,9 +271,15 @@ the rest of `/organizer`):
 
 - Three stat cards — Available, Pending, Paid out — same `Card` grid as the
   dashboard.
-- "Request payout" button (disabled at $0 or while a request is open) opening a
-  dialog: amount (default = full available, editable down), optional note, and
-  a line stating the holdback rule so Pending is explicable.
+- **Setup checklist card** (shown until setup is complete, in place of the
+  request button): the two steps with done/not-done state — "Meet with
+  TropTix" (with a contact link) and "Connect your bank account" (explains the
+  details are collected during setup and held at the bank, not by TropTix).
+  Read-only for the organizer; TropTix checks steps off.
+- "Request payout" button (setup complete only; disabled at $0 or while a
+  request is open) opening a dialog: amount (default = full available,
+  editable down), optional note, and a line stating the holdback rule so
+  Pending is explicable.
 - Requests table: date, amount, status badge, note, resolution — for `PAID`
   rows, the date plus "via bank transfer, ref …" so the organizer can match it
   against their bank statement. `REQUESTED` rows get a Cancel action.
@@ -244,6 +290,10 @@ the rest of `/organizer`):
 
 **Platform View: `/organizer/platform/payouts`**:
 
+- **Setup panel**: Organizations with paid ticketing enabled or any earnings,
+  each with the two setup checkboxes (meeting held, bank linked). Checking a
+  box stamps the timestamp via `setPayoutSetupStep`; the timestamps render so
+  it doubles as a record of when setup happened.
 - Table of all requests (organization, owner email, amount, note, age,
   status), `REQUESTED` first. `PAID` rows show rail + reference.
 - Per open row: **Mark paid** and **Reject** (note required). Both confirm
