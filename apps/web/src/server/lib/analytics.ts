@@ -5,6 +5,20 @@ import {
   type OrderCompletedProps,
 } from '@troptix/api/analytics';
 
+type OrderCompletedProperties = {
+  order_id: string;
+  reservation_id: string;
+  event_id: string;
+  order_type: OrderCompletedProps['orderType'];
+  total_cents: number;
+  subtotal_cents: number;
+  fees_cents: number;
+  ticket_count: number;
+  revenue_usd: number;
+  $session_id?: string;
+  $process_person_profile?: boolean;
+};
+
 /**
  * posthog-node implementation of the `CheckoutAnalytics` port. Same
  * per-request client pattern as `featureFlags.ts`: serverless multiplies
@@ -25,25 +39,26 @@ export function serverAnalytics(): CheckoutAnalytics | undefined {
         requestTimeout: 3000,
       });
       try {
+        const properties: OrderCompletedProperties = {
+          order_id: props.orderId,
+          reservation_id: props.reservationId,
+          event_id: props.eventId,
+          order_type: props.orderType,
+          total_cents: props.totalCents,
+          subtotal_cents: props.subtotalCents,
+          fees_cents: props.feesCents,
+          ticket_count: props.ticketCount,
+          revenue_usd: props.totalCents / 100,
+        };
+        if (props.sessionId) properties.$session_id = props.sessionId;
+        if (!props.distinctId) properties.$process_person_profile = false;
         client.capture({
           // With no browser identity (analytics blocked), fall back to a
           // server-only id and skip the person profile — the revenue event
           // still lands without minting a junk person.
           distinctId: props.distinctId ?? `server:${props.reservationId}`,
           event: ANALYTICS_EVENTS.orderCompleted,
-          properties: {
-            ...(props.sessionId ? { $session_id: props.sessionId } : {}),
-            ...(props.distinctId ? {} : { $process_person_profile: false }),
-            order_id: props.orderId,
-            reservation_id: props.reservationId,
-            event_id: props.eventId,
-            order_type: props.orderType,
-            total_cents: props.totalCents,
-            subtotal_cents: props.subtotalCents,
-            fees_cents: props.feesCents,
-            ticket_count: props.ticketCount,
-            revenue_usd: props.totalCents / 100,
-          },
+          properties,
         });
       } finally {
         await client.shutdown().catch(() => {});

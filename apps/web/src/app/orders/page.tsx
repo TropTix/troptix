@@ -19,21 +19,30 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
-type UserOrder = {
-  id: string;
-  createdAt: Date;
+import type { Prisma } from '@troptix/db';
+
+const USER_ORDER_SELECT = {
+  id: true,
+  createdAt: true,
   event: {
-    id: string;
-    name: string | null;
-    venue: string | null;
-    address: string | null;
-    imageUrl: string | null;
-    startsAt: Date;
-  } | null;
+    select: {
+      id: true,
+      name: true,
+      venue: true,
+      address: true,
+      imageUrl: true,
+      startsAt: true,
+      createdAt: true,
+    },
+  },
   _count: {
-    tickets: number;
-  };
-};
+    select: {
+      tickets: true,
+    },
+  },
+} satisfies Prisma.OrdersSelect;
+
+type UserOrder = Prisma.OrdersGetPayload<{ select: typeof USER_ORDER_SELECT }>;
 
 async function fetchUserOrders(): Promise<UserOrder[]> {
   const user = await getUserFromIdTokenCookie();
@@ -42,38 +51,18 @@ async function fetchUserOrders(): Promise<UserOrder[]> {
   }
 
   try {
-    const userOrders = await prisma.orders.findMany({
+    return await prisma.orders.findMany({
       where: {
         email: user.email.toLowerCase(),
         status: 'COMPLETED',
       },
-      select: {
-        id: true,
-        createdAt: true,
-        event: {
-          select: {
-            id: true,
-            name: true,
-            venue: true,
-            address: true,
-            imageUrl: true,
-            startsAt: true,
-            createdAt: true,
-          },
-        },
-        _count: {
-          select: {
-            tickets: true,
-          },
-        },
-      },
+      select: USER_ORDER_SELECT,
       orderBy: {
         event: {
           startsAt: 'desc',
         },
       },
     });
-    return userOrders as UserOrder[];
   } catch (error) {
     console.error('Failed to fetch user orders:', error);
     return [];
@@ -187,7 +176,7 @@ type OrderCardProps = {
     venue: string;
     imageUrl: string;
     ticketCount: number;
-    createdAt: Date;
+    createdAt: Date | null;
     eventDate: Date | null;
     isPastEvent: boolean;
     isToday: boolean;
@@ -303,7 +292,7 @@ const OrderCard = ({ order }: OrderCardProps) => {
 
           <CardFooter className="pt-0 flex items-center justify-between">
             <div className="text-xs text-muted-foreground">
-              Ordered {createdAt.toLocaleDateString()}
+              {createdAt ? `Ordered ${createdAt.toLocaleDateString()}` : null}
             </div>
             <div className="flex items-center text-sm text-primary font-medium group-hover:text-primary/80">
               View Tickets

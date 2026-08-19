@@ -5,9 +5,9 @@ import type { DashboardRange } from '@troptix/api';
  * `'use client'` boundary — exports of a client module become client-reference
  * stubs in the server graph, and a lookup against one silently yields undefined.
  */
-export const RANGE_LABELS: Record<DashboardRange, string> = {
+export const RANGE_LABELS = {
   today: 'Today',
   yesterday: 'Yesterday',
   week: 'Past week',
   month: 'Past month',
-};
+} satisfies Record<DashboardRange, string>;

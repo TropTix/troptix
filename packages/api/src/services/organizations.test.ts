@@ -4,6 +4,8 @@
  * generation, the empty-name fallback, and the ownerUserId unique-race recovery.
  */
 import { describe, expect, it } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
+import { Prisma } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
 import {
   ensureOrganizationForUser,
@@ -11,6 +13,14 @@ import {
   updateOrganizationProfile,
 } from './organizations';
 import { NotFoundError } from './_shared/errors';
+
+// The unique-violation error the real client throws (the services check it
+// with instanceof, so a plain `{ code }` object no longer passes).
+const p2002 = () =>
+  new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: 'test',
+  });
 
 type OrgRow = {
   id: string;
@@ -24,30 +34,32 @@ function makeFakePrisma() {
   const orgs: OrgRow[] = [];
   let clock = 0;
 
-  const prisma = {
-    organization: {
-      findFirst: async ({ where }: any) =>
-        orgs
-          .filter((o) => o.ownerUserId === where.ownerUserId)
-          .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
-      findMany: async () => orgs.map((o) => ({ slug: o.slug })),
-      create: async ({ data }: any) => {
-        // The DB enforces one org per owner (ADR 0022) — mirror it.
-        if (orgs.some((o) => o.ownerUserId === data.ownerUserId)) {
-          throw { code: 'P2002' };
-        }
-        const row: OrgRow = {
-          id: `org-${orgs.length}`,
-          createdAt: clock++,
-          ...data,
-        };
-        orgs.push(row);
-        return row;
-      },
+  const organization = {
+    findFirst: async ({ where }: any) =>
+      orgs
+        .filter((o) => o.ownerUserId === where.ownerUserId)
+        .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
+    findMany: async () => orgs.map((o) => ({ slug: o.slug })),
+    create: async ({ data }: any) => {
+      // The DB enforces one org per owner (ADR 0022) — mirror it.
+      if (orgs.some((o) => o.ownerUserId === data.ownerUserId)) {
+        throw p2002();
+      }
+      const row: OrgRow = {
+        id: `org-${orgs.length}`,
+        createdAt: clock++,
+        ...data,
+      };
+      orgs.push(row);
+      return row;
     },
-  } as unknown as PrismaClient;
+  };
 
-  return { prisma, orgs };
+  return {
+    prisma: fromPartial<PrismaClient>({ organization }),
+    orgs,
+    organization,
+  };
 }
 
 describe('ensureOrganizationForUser', () => {
@@ -120,24 +132,23 @@ describe('ensureOrganizationForUser', () => {
   });
 
   it('recovers the winner when a concurrent create hits the owner unique index', async () => {
-    const { prisma, orgs } = makeFakePrisma();
+    const { prisma, orgs, organization } = makeFakePrisma();
     const winner = await ensureOrganizationForUser(prisma, {
       ownerUserId: 'u1',
       displayName: 'Island Vibes',
     });
     // Simulate the race: the loser's pre-create findFirst saw nothing.
-    const raced = { ...prisma } as any;
-    raced.organization = {
-      ...(prisma as any).organization,
-      findFirst: (() => {
-        let calls = 0;
-        return async (args: any) => {
+    let calls = 0;
+    const raced = fromPartial<PrismaClient>({
+      organization: {
+        ...organization,
+        findFirst: async (args: any) => {
           calls += 1;
           if (calls === 1) return null; // the ensure's own existence check
-          return (prisma as any).organization.findFirst(args); // the recovery read
-        };
-      })(),
-    };
+          return organization.findFirst(args); // the recovery read
+        },
+      },
+    });
     const b = await ensureOrganizationForUser(raced, {
       ownerUserId: 'u1',
       displayName: 'Late Arrival',
@@ -166,13 +177,17 @@ describe('getOrganizationBySlug', () => {
     };
   }
 
+  type EventsQueryArgs = {
+    select?: {
+      events?: { where?: { isDraft?: boolean; isPrivate?: boolean } };
+    };
+  };
+
   const fakePrisma = (
     events: unknown[] | null,
-    onQuery?: (args: {
-      select?: { events?: { where?: Record<string, unknown> } };
-    }) => void
+    onQuery?: (args: EventsQueryArgs) => void
   ) =>
-    ({
+    fromPartial<PrismaClient>({
       organization: {
         findUnique: async ({ where, ...args }: any) => {
           onQuery?.(args);
@@ -192,7 +207,7 @@ describe('getOrganizationBySlug', () => {
               };
         },
       },
-    }) as unknown as PrismaClient;
+    });
 
   it('throws NotFoundError when the slug does not exist', async () => {
     await expect(
@@ -228,9 +243,7 @@ describe('getOrganizationBySlug', () => {
   });
 
   it('queries only published, non-private events', async () => {
-    let captured:
-      | { select?: { events?: { where?: Record<string, unknown> } } }
-      | undefined;
+    let captured: EventsQueryArgs | undefined;
     const prisma = fakePrisma([], (args) => {
       captured = args;
     });
@@ -258,7 +271,7 @@ describe('updateOrganizationProfile', () => {
 
   function makeFake(seed: Org[]) {
     const orgs = seed.map((o) => ({ ...o }));
-    const prisma = {
+    const prisma = fromPartial<PrismaClient>({
       organization: {
         findFirst: async ({ where }: any) =>
           orgs
@@ -277,7 +290,7 @@ describe('updateOrganizationProfile', () => {
               (o) => o.ownerUserId === data.ownerUserId || o.slug === data.slug
             )
           ) {
-            throw { code: 'P2002' };
+            throw p2002();
           }
           const row = {
             id: `org-${orgs.length}`,
@@ -288,7 +301,7 @@ describe('updateOrganizationProfile', () => {
           return row;
         },
       },
-    } as unknown as PrismaClient;
+    });
     return { prisma, orgs };
   }
 
@@ -393,7 +406,7 @@ describe('updateOrganizationProfile', () => {
   });
 
   it('maps a slug unique-constraint violation (race) to slug_taken', async () => {
-    const prisma = {
+    const prisma = fromPartial<PrismaClient>({
       organization: {
         findFirst: async () => ({
           id: 'a',
@@ -403,10 +416,10 @@ describe('updateOrganizationProfile', () => {
         }),
         findUnique: async () => null, // check passes…
         update: async () => {
-          throw { code: 'P2002' }; // …but another write claimed the slug first
+          throw p2002(); // …but another write claimed the slug first
         },
       },
-    } as unknown as PrismaClient;
+    });
     const result = await updateOrganizationProfile(prisma, {
       ...base,
       slug: 'new-slug',

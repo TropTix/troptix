@@ -1,6 +1,7 @@
 import React from 'react';
 import { EventManagementNav } from '@/components/ui/event-management-nav';
 import prisma from '@/server/prisma';
+import type { Prisma } from '@troptix/db';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
@@ -10,12 +11,10 @@ import type { ServerUser } from '@/server/authUser';
 // layouts can't read ?viewAs, and blocking here would kill View-as on every
 // page below; the pages themselves authorize.
 async function getEvent(eventId: string, user: ServerUser) {
+  const where: Prisma.EventsWhereUniqueInput = { id: eventId, deletedAt: null };
+  if (!user.isPlatformOwner) where.organizerUserId = user.uid;
   const event = await prisma.events.findUnique({
-    where: {
-      id: eventId,
-      deletedAt: null,
-      ...(user.isPlatformOwner ? {} : { organizerUserId: user.uid }),
-    },
+    where,
     select: { name: true, isDraft: true },
   });
   if (!event) {

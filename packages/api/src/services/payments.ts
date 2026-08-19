@@ -170,36 +170,33 @@ export async function beginPayment(
 
   const descriptorSuffix = event ? statementDescriptorSuffix(event.name) : null;
 
-  const session = await stripe.checkout.sessions.create(
-    {
-      ui_mode: 'elements',
-      mode: 'payment',
-      line_items: lineItems,
-      payment_method_types: ['card'],
-      return_url: `${input.baseUrl}/e/${reservation.eventId}?reservation=${reservation.id}`,
-      metadata: { reservationId: reservation.id, eventId: reservation.eventId },
-      // Backstop cap on a lingering session (Stripe default is 24h; min 30 min).
-      // The sweep expires it far sooner (at the 12-min hold); this only bounds
-      // sessions the sweep never reaches (e.g. cron down). 2h clears our longest
-      // realistic hold-refresh, avoiding a resume onto an auto-expired session.
-      expires_at: Math.floor(Date.now() / 1000) + 2 * 60 * 60,
-      ...(descriptorSuffix
-        ? {
-            payment_intent_data: {
-              statement_descriptor_suffix: descriptorSuffix,
-            },
-          }
-        : {}),
-      ...(reservation.email ? { customer_email: reservation.email } : {}),
-    },
-    {
-      // Distinct-per-dead-session key on retry (stable for the same dead
-      // Session, so concurrent retries still dedupe); the fixed key otherwise.
-      idempotencyKey: staleSessionId
-        ? `checkout-${reservation.id}-retry-${staleSessionId}`
-        : `checkout-${reservation.id}`,
-    }
-  );
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    ui_mode: 'elements',
+    mode: 'payment',
+    line_items: lineItems,
+    payment_method_types: ['card'],
+    return_url: `${input.baseUrl}/e/${reservation.eventId}?reservation=${reservation.id}`,
+    metadata: { reservationId: reservation.id, eventId: reservation.eventId },
+    // Backstop cap on a lingering session (Stripe default is 24h; min 30 min).
+    // The sweep expires it far sooner (at the 12-min hold); this only bounds
+    // sessions the sweep never reaches (e.g. cron down). 2h clears our longest
+    // realistic hold-refresh, avoiding a resume onto an auto-expired session.
+    expires_at: Math.floor(Date.now() / 1000) + 2 * 60 * 60,
+  };
+  if (descriptorSuffix) {
+    sessionParams.payment_intent_data = {
+      statement_descriptor_suffix: descriptorSuffix,
+    };
+  }
+  if (reservation.email) sessionParams.customer_email = reservation.email;
+
+  const session = await stripe.checkout.sessions.create(sessionParams, {
+    // Distinct-per-dead-session key on retry (stable for the same dead
+    // Session, so concurrent retries still dedupe); the fixed key otherwise.
+    idempotencyKey: staleSessionId
+      ? `checkout-${reservation.id}-retry-${staleSessionId}`
+      : `checkout-${reservation.id}`,
+  });
 
   if (!session.client_secret) {
     throw new Error(
@@ -327,10 +324,14 @@ export async function getCheckoutState(
       reservation.stripeCheckoutSessionId
     );
     if (session.payment_status !== 'unpaid') {
+      // Stripe expandable field: the SDK types it `string | PaymentIntent`,
+      // and this sits at the Stripe I/O boundary where the branch belongs.
+      // oxlint-disable anti-slop/no-runtime-typeof
       const paymentIntentId =
         typeof session.payment_intent === 'string'
           ? session.payment_intent
           : session.payment_intent?.id;
+      // oxlint-enable anti-slop/no-runtime-typeof
       if (paymentIntentId) {
         return confirmPaid(
           prisma,

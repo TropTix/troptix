@@ -8,14 +8,16 @@ jest.mock('@/server/prisma', () => ({
   default: { events: { findUnique: jest.fn() } },
 }));
 
+import { fromPartial } from '@total-typescript/shoehorn';
+import type { NextRequest } from 'next/server';
 import prisma from '@/server/prisma';
 import { GET } from './route';
 
-const mockFindUnique = prisma.events.findUnique as jest.Mock;
+const mockFindUnique = jest.mocked(prisma.events.findUnique);
 
-const req = () => ({}) as any;
-const props = (eventId?: string) => ({
-  params: Promise.resolve({ eventId: eventId as string }),
+const req = () => fromPartial<NextRequest>({});
+const props = (eventId: string) => ({
+  params: Promise.resolve({ eventId }),
 });
 
 beforeEach(() => {
@@ -25,14 +27,15 @@ beforeEach(() => {
 
 describe('GET /api/events/[eventId]', () => {
   it('returns the event for a published, non-deleted event', async () => {
-    const event = {
-      id: 'e1',
-      name: 'Concert',
-      startsAt: new Date('2026-09-01T00:00:00Z'),
-      organizer: 'Acme',
-      address: '123 Main St',
-    };
-    mockFindUnique.mockResolvedValue(event);
+    mockFindUnique.mockResolvedValue(
+      fromPartial({
+        id: 'e1',
+        name: 'Concert',
+        startsAt: new Date('2026-09-01T00:00:00Z'),
+        organizer: 'Acme',
+        address: '123 Main St',
+      })
+    );
 
     const res = await GET(req(), props('e1'));
     const body = await res.json();

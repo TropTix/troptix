@@ -28,6 +28,8 @@ jest.mock('@troptix/api/server', () => {
   };
 });
 
+import { fromPartial } from '@total-typescript/shoehorn';
+import type { NextRequest } from 'next/server';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import {
   scanTicket,
@@ -38,11 +40,11 @@ import {
 import { PUT as scanPUT } from '../tickets/scan/route';
 import { PUT as checkInPUT } from '../tickets/check-in/route';
 
-const mockGetUser = getUserFromIdTokenCookie as jest.Mock;
-const mockScan = scanTicket as unknown as jest.Mock;
-const mockToggle = toggleTicketCheckIn as unknown as jest.Mock;
+const mockGetUser = jest.mocked(getUserFromIdTokenCookie);
+const mockScan = jest.mocked(scanTicket);
+const mockToggle = jest.mocked(toggleTicketCheckIn);
 
-const req = (body: unknown) => ({ json: async () => body }) as any;
+const req = (body: any) => fromPartial<NextRequest>({ json: async () => body });
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -119,12 +121,13 @@ describe('check-in route', () => {
   });
 
   it('returns the updated ticket from the service', async () => {
-    const updated = {
-      id: 't1',
-      status: 'NOT_AVAILABLE',
-      checkinTimestamp: new Date().toISOString(),
-    };
-    mockToggle.mockResolvedValue(updated);
+    mockToggle.mockResolvedValue(
+      fromPartial({
+        id: 't1',
+        status: 'NOT_AVAILABLE',
+        checkinTimestamp: new Date(),
+      })
+    );
 
     const res = await checkInPUT(req({ ticketId: 't1' }));
     const body = await res.json();

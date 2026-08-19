@@ -94,6 +94,12 @@ export function DataTable<TData, TValue>({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
+  // SAFETY: the filter value is only ever set from the search input below, so
+  // it is always a string when present.
+  const filterValue = filterColumnId
+    ? ((table.getColumn(filterColumnId)?.getFilterValue() as string) ?? '')
+    : '';
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -101,10 +107,7 @@ export function DataTable<TData, TValue>({
           {filterColumnId && (
             <Input
               placeholder={filterInputPlaceholder}
-              value={
-                (table.getColumn(filterColumnId)?.getFilterValue() as string) ??
-                ''
-              }
+              value={filterValue}
               onChange={(event) =>
                 table
                   .getColumn(filterColumnId)
@@ -133,8 +136,7 @@ export function DataTable<TData, TValue>({
                 .getAllColumns()
                 .filter(
                   (column) =>
-                    typeof column.accessorFn !== 'undefined' &&
-                    column.getCanHide()
+                    column.accessorFn !== undefined && column.getCanHide()
                 )
                 .map((column) => {
                   return (

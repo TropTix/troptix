@@ -128,6 +128,9 @@ function toEventFields(data: EventFormValues) {
   };
 }
 
+// Catch-clause boundary: `unknown` is the caught-error type; the instanceof
+// chain below is what parses it.
+// oxlint-disable-next-line anti-slop/no-unknown-parameters
 function failure(error: unknown, fallback: string): ActionResult {
   if (error instanceof PaidTicketingNotEnabledError) {
     return {

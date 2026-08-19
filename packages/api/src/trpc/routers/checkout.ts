@@ -27,10 +27,7 @@ import { beginPayment, getCheckoutState } from '../../services/payments';
  * (ADR 0018). They're optional on the context (reads/free flow and unit tests
  * don't need them), so assert them here rather than widen the whole context.
  */
-function requireStripe(ctx: Context): {
-  stripe: NonNullable<Context['stripe']>;
-  siteUrl: string;
-} {
+function requireStripe(ctx: Context) {
   if (!ctx.stripe || !ctx.siteUrl) {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',

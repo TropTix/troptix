@@ -6,6 +6,7 @@
  * event id in afterAll.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type Stripe from 'stripe';
 import prisma, { ReservationStatus } from '@troptix/db';
 import { generateId } from './_shared/ids';
@@ -155,16 +156,26 @@ interface FakeSessionState {
   payment_intent: string | null;
 }
 
+type FakeStripeCalls = {
+  create: {
+    params: Stripe.Checkout.SessionCreateParams;
+    opts: Stripe.RequestOptions;
+  }[];
+  retrieve: string[];
+  refund: { params: Stripe.RefundCreateParams; opts: Stripe.RequestOptions }[];
+  expire: string[];
+};
+
 /** Minimal fake Stripe; records calls and returns a controllable session. */
 function fakeStripe(
   session?: Partial<FakeSessionState>,
   opts?: { expireThrows?: boolean }
 ) {
-  const calls = {
-    create: [] as Array<{ params: unknown; opts: unknown }>,
-    retrieve: [] as string[],
-    refund: [] as Array<{ params: unknown; opts: unknown }>,
-    expire: [] as string[],
+  const calls: FakeStripeCalls = {
+    create: [],
+    retrieve: [],
+    refund: [],
+    expire: [],
   };
   let current: FakeSessionState = {
     id: `cs_test_${generateId()}`,
@@ -174,11 +185,11 @@ function fakeStripe(
     payment_intent: null,
     ...session,
   };
-  const stripe = {
+  const stripe = fromPartial<Stripe>({
     checkout: {
       sessions: {
-        create: async (params: unknown, opts: unknown) => {
-          calls.create.push({ params, opts });
+        create: async (params: any, options: any) => {
+          calls.create.push({ params, opts: options });
           return current;
         },
         retrieve: async (id: string) => {
@@ -194,12 +205,12 @@ function fakeStripe(
       },
     },
     refunds: {
-      create: async (params: unknown, opts: unknown) => {
-        calls.refund.push({ params, opts });
+      create: async (params: any, options: any) => {
+        calls.refund.push({ params, opts: options });
         return { id: `re_test_${generateId()}` };
       },
     },
-  } as unknown as Stripe;
+  });
   return {
     stripe,
     calls,
@@ -428,13 +439,13 @@ describe('beginPayment — session creation + reuse', () => {
     ]);
     expect(fake.calls.create).toHaveLength(1);
     // Line items: a tier line + a single service-fee line.
-    expect((fake.calls.create[0].params as any).line_items).toHaveLength(2);
-    expect((fake.calls.create[0].params as any).ui_mode).toBe('elements');
+    expect(fake.calls.create[0].params.line_items).toHaveLength(2);
+    expect(fake.calls.create[0].params.ui_mode).toBe('elements');
     // Event name lands on the card statement: 'Payments Test Event' cleaned,
     // uppercased, and cut at 13 characters (22 minus the TROPTIX* prefix).
     expect(
-      (fake.calls.create[0].params as any).payment_intent_data
-        .statement_descriptor_suffix
+      fake.calls.create[0].params.payment_intent_data
+        ?.statement_descriptor_suffix
     ).toBe('PAYMENTS TEST');
 
     const res = await prisma.reservation.findUnique({
@@ -497,7 +508,7 @@ describe('beginPayment — session creation + reuse', () => {
     // not the fixed `checkout-<id>` key that would replay the dead session.
     expect(fake.calls.retrieve).toContain(deadSessionId);
     expect(fake.calls.create).toHaveLength(1);
-    expect((fake.calls.create[0].opts as any).idempotencyKey).toBe(
+    expect(fake.calls.create[0].opts.idempotencyKey).toBe(
       `checkout-${reservationId}-retry-${deadSessionId}`
     );
   });

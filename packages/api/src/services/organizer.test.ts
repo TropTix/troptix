@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@troptix/db';
 import { describe, expect, it } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { Actor } from '../trpc/context';
 import { checkInTicket, undoCheckInTicket } from './organizer';
 
@@ -8,7 +9,7 @@ type MockPrismaOptions = {
 };
 
 function fakePrisma(opts: MockPrismaOptions): PrismaClient {
-  return {
+  return fromPartial<PrismaClient>({
     tickets: {
       findUnique: async () => opts.ticket ?? null,
       updateMany: async ({ where }: any) => {
@@ -27,7 +28,7 @@ function fakePrisma(opts: MockPrismaOptions): PrismaClient {
         };
       },
     },
-  } as unknown as PrismaClient;
+  });
 }
 
 const mockActor: Actor = { kind: 'user', userId: 'org-1', role: 'ORGANIZER' };

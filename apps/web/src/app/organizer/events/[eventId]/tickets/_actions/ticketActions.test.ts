@@ -37,9 +37,9 @@ import {
 import { createTicketType, updateTicketType } from './ticketActions';
 import type { TicketTypeFormValues } from '@/lib/schemas/ticketSchema';
 
-const mockGetUser = getServerUser as jest.Mock;
-const mockCreateService = createService as jest.Mock;
-const mockUpdateService = updateService as jest.Mock;
+const mockGetUser = jest.mocked(getServerUser);
+const mockCreateService = jest.mocked(createService);
+const mockUpdateService = jest.mocked(updateService);
 
 const validForm: TicketTypeFormValues = {
   name: 'General Admission',
@@ -55,7 +55,11 @@ const validForm: TicketTypeFormValues = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGetUser.mockResolvedValue({ uid: 'owner', role: 'PATRON' });
+  mockGetUser.mockResolvedValue({
+    uid: 'owner',
+    role: 'PATRON',
+    isPlatformOwner: false,
+  });
 });
 
 describe('createTicketType adapter', () => {

@@ -6,6 +6,7 @@
  * matched-pair guarantee: what the form sends is what the row stores).
  */
 import { describe, expect, it, vi } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type { CreateEventInput } from '../contracts/organizer';
@@ -59,7 +60,7 @@ function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
     .mockResolvedValue(opts.event === undefined ? { id: 'e1' } : opts.event);
   const eventsUpdate = vi.fn().mockResolvedValue({});
 
-  const prisma = {
+  const prisma = fromPartial<PrismaClient>({
     users: {
       findUnique: vi.fn().mockResolvedValue({ email: 'o@b.com' }),
     },
@@ -68,13 +69,13 @@ function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
     },
     events: { findFirst: eventsFindFirst, update: eventsUpdate },
     $transaction: vi.fn(
-      async (fn: (tx: unknown) => Promise<unknown>) =>
+      async (fn: any) =>
         await fn({
           events: { create: eventsCreate },
           ticketTypes: { createMany: ticketTypesCreateMany },
         })
     ),
-  } as unknown as PrismaClient;
+  });
 
   return {
     prisma,

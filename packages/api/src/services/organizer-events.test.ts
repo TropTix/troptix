@@ -6,6 +6,7 @@
  * exclusion.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { listOrganizerEvents } from './organizer-events';
@@ -20,19 +21,30 @@ function fakePrisma(
   opts: { platformOwner?: boolean; events?: unknown[] } = {}
 ) {
   const eventsFindMany = vi.fn().mockResolvedValue(opts.events ?? []);
-  const prisma = {
+  const prisma = fromPartial<PrismaClient>({
     users: {
       findUnique: vi
         .fn()
         .mockResolvedValue({ isPlatformOwner: opts.platformOwner ?? false }),
     },
     events: { findMany: eventsFindMany },
-  } as unknown as PrismaClient;
+  });
 
   return { prisma, eventsFindMany };
 }
 
-const event = (over: Record<string, unknown> = {}) => ({
+type EventRow = {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  isDraft: boolean;
+  startsAt: Date;
+  endsAt: Date;
+  ticketTypes: { capacity: number }[];
+  _count: { tickets: number };
+};
+
+const event = (over: Partial<EventRow> = {}): EventRow => ({
   id: 'e1',
   name: 'Demo',
   imageUrl: null,

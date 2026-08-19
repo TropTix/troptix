@@ -81,6 +81,9 @@ export function DailyRevenueChart({ data }: DailyRevenueChartProps) {
             <ChartTooltipContent
               labelFormatter={(label) => formatDate(String(label))}
               formatter={(value, name) => {
+                // Recharts types `value` as a union of number/string/arrays;
+                // this narrows that library union at its boundary.
+                // oxlint-disable-next-line anti-slop/no-runtime-typeof
                 if (name === 'revenue' && typeof value === 'number') {
                   return formatCurrency(value);
                 }

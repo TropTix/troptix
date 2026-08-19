@@ -5,6 +5,7 @@
  * clamp), the "From $X" derivation, the empty case, and not-found.
  */
 import { describe, expect, it } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import { getEventDetail, listPublicEvents } from './events';
 import { NotFoundError } from './_shared/errors';
@@ -88,9 +89,9 @@ function fakeEvent(
 }
 
 function fakePrisma(event: ReturnType<typeof fakeEvent> | null): PrismaClient {
-  return {
+  return fromPartial<PrismaClient>({
     events: { findUnique: async () => event },
-  } as unknown as PrismaClient;
+  });
 }
 
 describe('getEventDetail', () => {
@@ -261,18 +262,22 @@ function summaryRow(overrides: Partial<SummaryRow> = {}): SummaryRow {
   };
 }
 
+type ListQueryArgs = {
+  where?: { isDraft?: boolean; isPrivate?: boolean };
+};
+
 function fakeListPrisma(
   rows: SummaryRow[],
-  onQuery?: (args: { where?: Record<string, unknown> }) => void
+  onQuery?: (args: ListQueryArgs) => void
 ): PrismaClient {
-  return {
+  return fromPartial<PrismaClient>({
     events: {
-      findMany: async (args: { where?: Record<string, unknown> }) => {
+      findMany: async (args: any) => {
         onQuery?.(args);
         return rows;
       },
     },
-  } as unknown as PrismaClient;
+  });
 }
 
 describe('listPublicEvents', () => {
@@ -322,7 +327,7 @@ describe('listPublicEvents', () => {
   });
 
   it('queries only published, non-private events', async () => {
-    let captured: { where?: Record<string, unknown> } | undefined;
+    let captured: ListQueryArgs | undefined;
     const prisma = fakeListPrisma([], (args) => {
       captured = args;
     });

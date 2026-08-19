@@ -76,7 +76,7 @@ export async function POST(req: Request) {
 async function handleEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case 'checkout.session.completed': {
-      const session = event.data.object as Stripe.Checkout.Session;
+      const session = event.data.object;
       const reservationId = session.metadata?.reservationId;
       if (!reservationId) {
         // Not one of ours — acknowledge without acting.
@@ -86,10 +86,14 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
         // A completed-but-unpaid Session has nothing to fulfill.
         return;
       }
+      // Stripe expandable field: the SDK types it `string | PaymentIntent`,
+      // and this sits at the Stripe I/O boundary where the branch belongs.
+      // oxlint-disable anti-slop/no-runtime-typeof
       const paymentIntentId =
         typeof session.payment_intent === 'string'
           ? session.payment_intent
           : session.payment_intent?.id;
+      // oxlint-enable anti-slop/no-runtime-typeof
       if (!paymentIntentId) {
         console.error(
           `[ReservationWebhook] Session ${session.id} completed with no payment_intent`
@@ -130,7 +134,7 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
     case 'checkout.session.async_payment_failed': {
       // v1 is cards-only, so delayed-settlement events shouldn't fire. Log if
       // they ever do (e.g. a payment method was enabled in the dashboard).
-      const session = event.data.object as Stripe.Checkout.Session;
+      const session = event.data.object;
       console.warn(
         `[ReservationWebhook] Unexpected async payment event ${event.type} for Session ${session.id}`
       );

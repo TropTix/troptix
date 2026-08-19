@@ -5,6 +5,7 @@
  * line-item grouping, and the payment-method shaping.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { getOrderDetail, listEventOrders } from './organizer-orders';
@@ -27,7 +28,7 @@ function fakePrisma(
   const ordersFindMany = vi.fn().mockResolvedValue(opts.orders ?? []);
   const ordersFindFirst = vi.fn().mockResolvedValue(opts.order ?? null);
 
-  const prisma = {
+  const prisma = fromPartial<PrismaClient>({
     users: {
       findUnique: vi
         .fn()
@@ -35,7 +36,7 @@ function fakePrisma(
     },
     events: { findFirst: eventsFindFirst },
     orders: { findMany: ordersFindMany, findFirst: ordersFindFirst },
-  } as unknown as PrismaClient;
+  });
 
   return { prisma, eventsFindFirst, ordersFindMany, ordersFindFirst };
 }
@@ -106,7 +107,31 @@ describe('listEventOrders', () => {
 });
 
 describe('getOrderDetail', () => {
-  const order = (over: Record<string, unknown> = {}) => ({
+  type TicketRow = {
+    subtotal?: number | null;
+    ticketType: { id: string; name: string; price: number } | null;
+  };
+  type OrderRow = {
+    id: string;
+    status: string;
+    createdAt: Date;
+    name: string | null;
+    firstName: string;
+    lastName: string;
+    email: string;
+    telephoneNumber: string;
+    cardType: string | null;
+    cardLast4: string | null;
+    subtotal: number;
+    fees: number;
+    total: number;
+    subtotalCents: number | null;
+    feesCents: number | null;
+    totalCents: number | null;
+    tickets: TicketRow[];
+  };
+
+  const order = (over: Partial<OrderRow> = {}): OrderRow => ({
     id: 'o1',
     status: 'COMPLETED',
     createdAt: new Date('2026-07-14T10:00:00Z'),

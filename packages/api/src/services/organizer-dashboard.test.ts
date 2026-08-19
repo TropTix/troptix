@@ -5,6 +5,7 @@
  * sales trend.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { getDashboard } from './organizer-dashboard';
@@ -33,7 +34,7 @@ function fakePrisma(opts: FakeOpts = {}) {
   const orgFindFirst = vi.fn().mockResolvedValue(opts.org ?? null);
   const queryRaw = vi.fn().mockResolvedValue(opts.sales ?? []);
 
-  const prisma = {
+  const prisma = fromPartial<PrismaClient>({
     users: {
       findUnique: vi
         .fn()
@@ -43,9 +44,9 @@ function fakePrisma(opts: FakeOpts = {}) {
     events: { findMany: eventsFindMany },
     organization: { findFirst: orgFindFirst },
     $queryRaw: queryRaw,
-  } as unknown as PrismaClient;
+  });
 
-  return { prisma, eventsFindMany, ordersFindMany };
+  return { prisma, eventsFindMany, ordersFindMany, ordersAggregate, queryRaw };
 }
 
 describe('getDashboard — authorization', () => {
@@ -213,25 +214,25 @@ describe('getDashboard — shaping', () => {
 });
 
 describe('getDashboard — range', () => {
-  const bucketOf = (prismaMock: { $queryRaw: unknown }) =>
+  const bucketOf = (queryRaw: ReturnType<typeof vi.fn>) =>
     // The tagged-template call passes the bound values after the strings array.
-    (prismaMock.$queryRaw as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    queryRaw.mock.calls[0][1];
 
   it('defaults to the past month, bucketed daily', async () => {
-    const { prisma } = fakePrisma();
+    const { prisma, queryRaw } = fakePrisma();
     const result = await getDashboard(prisma, OWNER, {}, NOW);
 
     expect(result.range).toBe('month');
     expect(result.salesSeries).toHaveLength(30);
-    expect(bucketOf(prisma as never)).toBe('day');
+    expect(bucketOf(queryRaw)).toBe('day');
   });
 
   it('buckets today hourly, from midnight through the current hour', async () => {
-    const { prisma } = fakePrisma();
+    const { prisma, queryRaw } = fakePrisma();
     const result = await getDashboard(prisma, OWNER, { range: 'today' }, NOW);
 
     expect(result.range).toBe('today');
-    expect(bucketOf(prisma as never)).toBe('hour');
+    expect(bucketOf(queryRaw)).toBe('hour');
     // NOW is 12:00Z → hours 00:00..12:00 inclusive.
     expect(result.salesSeries).toHaveLength(13);
     expect(result.salesSeries[0].at).toBe('2026-07-15T00:00:00.000Z');
@@ -286,11 +287,10 @@ describe('getDashboard — range', () => {
   });
 
   it('scopes the revenue aggregate to the range window', async () => {
-    const { prisma } = fakePrisma();
+    const { prisma, ordersAggregate } = fakePrisma();
     await getDashboard(prisma, OWNER, { range: 'today' }, NOW);
 
-    const where = (prisma.orders.aggregate as ReturnType<typeof vi.fn>).mock
-      .calls[0][0].where;
+    const where = ordersAggregate.mock.calls[0][0].where;
     expect(where.createdAt.gte).toEqual(new Date('2026-07-15T00:00:00.000Z'));
     expect(where.createdAt.lt).toEqual(NOW);
   });

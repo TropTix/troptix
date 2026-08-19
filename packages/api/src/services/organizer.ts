@@ -90,7 +90,7 @@ export async function getEvent(
       id: t.id,
       name:
         `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim() || 'Unknown Guest',
-      ticketType: t.ticketType?.name ?? (t.ticketsType as string) ?? 'General',
+      ticketType: t.ticketType?.name ?? t.ticketsType ?? 'General',
       ticketId: t.id,
       checkedIn: !!t.checkinTimestamp,
       checkedInAt: t.checkinTimestamp?.toISOString(),

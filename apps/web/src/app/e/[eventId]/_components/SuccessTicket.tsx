@@ -32,11 +32,9 @@ export default function SuccessTicket({
 
   const ticketsHref = `/orders/${orderId}/tickets`;
 
+  // An event handler, so `window` always exists.
   async function onShare() {
-    const url =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/e/${event.id}`
-        : '';
+    const url = `${window.location.origin}/e/${event.id}`;
     if (navigator.share) {
       try {
         await navigator.share({

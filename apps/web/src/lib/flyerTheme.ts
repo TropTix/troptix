@@ -115,7 +115,7 @@ function solveL(c: HSL, vs: HSL, target: number, dir: 1 | -1): HSL {
 // Two independent bars: the fill must read against the page (≥3:1, WCAG
 // non-text — also covers --ring) and the label on the fill (≥4.5:1). The
 // candidate that moves the fill least from the flyer's color wins.
-function solveCta(vib: HSL, bg: HSL): { fill: HSL; ink: HSL } {
+function solveCta(vib: HSL, bg: HSL) {
   const away: 1 | -1 = bg.l > 0.5 ? -1 : 1;
   const base = solveL(vib, bg, 3, away);
   const darkInk: HSL = { h: vib.h, s: 0.55, l: 0.09 };
@@ -242,7 +242,9 @@ const t = ({ h, s, l }: HSL) =>
   `hsl(${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
 
 /** shadcn CSS variable overrides, as full `--var: "hsl(H S% L%)"` colors. */
-export type ThemeVars = Record<string, string>;
+// The exact CSS-variable set both derivations emit (they must stay in sync —
+// `deriveDark`'s return is checked against this shape).
+export type ThemeVars = ReturnType<typeof deriveWash>;
 
 /** The color that leads the theme: the organizer's pick, else the auto-pick. */
 export function leadColor(palette: FlyerPalette | null): string | null {
@@ -264,11 +266,7 @@ function accentColor(palette: FlyerPalette, lead: HSL): HSL {
   return hex ? hexToHsl(hex) : lead;
 }
 
-function deriveWash(
-  palette: FlyerPalette,
-  dominant: HSL,
-  lead: HSL
-): ThemeVars {
+function deriveWash(palette: FlyerPalette, dominant: HSL, lead: HSL) {
   // Poster backgrounds are usually near-black or near-white — no usable hue.
   // Tint from the lead color in that case: it's the flyer's identity.
   const domDull = dominant.s < 0.25 || dominant.l < 0.2 || dominant.l > 0.85;
@@ -308,6 +306,7 @@ function deriveDark(
   dominant: HSL,
   lead: HSL
 ): ThemeVars {
+  // (annotated so drift from `deriveWash`'s variable set fails to build)
   // Near-gray dominants report hue 0 (red) and the saturation floor would
   // manufacture color from it — only those hand the hue to the lead color.
   const domDull = dominant.s < 0.15;
@@ -366,6 +365,8 @@ export function themeStyle(
   theme: EventPageTheme,
   palette: FlyerPalette | null
 ): CSSProperties | undefined {
+  // SAFETY: every ThemeVars key is a `--*` custom property — valid in a style
+  // object at runtime; csstype just has no index signature for them.
   return (deriveThemeVars(theme, palette) ?? undefined) as
     | CSSProperties
     | undefined;

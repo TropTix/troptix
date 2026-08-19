@@ -8,12 +8,12 @@ import type { EventTicket } from '@troptix/api';
 const money = (cents: number) => getFormattedCurrency(cents / 100);
 
 // `onSale` covers a live tier that still can't be added (draft preview).
-const UNAVAILABLE_LABEL: Record<EventTicket['saleStatus'], string> = {
+const UNAVAILABLE_LABEL = {
   soldOut: 'Sold out',
   saleEnded: 'Sales ended',
   notYetOnSale: 'On sale soon',
   onSale: 'Unavailable',
-};
+} satisfies Record<EventTicket['saleStatus'], string>;
 
 function Stepper({
   value,

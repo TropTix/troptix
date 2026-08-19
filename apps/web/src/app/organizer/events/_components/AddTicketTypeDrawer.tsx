@@ -375,6 +375,8 @@ export function AddTicketTypeDrawer({
                           value={field.value}
                           onValueChange={(value: string) => {
                             field.onChange(value);
+                            // SAFETY: this Select renders only the two Fees
+                            // items, so the callback value is a Fees member.
                             handleFeesChange(value as Fees);
                           }}
                         >
