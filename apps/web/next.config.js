@@ -46,6 +46,8 @@ const nextConfig = {
   },
   reactStrictMode: false,
   images: {
+    // Default list plus 160, so 80px thumbnails resolve to 160w (not 256w) at 2x DPR.
+    imageSizes: [16, 32, 48, 64, 96, 128, 160, 256, 384],
     remotePatterns: [
       {
         protocol: 'https',
