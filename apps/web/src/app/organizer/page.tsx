@@ -169,7 +169,7 @@ function ActiveEvents({ events }: { events: OrganizerEventSummary[] }) {
         </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {events.map((event) => (
           <ActiveEventCard key={event.id} event={event} />
         ))}
@@ -186,40 +186,38 @@ function ActiveEventCard({ event }: { event: OrganizerEventSummary }) {
 
   return (
     <Link href={`/organizer/events/${event.id}`} className="group">
-      <Card className="h-full transition-colors group-hover:border-primary/50">
-        <CardContent className="flex gap-4 p-4">
-          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-            <Image
-              src={flyerUrl}
-              alt=""
-              fill
-              sizes="64px"
-              className="object-cover"
-            />
-          </div>
+      <Card className="h-full flex-row items-center gap-4 p-4 transition-colors group-hover:border-primary/50">
+        <div className="relative size-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+          <Image
+            src={flyerUrl}
+            alt=""
+            fill
+            sizes="80px"
+            className="object-cover"
+          />
+        </div>
 
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="flex items-start justify-between gap-2">
-              <p className="truncate font-medium" title={event.name}>
-                {event.name}
-              </p>
-              <div className="flex shrink-0 gap-1">
-                {event.isPrivate && <Badge variant="secondary">Private</Badge>}
-                <Badge variant="outline">{event.status}</Badge>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {getDateFormatter(new Date(event.startsAt), 'MMM d, yyyy')}
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="flex items-start justify-between gap-2">
+            <p className="truncate font-medium" title={event.name}>
+              {event.name}
             </p>
-            <div className="space-y-1 pt-1">
-              <Progress value={soldPercent} className="h-1.5" />
-              <p className="text-xs text-muted-foreground">
-                {event.sold.toLocaleString()} /{' '}
-                {event.capacity.toLocaleString()} sold
-              </p>
+            <div className="flex shrink-0 gap-1">
+              {event.isPrivate && <Badge variant="secondary">Private</Badge>}
+              <Badge variant="outline">{event.status}</Badge>
             </div>
           </div>
-        </CardContent>
+          <p className="text-xs text-muted-foreground">
+            {getDateFormatter(new Date(event.startsAt), 'MMM d, yyyy')}
+          </p>
+          <div className="space-y-1 pt-1">
+            <Progress value={soldPercent} className="h-1.5" />
+            <p className="text-xs text-muted-foreground">
+              {event.sold.toLocaleString()} / {event.capacity.toLocaleString()}{' '}
+              sold
+            </p>
+          </div>
+        </div>
       </Card>
     </Link>
   );
