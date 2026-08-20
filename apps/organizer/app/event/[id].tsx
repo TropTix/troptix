@@ -8,8 +8,8 @@ import Scanner from './scanner';
 const Tab = createMaterialTopTabNavigator();
 
 export default function EventDetails() {
-  const { id } = useLocalSearchParams();
-  const { isPending, isError, data, error } = useFetchEventById(id as string);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { isPending, isError, data, error } = useFetchEventById(id);
 
   return (
     <View style={{ height: '100%', backgroundColor: 'white' }}>

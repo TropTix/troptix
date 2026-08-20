@@ -4,6 +4,7 @@
  * states, the priceCents fallback, per-ticket-type revenue, and the summary totals.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { listTicketTypes } from './organizer-ticket-types';
@@ -14,7 +15,22 @@ const NOW = new Date('2026-07-15T12:00:00Z');
 const OWNER: Actor = { kind: 'user', userId: 'owner-1', role: 'PATRON' };
 const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 
-const ticketType = (over: Record<string, unknown> = {}) => ({
+type TicketTypeRow = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  priceCents: number | null;
+  capacity: number;
+  sold: number;
+  maxPurchasePerUser: number;
+  saleStartsAt: Date;
+  saleEndsAt: Date;
+  ticketingFees: string;
+  discountCode: string | null;
+};
+
+const ticketType = (over: Partial<TicketTypeRow> = {}): TicketTypeRow => ({
   id: 't-ga',
   name: 'GA',
   description: 'Main floor',
@@ -49,7 +65,7 @@ function fakePrisma(
   );
   const ticketsGroupBy = vi.fn().mockResolvedValue(opts.revenue ?? []);
 
-  const prisma = {
+  const prisma = fromPartial<PrismaClient>({
     users: {
       findUnique: vi
         .fn()
@@ -57,7 +73,7 @@ function fakePrisma(
     },
     events: { findFirst: eventsFindFirst },
     tickets: { groupBy: ticketsGroupBy },
-  } as unknown as PrismaClient;
+  });
 
   return { prisma, eventsFindFirst, ticketsGroupBy };
 }

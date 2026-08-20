@@ -8,10 +8,11 @@ jest.mock('@/lib/supabase/server', () => ({
   createClient: jest.fn(),
 }));
 
+import { fromPartial } from '@total-typescript/shoehorn';
 import { createClient } from '@/lib/supabase/server';
 import { GET } from './route';
 
-const mockCreateClient = createClient as jest.Mock;
+const mockCreateClient = jest.mocked(createClient);
 
 const APP_ORIGIN = 'https://example.com';
 
@@ -26,12 +27,16 @@ function mockSupabase({
   exchangeError?: Error | null;
   verifyError?: Error | null;
 } = {}) {
-  mockCreateClient.mockResolvedValue({
-    auth: {
-      exchangeCodeForSession: jest.fn(async () => ({ error: exchangeError })),
-      verifyOtp: jest.fn(async () => ({ error: verifyError })),
-    },
-  });
+  mockCreateClient.mockResolvedValue(
+    fromPartial({
+      auth: {
+        exchangeCodeForSession: jest.fn(async () => ({
+          error: exchangeError,
+        })),
+        verifyOtp: jest.fn(async () => ({ error: verifyError })),
+      },
+    })
+  );
 }
 
 beforeEach(() => {

@@ -34,6 +34,9 @@ function GlobalLayout({ children }: { children: React.ReactNode }) {
 // The reservationId is a bearer capability (it dereferences to the order and
 // ticket QRs). It stays in the URL by design (resume-on-refresh), so strip it
 // from URL properties before they reach PostHog.
+// PostHog's `sanitize_properties` hands over untyped property values, so
+// `unknown` in/out plus a `typeof` branch is the narrowing this boundary needs.
+// oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns, anti-slop/no-runtime-typeof
 function stripReservationParam(value: unknown): unknown {
   if (typeof value !== 'string') return value;
   try {
@@ -45,6 +48,7 @@ function stripReservationParam(value: unknown): unknown {
     return value;
   }
 }
+// oxlint-enable anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns, anti-slop/no-runtime-typeof
 
 function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {

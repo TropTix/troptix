@@ -2,6 +2,17 @@ import { NextResponse } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 
+// The `type` query param is untrusted; only these values reach verifyOtp. The
+// satisfies clause keeps the list within supabase's union (typos fail to build).
+const EMAIL_OTP_TYPES = [
+  'signup',
+  'invite',
+  'magiclink',
+  'recovery',
+  'email_change',
+  'email',
+] as const satisfies readonly EmailOtpType[];
+
 // Parse, then compare origins. A string check like startsWith('/') misses the
 // shapes a URL parser folds into the authority component.
 function resolveNext(next: string | null, origin: string): string {
@@ -26,7 +37,8 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
   const tokenHash = searchParams.get('token_hash');
-  const type = searchParams.get('type') as EmailOtpType | null;
+  const typeParam = searchParams.get('type');
+  const type = EMAIL_OTP_TYPES.find((t) => t === typeParam) ?? null;
   const next = searchParams.get('next') ?? '/';
 
   const supabase = await createClient();

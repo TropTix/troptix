@@ -96,7 +96,7 @@ export default function Login() {
     const account = await GoogleSignin.signIn();
     const idToken = account.data?.idToken;
 
-    const googleCredential = GoogleAuthProvider.credential(idToken as string);
+    const googleCredential = GoogleAuthProvider.credential(idToken ?? null);
 
     return signInWithCredential(getAuth(), googleCredential)
       .then((user) => {

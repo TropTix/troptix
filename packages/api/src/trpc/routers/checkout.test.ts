@@ -5,6 +5,7 @@
  * itself is covered by services/checkout.test.ts.
  */
 import { describe, expect, it } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import { createCaller } from './index';
 import { createContext } from '../context';
@@ -33,13 +34,13 @@ function fakePrisma(opts: {
   ticketTypes?: unknown[];
   matched?: unknown;
 }): PrismaClient {
-  return {
+  return fromPartial<PrismaClient>({
     ticketTypes: {
       findMany: async () => opts.ticketTypes ?? [],
       findFirst: async () => opts.matched ?? null,
     },
     events: { count: async () => 1 },
-  } as unknown as PrismaClient;
+  });
 }
 
 function caller(prisma: PrismaClient) {

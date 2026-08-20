@@ -21,31 +21,43 @@ const withScheme = (url: string) =>
   /^https?:\/\//i.test(url) ? url : `https://${url}`;
 const handle = (username: string) => username.replace(/^@+/, '').trim();
 
+type SocialLink = {
+  icon: React.ComponentType<{ className?: string }>;
+  href: string;
+  label: string;
+};
+
 function build(socials: OrgSocials) {
-  return [
-    socials.instagram &&
-      handle(socials.instagram) && {
-        icon: Instagram,
-        href: `https://instagram.com/${handle(socials.instagram)}`,
-        label: 'Instagram',
-      },
-    socials.twitter &&
-      handle(socials.twitter) && {
-        icon: Twitter,
-        href: `https://x.com/${handle(socials.twitter)}`,
-        label: 'Twitter',
-      },
-    socials.linkedin && {
+  const links: SocialLink[] = [];
+  if (socials.instagram && handle(socials.instagram)) {
+    links.push({
+      icon: Instagram,
+      href: `https://instagram.com/${handle(socials.instagram)}`,
+      label: 'Instagram',
+    });
+  }
+  if (socials.twitter && handle(socials.twitter)) {
+    links.push({
+      icon: Twitter,
+      href: `https://x.com/${handle(socials.twitter)}`,
+      label: 'Twitter',
+    });
+  }
+  if (socials.linkedin) {
+    links.push({
       icon: Linkedin,
       href: withScheme(socials.linkedin),
       label: 'LinkedIn',
-    },
-    socials.website && {
+    });
+  }
+  if (socials.website) {
+    links.push({
       icon: Globe,
       href: withScheme(socials.website),
       label: 'Website',
-    },
-  ].filter(Boolean) as { icon: typeof Globe; href: string; label: string }[];
+    });
+  }
+  return links;
 }
 
 export function OrgSocialLinks({

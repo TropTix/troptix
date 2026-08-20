@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { sendEmailConfirmationEmailToUser } from '@/server/lib/email';
+
+const bodySchema = z.object({ orderId: z.string().min(1) });
 
 /**
  * Sends the order confirmation email after checkout. Fired (fire-and-forget) by
@@ -8,15 +11,15 @@ import { sendEmailConfirmationEmailToUser } from '@/server/lib/email';
  */
 export async function POST(req: Request) {
   try {
-    const { orderId } = (await req.json()) as { orderId?: string };
-    if (!orderId) {
+    const body = bodySchema.safeParse(await req.json());
+    if (!body.success) {
       return NextResponse.json(
         { success: false, error: 'orderId is required' },
         { status: 400 }
       );
     }
 
-    await sendEmailConfirmationEmailToUser(orderId);
+    await sendEmailConfirmationEmailToUser(body.data.orderId);
     return NextResponse.json({ success: true });
   } catch (error) {
     const details = error instanceof Error ? error.message : 'Unknown error';

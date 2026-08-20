@@ -11,6 +11,7 @@ jest.mock('@troptix/api/server', () => {
   return { toggleTicketCheckIn: jest.fn(), NotFoundError, ConflictError };
 });
 
+import { fromPartial } from '@total-typescript/shoehorn';
 import { revalidatePath } from 'next/cache';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import {
@@ -20,8 +21,8 @@ import {
 } from '@troptix/api/server';
 import { toggleTicketStatus } from './attendeeActions';
 
-const mockGetUser = getUserFromIdTokenCookie as jest.Mock;
-const mockToggle = toggleTicketCheckIn as unknown as jest.Mock;
+const mockGetUser = jest.mocked(getUserFromIdTokenCookie);
+const mockToggle = jest.mocked(toggleTicketCheckIn);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -36,11 +37,13 @@ beforeEach(() => {
 
 describe('toggleTicketStatus', () => {
   it('calls the seam as the caller and revalidates the ticket’s own event page', async () => {
-    mockToggle.mockResolvedValue({
-      id: 't1',
-      status: 'NOT_AVAILABLE',
-      eventId: 'e1',
-    });
+    mockToggle.mockResolvedValue(
+      fromPartial({
+        id: 't1',
+        status: 'NOT_AVAILABLE',
+        eventId: 'e1',
+      })
+    );
 
     const result = await toggleTicketStatus('t1');
 

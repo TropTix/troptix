@@ -5,6 +5,7 @@
  * stamp-vs-clear are the behaviors the routes used to own.
  */
 import { describe, expect, it } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import {
@@ -29,8 +30,8 @@ type EventRow = {
   deletedAt: Date | null;
 };
 
-function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
-  const prisma = {
+function fakeImpls(events: EventRow[], tickets: TicketRow[]) {
+  return {
     events: {
       findFirst: async ({ where }: any) =>
         events.find(
@@ -80,16 +81,19 @@ function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
         return updated;
       },
     },
-  } as unknown as PrismaClient;
-  return prisma;
+  };
 }
 
-const seed = (): { events: EventRow[]; tickets: TicketRow[] } => ({
-  events: [
+function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
+  return fromPartial<PrismaClient>(fakeImpls(events, tickets));
+}
+
+const seed = () => {
+  const events: EventRow[] = [
     { id: 'e1', organizerUserId: 'org-1', deletedAt: null },
     { id: 'e2', organizerUserId: 'org-2', deletedAt: null },
-  ],
-  tickets: [
+  ];
+  const tickets: TicketRow[] = [
     {
       id: 't1',
       eventId: 'e1',
@@ -104,8 +108,9 @@ const seed = (): { events: EventRow[]; tickets: TicketRow[] } => ({
       checkinTimestamp: null,
       ticketType: null,
     },
-  ],
-});
+  ];
+  return { events, tickets };
+};
 
 describe('scanTicket', () => {
   it("throws NotFound for an event the actor doesn't own", async () => {
@@ -250,16 +255,18 @@ describe('toggleTicketCheckIn', () => {
 
   it('refuses when the row changed between the read and the write', async () => {
     const { events, tickets } = seed();
-    const prisma = makeFakePrisma(events, tickets);
+    const impls = fakeImpls(events, tickets);
     // A competing scan won the race: the stored row is already checked in,
     // but this caller's read saw it un-checked.
     tickets[0].status = 'NOT_AVAILABLE';
     tickets[0].checkinTimestamp = new Date();
-    const stale = { ...prisma } as any;
-    stale.tickets = {
-      ...(prisma as any).tickets,
-      findFirst: async () => ({ id: 't1', status: 'AVAILABLE' }),
-    };
+    const stale = fromPartial<PrismaClient>({
+      ...impls,
+      tickets: {
+        ...impls.tickets,
+        findFirst: async () => ({ id: 't1', status: 'AVAILABLE' }),
+      },
+    });
     await expect(
       toggleTicketCheckIn(stale, owner, { ticketId: 't1' })
     ).rejects.toBeInstanceOf(ConflictError);

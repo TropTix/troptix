@@ -152,8 +152,7 @@ const MobileAttendeeView = ({
 };
 
 const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
-  const params = useParams();
-  const eventId = params?.eventId as string;
+  const { eventId } = useParams<{ eventId: string }>();
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
 

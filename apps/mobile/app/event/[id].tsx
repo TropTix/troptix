@@ -202,12 +202,13 @@ function ScannerTab({
   );
 }
 
-const TICKET_COLORS: Record<string, string> = {
-  VIP: '#F59E0B',
-  'General Admission': colors.accent,
-  'Early Bird': colors.success,
-  RSVP: '#8B5CF6',
-};
+// An open lookup — ticket-type names are organizer-authored strings.
+const TICKET_COLORS = new Map<string, string>([
+  ['VIP', '#F59E0B'],
+  ['General Admission', colors.accent],
+  ['Early Bird', colors.success],
+  ['RSVP', '#8B5CF6'],
+]);
 
 function GuestRow({
   guest,
@@ -249,7 +250,7 @@ function GuestRow({
         <Text
           style={[
             styles.ticketPillText,
-            { color: TICKET_COLORS[guest.ticketType] ?? colors.textMuted },
+            { color: TICKET_COLORS.get(guest.ticketType) ?? colors.textMuted },
           ]}
         >
           {guest.ticketType}

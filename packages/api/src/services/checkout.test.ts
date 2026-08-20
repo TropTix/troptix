@@ -5,6 +5,7 @@
  * mapping / sorting / gating / fee logic (ADR 0010).
  */
 import { describe, expect, it } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import { applyCode, getCheckoutConfig } from './checkout';
 
@@ -55,7 +56,7 @@ function fakePrisma(opts: {
   matchedTicketType?: Row | null;
   eventCount?: number;
 }): PrismaClient {
-  return {
+  return fromPartial<PrismaClient>({
     ticketTypes: {
       findMany: async () => opts.ticketTypes ?? [],
       findFirst: async () => opts.matchedTicketType ?? null,
@@ -63,7 +64,7 @@ function fakePrisma(opts: {
     events: {
       count: async () => opts.eventCount ?? 0,
     },
-  } as unknown as PrismaClient;
+  });
 }
 
 /** Run getCheckoutConfig over a single ticket-type row and return the mapped ticket. */

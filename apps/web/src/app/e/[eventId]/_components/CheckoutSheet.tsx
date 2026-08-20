@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePostHog } from 'posthog-js/react';
+import type { Properties } from 'posthog-js';
 import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
@@ -9,6 +10,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { trpc } from '@/lib/trpc';
 import type {
   BeginPaymentResponse,
+  CreateReservationInput,
   EventDetail,
   ReservationContact,
 } from '@troptix/api';
@@ -30,7 +32,7 @@ type Step =
   | 'expired'
   | 'refunded';
 
-const STEP_TITLE: Record<Step, string> = {
+const STEP_TITLE = {
   select: 'Choose tickets',
   contact: 'Your details',
   payment: 'Payment',
@@ -38,15 +40,15 @@ const STEP_TITLE: Record<Step, string> = {
   success: "You're going",
   expired: 'Hold expired',
   refunded: 'Payment refunded',
-};
+} satisfies Record<Step, string>;
 
 type SuccessData = {
   orderId: string;
   tickets: { id: string; ticketTypeName: string | null }[];
 };
 
+// Only called from event handlers, so `window` always exists.
 function setReservationParam(reservationId: string | null) {
-  if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   if (reservationId) url.searchParams.set('reservation', reservationId);
   else url.searchParams.delete('reservation');
@@ -93,20 +95,20 @@ export default function CheckoutSheet({
 
   // The browser's PostHog identity, sent with the hold so the server-side
   // conversion capture joins this person/session (see contracts/analytics.ts).
-  function analyticsIds() {
+  function analyticsIds(): CreateReservationInput['analytics'] {
     try {
+      const ids: NonNullable<CreateReservationInput['analytics']> = {};
       const distinctId = posthog.get_distinct_id();
+      if (distinctId) ids.distinctId = distinctId;
       const sessionId = posthog.get_session_id();
-      return {
-        ...(distinctId ? { distinctId } : {}),
-        ...(sessionId ? { sessionId } : {}),
-      };
+      if (sessionId) ids.sessionId = sessionId;
+      return ids;
     } catch {
       return undefined;
     }
   }
 
-  function capture(name: string, props?: Record<string, unknown>) {
+  function capture(name: string, props?: Properties) {
     posthog.capture(name, { event_id: event.id, ...props });
   }
 

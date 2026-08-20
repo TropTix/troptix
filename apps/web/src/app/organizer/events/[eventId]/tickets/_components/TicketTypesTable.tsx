@@ -17,14 +17,14 @@ import {
 } from '@/components/ui/table';
 import { formatPriceCents, getDateFormatter } from '@/lib/dateUtils';
 
-const SALE_STATE: Record<
-  SaleState,
-  { label: string; variant: 'default' | 'outline' | 'secondary' }
-> = {
+const SALE_STATE = {
   OnSale: { label: 'On Sale', variant: 'default' },
   Scheduled: { label: 'Scheduled', variant: 'outline' },
   Ended: { label: 'Ended', variant: 'secondary' },
-};
+} satisfies Record<
+  SaleState,
+  { label: string; variant: 'default' | 'outline' | 'secondary' }
+>;
 
 function saleDate(iso: string) {
   return getDateFormatter(new Date(iso), 'MMM d, yyyy');

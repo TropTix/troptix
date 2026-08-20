@@ -73,8 +73,10 @@ const createPrismaClient = () => {
   });
 };
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+// SAFETY: `globalThis` carries no `prisma` property in its type; we widen it to
+// cache the client across Next.js dev HMR reloads. Only this module touches it.
+const globalForPrisma = globalThis as typeof globalThis & {
+  prisma?: PrismaClient;
 };
 
 const prisma = globalForPrisma.prisma ?? createPrismaClient();

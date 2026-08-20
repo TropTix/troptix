@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { sendRefundNoticeEmail } from '@/server/lib/email';
+
+const bodySchema = z.object({ reservationId: z.string().min(1) });
 
 /**
  * Sends the auto-refund notice after the expiry race (ADR 0018). The reservation
@@ -10,15 +13,15 @@ import { sendRefundNoticeEmail } from '@/server/lib/email';
  */
 export async function POST(req: Request) {
   try {
-    const { reservationId } = (await req.json()) as { reservationId?: string };
-    if (!reservationId) {
+    const body = bodySchema.safeParse(await req.json());
+    if (!body.success) {
       return NextResponse.json(
         { success: false, error: 'reservationId is required' },
         { status: 400 }
       );
     }
 
-    await sendRefundNoticeEmail(reservationId);
+    await sendRefundNoticeEmail(body.data.reservationId);
     return NextResponse.json({ success: true });
   } catch (error) {
     const details = error instanceof Error ? error.message : 'Unknown error';

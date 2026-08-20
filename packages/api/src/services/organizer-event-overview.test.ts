@@ -6,6 +6,7 @@
  * check-in summary, and the zero-filled revenue series.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { getEventOverview } from './organizer-event-overview';
@@ -53,7 +54,7 @@ function fakePrisma(opts: FakeOpts = {}) {
   const ticketsCount = vi.fn().mockResolvedValue(opts.checkedIn ?? 0);
   const ordersFindMany = vi.fn().mockResolvedValue(opts.orders ?? []);
 
-  const prisma = {
+  const prisma = fromPartial<PrismaClient>({
     users: {
       findUnique: vi
         .fn()
@@ -63,12 +64,16 @@ function fakePrisma(opts: FakeOpts = {}) {
     orders: { aggregate: ordersAggregate, findMany: ordersFindMany },
     tickets: { groupBy: ticketsGroupBy, count: ticketsCount },
     $queryRaw: queryRaw,
-  } as unknown as PrismaClient;
+  });
 
   return { prisma, eventsFindFirst };
 }
 
-const ticketType = (id: string, count: number, subtotal: number | null) => ({
+const ticketType = (
+  id: string | null,
+  count: number,
+  subtotal: number | null
+) => ({
   ticketTypeId: id,
   _count: { _all: count },
   _sum: { subtotal },
@@ -148,7 +153,7 @@ describe('getEventOverview — vitals & ticketTypes', () => {
       },
       rollups: [
         ticketType('t-ga', 37, 370),
-        ticketType(null as never, 3, 30), // orphaned: type deleted
+        ticketType(null, 3, 30), // orphaned: type deleted
       ],
     });
 
@@ -161,7 +166,7 @@ describe('getEventOverview — vitals & ticketTypes', () => {
 
   it('counts null-ticketType tickets in sold (and the check-in total) though no ticketType shows them', async () => {
     const { prisma } = fakePrisma({
-      rollups: [ticketType('t-ga', 40, 400), ticketType(null as never, 3, 30)],
+      rollups: [ticketType('t-ga', 40, 400), ticketType(null, 3, 30)],
       checkedIn: 10,
     });
     const result = await getEventOverview(prisma, OWNER, 'e1', {}, NOW);

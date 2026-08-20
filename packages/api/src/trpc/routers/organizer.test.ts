@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@troptix/db';
 import { describe, expect, it } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import { createContext } from '../context';
 import { createCaller } from './index';
 
@@ -9,7 +10,7 @@ type MockPrismaOptions = {
 };
 
 function fakePrisma(opts: MockPrismaOptions): PrismaClient {
-  return {
+  return fromPartial<PrismaClient>({
     tickets: {
       findUnique: async () => opts.ticket ?? null,
       updateMany: async ({ where }: any) => {
@@ -31,7 +32,7 @@ function fakePrisma(opts: MockPrismaOptions): PrismaClient {
     events: {
       findMany: async () => opts.events ?? [],
     },
-  } as unknown as PrismaClient;
+  });
 }
 
 function caller(prisma: PrismaClient) {
@@ -58,7 +59,7 @@ describe('appRouter.organizer (via createCaller)', () => {
 
   it('rejects invalid input at the boundary (empty ticketId)', async () => {
     await expect(
-      (caller(fakePrisma({})).organizer.checkInTicket as any)({})
+      caller(fakePrisma({})).organizer.checkInTicket(fromPartial({}))
     ).rejects.toThrow();
   });
 

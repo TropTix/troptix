@@ -5,6 +5,7 @@
  * (cents + legacy float + FREE/PAID + discountCode null-coalescing).
  */
 import { describe, expect, it, vi } from 'vitest';
+import { fromPartial } from '@total-typescript/shoehorn';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type { TicketTypeInput } from '../contracts/organizer';
@@ -52,7 +53,7 @@ function fakePrisma(
   const ticketTypesCreate = vi.fn().mockResolvedValue({});
   const ticketTypesUpdate = vi.fn().mockResolvedValue({});
 
-  const prisma = {
+  const prisma = fromPartial<PrismaClient>({
     organization: {
       findFirst: vi
         .fn()
@@ -68,7 +69,7 @@ function fakePrisma(
       create: ticketTypesCreate,
       update: ticketTypesUpdate,
     },
-  } as unknown as PrismaClient;
+  });
 
   return {
     prisma,

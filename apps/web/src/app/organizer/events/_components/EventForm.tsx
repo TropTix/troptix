@@ -266,7 +266,7 @@ export default function EventForm({
     }
   };
 
-  const { ref: placesRef } = usePlacesWidget({
+  const { ref: placesRef } = usePlacesWidget<HTMLInputElement>({
     apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
     onPlaceSelected: handlePlaceSelected,
     options: {
@@ -556,8 +556,11 @@ export default function EventForm({
                             {...field}
                             ref={(el) => {
                               field.ref(el);
+                              // SAFETY: React ref callbacks pass null on
+                              // unmount; the hook types its ref non-null but
+                              // the ref object accepts null at runtime.
                               (
-                                placesRef as React.MutableRefObject<HTMLInputElement | null>
+                                placesRef as React.RefObject<HTMLInputElement | null>
                               ).current = el;
                             }}
                           />

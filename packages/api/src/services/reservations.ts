@@ -167,24 +167,23 @@ export async function reserve(
     const totalCents = subtotalCents + feesCents;
 
     // One write: create the hold with its items and final totals already known.
-    await tx.reservation.create({
-      data: {
-        id: reservationId,
-        status: ReservationStatus.HELD,
-        expiresAt,
-        email: input.contact?.email ?? null,
-        firstName: input.contact?.firstName ?? null,
-        lastName: input.contact?.lastName ?? null,
-        posthogDistinctId: input.analytics?.distinctId ?? null,
-        posthogSessionId: input.analytics?.sessionId ?? null,
-        subtotalCents,
-        feesCents,
-        totalCents,
-        event: { connect: { id: input.eventId } },
-        ...(input.userId ? { user: { connect: { id: input.userId } } } : {}),
-        items: { createMany: { data: itemRows } },
-      },
-    });
+    const data: Prisma.ReservationCreateInput = {
+      id: reservationId,
+      status: ReservationStatus.HELD,
+      expiresAt,
+      email: input.contact?.email ?? null,
+      firstName: input.contact?.firstName ?? null,
+      lastName: input.contact?.lastName ?? null,
+      posthogDistinctId: input.analytics?.distinctId ?? null,
+      posthogSessionId: input.analytics?.sessionId ?? null,
+      subtotalCents,
+      feesCents,
+      totalCents,
+      event: { connect: { id: input.eventId } },
+      items: { createMany: { data: itemRows } },
+    };
+    if (input.userId) data.user = { connect: { id: input.userId } };
+    await tx.reservation.create({ data });
 
     return {
       reservationId,
@@ -392,7 +391,7 @@ async function materializeOrder(
     });
 
     for (let i = 0; i < item.quantity; i++) {
-      ticketRows.push({
+      const row: Prisma.TicketsCreateManyOrderInput = {
         id: generateId(),
         status: TicketStatus.VALID,
         ticketsType,
@@ -404,48 +403,49 @@ async function materializeOrder(
         email: reservation.email,
         eventId: reservation.eventId,
         ticketTypeId: item.ticketTypeId,
-        ...(reservation.userId ? { userId: reservation.userId } : {}),
-      });
+      };
+      if (reservation.userId) row.userId = reservation.userId;
+      ticketRows.push(row);
     }
   }
 
   const orderId = generateId();
-  await tx.orders.create({
-    data: {
-      id: orderId,
-      status: OrderStatus.COMPLETED,
-      type: orderType,
-      stripePaymentId: opts.paymentIntentId ?? null,
-      total: reservation.totalCents / 100,
-      subtotal: reservation.subtotalCents / 100,
-      fees: reservation.feesCents / 100,
-      totalCents: reservation.totalCents,
-      subtotalCents: reservation.subtotalCents,
-      feesCents: reservation.feesCents,
-      firstName: reservation.firstName,
-      lastName: reservation.lastName,
-      email: reservation.email,
-      cardType: opts.cardType ?? null,
-      cardLast4: opts.cardLast4 ?? null,
-      event: { connect: { id: reservation.eventId } },
-      ...(reservation.userId
-        ? { user: { connect: { id: reservation.userId } } }
-        : {}),
-      tickets: { createMany: { data: ticketRows } },
-    },
-  });
+  const orderData: Prisma.OrdersCreateInput = {
+    id: orderId,
+    status: OrderStatus.COMPLETED,
+    type: orderType,
+    stripePaymentId: opts.paymentIntentId ?? null,
+    total: reservation.totalCents / 100,
+    subtotal: reservation.subtotalCents / 100,
+    fees: reservation.feesCents / 100,
+    totalCents: reservation.totalCents,
+    subtotalCents: reservation.subtotalCents,
+    feesCents: reservation.feesCents,
+    firstName: reservation.firstName,
+    lastName: reservation.lastName,
+    email: reservation.email,
+    cardType: opts.cardType ?? null,
+    cardLast4: opts.cardLast4 ?? null,
+    event: { connect: { id: reservation.eventId } },
+    tickets: { createMany: { data: ticketRows } },
+  };
+  if (reservation.userId) {
+    orderData.user = { connect: { id: reservation.userId } };
+  }
+  await tx.orders.create({ data: orderData });
 
+  const reservationData: Prisma.ReservationUncheckedUpdateInput = {
+    status: ReservationStatus.CONVERTED,
+    orderId,
+  };
+  // Backfill the PaymentIntent id for refund traceability (paid path); the
+  // paid flow keys off the Checkout Session, so this is set here at confirm.
+  if (opts.paymentIntentId) {
+    reservationData.stripePaymentIntentId = opts.paymentIntentId;
+  }
   await tx.reservation.update({
     where: { id: reservation.id },
-    data: {
-      status: ReservationStatus.CONVERTED,
-      orderId,
-      // Backfill the PaymentIntent id for refund traceability (paid path); the
-      // paid flow keys off the Checkout Session, so this is set here at confirm.
-      ...(opts.paymentIntentId
-        ? { stripePaymentIntentId: opts.paymentIntentId }
-        : {}),
-    },
+    data: reservationData,
   });
 
   return orderId;

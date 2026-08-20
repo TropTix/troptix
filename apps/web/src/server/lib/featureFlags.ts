@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { PostHog } from 'posthog-node';
+import { z } from 'zod';
 import type { FeatureFlagKey } from '@troptix/api';
 
 /**
@@ -32,10 +33,11 @@ export async function isFlagEnabled(
       featureFlagsRequestTimeoutMs: 2000,
     });
     const distinctId = user?.id || (await anonymousDistinctId(apiKey));
-    const flags = await client.evaluateFlags(distinctId, {
+    const options: Parameters<typeof client.evaluateFlags>[1] = {
       flagKeys: [flag],
-      ...(user?.email ? { personProperties: { email: user.email } } : {}),
-    });
+    };
+    if (user?.email) options.personProperties = { email: user.email };
+    const flags = await client.evaluateFlags(distinctId, options);
     return flags.isEnabled(flag);
   } catch {
     return false;
@@ -59,8 +61,10 @@ async function anonymousDistinctId(apiKey: string): Promise<string> {
     const store = await cookies();
     const raw = store.get(`ph_${apiKey}_posthog`)?.value;
     if (raw) {
-      const distinctId = JSON.parse(raw)?.distinct_id;
-      if (typeof distinctId === 'string' && distinctId) return distinctId;
+      const cookie = z
+        .object({ distinct_id: z.string().min(1) })
+        .safeParse(JSON.parse(raw));
+      if (cookie.success) return cookie.data.distinct_id;
     }
   } catch {
     // No request scope or unreadable cookie — fall through.

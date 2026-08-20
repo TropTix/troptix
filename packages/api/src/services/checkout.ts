@@ -72,7 +72,7 @@ function toCheckoutTicket(
       ? calculateFeesCents(priceCents)
       : 0;
 
-  return {
+  const ticket: CheckoutTicket = {
     id: tt.id,
     name: tt.name,
     description: tt.description,
@@ -84,8 +84,9 @@ function toCheckoutTicket(
     feeStructure: tt.ticketingFees,
     ticketType: tt.ticketType,
     ticketQuantityLow: availability > 0 && availability < 10,
-    ...(opts.isPasswordProtected ? { isPasswordProtected: true } : {}),
   };
+  if (opts.isPasswordProtected) ticket.isPasswordProtected = true;
+  return ticket;
 }
 
 /**

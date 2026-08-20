@@ -11,6 +11,7 @@ jest.mock('@/server/prisma', () => ({
   default: { users: { findUnique: jest.fn() } },
 }));
 
+import { fromAny, fromPartial } from '@total-typescript/shoehorn';
 import { createClient } from '@/lib/supabase/server';
 import prisma from '@/server/prisma';
 import {
@@ -19,8 +20,8 @@ import {
   getUserFromIdTokenCookie,
 } from './authUser';
 
-const mockCreateClient = createClient as jest.Mock;
-const mockFindUnique = prisma.users.findUnique as jest.Mock;
+const mockCreateClient = jest.mocked(createClient);
+const mockFindUnique = jest.mocked(prisma.users.findUnique);
 const mockGetClaims = jest.fn();
 
 const AUTH_SUB = '11111111-1111-1111-1111-111111111111';
@@ -33,9 +34,11 @@ const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
-  mockCreateClient.mockResolvedValue({
-    auth: { getClaims: mockGetClaims },
-  });
+  mockCreateClient.mockResolvedValue(
+    fromPartial({
+      auth: { getClaims: mockGetClaims },
+    })
+  );
 });
 
 afterEach(() => {
@@ -50,12 +53,14 @@ afterEach(() => {
 describe('getServerUser', () => {
   it('resolves uid to the app Users.id, not the auth sub (ADR 0011/0015)', async () => {
     mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });
-    mockFindUnique.mockResolvedValue({
-      id: APP_USER_ID,
-      email: 'a@example.com',
-      role: 'PATRON',
-      isPlatformOwner: false,
-    });
+    mockFindUnique.mockResolvedValue(
+      fromPartial({
+        id: APP_USER_ID,
+        email: 'a@example.com',
+        role: 'PATRON',
+        isPlatformOwner: false,
+      })
+    );
 
     const result = await getServerUser();
 
@@ -102,12 +107,15 @@ describe('getServerUser', () => {
 
   it('falls back isPlatformOwner to false when the row has it as null', async () => {
     mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });
-    mockFindUnique.mockResolvedValue({
-      id: APP_USER_ID,
-      email: 'a@example.com',
-      role: 'PATRON',
-      isPlatformOwner: null,
-    });
+    // fromAny: feeds an off-schema null to exercise the defensive `?? false`.
+    mockFindUnique.mockResolvedValue(
+      fromAny({
+        id: APP_USER_ID,
+        email: 'a@example.com',
+        role: 'PATRON',
+        isPlatformOwner: null,
+      })
+    );
 
     const result = await getServerUser();
 
@@ -118,12 +126,14 @@ describe('getServerUser', () => {
 describe('getUserFromIdTokenCookie', () => {
   it('passes an explicit token through to getClaims', async () => {
     mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });
-    mockFindUnique.mockResolvedValue({
-      id: APP_USER_ID,
-      email: 'a@example.com',
-      role: 'PATRON',
-      isPlatformOwner: false,
-    });
+    mockFindUnique.mockResolvedValue(
+      fromPartial({
+        id: APP_USER_ID,
+        email: 'a@example.com',
+        role: 'PATRON',
+        isPlatformOwner: false,
+      })
+    );
 
     await getUserFromIdTokenCookie('bearer-token');
 
@@ -144,15 +154,17 @@ describe('getUserFromIdTokenCookie', () => {
 describe('getCurrentUserProfile', () => {
   it('returns the profile keyed on the app Users.id, not the auth sub (ADR 0011/0015)', async () => {
     mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });
-    mockFindUnique.mockResolvedValue({
-      id: APP_USER_ID,
-      email: 'a@example.com',
-      firstName: 'A',
-      lastName: 'B',
-      role: 'PATRON',
-      stripeId: null,
-      isPlatformOwner: false,
-    });
+    mockFindUnique.mockResolvedValue(
+      fromPartial({
+        id: APP_USER_ID,
+        email: 'a@example.com',
+        firstName: 'A',
+        lastName: 'B',
+        role: 'PATRON',
+        stripeId: null,
+        isPlatformOwner: false,
+      })
+    );
 
     const profile = await getCurrentUserProfile();
 

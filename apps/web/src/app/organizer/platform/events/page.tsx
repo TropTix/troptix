@@ -77,13 +77,10 @@ export default async function PlatformEventsPage() {
     { totalEvents: 0, totalRevenue: 0, totalTickets: 0, totalOrders: 0 }
   );
 
-  const statusGroups = events.reduce(
-    (acc, event) => {
-      acc[event.status] = (acc[event.status] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
+  const statusGroups = events.reduce<Record<string, number>>((acc, event) => {
+    acc[event.status] = (acc[event.status] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">

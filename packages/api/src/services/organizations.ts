@@ -7,6 +7,7 @@
  * (== `Events.organizerUserId`) and enforced by a unique index (ADR 0022). See
  * docs/plans/2026-06-event-spotlight-and-organizer-brand.md (2, 2b).
  */
+import { Prisma } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
 import type { EventSummary } from '../contracts/events';
 import type {
@@ -69,7 +70,10 @@ export async function ensureOrganizationForUser(
   } catch (err) {
     // ownerUserId is unique (one org per owner): a concurrent ensure lost the
     // race — the winner's row is the org. Slug collisions rethrow.
-    if ((err as { code?: string }).code === 'P2002') {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
       const winner = await findOrganizationForOwner(prisma, ownerUserId);
       if (winner) return winner;
     }
@@ -143,7 +147,10 @@ export async function updateOrganizationProfile(
       });
     }
   } catch (err) {
-    if ((err as { code?: string }).code === 'P2002') {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
       // Two uniques can fire. Losing the one-org-per-owner race means a
       // concurrent first save won — its row exists now, so retry as an update.
       // Otherwise it's the slug race, and the index is the arbiter.

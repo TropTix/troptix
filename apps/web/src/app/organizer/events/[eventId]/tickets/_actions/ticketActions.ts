@@ -107,10 +107,14 @@ function toServiceInput(data: TicketTypeFormValues) {
   };
 }
 
+// Catch-clause boundary: `unknown` is the caught-error type; the instanceof
+// chain below is what parses it.
+// oxlint-disable anti-slop/no-unknown-parameters
 function failure(
   error: unknown,
   messages: { notFound: string; fallback: string }
 ): ActionResult {
+  // oxlint-enable anti-slop/no-unknown-parameters
   if (error instanceof PaidTicketingNotEnabledError) {
     return {
       success: false,

@@ -178,8 +178,9 @@ export default function EventDetailView({
   })}`;
   const priceLabel = priceLabelFor(event.fromPriceCents);
 
+  // An event handler, so `window` always exists.
   async function onShare() {
-    const url = typeof window !== 'undefined' ? window.location.href : '';
+    const url = window.location.href;
     if (navigator.share) {
       try {
         await navigator.share({ title: event.name, url });

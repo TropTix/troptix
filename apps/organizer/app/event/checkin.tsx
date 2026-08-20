@@ -182,13 +182,13 @@ export default function CheckInPage({ event }) {
               return true;
             } else {
               return (
-                doesStringInclude(guest.id as string, searchValue) ||
-                doesStringInclude(guest?.firstName as string, searchValue) ||
-                doesStringInclude(guest?.lastName as string, searchValue)
+                doesStringInclude(guest.id ?? '', searchValue) ||
+                doesStringInclude(guest.firstName ?? '', searchValue) ||
+                doesStringInclude(guest.lastName ?? '', searchValue)
               );
             }
           })}
-          keyExtractor={(item) => item.id as string}
+          keyExtractor={(item) => item.id ?? ''}
           renderItem={({ item, index }) => {
             let buttonText = 'Check In';
 

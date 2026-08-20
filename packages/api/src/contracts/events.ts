@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Prisma } from '@troptix/db';
 
 // The public event-page DTO: event meta + a server-computed "From $X" price.
 // Client-safe by construction — no ticket rows, no discount codes, no gated-tier
@@ -38,7 +39,9 @@ export type FlyerPalette = z.infer<typeof flyerPaletteSchema>;
  * Read a stored (JSONB) palette: malformed rows degrade to null — "no
  * palette", the brand theme — instead of breaking the read.
  */
-export function parseStoredFlyerPalette(value: unknown): FlyerPalette | null {
+export function parseStoredFlyerPalette(
+  value: Prisma.JsonValue | null
+): FlyerPalette | null {
   return flyerPaletteSchema
     .nullable()
     .catch(null)

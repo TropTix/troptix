@@ -22,11 +22,11 @@ import StatusBadge from './StatusBadge';
 // PENDING is excluded server-side (in-flight checkouts aren't orders to manage).
 type Filter = 'All' | 'COMPLETED' | 'CANCELLED';
 const FILTERS: Filter[] = ['All', 'COMPLETED', 'CANCELLED'];
-const FILTER_LABEL: Record<Filter, string> = {
+const FILTER_LABEL = {
   All: 'All',
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
-};
+} satisfies Record<Filter, string>;
 
 export function OrdersTable({
   orders,

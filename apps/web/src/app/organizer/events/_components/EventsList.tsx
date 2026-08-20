@@ -18,13 +18,12 @@ import { DEFAULT_EVENT_IMAGE, eventFlyerUrl } from '@/lib/supabase/storage';
 type Filter = 'All' | EventStatus;
 const FILTERS: Filter[] = ['All', 'Active', 'Upcoming', 'Past', 'Draft'];
 
-const STATUS_VARIANT: Record<EventStatus, 'default' | 'outline' | 'secondary'> =
-  {
-    Active: 'default',
-    Upcoming: 'outline',
-    Past: 'secondary',
-    Draft: 'secondary',
-  };
+const STATUS_VARIANT = {
+  Active: 'default',
+  Upcoming: 'outline',
+  Past: 'secondary',
+  Draft: 'secondary',
+} satisfies Record<EventStatus, 'default' | 'outline' | 'secondary'>;
 
 export function EventsList({ events }: { events: OrganizerEventSummary[] }) {
   const [filter, setFilter] = useState<Filter>('All');

@@ -7,11 +7,11 @@ import { cn } from '@/lib/utils';
 
 // Three fixed treatments, never a color picker — the system owns contrast.
 
-export const THEME_LABELS: Record<EventPageTheme, string> = {
+export const THEME_LABELS = {
   off: 'Classic',
   wash: 'Tinted wash',
   dark: 'Poster dark',
-};
+} satisfies Record<EventPageTheme, string>;
 
 const OPTIONS: {
   value: EventPageTheme;
