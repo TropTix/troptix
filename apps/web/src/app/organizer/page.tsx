@@ -186,14 +186,14 @@ function ActiveEventCard({ event }: { event: OrganizerEventSummary }) {
 
   return (
     <Link href={`/organizer/events/${event.id}`} className="group">
-      <Card className="h-full transition-colors group-hover:border-primary/50">
-        <CardContent className="flex gap-4 p-4">
-          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+      <Card className="h-full py-0 transition-colors group-hover:border-primary/50">
+        <CardContent className="flex items-center gap-4 p-4">
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
             <Image
               src={flyerUrl}
               alt=""
               fill
-              sizes="64px"
+              sizes="80px"
               className="object-cover"
             />
           </div>
