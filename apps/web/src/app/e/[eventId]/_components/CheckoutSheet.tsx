@@ -171,10 +171,25 @@ export default function CheckoutSheet({
   const releaseReservation = trpc.checkout.release.useMutation();
 
   // Poll the server for the checkout outcome while finalizing (resume path).
+  // Backed off: each poll costs a DB read and (until fulfilled) a Stripe
+  // retrieve, and the webhook resolves most checkouts — fast polls matter only
+  // in the first seconds after the redirect. Flat 1.5s across many concurrent
+  // buyers is enough to hit Stripe's read rate limit.
   const polling = step === 'finalizing' && !!reservationId;
   const stateQuery = trpc.checkout.getCheckoutState.useQuery(
     { reservationId: reservationId ?? '' },
-    { enabled: polling, refetchInterval: polling ? 1500 : false }
+    {
+      enabled: polling,
+      refetchInterval: polling
+        ? (query) => {
+            const polls =
+              query.state.dataUpdateCount + query.state.errorUpdateCount;
+            if (polls < 10) return 1500;
+            if (polls < 25) return 5000;
+            return 10000;
+          }
+        : false,
+    }
   );
 
   // Resume an in-flight checkout when opened with ?reservation= (post-payment

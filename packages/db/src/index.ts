@@ -55,11 +55,21 @@ const parseConnection = () => {
   }
 };
 
+// The pooler's max_client_conn must absorb instances × max, so cap the pool
+// well under pg's default 10. PG_POOL_MAX is the ops override; anything but a
+// positive integer (unset, empty, typo) falls back to 5 — pg-pool would treat
+// 0/NaN as falsy and silently restore the default 10.
+const poolMax = () => {
+  const parsed = Number(process.env.PG_POOL_MAX);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 5;
+};
+
 const createPrismaClient = () => {
   const { connectionString, ssl } = parseConnection();
   return new PrismaClient({
     adapter: new PrismaPg({
       connectionString,
+      max: poolMax(),
       // Supabase pgbouncer drops idle server-side connections after ~30s. Close
       // pool connections after 20s of idleness so the pool never hands out a
       // dead socket, which would surface as "Connection terminated unexpectedly".

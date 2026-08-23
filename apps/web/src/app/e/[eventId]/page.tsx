@@ -1,17 +1,32 @@
 import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
+import { connection } from 'next/server';
 import prisma from '@/server/prisma';
-import { getEventDetail, NotFoundError } from '@troptix/api/server';
+import {
+  getEventDetailRaw,
+  shapeEventDetail,
+  NotFoundError,
+} from '@troptix/api/server';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
+import { eventDetailCacheTag } from '@/server/revalidateEventPages';
 import EventDetailView from './_components/EventDetailView';
 
 // The public event page. Legacy `/events/[eventId]` 308-redirects here
 // (next.config.js). See docs/plans/2026-06-event-page-redesign.md.
 
-// Deduped per request so generateMetadata + the page share one DB read.
-const loadEvent = cache((eventId: string) =>
-  getEventDetail(prisma, { eventId })
+// The raw event read is served from the shared data cache (60s TTL, tag-busted
+// by organizer edits) so a traffic spike doesn't become a per-view DB query.
+// Clock-derived state (saleStatus, maxAllowedToAdd) is shaped per request from
+// the cached row, so a sale opening is never delayed by the TTL; availability
+// alone can be up to 60s stale — display-only, createReservation re-checks.
+const loadEventRaw = cache((eventId: string) =>
+  unstable_cache(
+    () => getEventDetailRaw(prisma, { eventId }),
+    ['event-detail', eventId],
+    { revalidate: 60, tags: [eventDetailCacheTag(eventId)] }
+  )()
 );
 
 export async function generateMetadata(props: {
@@ -19,7 +34,7 @@ export async function generateMetadata(props: {
 }) {
   const { eventId } = await props.params;
   try {
-    const event = await loadEvent(eventId);
+    const event = await loadEventRaw(eventId);
     // OG images must be absolute URLs; resolve the stored path (ADR 0016).
     const ogImage = eventFlyerUrl(event.imageUrl);
     return {
@@ -43,19 +58,27 @@ export default async function EventDetailPage({
 }: {
   params: Promise<{ eventId: string }>;
 }) {
-  const user = await getUserFromIdTokenCookie();
+  // Keep the route itself per-request: the draft guard reads cookies only on
+  // the draft branch, and `eventEnded` needs the request clock — without this
+  // a published event's first render could be cached as static indefinitely.
+  await connection();
   const { eventId } = await params;
 
   let event;
   try {
-    event = await loadEvent(eventId);
+    event = shapeEventDetail(await loadEventRaw(eventId), new Date());
   } catch (err) {
     if (err instanceof NotFoundError) notFound();
     throw err;
   }
 
-  if (event.isDraft && user?.uid !== event.organizerUserId) {
-    notFound();
+  // Resolve the viewer only for drafts — the auth lookup (Supabase claims +
+  // Users row) is the other per-view cost worth skipping on public traffic.
+  if (event.isDraft) {
+    const user = await getUserFromIdTokenCookie();
+    if (user?.uid !== event.organizerUserId) {
+      notFound();
+    }
   }
 
   return (

@@ -149,12 +149,7 @@ describe('ensureOrganizationForUser', () => {
 
 describe('getOrganizationBySlug', () => {
   const DAY = 86_400_000;
-  function ev(
-    id: string,
-    startDays: number,
-    endDays: number,
-    tier?: { priceCents: number | null; price: number }
-  ) {
+  function ev(id: string, startDays: number, endDays: number) {
     return {
       id,
       name: id,
@@ -162,7 +157,6 @@ describe('getOrganizationBySlug', () => {
       startsAt: new Date(Date.now() + startDays * DAY),
       endsAt: new Date(Date.now() + endDays * DAY),
       venue: 'The Deck',
-      ticketTypes: tier ? [tier] : [],
     };
   }
 
@@ -205,7 +199,7 @@ describe('getOrganizationBySlug', () => {
     const prisma = fakePrisma([
       ev('past-old', -10, -9),
       ev('past-recent', -3, -2),
-      ev('up-soon', 2, 3, { priceCents: 2500, price: 25 }),
+      ev('up-soon', 2, 3),
       ev('up-later', 8, 9),
     ]);
     const result = await getOrganizationBySlug(prisma, {
@@ -223,8 +217,6 @@ describe('getOrganizationBySlug', () => {
       'past-recent',
       'past-old',
     ]);
-    expect(result.upcomingEvents[0].fromPriceCents).toBe(2500);
-    expect(result.upcomingEvents[1].fromPriceCents).toBeNull();
   });
 
   it('queries only published, non-private events', async () => {

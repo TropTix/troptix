@@ -14,6 +14,15 @@ export const TropTixContext = createContext<{ user: User; loading: boolean }>({
 
 export const useAuth = () => useContext(TropTixContext);
 
+// Mirrors the server's fast-path predicate (see server/authUser.ts): a
+// `sb-<ref>-auth-token` cookie (possibly chunked) is what getClaims reads.
+function hasSupabaseAuthCookie() {
+  return document.cookie.split('; ').some((entry) => {
+    const name = entry.split('=')[0];
+    return name.startsWith('sb-') && name.includes('-auth-token');
+  });
+}
+
 /**
  * Client-side auth state for Client Components (header, checkout). The single
  * source of truth is /api/user/me — the server resolves the Supabase session
@@ -34,16 +43,20 @@ export default function AuthProvider({
   // Tracks whether we've identified this session, so sign-out resets exactly
   // once — reset() on an already-anonymous visitor would rotate their id.
   const identifiedId = useRef<string | null>(null);
+  // Serializes loadUser: a response only applies if no newer load (or local
+  // sign-out reset) superseded it while it was in flight.
+  const loadSeq = useRef(0);
 
   useEffect(() => {
     const supabase = createClient();
     let active = true;
 
     async function loadUser() {
+      const seq = ++loadSeq.current;
       try {
         const res = await fetch('/api/user/me', { cache: 'no-store' });
         const json = await res.json();
-        if (active) {
+        if (active && seq === loadSeq.current) {
           const nextUser: User = json.user ?? emptyUser;
           setUser(nextUser);
           if (nextUser.id) {
@@ -59,18 +72,35 @@ export default function AuthProvider({
         }
       } catch (error) {
         console.error('Failed to load user:', error);
-        if (active) setUser(emptyUser);
+        if (active && seq === loadSeq.current) setUser(emptyUser);
       } finally {
-        if (active) setLoading(false);
+        if (active && seq === loadSeq.current) setLoading(false);
       }
     }
 
     // onAuthStateChange fires INITIAL_SESSION right after subscribing, so this
     // loads on mount too — no separate up-front fetch needed (avoids a double
-    // /api/user/me on every page load).
+    // /api/user/me on every page load). Skip the server round-trip only when
+    // the client session AND the auth cookie are both absent; a cookie the
+    // client can't parse into a session (corrupt chunk, deploy skew) still
+    // gets the server's verdict, keeping /api/user/me the source of truth.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => loadUser());
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session || hasSupabaseAuthCookie()) {
+        void loadUser();
+        return;
+      }
+      if (active) {
+        loadSeq.current++;
+        if (identifiedId.current) {
+          posthog.reset();
+          identifiedId.current = null;
+        }
+        setUser(emptyUser);
+        setLoading(false);
+      }
+    });
 
     return () => {
       active = false;

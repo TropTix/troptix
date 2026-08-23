@@ -30,10 +30,8 @@ const SALE_STATUS = {
 } as const;
 
 /**
- * Public discovery listing: upcoming, non-draft, non-private events shaped for the cards on
- * `/discover`. Soonest-first. The cheapest public price is pre-derived here
- * (`fromPriceCents`) so no tier rows or discount codes reach the browser. New
- * `priceCents` column falls back to legacy `price * 100` until the backfill.
+ * Public discovery listing: upcoming, non-draft, non-private events shaped for
+ * the cards on `/discover`. Soonest-first. Card fields only — no tier data.
  */
 export async function listPublicEvents(
   prisma: PrismaClient
@@ -51,28 +49,22 @@ export async function listPublicEvents(
       startsAt: true,
       endsAt: true,
       venue: true,
-      // Cheapest public tier only (a null/empty discount code means public).
-      ticketTypes: {
-        where: {
-          OR: [
-            { discountCode: { equals: null } },
-            { discountCode: { equals: '' } },
-          ],
-        },
-        select: { priceCents: true, price: true },
-        orderBy: { price: Prisma.SortOrder.asc },
-        take: 1,
-      },
     },
   });
 
   return events.map(toEventSummary);
 }
 
-export async function getEventDetail(
+/**
+ * Fetch half of the event-detail read: the query result with dates as ISO
+ * strings, safe to hold in a cross-request cache. Clock-derived fields
+ * (saleStatus, maxAllowedToAdd) are added by `shapeEventDetail`, so a cached
+ * row never freezes a sale-window transition.
+ */
+export async function getEventDetailRaw(
   prisma: PrismaClient,
   input: EventDetailInput
-): Promise<EventDetail> {
+) {
   const event = await prisma.events.findUnique({
     where: { id: input.eventId },
     select: {
@@ -136,15 +128,38 @@ export async function getEventDetail(
     throw new NotFoundError(`Event with ID ${input.eventId} not found.`);
   }
 
-  const now = new Date();
+  return {
+    ...event,
+    startsAt: event.startsAt.toISOString(),
+    endsAt: event.endsAt.toISOString(),
+    ticketTypes: event.ticketTypes.map((tt) => ({
+      ...tt,
+      saleStartsAt: tt.saleStartsAt.toISOString(),
+      saleEndsAt: tt.saleEndsAt.toISOString(),
+    })),
+  };
+}
+
+export type EventDetailRaw = Awaited<ReturnType<typeof getEventDetailRaw>>;
+
+export function shapeEventDetail(
+  event: EventDetailRaw,
+  now: Date
+): EventDetail {
   const tickets: EventTicket[] = event.ticketTypes
     .map((tt) => {
       // priceCents falls back to price * 100; the sale window needs no fallback
       // — one pair, full timestamps (ADR 0020).
       const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
       const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
+      const saleWindow = {
+        saleStartsAt: new Date(tt.saleStartsAt),
+        saleEndsAt: new Date(tt.saleEndsAt),
+      };
       const saleStatus: EventTicket['saleStatus'] =
-        availability === 0 ? 'soldOut' : SALE_STATUS[getSaleState(tt, now)];
+        availability === 0
+          ? 'soldOut'
+          : SALE_STATUS[getSaleState(saleWindow, now)];
       const maxAllowedToAdd =
         saleStatus === 'onSale' && !event.isDraft
           ? Math.max(0, Math.min(availability, tt.maxPurchasePerUser))
@@ -195,8 +210,8 @@ export async function getEventDetail(
           website: event.organization.website,
         }
       : null,
-    startsAt: event.startsAt.toISOString(),
-    endsAt: event.endsAt.toISOString(),
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
     venue: event.venue,
     address: event.address,
     latitude: event.latitude,
@@ -206,4 +221,11 @@ export async function getEventDetail(
     fromPriceCents,
     tickets,
   };
+}
+
+export async function getEventDetail(
+  prisma: PrismaClient,
+  input: EventDetailInput
+): Promise<EventDetail> {
+  return shapeEventDetail(await getEventDetailRaw(prisma, input), new Date());
 }
