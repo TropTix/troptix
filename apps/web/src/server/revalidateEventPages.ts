@@ -6,20 +6,16 @@ export function eventDetailCacheTag(eventId: string) {
 }
 
 /**
- * Bust one event's detail data cache. `{ expire: 0 }` = expire now ('max'
- * would serve one more stale view; updateTag is Server-Action-only and this
- * runs from Route Handlers too).
+ * `{ expire: 0 }` = expire now; 'max' would serve one more stale view, and
+ * updateTag is Server-Action-only while Route Handlers call this too.
  */
 export function revalidateEventDetail(eventId: string) {
   revalidateTag(eventDetailCacheTag(eventId), { expire: 0 });
 }
 
 /**
- * Bust every cached public surface that renders this event: the detail data
- * cache plus the ISR listings (/discover, /o/[slug]). One helper so a new
- * public surface is added here once, not to per-mutation path lists.
- * /e/[eventId] itself renders dynamically — if it ever becomes ISR again, a
- * revalidatePath(`/e/${eventId}`) must return here.
+ * Bust every cached public surface that renders this event. If /e/[eventId]
+ * ever becomes ISR again, a revalidatePath for it must return here.
  */
 export function revalidateEventPublicPages(
   eventId: string,

@@ -56,10 +56,8 @@ export async function listPublicEvents(
 }
 
 /**
- * Fetch half of the event-detail read: the query result with dates as ISO
- * strings, safe to hold in a cross-request cache. Clock-derived fields
- * (saleStatus, maxAllowedToAdd) are added by `shapeEventDetail`, so a cached
- * row never freezes a sale-window transition.
+ * Cacheable half of the event read: JSON-safe, no clock-derived fields — those
+ * live in `shapeEventDetail` so a cached row can't freeze a sale transition.
  */
 export async function getEventDetailRaw(
   prisma: PrismaClient,

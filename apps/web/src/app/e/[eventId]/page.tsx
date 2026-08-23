@@ -16,11 +16,8 @@ import EventDetailView from './_components/EventDetailView';
 // The public event page. Legacy `/events/[eventId]` 308-redirects here
 // (next.config.js). See docs/plans/2026-06-event-page-redesign.md.
 
-// The raw event read is served from the shared data cache (60s TTL, tag-busted
-// by organizer edits) so a traffic spike doesn't become a per-view DB query.
-// Clock-derived state (saleStatus, maxAllowedToAdd) is shaped per request from
-// the cached row, so a sale opening is never delayed by the TTL; availability
-// alone can be up to 60s stale — display-only, createReservation re-checks.
+// Cached 60s + tag-busted on organizer edits. Availability can be 60s stale —
+// display-only; createReservation re-checks under the inventory lock.
 const loadEventRaw = cache((eventId: string) =>
   unstable_cache(
     () => getEventDetailRaw(prisma, { eventId }),
@@ -58,9 +55,8 @@ export default async function EventDetailPage({
 }: {
   params: Promise<{ eventId: string }>;
 }) {
-  // Keep the route itself per-request: the draft guard reads cookies only on
-  // the draft branch, and `eventEnded` needs the request clock — without this
-  // a published event's first render could be cached as static indefinitely.
+  // Without this a published event's render could be cached as static forever —
+  // nothing else on the non-draft path is request-bound.
   await connection();
   const { eventId } = await params;
 
@@ -72,8 +68,6 @@ export default async function EventDetailPage({
     throw err;
   }
 
-  // Resolve the viewer only for drafts — the auth lookup (Supabase claims +
-  // Users row) is the other per-view cost worth skipping on public traffic.
   if (event.isDraft) {
     const user = await getUserFromIdTokenCookie();
     if (user?.uid !== event.organizerUserId) {

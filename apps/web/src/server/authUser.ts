@@ -30,9 +30,8 @@ async function getAuthUserId(token?: string): Promise<string | null> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return null;
   }
-  // Anonymous fast path: no Supabase session cookie (`sb-<ref>-auth-token`,
-  // possibly chunked) means getClaims can't succeed — skip it. Most checkout
-  // traffic is anonymous, and this runs on every tRPC request.
+  // No session cookie (`sb-<ref>-auth-token`, possibly chunked) means getClaims
+  // can't succeed — skip it.
   if (!token) {
     const cookieStore = await cookies();
     const hasSessionCookie = cookieStore

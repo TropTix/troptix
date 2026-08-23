@@ -79,11 +79,9 @@ export default function AuthProvider({
     }
 
     // onAuthStateChange fires INITIAL_SESSION right after subscribing, so this
-    // loads on mount too — no separate up-front fetch needed (avoids a double
-    // /api/user/me on every page load). Skip the server round-trip only when
-    // the client session AND the auth cookie are both absent; a cookie the
-    // client can't parse into a session (corrupt chunk, deploy skew) still
-    // gets the server's verdict, keeping /api/user/me the source of truth.
+    // loads on mount too — no separate up-front fetch needed. A cookie without
+    // a parseable client session still asks the server: /api/user/me stays the
+    // source of truth.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {

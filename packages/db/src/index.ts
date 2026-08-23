@@ -55,10 +55,8 @@ const parseConnection = () => {
   }
 };
 
-// The pooler's max_client_conn must absorb instances × max, so cap the pool
-// well under pg's default 10. PG_POOL_MAX is the ops override; anything but a
-// positive integer (unset, empty, typo) falls back to 5 — pg-pool would treat
-// 0/NaN as falsy and silently restore the default 10.
+// instances × max is what the pooler's max_client_conn absorbs — cap well under
+// pg's default 10. Invalid PG_POOL_MAX falls back to 5 (pg-pool turns 0/NaN into 10).
 const poolMax = () => {
   const parsed = Number(process.env.PG_POOL_MAX);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 5;
