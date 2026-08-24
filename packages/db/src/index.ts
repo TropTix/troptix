@@ -70,6 +70,17 @@ const createPrismaClient = () => {
       // see parseConnection() for why sslmode is stripped from the URL.
       ssl,
     }),
+    // Interactive transactions default to a 5s budget, measured wall-clock
+    // across every round-trip inside the callback. Against the remote Supabase
+    // pooler (Vercel prod, local runs of the packages/api suite) a handful of
+    // queries plus latency spikes can blow that, surfacing as "commit cannot be
+    // executed on an expired transaction" — in prod that would strand a settled
+    // payment without its order. Same class of tuning as the pool timeouts
+    // above.
+    transactionOptions: {
+      maxWait: 10000,
+      timeout: 15000,
+    },
   });
 };
 
