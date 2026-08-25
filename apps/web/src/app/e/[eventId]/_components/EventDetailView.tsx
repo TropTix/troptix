@@ -23,7 +23,7 @@ import VenueMap from './VenueMap';
 // on desktop. See docs/plans/2026-06-event-page-redesign.md.
 
 const SECTION_LABEL =
-  'text-xs font-semibold uppercase tracking-wide text-primary';
+  'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
 const ROUND_BTN =
   'grid h-10 w-10 place-items-center rounded-full text-foreground transition-colors';
