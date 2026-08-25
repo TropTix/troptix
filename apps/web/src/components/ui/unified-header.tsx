@@ -106,14 +106,6 @@ export default function UnifiedHeader() {
         <DropdownMenuSeparator />
         {!isOrganizerRoute && (
           <DropdownMenuItem asChild>
-            <Link href="/orders">
-              <Ticket className="mr-2 h-4 w-4" />
-              Tickets
-            </Link>
-          </DropdownMenuItem>
-        )}
-        {!isOrganizerRoute && (
-          <DropdownMenuItem asChild>
             <Link href="/organizer">
               <Home className="mr-2 h-4 w-4" />
               Organizer Dashboard
