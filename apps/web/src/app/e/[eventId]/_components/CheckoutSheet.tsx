@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation'; // PROTOTYPE (otp-login-checkout)
 import { usePostHog } from 'posthog-js/react';
 import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -16,6 +17,12 @@ import SelectStep from './SelectStep';
 import ContactStep from './ContactStep';
 import PaymentStep from './PaymentStep';
 import SuccessTicket from './SuccessTicket';
+// PROTOTYPE (otp-login-checkout): mock sign-in step variants, active only
+// with ?variant=D|A|B|C in the URL. Delete ./prototype and every line marked
+// PROTOTYPE in this file once a variant wins.
+import AuthStepPrototype, {
+  AUTH_PROTOTYPE_VARIANTS,
+} from './prototype/AuthStepPrototype';
 
 // Checkout orchestrator: owns the step machine + selection, calls the tRPC
 // mutations/queries, and drives the presentational steps. Free RSVP completes
@@ -23,6 +30,7 @@ import SuccessTicket from './SuccessTicket';
 // then the resume path (?reservation=) finalizes into success (ADR 0018).
 type Step =
   | 'select'
+  | 'auth' // PROTOTYPE (otp-login-checkout)
   | 'contact'
   | 'payment'
   | 'finalizing'
@@ -32,6 +40,7 @@ type Step =
 
 const STEP_TITLE: Record<Step, string> = {
   select: 'Choose tickets',
+  auth: 'Sign in', // PROTOTYPE (otp-login-checkout)
   contact: 'Your details',
   payment: 'Payment',
   finalizing: 'Finalizing',
@@ -68,6 +77,24 @@ export default function CheckoutSheet({
   const { user } = useAuth();
   const posthog = usePostHog();
   const [step, setStep] = useState<Step>('select');
+  // PROTOTYPE (otp-login-checkout): which mock sign-in variant is active.
+  const searchParams = useSearchParams();
+  const rawVariant = searchParams?.get('variant') ?? null;
+  const prototypeVariant = (
+    AUTH_PROTOTYPE_VARIANTS as readonly string[]
+  ).includes(rawVariant ?? '')
+    ? rawVariant
+    : null;
+  const [prototypeEmail, setPrototypeEmail] = useState<string | null>(null);
+  const [prototypeNames, setPrototypeNames] = useState<{
+    firstName: string;
+    lastName: string;
+  } | null>(null);
+  function setPrototypeVariantParam(variant: string) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('variant', variant);
+    window.history.replaceState(null, '', url.toString());
+  }
   const [selection, setSelection] = useState<Record<string, number>>({});
   const [localError, setLocalError] = useState<string | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
@@ -433,6 +460,29 @@ export default function CheckoutSheet({
                     fees_cents: feesCents,
                     is_free: isFree,
                   });
+                  // PROTOTYPE (otp-login-checkout): detour through the mock
+                  // sign-in step when a variant is selected in the URL.
+                  setStep(prototypeVariant ? 'auth' : 'contact');
+                }}
+              />
+            )}
+            {/* PROTOTYPE (otp-login-checkout) */}
+            {step === 'auth' && (
+              <AuthStepPrototype
+                variant={prototypeVariant ?? 'A'}
+                onVariantChange={setPrototypeVariantParam}
+                eventName={event.name}
+                summary={{
+                  items: chosen.map((t) => ({
+                    name: t.name,
+                    qty: selection[t.id],
+                  })),
+                  totalCents,
+                }}
+                onBack={() => setStep('select')}
+                onDone={(email, names) => {
+                  setPrototypeEmail(email);
+                  setPrototypeNames(names ?? null);
                   setStep('contact');
                 }}
               />
@@ -440,9 +490,10 @@ export default function CheckoutSheet({
             {step === 'contact' && (
               <ContactStep
                 defaultValues={{
-                  firstName: user?.firstName ?? '',
-                  lastName: user?.lastName ?? '',
-                  email: user?.email ?? '',
+                  // PROTOTYPE (otp-login-checkout): mock signed-in profile.
+                  firstName: prototypeNames?.firstName ?? user?.firstName ?? '',
+                  lastName: prototypeNames?.lastName ?? user?.lastName ?? '',
+                  email: prototypeEmail ?? user?.email ?? '',
                 }}
                 isFree={isFree}
                 submitting={submitting}
