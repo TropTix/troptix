@@ -278,15 +278,15 @@ export async function confirmPaid(
 
 /**
  * The buyer-visible state of a checkout — powers both the confirmation poll and
- * resume-from-URL after the payment redirect. If the reservation isn't yet an
- * order but its Session has been paid, fulfill inline (the hybrid-fulfillment
- * sync fallback, per Stripe's fulfillment guide) so tickets appear even when the
- * webhook is slow or down. Never polls Stripe on a loop — one retrieve per call.
+ * resume-from-URL after the payment redirect. `sync` is the landing-page
+ * fulfillment attempt (Stripe's fulfillment guide): retrieve the Session,
+ * fulfill inline if paid. Steady-state polls skip Stripe for a live hold — the
+ * webhook converts it; the paid-but-expired race always checks.
  */
 export async function getCheckoutState(
   prisma: PrismaClient,
   stripe: Stripe,
-  input: { reservationId: string },
+  input: { reservationId: string; sync?: boolean },
   analytics?: CheckoutAnalytics
 ): Promise<CheckoutState> {
   const reservation = await prisma.reservation.findUnique({
@@ -321,8 +321,14 @@ export async function getCheckoutState(
     return { kind: 'expired' };
   }
 
-  // HELD or EXPIRED: if the Session has been paid, fulfill now (sync fallback).
-  if (reservation.stripeCheckoutSessionId) {
+  const heldLive =
+    reservation.status === ReservationStatus.HELD &&
+    reservation.expiresAt.getTime() > Date.now();
+
+  // If the Session has been paid, fulfill now (sync fallback). Consulted only
+  // on the sync poll and for the paid-but-expired race — a live hold's
+  // steady-state polls answer from our row alone.
+  if (reservation.stripeCheckoutSessionId && (input.sync || !heldLive)) {
     const session = await stripe.checkout.sessions.retrieve(
       reservation.stripeCheckoutSessionId
     );
@@ -342,10 +348,7 @@ export async function getCheckoutState(
     }
   }
 
-  if (
-    reservation.status === ReservationStatus.HELD &&
-    reservation.expiresAt.getTime() > Date.now()
-  ) {
+  if (heldLive) {
     return {
       kind: 'held',
       expiresAt: reservation.expiresAt.toISOString(),

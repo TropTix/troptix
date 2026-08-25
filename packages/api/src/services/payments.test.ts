@@ -516,8 +516,25 @@ describe('getCheckoutState', () => {
 
     const state = await getCheckoutState(prisma, fake.stripe, {
       reservationId,
+      sync: true,
     });
     expect(state.kind).toBe('held');
+  });
+
+  it('answers a live hold from the row alone when not syncing', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+    const fake = fakeStripe({ payment_status: 'paid' });
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { stripeCheckoutSessionId: `cs_test_${generateId()}` },
+    });
+
+    const state = await getCheckoutState(prisma, fake.stripe, {
+      reservationId,
+    });
+    expect(state.kind).toBe('held');
+    expect(fake.calls.retrieve).toHaveLength(0);
   });
 
   it('fulfills inline when the Session is paid but no order exists yet', async () => {
@@ -532,6 +549,7 @@ describe('getCheckoutState', () => {
 
     const state = await getCheckoutState(prisma, fake.stripe, {
       reservationId,
+      sync: true,
     });
     expect(state.kind).toBe('order');
     if (state.kind !== 'order') throw new Error('unreachable');

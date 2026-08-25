@@ -96,7 +96,7 @@ export const checkoutRouter = router({
       return getCheckoutState(
         ctx.prisma,
         stripe,
-        { reservationId: input.reservationId },
+        { reservationId: input.reservationId, sync: input.sync },
         ctx.analytics
       );
     }),

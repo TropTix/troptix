@@ -33,6 +33,8 @@ export type BeginPaymentResponse = z.infer<typeof beginPaymentResponseSchema>;
 
 export const getCheckoutStateInputSchema = z.object({
   reservationId: z.string().min(1),
+  /** The landing-page fulfillment attempt — the one poll that consults Stripe. */
+  sync: z.boolean().optional().default(false),
 });
 export type GetCheckoutStateInput = z.infer<typeof getCheckoutStateInputSchema>;
 

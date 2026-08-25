@@ -170,12 +170,13 @@ export default function CheckoutSheet({
   const beginPayment = trpc.checkout.beginPayment.useMutation();
   const releaseReservation = trpc.checkout.release.useMutation();
 
-  // Poll the server for the checkout outcome while finalizing (resume path).
-  // Backed off — each poll can hit Stripe, and flat 1.5s across concurrent
-  // buyers would breach Stripe's read rate limit.
+  // Poll the checkout outcome while finalizing, backed off. Only the first
+  // poll consults Stripe (the landing-page fulfillment attempt); later polls
+  // read our reservation row and rely on the webhook.
+  const [needsSync, setNeedsSync] = useState(true);
   const polling = step === 'finalizing' && !!reservationId;
   const stateQuery = trpc.checkout.getCheckoutState.useQuery(
-    { reservationId: reservationId ?? '' },
+    { reservationId: reservationId ?? '', sync: needsSync },
     {
       enabled: polling,
       refetchInterval: polling
@@ -208,6 +209,7 @@ export default function CheckoutSheet({
   // Map the polled state onto the step machine.
   useEffect(() => {
     if (step !== 'finalizing' || !stateQuery.data) return;
+    if (needsSync) setNeedsSync(false);
     const state = stateQuery.data;
     if (state.kind === 'order') {
       finishCheckout(
