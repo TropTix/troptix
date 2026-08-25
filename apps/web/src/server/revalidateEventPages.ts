@@ -1,14 +1,27 @@
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
+
+/** Data-cache tag for one event's public detail (see /e/[eventId]/page.tsx). */
+export function eventDetailCacheTag(eventId: string) {
+  return `event-${eventId}`;
+}
 
 /**
- * Bust every ISR-cached public page that renders this event. One helper so a
- * new public surface is added here once, not to per-mutation path lists.
+ * `{ expire: 0 }` = expire now; 'max' would serve one more stale view, and
+ * updateTag is Server-Action-only while Route Handlers call this too.
+ */
+export function revalidateEventDetail(eventId: string) {
+  revalidateTag(eventDetailCacheTag(eventId), { expire: 0 });
+}
+
+/**
+ * Bust every cached public surface that renders this event. If /e/[eventId]
+ * ever becomes ISR again, a revalidatePath for it must return here.
  */
 export function revalidateEventPublicPages(
   eventId: string,
   orgSlug: string | null | undefined
 ) {
-  revalidatePath(`/e/${eventId}`);
+  revalidateEventDetail(eventId);
   revalidatePath('/discover');
   if (orgSlug) {
     revalidatePath(`/o/${orgSlug}`);

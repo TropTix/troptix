@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { revalidateEventDetail } from '@/server/revalidateEventPages';
 import { ZodError } from 'zod';
 import prisma from '@/server/prisma';
 import {
@@ -50,6 +51,8 @@ export async function createTicketType(
       toServiceInput(validationResult.data)
     );
     revalidatePath(`/organizer/events/${eventId}/tickets`);
+    // Tiers surface only on the event detail page — listings carry no tier data.
+    revalidateEventDetail(eventId);
     return { success: true };
   } catch (error) {
     return failure(error, {
@@ -84,6 +87,7 @@ export async function updateTicketType(
       toServiceInput(validationResult.data)
     );
     revalidatePath(`/organizer/events/${eventId}/tickets`);
+    revalidateEventDetail(eventId);
     return { success: true };
   } catch (error) {
     return failure(error, {
