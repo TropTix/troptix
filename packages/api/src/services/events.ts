@@ -30,10 +30,8 @@ const SALE_STATUS = {
 } as const;
 
 /**
- * Public discovery listing: upcoming, non-draft, non-private events shaped for the cards on
- * `/discover`. Soonest-first. The cheapest public price is pre-derived here
- * (`fromPriceCents`) so no tier rows or discount codes reach the browser. New
- * `priceCents` column falls back to legacy `price * 100` until the backfill.
+ * Public discovery listing: upcoming, non-draft, non-private events shaped for
+ * the cards on `/discover`. Soonest-first. Card fields only — no tier data.
  */
 export async function listPublicEvents(
   prisma: PrismaClient
@@ -51,18 +49,6 @@ export async function listPublicEvents(
       startsAt: true,
       endsAt: true,
       venue: true,
-      // Cheapest public tier only (a null/empty discount code means public).
-      ticketTypes: {
-        where: {
-          OR: [
-            { discountCode: { equals: null } },
-            { discountCode: { equals: '' } },
-          ],
-        },
-        select: { priceCents: true, price: true },
-        orderBy: { price: Prisma.SortOrder.asc },
-        take: 1,
-      },
     },
   });
 

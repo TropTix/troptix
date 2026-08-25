@@ -63,9 +63,8 @@ export const eventTicketSchema = z.object({
 });
 export type EventTicket = z.infer<typeof eventTicketSchema>;
 
-// The discovery-listing DTO: just what an event card renders. The cheapest
-// public price is pre-derived server-side (`fromPriceCents`); no tier rows or
-// discount codes reach the browser.
+// The discovery-listing DTO: just what an event card renders. No tier data —
+// prices live on the event detail page, so listings never depend on tiers.
 
 export const eventSummarySchema = z.object({
   id: z.string(),
@@ -75,8 +74,6 @@ export const eventSummarySchema = z.object({
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
   venue: z.string().nullable(),
-  /** Cheapest public tier, integer cents. Null = free / no public tiers. */
-  fromPriceCents: z.number().int().nullable(),
 });
 export type EventSummary = z.infer<typeof eventSummarySchema>;
 

@@ -1,9 +1,7 @@
 /**
  * Shared shaping for the `EventSummary` discovery-card DTO — used by the public
- * events listing and the organization page. Keeps the "cheapest public tier →
- * fromPriceCents" derivation in one place. `select` the same fields (id, name,
- * imageUrl, startsAt, endsAt, venue, + the cheapest public tier) into a row of
- * this shape, then map it here.
+ * events listing and the organization page. Card-level fields only: listings
+ * carry no tier data, so tier writes never invalidate them.
  */
 import type { EventSummary } from '../../contracts/events';
 
@@ -14,15 +12,9 @@ export type EventSummaryRow = {
   startsAt: Date;
   endsAt: Date;
   venue: string | null;
-  ticketTypes: { priceCents: number | null; price: number }[];
 };
 
 export function toEventSummary(event: EventSummaryRow): EventSummary {
-  const cheapest = event.ticketTypes[0];
-  const fromPriceCents = cheapest
-    ? (cheapest.priceCents ?? Math.round(cheapest.price * 100))
-    : null;
-
   return {
     id: event.id,
     name: event.name,
@@ -30,6 +22,5 @@ export function toEventSummary(event: EventSummaryRow): EventSummary {
     startsAt: event.startsAt.toISOString(),
     endsAt: event.endsAt.toISOString(),
     venue: event.venue,
-    fromPriceCents,
   };
 }
