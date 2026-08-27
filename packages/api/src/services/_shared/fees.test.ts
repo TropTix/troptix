@@ -16,5 +16,6 @@ describe('calculateFeesCents', () => {
     expect(calculateFeesCents(5000)).toBe(450); // 5000*0.08 + 50 = 450
     expect(calculateFeesCents(10000)).toBe(850); // 800 + 50
     expect(calculateFeesCents(1)).toBe(50); // round(50.08) = 50
+    expect(calculateFeesCents(1049)).toBe(134); // round(133.92) = 134, floor would give 133
   });
 });

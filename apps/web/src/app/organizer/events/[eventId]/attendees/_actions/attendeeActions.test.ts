@@ -86,6 +86,8 @@ describe('toggleTicketStatus', () => {
     const result = await toggleTicketStatus('t1');
 
     expect(result.success).toBe(false);
+    // The deliberate message, not a TypeError from a null user leaking through.
+    expect(result.error).toBe('User not authenticated');
     expect(mockToggle).not.toHaveBeenCalled();
   });
 });

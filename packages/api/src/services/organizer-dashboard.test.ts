@@ -116,6 +116,22 @@ describe('getDashboard — shaping', () => {
     const { prisma } = fakePrisma({ subtotalSum: 59.969999999999999 });
     const result = await getDashboard(prisma, OWNER, {}, NOW);
     expect(result.stats.revenueCents).toBe(5997);
+
+    // Values where truncating or ceiling would differ from rounding.
+    const up = await getDashboard(
+      fakePrisma({ subtotalSum: 123.456 }).prisma,
+      OWNER,
+      {},
+      NOW
+    );
+    expect(up.stats.revenueCents).toBe(12346);
+    const down = await getDashboard(
+      fakePrisma({ subtotalSum: 10.443 }).prisma,
+      OWNER,
+      {},
+      NOW
+    );
+    expect(down.stats.revenueCents).toBe(1044);
   });
 
   it('reports zero revenue when there are no completed orders', async () => {
@@ -293,6 +309,11 @@ describe('getDashboard — range', () => {
       .calls[0][0].where;
     expect(where.createdAt.gte).toEqual(new Date('2026-07-15T00:00:00.000Z'));
     expect(where.createdAt.lt).toEqual(NOW);
+    expect(where.status).toBe('COMPLETED');
+    expect(where.event).toMatchObject({
+      organizerUserId: 'owner-1',
+      deletedAt: null,
+    });
   });
 
   it('derives tickets sold from the same buckets the chart uses', async () => {

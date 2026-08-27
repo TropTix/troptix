@@ -57,9 +57,11 @@ describe('appRouter.organizer (via createCaller)', () => {
   });
 
   it('rejects invalid input at the boundary (empty ticketId)', async () => {
+    // Must fail validation (BAD_REQUEST), not fall through to the service's
+    // NOT_FOUND — otherwise loosened input schemas pass unnoticed.
     await expect(
       (caller(fakePrisma({})).organizer.checkInTicket as any)({})
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('checkInTicket throws CONFLICT (ALREADY_CHECKED_IN) when ticket is unavailable', async () => {

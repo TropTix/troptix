@@ -137,6 +137,7 @@ describe('getEventDetail', () => {
         ticketTypes: [
           tier({ id: 'soldout', priceCents: 1000, capacity: 5, sold: 5 }),
           tier({ id: 'open', priceCents: 5000, capacity: 5, sold: 2 }),
+          tier({ id: 'capped', priceCents: 7000, maxPurchasePerUser: 4 }),
         ],
       })
     );
@@ -144,6 +145,7 @@ describe('getEventDetail', () => {
     const byId = Object.fromEntries(result.tickets.map((t) => [t.id, t]));
     expect(byId.soldout.maxAllowedToAdd).toBe(0);
     expect(byId.open.maxAllowedToAdd).toBe(3); // min(availability 3, max-per-user 10)
+    expect(byId.capped.maxAllowedToAdd).toBe(4); // min(availability 100, max-per-user 4)
     // Available tier comes first despite being pricier.
     expect(result.tickets[0].id).toBe('open');
   });
