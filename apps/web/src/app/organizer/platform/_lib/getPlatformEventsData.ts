@@ -15,8 +15,8 @@ export type PlatformEventData = {
   createdAt: Date;
   organizer: {
     id: string;
-    name: string | null;
-    email: string | null;
+    name: string;
+    email: string;
   };
   stats: {
     totalOrders: number;
@@ -45,7 +45,15 @@ export async function getAllPlatformEvents(
       imageUrl: true,
       isDraft: true,
       createdAt: true,
-      organizerUserId: true,
+
+      // The canonical organizer (ADR 0022) — not the stale `organizer` name
+      // snapshot on the event row, and not the legacy organizerUserId key.
+      organization: {
+        select: {
+          displayName: true,
+          owner: { select: { id: true, email: true } },
+        },
+      },
 
       orders: {
         where: { status: 'COMPLETED' },
@@ -60,23 +68,6 @@ export async function getAllPlatformEvents(
       { startsAt: 'desc' },
     ],
   });
-
-  const organizerIds = Array.from(
-    new Set(eventsRaw.map((event) => event.organizerUserId))
-  );
-  const organizers = await prisma.users.findMany({
-    where: { id: { in: organizerIds } },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-    },
-  });
-
-  // TODO: This is a hack to get the organizer name. We should store the organizer name in the event table.
-  // I just don't want to change the schema right now.
-  const organizerMap = new Map(organizers.map((org) => [org.id, org]));
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -102,18 +93,6 @@ export async function getAllPlatformEvents(
       0
     );
 
-    const organizer = organizerMap.get(event.organizerUserId) || {
-      id: event.organizerUserId,
-      email: null,
-      firstName: null,
-      lastName: null,
-    };
-
-    const organizerName =
-      organizer.firstName && organizer.lastName
-        ? organizer.firstName + ' ' + organizer.lastName
-        : 'Name not set';
-
     return {
       id: event.id,
       name: event.name,
@@ -126,9 +105,9 @@ export async function getAllPlatformEvents(
       status,
       createdAt: event.createdAt,
       organizer: {
-        id: organizer.id,
-        name: organizerName,
-        email: organizer.email,
+        id: event.organization.owner.id,
+        name: event.organization.displayName,
+        email: event.organization.owner.email,
       },
       stats: {
         totalOrders: event.orders.length,
