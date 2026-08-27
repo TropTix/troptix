@@ -29,7 +29,7 @@ export default function RootLayout() {
       }
 
       const token = await authUser
-        .getIdToken(/* forceRefresh */ true)
+        .getIdToken(true)
         .then(function (idToken) {
           return idToken;
         })

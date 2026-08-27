@@ -1,13 +1,5 @@
-/**
- * Integration tests for the reservation primitives. These hit a REAL Postgres
- * (the locking/atomicity behavior is not mockable), so point your env at a
- * preview branch (or the dev branch) before running: `yarn workspace
- * @troptix/api test`. The connection comes from `@troptix/db` (POSTGRES_PRISMA_URL),
- * loaded by vitest.config.ts from apps/web/.env locally / CI env directly.
- *
- * Each test provisions its own ticket type and everything is cleaned up by event
- * id in afterAll.
- */
+// Real Postgres (locking/atomicity isn't mockable) via POSTGRES_PRISMA_URL,
+// loaded by vitest.config.ts from apps/web/.env — point it at a preview/dev branch, never prod.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import prisma, {
   OrderStatus,
@@ -26,8 +18,6 @@ import {
 } from './reservations';
 
 const TEST_EVENT_ID = `test-evt-${generateId()}`;
-// Events.organizationId is NOT NULL (ADR 0022) — the fixture needs the full
-// owner chain: Users -> Organization -> Events.
 const TEST_OWNER_ID = `test-evt-owner-${generateId()}`;
 const TEST_ORG_ID = `test-evt-org-${generateId()}`;
 
@@ -60,10 +50,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // FK-safe teardown, scoped to the test event.
   await prisma.tickets.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.orders.deleteMany({ where: { eventId: TEST_EVENT_ID } });
-  await prisma.reservation.deleteMany({ where: { eventId: TEST_EVENT_ID } }); // items cascade
+  await prisma.reservation.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.ticketTypes.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.events.delete({ where: { id: TEST_EVENT_ID } });
   await prisma.organization.delete({ where: { id: TEST_ORG_ID } });
@@ -172,7 +161,6 @@ describe('confirm — atomic + idempotent', () => {
       },
     });
 
-    // The route assigns the PaymentIntent id after creating the intent.
     const paymentIntentId = `pi_test_${generateId()}`;
     await prisma.reservation.update({
       where: { id: r.reservationId },
@@ -243,7 +231,6 @@ describe('release', () => {
         ?.status
     ).toBe(ReservationStatus.RELEASED);
 
-    // idempotent: releasing again is a no-op
     expect(await release(prisma, r.reservationId)).toBe(false);
   });
 });
@@ -261,7 +248,7 @@ describe('expire', () => {
           feesCents: 0,
         },
       ],
-      ttlMinutes: -1, // already expired
+      ttlMinutes: -1,
     });
     expect(
       (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
@@ -282,7 +269,7 @@ describe('expire', () => {
 
 describe('createReservation — server pricing authority', () => {
   it('derives fees from the tier and holds inventory', async () => {
-    const tt = await makeTicketType(5, 5000); // PASS_TICKET_FEES by default
+    const tt = await makeTicketType(5, 5000);
     const res = await createReservation(
       prisma,
       {
@@ -298,7 +285,7 @@ describe('createReservation — server pricing authority', () => {
     );
 
     expect(res.wasAdjusted).toBe(false);
-    expect(res.totalCents).toBe(2 * (5000 + 450)); // fee = round(5000*.08 + 50)
+    expect(res.totalCents).toBe(2 * (5000 + 450));
     expect(
       (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
     ).toBe(2);
@@ -342,7 +329,7 @@ describe('createReservation — server pricing authority', () => {
 
 describe('completeFree', () => {
   it('materializes a free order + tickets, idempotently', async () => {
-    const tt = await makeTicketType(5, 0); // free tier
+    const tt = await makeTicketType(5, 0);
     const res = await createReservation(
       prisma,
       {

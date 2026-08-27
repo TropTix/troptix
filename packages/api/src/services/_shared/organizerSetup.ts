@@ -1,12 +1,3 @@
-/**
- * What an Organization still has to do before it looks like a brand.
- *
- * One rule with two consumers: the home screen's setup banner ("Finish your
- * organizer profile →") and the profile screen that the banner links to, which
- * needs to know *which* fields are missing to render its setup area. Returning
- * the fields — rather than a boolean — keeps those two from disagreeing the
- * moment the requirements change.
- */
 export type ProfileField = 'logo' | 'bio';
 
 type BrandFields = Pick<

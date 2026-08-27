@@ -16,9 +16,8 @@ import { useAuth } from '../../context/AuthContext';
 
 const RESEND_COOLDOWN = 45;
 
-// App Store review signs in with this fixed account. Apple's reviewers can't
-// receive email, so this account skips the passwordless flow entirely and
-// signs in with a password instead.
+// App Store review signs in with this fixed account — Apple's reviewers can't
+// receive email, so it skips the passwordless flow and uses a password.
 const REVIEW_ACCOUNT_EMAIL = 'test@usetroptix.com';
 
 export default function LoginScreen() {
@@ -47,8 +46,6 @@ export default function LoginScreen() {
       return;
     }
 
-    // App Store review can't receive the passwordless email, so this account
-    // signs in with a password instead of triggering the OTP flow.
     if (trimmed === REVIEW_ACCOUNT_EMAIL) {
       setIsPasswordLogin(true);
       return;

@@ -1,4 +1,3 @@
-// Requires NGROK_AUTH_TOKEN in .env; run via `yarn dev:mobile`.
 import 'dotenv/config';
 import { spawn, ChildProcess } from 'child_process';
 import ngrok from 'ngrok';

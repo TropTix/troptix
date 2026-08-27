@@ -2,10 +2,8 @@ import type { PrismaClient } from '@troptix/db';
 import { NotFoundError } from './errors';
 
 /**
- * The seam's ownership assert: the event exists, is live, and belongs to the
- * resolved organizer — else NotFound (never Forbidden, so foreign ids can't be
- * probed). One home so that when Phase 1 redefines ownership as membership in
- * the owning Organization (ADR 0022), every write path changes here at once.
+ * NotFound, never Forbidden, so foreign ids can't be probed. The one home of
+ * the write-path ownership rule (ADR 0022) — redefine here, not at call sites.
  */
 export async function requireOwnedEvent(
   prisma: PrismaClient,

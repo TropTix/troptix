@@ -1,18 +1,5 @@
-/**
- * Screen E — the ticket-type write seam (#452, same shape as the event
- * writes). Create and edit a ticket type, pure over an injected `prisma`,
- * authorized on the `Actor` with the owning event as the boundary; writes
- * never take a View-as target (ADR 0018).
- *
- * The paid gate reads the actor's Organization (unapproved or missing org ⇒
- * free tickets only) through the same `assertPaidTicketingAllowed` the event
- * writes use. It gates NEW paid inventory: every create, and the free → paid
- * transition on update — a row that is already paid stays editable even if
- * the org lost (or never had) approval, per the gate's grandfathering rule.
- * Deliberately unguarded, matching today: capacity may be edited below
- * `sold` (stops further sales, corrupts nothing — availability is
- * capacity − reserved − sold).
- */
+// Capacity may deliberately be edited below `sold` — it stops further sales
+// and corrupts nothing, so no guard belongs here.
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import {
@@ -78,9 +65,8 @@ export async function updateTicketType(
   if (!owned) {
     throw new NotFoundError('Ticket type not found');
   }
-  // The gate is on NEW paid inventory. A row that is already paid stays
-  // editable (name, capacity, window) even if the org lost — or never had —
-  // approval; only the free → paid transition is a gated act.
+  // Only the free → paid transition is gated: a row already paid stays
+  // editable even if the org lost — or never had — approval.
   const storedPriceCents = owned.priceCents ?? toCents(owned.price);
   if (storedPriceCents === 0) {
     assertPaidTicketingAllowed(

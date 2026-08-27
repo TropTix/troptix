@@ -40,15 +40,12 @@ import { ChevronDownIcon } from 'lucide-react';
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  /** ID of the column to use for the primary search input */
   filterColumnId?: string;
   filterInputPlaceholder?: string;
-  /** Render custom actions/filters in the toolbar */
   renderToolbarActions?: (table: ReactTable<TData>) => React.ReactNode;
   enablePagination?: boolean;
   enableColumnVisibility?: boolean;
   initialSorting?: SortingState;
-  /** Custom metadata accessible in cells/headers */
   meta?: TableMeta<TData>;
 }
 

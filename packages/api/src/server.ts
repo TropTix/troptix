@@ -1,10 +1,5 @@
-// @troptix/api/server — SERVER ENTRY.
-//
-// The server-side surface of the API package: the service layer + the tRPC
-// router value, context, and caller. Import only from server code; the Expo
-// app is lint-banned from this entry (guardrail lands with Stage 2). It does
-// NOT use the `server-only` package — that throws outside RSC and would break
-// Pages-Router routes / Node tooling that consume the services (see ADR 0009).
+// Server entry — import only from server code. Deliberately not `server-only`:
+// that throws outside RSC and breaks Pages-Router routes / Node tooling (ADR 0009).
 
 export {
   reserve,

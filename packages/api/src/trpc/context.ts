@@ -3,10 +3,8 @@ import type Stripe from 'stripe';
 import type { CheckoutAnalytics } from '../contracts/analytics';
 
 /**
- * Who is making the request (ADR 0013). Authorization is enforced in the
- * services off this value; the tRPC procedure tiers gate on it too. Real users
- * arrive once Supabase Auth lands (Stage 1c) — until then every request is
- * `anonymous`. `system` is for the webhook/cron, which bypass user checks.
+ * Authorization is enforced in the services off this value (ADR 0013).
+ * `system` is for the webhook/cron only — it bypasses user checks.
  */
 export type Actor =
   | { kind: 'anonymous' }
@@ -16,27 +14,12 @@ export type Actor =
 export interface Context {
   prisma: PrismaClient;
   actor: Actor;
-  /**
-   * Injected Stripe client + app origin, needed only by the paid-checkout
-   * procedures (`beginPayment`/`getCheckoutState`, ADR 0018). Optional so that
-   * reads/free-flow callers and unit tests can build a context without Stripe;
-   * the paid procedures assert their presence.
-   */
   stripe?: Stripe;
   siteUrl?: string;
-  /**
-   * Server-side PostHog capture port for the conversion event. Optional —
-   * missing means analytics is off (no key, tests) and captures are skipped.
-   */
+  /** Missing means analytics is off — captures are silently skipped. */
   analytics?: CheckoutAnalytics;
 }
 
-/**
- * Build the per-request context. The DB client is injected so the services stay
- * framework-agnostic. The caller resolves the actor from the request (Bearer
- * token or session cookie) and passes it in; procedures never do auth
- * themselves, they gate on ctx.actor.kind.
- */
 export function createContext(opts: {
   prisma: PrismaClient;
   actor?: Actor;

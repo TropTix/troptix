@@ -1,14 +1,6 @@
 /**
- * LEGACY — the mobile-oriented reads for `apps/organizer-v2` only. Frozen: do
- * not extend, and do not copy `authorizeOrganizer` into new code.
- *
- * The web organizer surface uses `organizer-scope.ts` +
- * `organizer-dashboard.ts` instead, which handle the platform-owner bypass
- * via an explicit View-as target (ADR 0018) rather than the implicit
- * "@usetroptix.com sees admin-owned events" scoping here. This file still
- * throws string errors the tRPC router matches on rather than the typed
- * errors in `_shared/errors.ts`. Both are retired when v2 moves onto the new
- * seam (see docs/plans/2026-07-organizer-dashboard-migration.md).
+ * LEGACY mobile path (`apps/organizer-v2`) — frozen; build on organizer-scope
+ * instead. The string errors are matched by the tRPC router; do not change.
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -85,7 +77,7 @@ export async function getEvent(
     name: event.name,
     date: event.startsAt,
     venue: event.venue ?? '',
-    city: event.address?.split(',')[1]?.trim() ?? '', // Simple fallback for city
+    city: event.address?.split(',')[1]?.trim() ?? '',
     guests: event.tickets.map((t) => ({
       id: t.id,
       name:
@@ -117,15 +109,12 @@ export async function checkInTicket(
     throw new Error('NOT_FOUND');
   }
 
-  // Ownership-only: writes never carry platform-owner power (ADR 0018).
   if (ticket.event.organizerUserId !== actor.userId) {
     throw new Error('UNAUTHORIZED');
   }
 
-  // Atomic check-then-flip is the only gate: only the request that finds the
-  // ticket still un-checked flips it, so two simultaneous scans can't both
-  // succeed. Un-checked means legacy AVAILABLE or the canonical VALID the
-  // reservation checkout mints (the lifecycle enums are mid-cutover).
+  // Atomic check-then-flip — two simultaneous scans can't both succeed.
+  // Un-checked is legacy AVAILABLE or canonical VALID (enums mid-cutover).
   const result = await prisma.tickets.updateMany({
     where: {
       id: ticketId,

@@ -1,9 +1,3 @@
-/**
- * Unit tests for the public event-page read. Pure over an injected `prisma`
- * (a hand-rolled fake returning canned rows) — no Postgres (ADR 0010). Asserts
- * the tier shaping (price/fees, priceCents-with-legacy-fallback, maxAllowedToAdd
- * clamp), the "From $X" derivation, the empty case, and not-found.
- */
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import { getEventDetail, listPublicEvents } from './events';
@@ -107,7 +101,6 @@ describe('getEventDetail', () => {
     const result = await getEventDetail(prisma, { eventId: 'ev-1' });
     expect(result.fromPriceCents).toBe(2500);
     expect(result.tickets).toHaveLength(3);
-    // Sorted by ascending price (all available).
     expect(result.tickets.map((t) => t.priceCents)).toEqual([2500, 4000, 6000]);
   });
 
@@ -144,9 +137,8 @@ describe('getEventDetail', () => {
     const result = await getEventDetail(prisma, { eventId: 'ev-1' });
     const byId = Object.fromEntries(result.tickets.map((t) => [t.id, t]));
     expect(byId.soldout.maxAllowedToAdd).toBe(0);
-    expect(byId.open.maxAllowedToAdd).toBe(3); // min(availability 3, max-per-user 10)
-    expect(byId.capped.maxAllowedToAdd).toBe(4); // min(availability 100, max-per-user 4)
-    // Available tier comes first despite being pricier.
+    expect(byId.open.maxAllowedToAdd).toBe(3);
+    expect(byId.capped.maxAllowedToAdd).toBe(4);
     expect(result.tickets[0].id).toBe('open');
   });
 

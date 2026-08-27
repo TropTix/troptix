@@ -1,14 +1,12 @@
 import { z } from 'zod';
 
-// Paid-checkout contracts (ADR 0018). Cents + ISO strings on the wire (no
-// superjson transformer), shared by the tRPC procedures and the client.
+// No superjson transformer on the wire — ISO strings, never z.date().
 
 export const beginPaymentInputSchema = z.object({
   reservationId: z.string().min(1),
 });
 export type BeginPaymentInput = z.infer<typeof beginPaymentInputSchema>;
 
-/** One order-summary line for the payment screen (server-authoritative). */
 export const paymentSummaryItemSchema = z.object({
   name: z.string(),
   quantity: z.number().int(),
@@ -18,15 +16,13 @@ export const paymentSummaryItemSchema = z.object({
 export type PaymentSummaryItem = z.infer<typeof paymentSummaryItemSchema>;
 
 export const beginPaymentResponseSchema = z.object({
-  /** Checkout Session client secret for `CheckoutElementsProvider`. */
   clientSecret: z.string(),
-  /** ISO-8601 — the hold's TTL (drives the countdown). */
   expiresAt: z.string().datetime(),
   totalCents: z.number().int(),
   subtotalCents: z.number().int(),
   feesCents: z.number().int(),
-  /** What the buyer is paying for — from the reservation, so it survives a
-   * resumed/refreshed payment screen where the client selection is gone. */
+  /** From the reservation, not the client — it must survive a resumed/refreshed
+   * payment screen where the client selection is gone. */
   items: z.array(paymentSummaryItemSchema),
 });
 export type BeginPaymentResponse = z.infer<typeof beginPaymentResponseSchema>;
@@ -41,12 +37,6 @@ const checkoutOrderTicketSchema = z.object({
   ticketTypeName: z.string().nullable(),
 });
 
-/**
- * The buyer-visible state of a reservation-backed checkout — the single shape
- * behind both the confirmation poll and resume-from-URL. `held` means still
- * payable; `order` means fulfilled; `expired` and `refunded` are terminal
- * exception states each rendered with its own explicit copy.
- */
 export const checkoutStateSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('held'),

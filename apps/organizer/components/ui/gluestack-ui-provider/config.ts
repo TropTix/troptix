@@ -16,7 +16,6 @@ export const config = {
     '--color-primary-900': '10 10 10',
     '--color-primary-950': '8 8 8',
 
-    /* Secondary  */
     '--color-secondary-0': '253 253 253',
     '--color-secondary-50': '251 251 251',
     '--color-secondary-100': '246 246 246',
@@ -30,7 +29,6 @@ export const config = {
     '--color-secondary-900': '165 164 164',
     '--color-secondary-950': '157 157 157',
 
-    /* Tertiary */
     '--color-tertiary-0': '255 250 245',
     '--color-tertiary-50': '255 242 229',
     '--color-tertiary-100': '255 233 213',
@@ -44,7 +42,6 @@ export const config = {
     '--color-tertiary-900': '108 61 19',
     '--color-tertiary-950': '84 49 18',
 
-    /* Error */
     '--color-error-0': '254 233 233',
     '--color-error-50': '254 226 226',
     '--color-error-100': '254 202 202',
@@ -58,7 +55,6 @@ export const config = {
     '--color-error-900': '127 29 29',
     '--color-error-950': '83 19 19',
 
-    /* Success */
     '--color-success-0': '228 255 244',
     '--color-success-50': '202 255 232',
     '--color-success-100': '162 241 192',
@@ -72,7 +68,6 @@ export const config = {
     '--color-success-900': '20 83 45',
     '--color-success-950': '27 50 36',
 
-    /* Warning */
     '--color-warning-0': '255 249 245',
     '--color-warning-50': '255 244 236',
     '--color-warning-100': '255 231 213',
@@ -86,7 +81,6 @@ export const config = {
     '--color-warning-900': '108 56 19',
     '--color-warning-950': '84 45 18',
 
-    /* Info */
     '--color-info-0': '236 248 254',
     '--color-info-50': '199 235 252',
     '--color-info-100': '162 221 250',
@@ -100,7 +94,6 @@ export const config = {
     '--color-info-900': '5 64 93',
     '--color-info-950': '3 38 56',
 
-    /* Typography */
     '--color-typography-0': '254 254 255',
     '--color-typography-50': '245 245 245',
     '--color-typography-100': '229 229 229',
@@ -114,7 +107,6 @@ export const config = {
     '--color-typography-900': '38 38 39',
     '--color-typography-950': '23 23 23',
 
-    /* Outline */
     '--color-outline-0': '253 254 254',
     '--color-outline-50': '243 243 243',
     '--color-outline-100': '230 230 230',
@@ -128,7 +120,6 @@ export const config = {
     '--color-outline-900': '39 38 36',
     '--color-outline-950': '26 23 23',
 
-    /* Background */
     '--color-background-0': '255 255 255',
     '--color-background-50': '246 246 246',
     '--color-background-100': '242 241 241',
@@ -142,14 +133,12 @@ export const config = {
     '--color-background-900': '39 38 37',
     '--color-background-950': '18 18 18',
 
-    /* Background Special */
     '--color-background-error': '254 241 241',
     '--color-background-warning': '255 243 234',
     '--color-background-success': '237 252 242',
     '--color-background-muted': '247 248 247',
     '--color-background-info': '235 248 254',
 
-    /* Focus Ring Indicator  */
     '--color-indicator-primary': '55 55 55',
     '--color-indicator-info': '83 153 236',
     '--color-indicator-error': '185 28 28',
@@ -168,7 +157,6 @@ export const config = {
     '--color-primary-900': '254 249 249',
     '--color-primary-950': '253 252 252',
 
-    /* Secondary  */
     '--color-secondary-0': '20 20 20',
     '--color-secondary-50': '23 23 23',
     '--color-secondary-100': '31 31 31',
@@ -182,7 +170,6 @@ export const config = {
     '--color-secondary-900': '150 150 150',
     '--color-secondary-950': '164 164 164',
 
-    /* Tertiary */
     '--color-tertiary-0': '84 49 18',
     '--color-tertiary-50': '108 61 19',
     '--color-tertiary-100': '130 73 23',
@@ -196,7 +183,6 @@ export const config = {
     '--color-tertiary-900': '255 242 229',
     '--color-tertiary-950': '255 250 245',
 
-    /* Error */
     '--color-error-0': '83 19 19',
     '--color-error-50': '127 29 29',
     '--color-error-100': '153 27 27',
@@ -210,7 +196,6 @@ export const config = {
     '--color-error-900': '254 226 226',
     '--color-error-950': '254 233 233',
 
-    /* Success */
     '--color-success-0': '27 50 36',
     '--color-success-50': '20 83 45',
     '--color-success-100': '22 101 52',
@@ -224,7 +209,6 @@ export const config = {
     '--color-success-900': '202 255 232',
     '--color-success-950': '228 255 244',
 
-    /* Warning */
     '--color-warning-0': '84 45 18',
     '--color-warning-50': '108 56 19',
     '--color-warning-100': '130 68 23',
@@ -238,7 +222,6 @@ export const config = {
     '--color-warning-900': '255 244 237',
     '--color-warning-950': '255 249 245',
 
-    /* Info */
     '--color-info-0': '3 38 56',
     '--color-info-50': '5 64 93',
     '--color-info-100': '7 90 131',
@@ -252,7 +235,6 @@ export const config = {
     '--color-info-900': '199 235 252',
     '--color-info-950': '236 248 254',
 
-    /* Typography */
     '--color-typography-0': '23 23 23',
     '--color-typography-50': '38 38 39',
     '--color-typography-100': '64 64 64',
@@ -266,7 +248,6 @@ export const config = {
     '--color-typography-900': '245 245 245',
     '--color-typography-950': '254 254 255',
 
-    /* Outline */
     '--color-outline-0': '26 23 23',
     '--color-outline-50': '39 38 36',
     '--color-outline-100': '65 65 65',
@@ -280,7 +261,6 @@ export const config = {
     '--color-outline-900': '243 243 243',
     '--color-outline-950': '253 254 254',
 
-    /* Background */
     '--color-background-0': '18 18 18',
     '--color-background-50': '39 38 37',
     '--color-background-100': '65 64 64',
@@ -294,14 +274,12 @@ export const config = {
     '--color-background-900': '246 246 246',
     '--color-background-950': '255 255 255',
 
-    /* Background Special */
     '--color-background-error': '66 43 43',
     '--color-background-warning': '65 47 35',
     '--color-background-success': '28 43 33',
     '--color-background-muted': '51 51 51',
     '--color-background-info': '26 40 46',
 
-    /* Focus Ring Indicator  */
     '--color-indicator-primary': '247 247 247',
     '--color-indicator-info': '161 199 245',
     '--color-indicator-error': '232 70 69',

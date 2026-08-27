@@ -6,9 +6,8 @@ import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
 import type { ServerUser } from '@/server/authUser';
 
-// Ownership-scoped: null is a 404. Platform Owners pass this nav shell —
-// layouts can't read ?viewAs, and blocking here would kill View-as on every
-// page below; the pages themselves authorize.
+// Platform Owners pass this nav shell: layouts can't read ?viewAs, and blocking
+// here would kill View-as on every page below — the pages themselves authorize.
 async function getEvent(eventId: string, user: ServerUser) {
   const event = await prisma.events.findUnique({
     where: {

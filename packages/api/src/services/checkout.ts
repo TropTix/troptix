@@ -1,19 +1,3 @@
-/**
- * Read-side checkout services: the public ticket list (`getCheckoutConfig`) and
- * discount/password-code unlock (`applyCode`). Ports of
- * `apps/web/src/app/api/checkout/{config,apply-code}/route.ts`, rewritten
- * against the reservation-rebuild columns and the cents contract.
- *
- * Prisma is injected as the first argument (framework-agnostic, unit-testable
- * with a fake). These are reads keyed off `eventId` / `code`, so — like the
- * reservation primitives — they carry no authorization (ADR 0013).
- *
- * Availability = `capacity - reserved - sold` (the inventory counters), so
- * active holds are already netted out via `reserved`; no separate pending-order
- * query. `priceCents` is nullable and falls back to `price * 100`;
- * `saleStartsAt`/`saleEndsAt` are the one sale-window pair, full timestamps
- * (ADR 0020).
- */
 import type { PrismaClient, Prisma } from '@troptix/db';
 import {
   type ApplyCodeInput,
@@ -25,8 +9,6 @@ import {
 import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
 
-// Exactly the columns the mapper needs — shared by both queries so they read
-// the same data.
 const TICKET_TYPE_SELECT = {
   id: true,
   name: true,
@@ -37,10 +19,8 @@ const TICKET_TYPE_SELECT = {
   capacity: true,
   reserved: true,
   sold: true,
-  // Price. priceCents is authoritative; price is the legacy dollars fallback.
   priceCents: true,
   price: true,
-  // The sale window. One pair — ADR 0020.
   saleStartsAt: true,
   saleEndsAt: true,
   event: { select: { isDraft: true } },
@@ -50,17 +30,14 @@ type TicketTypeRow = Prisma.TicketTypesGetPayload<{
   select: typeof TICKET_TYPE_SELECT;
 }>;
 
-/**
- * Map a ticket-type row to its public `CheckoutTicket` shape — the availability,
- * sale-window, and fee logic shared by `getCheckoutConfig` and `applyCode`.
- * `now` is injected so callers compute against one consistent instant.
- */
 function toCheckoutTicket(
   tt: TicketTypeRow,
   now: Date,
   opts: { isPasswordProtected?: boolean } = {}
 ): CheckoutTicket {
   const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
+  // Active holds are already netted out via `reserved` — never subtract a
+  // separate pending-order/hold count on top.
   const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
   const saleIsActive = now >= tt.saleStartsAt && now <= tt.saleEndsAt;
   const maxAllowedToAdd =
@@ -88,12 +65,6 @@ function toCheckoutTicket(
   };
 }
 
-/**
- * The public ticket list for an event's checkout: every non-code-gated ticket
- * type, available ones first then by ascending price. Throws `NotFoundError`
- * when the event itself doesn't exist (vs. an event with no public tickets,
- * which returns an empty list).
- */
 export async function getCheckoutConfig(
   prisma: PrismaClient,
   input: CheckoutConfigInput
@@ -101,15 +72,12 @@ export async function getCheckoutConfig(
   const ticketTypes = await prisma.ticketTypes.findMany({
     where: {
       eventId: input.eventId,
-      // A null/empty discount code means the ticket is public.
       OR: [
         { discountCode: { equals: null } },
         { discountCode: { equals: '' } },
       ],
     },
     select: TICKET_TYPE_SELECT,
-    // No DB orderBy — the in-memory sort below (available-first, then by
-    // priceCents) is the source of truth and would re-order any DB sort anyway.
   });
 
   if (ticketTypes.length === 0) {
@@ -135,12 +103,6 @@ export async function getCheckoutConfig(
   return { tickets };
 }
 
-/**
- * Unlock a code-gated ticket type. Returns a discriminated result — `password`
- * with the unlocked ticket on a (case-insensitive) match, `invalid` otherwise.
- * Not found is a normal `invalid` result, not a thrown error (the caller maps
- * it to a 401/normal response).
- */
 export async function applyCode(
   prisma: PrismaClient,
   input: ApplyCodeInput

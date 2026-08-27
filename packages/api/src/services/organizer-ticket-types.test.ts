@@ -1,8 +1,3 @@
-/**
- * Unit tests for the Screen E ticket-types read. Pure over an injected fake
- * `prisma` (ADR 0010). Covers the shared authorization seam, the sale-window
- * states, the priceCents fallback, per-ticket-type revenue, and the summary totals.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -33,7 +28,7 @@ const ticketType = (over: Record<string, unknown> = {}) => ({
 function fakePrisma(
   opts: {
     platformOwner?: boolean;
-    event?: unknown; // undefined → owned with one ticket type; null → not found
+    event?: unknown;
     ticketTypes?: unknown[];
     revenue?: unknown[];
   } = {}
@@ -143,7 +138,6 @@ describe('listTicketTypes — shaping', () => {
       {
         id: 't-ga',
         name: 'GA',
-        // $20.00 set; the attendee pays 8% + $0.50 on top (PASS).
         grossPriceCents: 2000,
         displayPriceCents: 2210,
         sold: 40,
@@ -152,7 +146,6 @@ describe('listTicketTypes — shaping', () => {
         saleState: 'OnSale',
         saleStartsAt: '2026-07-01T00:00:00.000Z',
         saleEndsAt: '2026-07-31T00:00:00.000Z',
-        // The editable fields the manage screen's drawer seeds from.
         description: 'Main floor',
         maxPurchasePerUser: 10,
         ticketingFees: 'PASS_TICKET_FEES',
@@ -174,7 +167,6 @@ describe('listTicketTypes — shaping', () => {
       ticketTypes: [ticketType({ ticketingFees: 'ABSORB_TICKET_FEES' })],
     });
     const result = await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
-    // The attendee pays the sticker price; the organizer eats the fee.
     expect(result.ticketTypes[0].displayPriceCents).toBe(2000);
     expect(result.ticketTypes[0].grossPriceCents).toBe(2000);
   });
@@ -227,7 +219,6 @@ describe('listTicketTypes — shaping', () => {
     const { prisma } = fakePrisma({
       ticketTypes: [
         ticketType({ id: 't-ga', sold: 40, capacity: 100 }),
-        // Not yet on sale — must not count toward the onSale total.
         ticketType({
           id: 't-vip',
           sold: 5,

@@ -1,10 +1,8 @@
 import { z } from 'zod';
 import { eventSummarySchema } from './events';
 
-// The public organization-page DTO (/o/[slug]): brand header + the org's
-// published events, split into upcoming and past. Socials are plain columns
-// (instagram/twitter are usernames; linkedin/website are URLs — the web layer
-// builds the final hrefs). Always public; no draft events ever reach here.
+// Public DTO — no draft events may ever reach it. Socials: instagram/twitter
+// are usernames, linkedin/website are URLs; the web layer builds the hrefs.
 
 export const organizationDetailInputSchema = z.object({
   slug: z.string().min(1),
@@ -24,9 +22,7 @@ export const organizationDetailSchema = z.object({
   twitter: z.string().nullable(),
   linkedin: z.string().nullable(),
   verified: z.boolean(),
-  /** Published, not-yet-ended events, soonest first. */
   upcomingEvents: z.array(eventSummarySchema),
-  /** Published, already-ended events, most recent first. */
   pastEvents: z.array(eventSummarySchema),
 });
 export type OrganizationDetail = z.infer<typeof organizationDetailSchema>;

@@ -27,7 +27,7 @@ const AUTH_SUB = '11111111-1111-1111-1111-111111111111';
 const APP_USER_ID = 'app-user-1';
 
 // process.env is shared across every file in a Jest worker, so restore rather
-// than delete — same pattern as lib/supabase/storage.test.ts.
+// than delete.
 const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 beforeEach(() => {
@@ -139,8 +139,6 @@ describe('getUserFromIdTokenCookie', () => {
   });
 });
 
-// The profile /api/user/me hands to the browser. Its `id` becomes user.id on the
-// client, and it resolves through its own query rather than resolveByAuthUserId.
 describe('getCurrentUserProfile', () => {
   it('returns the profile keyed on the app Users.id, not the auth sub (ADR 0011/0015)', async () => {
     mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });

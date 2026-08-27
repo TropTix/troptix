@@ -1,15 +1,10 @@
 import type { EmailOrder } from '../emails/EmailConfirmation';
 
 /**
- * Calendar helpers for the order-confirmation email: an `.ics` attachment that
- * mail clients (Apple Mail, Outlook, Gmail) auto-detect, plus "Add to Calendar"
- * web links for clients that don't.
- *
  * Times are emitted as UTC instants (`...Z`). That fixes the exact moment of the
  * event unambiguously; each calendar then renders it in the viewer's own zone.
  */
 
-/** When no end time is recorded, assume an event runs this long. */
 const DEFAULT_DURATION_MS = 2 * 60 * 60 * 1000;
 
 function eventEnd(event: EmailOrder['event']): Date {
@@ -61,7 +56,6 @@ export interface CalendarLinks {
   outlook: string;
 }
 
-/** Pre-filled "Add to Calendar" web links for Google and Outlook. */
 export function buildCalendarLinks(
   order: EmailOrder,
   ticketUrl: string
@@ -101,8 +95,8 @@ export function calendarFileName(order: EmailOrder): string {
 }
 
 /**
- * A single-event `VCALENDAR` document for the order's event. The UID is keyed to
- * the order so re-sends update the same calendar entry rather than duplicating.
+ * The UID is keyed to the order so re-sends update the same calendar entry
+ * rather than duplicating.
  */
 export function buildEventIcs(order: EmailOrder, ticketUrl: string): string {
   const { event } = order;

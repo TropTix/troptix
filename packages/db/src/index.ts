@@ -1,43 +1,13 @@
-// @troptix/db — SERVER ENTRY.
-//
-// Owns the Prisma 7 runtime: the generated client + the `pg` driver adapter.
-// Import only from server code.
-//
-// NB: we deliberately do NOT use the `server-only` package here. It throws
-// outside a React-Server-Components context, which would break the repo's
-// Pages-Router API routes (src/pages/api/*) and Node tooling/tests that
-// legitimately use the DB — it's an App-Router-only guard, too blunt for a DB
-// package consumed across mixed runtimes. The client/RN quarantine is instead
-// enforced by the two-entry split (clients import the type-only
-// `@troptix/db/types`) + the ESLint no-restricted-imports ban on this entry in
-// apps/organizer (Stage 2).
+// Server entry (client/RN code imports type-only '@troptix/db/types'). No
+// `server-only` on purpose: it throws outside RSC, breaking Pages-Router API
+// routes and Node tests; the quarantine is the two-entry split + ESLint ban.
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/prisma/client';
 
-/**
- * Prisma 7 runtime client (moved here from apps/web in the packages/db
- * relocation). The Rust engine is gone — the client connects through the `pg`
- * driver adapter, with the connection URL read from the environment of the
- * consuming app (Next provides `POSTGRES_PRISMA_URL`, pooled). See
- * docs/plans/2026-06-prisma-7-upgrade.md for the pgbouncer / SSL notes.
- *
- * A single client is cached on `globalThis` in dev so HMR doesn't open a new
- * pool per reload.
- */
-
-/**
- * Strip `sslmode` from the connection string so the adapter's `ssl` config below
- * is authoritative. When `sslmode` is present, `pg-connection-string` parses it
- * into its own ssl settings that can override the explicit `ssl` object, which
- * re-enables cert validation and rejects Supabase's self-signed pooler cert
- * ("self-signed certificate in certificate chain"). Some envs (e.g. the Supabase
- * Vercel integration's preview branches) inject `sslmode`; our hand-set prod URL
- * does not, so this is a no-op there.
- *
- * `sslmode=disable` is the one value we honor rather than strip: the local
- * Supabase Postgres (CI, `supabase db start`) has no SSL at all, and `pg` with
- * a truthy `ssl` option aborts against a non-SSL server.
- */
+// Strip `sslmode` so the explicit `ssl` object stays authoritative — a URL-borne
+// sslmode (Supabase Vercel previews inject one) re-enables cert validation and
+// rejects Supabase's self-signed pooler cert. `sslmode=disable` alone is honored:
+// local/CI Supabase has no SSL, and `pg` with truthy `ssl` aborts there.
 const parseConnection = () => {
   const raw = process.env.POSTGRES_PRISMA_URL;
   const sslDefault = { rejectUnauthorized: false } as const;
@@ -68,23 +38,16 @@ const createPrismaClient = () => {
     adapter: new PrismaPg({
       connectionString,
       max: poolMax(),
-      // Supabase pgbouncer drops idle server-side connections after ~30s. Close
-      // pool connections after 20s of idleness so the pool never hands out a
-      // dead socket, which would surface as "Connection terminated unexpectedly".
+      // Supabase pgbouncer drops idle connections after ~30s — stay under it or
+      // the pool hands out dead sockets ("Connection terminated unexpectedly").
       idleTimeoutMillis: 20000,
       // Give Supabase free-tier enough time to wake a cold pooler connection.
       connectionTimeoutMillis: 15000,
-      // SSL is governed here (the Rust engine ignored cert validation pre-v7);
-      // see parseConnection() for why sslmode is stripped from the URL.
       ssl,
     }),
-    // Interactive transactions default to a 5s budget, measured wall-clock
-    // across every round-trip inside the callback. Against the remote Supabase
-    // pooler (Vercel prod, local runs of the packages/api suite) a handful of
-    // queries plus latency spikes can blow that, surfacing as "commit cannot be
-    // executed on an expired transaction" — in prod that would strand a settled
-    // payment without its order. Same class of tuning as the pool timeouts
-    // above.
+    // The default 5s interactive-transaction budget (wall-clock across the whole
+    // callback) gets blown by pooler latency spikes — "commit cannot be executed
+    // on an expired transaction", stranding a settled payment without its order.
     transactionOptions: {
       maxWait: 10000,
       timeout: 15000,
@@ -105,7 +68,4 @@ if (process.env.NODE_ENV !== 'production') {
 export default prisma;
 export { prisma };
 
-// Re-export the generated client's surface (PrismaClient, the `Prisma`
-// namespace, enums, model types) so server consumers import everything from
-// `@troptix/db` rather than reaching into the generated output directly.
 export * from './generated/prisma/client';

@@ -1,7 +1,3 @@
-/**
- * Unit tests for the pure server-side pricing authority (`deriveReserveItems`).
- * No Postgres — it's pure over the tier rows + selection (ADR 0010).
- */
 import { describe, expect, it } from 'vitest';
 import { deriveReserveItems, type PricedTierRow } from './reservations';
 import { NotFoundError } from './_shared/errors';
@@ -30,7 +26,7 @@ describe('deriveReserveItems', () => {
       NOW
     );
     expect(item.unitPriceCents).toBe(5000);
-    expect(item.feesCents).toBe(450); // round(5000*0.08 + 50)
+    expect(item.feesCents).toBe(450);
     expect(item.quantity).toBe(2);
   });
 
@@ -151,7 +147,7 @@ describe('deriveReserveItems', () => {
         NOW
       );
       expect(items).toHaveLength(1);
-      expect(items[0].quantity).toBe(4); // clamped to the cap, not 6
+      expect(items[0].quantity).toBe(4);
     });
 
     it('sorts output ascending by ticketTypeId regardless of input order', () => {

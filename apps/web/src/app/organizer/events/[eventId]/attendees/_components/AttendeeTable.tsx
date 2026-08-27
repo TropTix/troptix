@@ -81,7 +81,6 @@ const CheckInButton = ({
   );
 };
 
-// Separate mobile view component to prevent re-renders
 const MobileAttendeeView = ({
   attendees,
   eventId,

@@ -71,8 +71,6 @@ export default async function EditEventPage(props: EditEventPageProps) {
     flyerPalette: parseStoredFlyerPalette(event.flyerPalette),
   };
 
-  // Host brand for the read-only "Hosted by" line on the form. Paid ticketing
-  // is the Organization's approval — the same flag the write service enforces.
   const org = await prisma.organization.findFirst({
     where: { ownerUserId: user.uid },
     select: { displayName: true, paidTicketingEnabled: true },

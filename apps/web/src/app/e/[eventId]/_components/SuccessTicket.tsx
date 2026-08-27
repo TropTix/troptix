@@ -7,9 +7,6 @@ import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import type { EventDetail } from '@troptix/api';
 
-// Post-checkout confirmation: poster-forward on a light tinted field, with a
-// single "View tickets" action that hands off to the real swipeable QR view
-// The QR lives only there — never inline here.
 export default function SuccessTicket({
   event,
   orderId,

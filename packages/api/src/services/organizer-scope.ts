@@ -1,25 +1,11 @@
 /**
- * The organizer surface's authorization seam (ADR 0013).
- *
- * Access is **ownership-only** — no `ORGANIZER` role gate (ADR 0019). A read is
- * always scoped to exactly one organizer, so the old
- * `isPlatformOwner ? {} : { organizerUserId }` bypass has nowhere to live.
- *
- * View-as (ADR 0018) is the **one** place platform-owner power is spent: a
- * Platform Owner resolves the scope to another organizer, and from then on the
- * read is an ordinary single-organizer read. Nothing downstream re-checks for a
- * platform owner — an admin who wants an organizer's data views *as* them.
- * Writes never take a View-as target.
+ * Ownership-only access (ADR 0019). View-as is the ONE place platform-owner
+ * power is spent — nothing downstream re-checks, and writes never take it.
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { UnauthorizedError } from './_shared/errors';
 
-/**
- * The organizer this read is scoped to — the actor, or a View-as target when
- * the actor is a Platform Owner. The platform-owner lookup is only paid for
- * when a View-as target is actually asked for, so the common read costs nothing.
- */
 export async function resolveOrganizerScope(
   prisma: PrismaClient,
   actor: Actor,

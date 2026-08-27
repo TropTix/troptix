@@ -12,7 +12,6 @@ export interface EmailAttachment {
   contentType: string;
 }
 
-/** A ready-to-send transactional email: subject, HTML body, and attachments. */
 export interface EmailContent {
   subject: string;
   html: string;
@@ -25,10 +24,6 @@ export interface BuildOrderConfirmationOptions {
 }
 
 /**
- * Build the order-confirmation email — subject, HTML, and a calendar (`.ics`)
- * attachment — for an order.
- *
- * Transport-agnostic: the caller owns data fetching and the mail client.
  * `event.imageUrl` must already be an absolute URL — email clients can't
  * resolve a relative/bucket-path src.
  */

@@ -1,8 +1,7 @@
 datasource db {
   provider = "postgresql"
-  // Prisma 7: connection URLs are no longer allowed in the schema.
-  //  - CLI / migrate diff: prisma.config.ts -> datasource.url (direct, 5432)
-  //  - runtime: pg driver adapter in src/server/prisma.ts (pooled URL)
+  // Prisma 7: no URL here. CLI/migrate gets the direct 5432 URL from
+  // prisma.config.ts; runtime uses the pooled URL via the pg adapter in packages/db/src/index.ts.
 }
 
 generator client {
@@ -21,18 +20,14 @@ model Users {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   email               String                @unique
-  // Supabase Auth identity (ADR 0011). The auth key; `id` stays the app PK —
-  // never assume equality (migrated users have id != authUserId). FK to
-  // auth.users(id) is hand-appended in SQL (the auth schema isn't modeled in
-  // Prisma). Nullable until the 1c backfill + orphan gate clears it.
+  // Supabase Auth key (ADR 0011); `id` stays the app PK — never assume equality
+  // (migrated users differ). FK to auth.users is hand-appended SQL; nullable until the 1c backfill.
   authUserId          String?               @unique @db.Uuid
   name                String?
   firstName           String?
   lastName            String?
   stripeId            String?
   role                Role                  @default(PATRON)
-  // Platform Owner (TropTix staff, cross-organizer visibility) as an explicit
-  // grant — replaces the @usetroptix.com email-suffix inference (ADR 0022).
   isPlatformOwner     Boolean               @default(false)
   tickets             Tickets[]
   orders              Orders[]
@@ -68,14 +63,6 @@ model SocialMediaAccounts {
   @@index([userId])
 }
 
-// The organizer's brand and (per ADR 0022) the home for teams: a real, linkable
-// entity that powers "Hosted by" and a public page at /o/[slug]. Exactly one
-// per owner (`ownerUserId` unique). Events carry `organizationId`, but
-// ownership/auth still keys on `Events.organizerUserId` (dual-written ==
-// ownerUserId). See docs/plans/2026-06-event-spotlight-and-organizer-brand.md.
-//
-// Socials are a fixed, small set → plain columns, not the SocialMediaAccounts
-// join table (custom links are out of scope; the table's dormant + dual-FK).
 // `instagram`/`twitter` store usernames; `linkedin`/`website` store full URLs.
 model Organization {
   id          String   @id @default(uuid())
@@ -101,15 +88,13 @@ model Organization {
 }
 
 // Membership roles (ADR 0024). The Owner is never a row here — the
-// `ownerUserId` scalar is the one answer to "who owns this". Scanner lands
-// with the mobile rebuild as a one-line ADD VALUE; dropping an enum value
-// needs a type rebuild, so nothing ships early.
+// `ownerUserId` scalar is the one answer to "who owns this".
 enum MembershipRole {
   ADMIN
 }
 
-// An org-level grant tying a User to an Organization (ADR 0024). The role
-// covers every event the Organization owns — there are no per-event grants.
+// The role covers every event the Organization owns — there are no per-event
+// grants (ADR 0024).
 model Membership {
   id        String         @id @default(uuid())
   createdAt DateTime       @default(now())
@@ -125,9 +110,6 @@ model Membership {
   @@index([userId])
 }
 
-// A per-event spotlight card (DJ, artist, speaker, sponsor, collaborator): just
-// a title + optional external link / image / description that renders as a card
-// linking out. Generic — no role/type/category. Flat, ordered by `order`.
 model Spotlight {
   id          String   @id @default(uuid())
   createdAt   DateTime @default(now())
@@ -147,9 +129,8 @@ model Spotlight {
 enum TicketStatus {
   AVAILABLE
   NOT_AVAILABLE
-  // New canonical lifecycle (reservation rebuild, Phase A — additive).
-  // Replaces the overloaded AVAILABLE/NOT_AVAILABLE pair; the old values stay
-  // until the cleanup phase migrates remaining rows and drops them.
+  // Canonical lifecycle (reservation rebuild, Phase A). AVAILABLE/NOT_AVAILABLE
+  // are the deprecated pair, kept only until the cleanup migration drops them.
   VALID
   USED
   CANCELLED
@@ -162,15 +143,13 @@ enum TicketType {
   COMPLEMENTARY
 }
 
-// Order-level transaction kind (roadmap 2.4). Distinct from the per-ticket
-// TicketType enum; lets free/paid/comp share one reservation→confirm path.
+// Order-level transaction kind — distinct from the per-ticket TicketType enum.
 enum OrderType {
   FREE
   PAID
   COMPLEMENTARY
 }
 
-// Lifecycle of a checkout hold (reservation rebuild).
 enum ReservationStatus {
   HELD
   CONVERTED
@@ -181,8 +160,6 @@ enum ReservationStatus {
   REFUNDED
 }
 
-// Transactional-outbox row state — deferred side effects (e.g. confirmation
-// email) written in the confirm transaction, sent after commit / retried.
 enum OutboxStatus {
   PENDING
   SENT
@@ -202,7 +179,7 @@ model Tickets {
   lastName    String?
   email       String?
 
-  checkinTimestamp DateTime? // set when scanned/checked in at the door (roadmap 2.11)
+  checkinTimestamp DateTime?
 
   event        Events       @relation(fields: [eventId], references: [id])
   eventId      String
@@ -213,9 +190,8 @@ model Tickets {
   user         Users?       @relation(fields: [userId], references: [id])
   userId       String?
 
-  // createdAt trails eventId so the dashboard's sales trend range-scans its
-  // window instead of reading every ticket the event ever sold. Supersedes a
-  // bare [eventId] — Postgres serves that from this index's leading column.
+  // createdAt trails eventId so the sales trend range-scans its window; the
+  // leading column also serves bare [eventId] lookups — don't re-add that index.
   @@index([eventId, createdAt])
   @@index([orderId])
   @@index([ticketTypeId])
@@ -252,10 +228,8 @@ model Orders {
   billingState     String?
   tickets          Tickets[]
   ticketsLink      String?
-  // Guest ticket-access capability minted at order creation. Distinct from the
-  // PK (`id`) and any user-facing public code: this is the unguessable secret
-  // behind the email's `?t=` link and gates the order/tickets/receipt pages for
-  // non-authenticated viewers. Revocable (null it to kill outstanding links).
+  // The unguessable secret behind the email's `?t=` link, gating order/tickets/
+  // receipt pages for guests. Never a display code; null it to kill outstanding links.
   accessToken      String?     @unique
   status           OrderStatus @default(PENDING)
 
@@ -265,7 +239,7 @@ model Orders {
   totalCents    Int?
   subtotalCents Int?
   feesCents     Int?
-  reservation   Reservation? // the hold this order was materialized from
+  reservation   Reservation?
 
   user    Users?  @relation(fields: [userId], references: [id])
   userId  String?
@@ -273,16 +247,12 @@ model Orders {
   eventId String
 
   @@index([eventId])
-  // Serves both dashboard reads off one index: the revenue aggregate seeks
-  // straight to a status + date range, and recent-orders gets an ordered path
-  // instead of top-N sorting every completed order.
+  // One index for both dashboard reads: the revenue aggregate seeks a status +
+  // date range; recent-orders gets an ordered path instead of a top-N sort.
   @@index([eventId, status, createdAt])
   @@index([userId])
 }
 
-// How the public event page is themed from the flyer. `off` renders the brand
-// theme; `wash` tints a light page from the flyer; `dark` builds a dark stage
-// in the flyer's hue.
 enum EventPageTheme {
   off
   wash
@@ -303,14 +273,12 @@ model Events {
   summary         String?
   organizer       String
   organizerUserId String
-  // The owning Organization (ADR 0022: the Organization owns every event).
-  // Auth still keys on organizerUserId — a derived legacy key, dual-written ==
-  // organization.ownerUserId — until the query-key flip to organizationId.
+  // Auth still keys on organizerUserId — a legacy key dual-written ==
+  // organization.ownerUserId — until the query-key flip to organizationId (ADR 0022).
   organizationId  String
 
   // Full timestamps — the event form folds the time input into these before
-  // submitting, so there is no separate time column and no separate atomic
-  // column (ADR 0020).
+  // submitting; never add a separate date or time column (ADR 0020).
   startsAt DateTime
   endsAt   DateTime
 
@@ -321,10 +289,8 @@ model Events {
   latitude    Float?
   longitude   Float?
 
-  // Flyer-derived page theming. The organizer picks a treatment at create/edit
-  // time; the palette is extracted once from the flyer at upload and stored
-  // raw (hex strings) so the derivation can evolve in code without a backfill.
-  // See apps/web/src/lib/flyerTheme.ts.
+  // Extracted once from the flyer at upload, stored raw (hex strings) so the
+  // derivation can evolve in code without a backfill (apps/web/src/lib/flyerTheme.ts).
   pageTheme    EventPageTheme @default(off)
   flyerPalette Json?
 
@@ -341,11 +307,7 @@ model Events {
 }
 
 enum TicketFeeStructure {
-  // Fees to be included in the ticket price you set. 
-  // Fees will be deducted from your sales at the time of your payout.
   ABSORB_TICKET_FEES
-  // Attendees to pay the fees on top of the ticket price you set. 
-  // Fees will be collected off the top of your ticket sales at the time of your payout.
   PASS_TICKET_FEES
 }
 
@@ -365,13 +327,12 @@ model TicketTypes {
   sold     Int @default(0) // confirmed/paid
 
   // Full timestamps — the ticket form folds the time input into these before
-  // submitting, so there is no separate time column and no separate atomic
-  // column (ADR 0020).
+  // submitting; never add a separate date or time column (ADR 0020).
   saleStartsAt DateTime
   saleEndsAt   DateTime
 
   price         Float
-  priceCents    Int? // integer cents (roadmap 2.12), ← round(price * 100)
+  priceCents    Int?
   ticketingFees TicketFeeStructure @default(PASS_TICKET_FEES)
 
   event            Events            @relation(fields: [eventId], references: [id])
@@ -383,12 +344,7 @@ model TicketTypes {
   @@index([eventId])
 }
 
-// Reservation rebuild (Phase A — additive). New tables; not yet written to by
-// app code until the Phase B cutover. RLS is enabled on each in the migration
-// (per the #281 convention); the app connects as a bypassrls role.
-
-// An explicit, time-boxed hold on inventory. Replaces "a PENDING Orders row is
-// the reservation". The Order is materialized only when the hold is confirmed.
+// The Order is materialized only when the hold is confirmed.
 model Reservation {
   id                      String            @id @default(uuid())
   createdAt               DateTime          @default(now())
@@ -396,20 +352,17 @@ model Reservation {
   status                  ReservationStatus @default(HELD)
   expiresAt               DateTime
   stripePaymentIntentId   String?           @unique
-  // Checkout Sessions API (ADR 0018): the Session drives the paid flow; its
-  // PaymentIntent id is backfilled into `stripePaymentIntentId` at confirm time
-  // for refund traceability. `stripeRefundId` is set on the expiry-race refund.
+  // The Session drives the paid flow (ADR 0018); its PaymentIntent id lands in
+  // `stripePaymentIntentId` only at confirm. `stripeRefundId` is set on the expiry-race refund.
   stripeCheckoutSessionId String?           @unique
   stripeRefundId          String?
 
-  // buyer contact captured at hold time
   email     String?
   firstName String?
   lastName  String?
 
   // Buyer's PostHog browser identity, captured at hold time so the server-side
-  // conversion event (webhook-fulfilled) joins the same person and session
-  // replay. Nullable — the buyer may block analytics.
+  // conversion event joins the same person and replay; null when analytics is blocked.
   posthogDistinctId String?
   posthogSessionId  String?
 
@@ -422,7 +375,6 @@ model Reservation {
   eventId String
   user    Users?            @relation(fields: [userId], references: [id])
   userId  String?
-  // Set when the hold is converted to a paid/confirmed order.
   order   Orders?           @relation(fields: [orderId], references: [id])
   orderId String?           @unique
 
@@ -445,9 +397,8 @@ model ReservationItem {
   @@index([ticketTypeId])
 }
 
-// Transactional outbox — side effects (e.g. confirmation email) are written in
-// the same transaction as confirm_reservation and dispatched after commit, so
-// a slow/failed email can never roll back a confirmed payment (roadmap 1.2 / 4.4).
+// Transactional outbox — rows are written in the same transaction as
+// confirm_reservation and dispatched after commit, so a slow/failed email can never roll back a confirmed payment.
 model OutboxMessage {
   id          String       @id @default(uuid())
   createdAt   DateTime     @default(now())
@@ -461,11 +412,10 @@ model OutboxMessage {
   @@index([status])
 }
 
-// Idempotency ledger for Stripe webhook deliveries (Stripe is at-least-once).
-// Primary key is the Stripe event id; an INSERT that conflicts means we already
-// processed it. Belt-and-suspenders alongside the reservation-status guard.
+// Stripe webhook idempotency ledger (deliveries are at-least-once). The PK IS
+// the Stripe event id — a conflicting INSERT means already processed; never add a uuid default.
 model ProcessedStripeEvent {
-  id          String   @id // Stripe event id (evt_…)
+  id          String   @id
   type        String
   processedAt DateTime @default(now())
 }

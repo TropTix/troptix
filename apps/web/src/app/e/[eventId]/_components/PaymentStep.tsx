@@ -11,7 +11,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { getFormattedCurrency } from '@/lib/utils';
 import type { EventDetail } from '@troptix/api';
 
-// One Stripe.js instance for the module (loadStripe is memoized upstream too).
 const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 const stripePromise = loadStripe(stripeKey ?? '');
 
@@ -29,8 +28,6 @@ type PaymentSummary = {
   totalCents: number;
 };
 
-/** Order summary shown above the card field, so the buyer can see what they're
- * paying for. Server-sourced (survives a resumed/refreshed payment step). */
 function OrderSummary({
   event,
   summary,
@@ -75,12 +72,10 @@ function OrderSummary({
   );
 }
 
-// The server holds 2 min past the buyer's countdown (ADR 0018): showing a
-// deadline earlier than the true `expiresAt` gives a payment submitted right at
-// zero time to settle + have its webhook delivered before the hold releases.
+// The server holds 2 min past the buyer's countdown (ADR 0018), so a payment
+// submitted at zero can still settle and webhook before the hold releases.
 const CLIENT_HOLD_BUFFER_MS = 2 * 60_000;
 
-/** Whole seconds left until `expiresAt`, clamped at 0. */
 function useCountdown(expiresAt: string): number {
   const [secondsLeft, setSecondsLeft] = useState(() =>
     Math.max(0, Math.round((new Date(expiresAt).getTime() - Date.now()) / 1000))
@@ -116,16 +111,14 @@ function PaymentInner({
   const checkoutState = useCheckoutElements();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  // Count down to the soft (client) deadline, ahead of the server's hold.
   const softDeadline = new Date(
     new Date(expiresAt).getTime() - CLIENT_HOLD_BUFFER_MS
   ).toISOString();
   const secondsLeft = useCountdown(softDeadline);
   const expired = secondsLeft <= 0;
 
-  // Once the hold lapses, kick the parent to the "start over" step — but never
-  // while a confirm() is in flight, or we'd tear down the UI mid-charge. If that
-  // confirm then fails, `submitting` clears and this re-runs to expire.
+  // Never expire while confirm() is in flight — that tears down the UI
+  // mid-charge. If the confirm fails, `submitting` clears and this re-runs.
   useEffect(() => {
     if (expired && !submitting) onExpired();
   }, [expired, submitting, onExpired]);
@@ -174,8 +167,6 @@ function PaymentInner({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-5 py-4">
-      {/* pr-8 keeps the countdown clear of the sheet's absolute close (✕)
-          button pinned at right-4 — otherwise they overlap on mobile. */}
       <div className="mb-3 flex items-center justify-between pr-8 text-sm">
         <button
           type="button"
@@ -217,11 +208,6 @@ function PaymentInner({
   );
 }
 
-/**
- * Paid checkout surface (ADR 0018): the Checkout Session's Payment Element with
- * a visible hold countdown. Renders inside the CheckoutSheet. Success redirects
- * to the Session return_url — the parent never sees a success callback here.
- */
 export default function PaymentStep({
   clientSecret,
   event,

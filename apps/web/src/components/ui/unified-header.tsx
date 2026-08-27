@@ -141,8 +141,6 @@ export default function UnifiedHeader() {
     <header
       className={cn(
         'fixed w-full z-30 transition-all duration-300 ease-in-out border-b',
-        // Frosted glass nav — heavier blur, softer fill. Reads as part of the dark
-        // hero at the top of the page; settles into a clean translucent bar on scroll.
         hasScrolled
           ? 'bg-background/85 backdrop-blur-md backdrop-saturate-150'
           : 'bg-background/55 backdrop-blur-md backdrop-saturate-150',

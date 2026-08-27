@@ -1,13 +1,6 @@
 /**
  * @jest-environment node
  */
-// next/server (NextRequest/NextResponse) requires the Node runtime's web APIs,
-// not jsdom.
-//
-// The routes are thin adapters over the check-in seam — these tests cover the
-// adapter contract (auth, validation, error mapping, response pass-through);
-// the authorization and flip behavior lives in
-// packages/api/src/services/organizer-checkin.test.ts.
 jest.mock('next/headers', () => ({
   headers: jest.fn(async () => ({
     get: (k: string) => (k === 'authorization' ? 'Bearer tok' : null),
@@ -79,7 +72,6 @@ describe('scan route', () => {
       ticketDescription: 'desc',
       scanSucceeded: true,
     });
-    // The actor is the caller themself — no impersonation, no bypass.
     expect(mockScan.mock.calls[0][1]).toEqual({
       kind: 'user',
       userId: 'owner',
@@ -92,7 +84,7 @@ describe('scan route', () => {
   });
 
   it('rejects a malformed body with 400 before touching the service', async () => {
-    const res = await scanPUT(req({ ticketId: 't1' })); // missing eventId
+    const res = await scanPUT(req({ ticketId: 't1' }));
 
     expect(res.status).toBe(400);
     expect(mockScan).not.toHaveBeenCalled();

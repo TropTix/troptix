@@ -19,9 +19,6 @@ import { themeStyle } from '@/lib/flyerTheme';
 import CheckoutSheet from './CheckoutSheet';
 import VenueMap from './VenueMap';
 
-// Public event page (Luma-light). Immersive poster hero on mobile, two-column
-// on desktop. See docs/plans/2026-06-event-page-redesign.md.
-
 const SECTION_LABEL =
   'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
@@ -41,9 +38,8 @@ function MetaRow({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
-// Deliberately coarse (days, not minutes) so the SSR and client renders of
-// this label agree in practice; the chip still carries suppressHydrationWarning
-// for the rare boundary crossing.
+// Deliberately coarse (days, not minutes) so the SSR and client renders agree;
+// suppressHydrationWarning on the chip covers the rare boundary crossing.
 function countdownLabel(start: Date, end: Date, eventEnded: boolean) {
   if (eventEnded) return 'Ended';
   const now = Date.now();
@@ -55,7 +51,6 @@ function countdownLabel(start: Date, end: Date, eventEnded: boolean) {
   return `Starts in ${Math.round(days / 7)} weeks`;
 }
 
-// Falls back to the legacy organizer name when there's no linked brand.
 function HostedBy({ event }: { event: EventDetail }) {
   if (!event.hostedBy) {
     return <p className="mt-3 font-semibold">{event.organizer}</p>;
@@ -131,15 +126,12 @@ export default function EventDetailView({
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
-  // Resume an in-flight checkout after the Stripe redirect / a refresh (ADR
-  // 0018). The param stays in the URL on purpose — scrubbing it would break
-  // refresh-resume; the PostHog sanitizer keeps it out of analytics instead.
+  // The param stays in the URL on purpose — scrubbing it would break
+  // refresh-resume; the PostHog sanitizer keeps it out of analytics (ADR 0018).
   useEffect(() => {
     if (resumeReservationId) setSheetOpen(true);
   }, [resumeReservationId]);
 
-  // router.back() is a no-op when there's no in-app history (opened straight
-  // from a shared link), so fall back to Discover in that case.
   const handleBack = () => {
     if (window.history.length > 1) {
       router.back();
@@ -149,9 +141,8 @@ export default function EventDetailView({
   };
 
   const isFree = event.fromPriceCents === 0;
-  // "RSVP" copy is only right when there's nothing to pay for. An event can mix
-  // free and paid tiers (fromPriceCents === 0 yet paid tickets exist), so gate
-  // the reservation wording on whether any paid ticket is on sale.
+  // An event can mix free and paid tiers (fromPriceCents === 0 yet paid tickets
+  // exist), so gate the "RSVP" wording on this rather than isFree.
   const hasPaidTickets = event.tickets.some((t) => t.priceCents > 0);
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
@@ -160,8 +151,6 @@ export default function EventDetailView({
   const end = new Date(event.endsAt);
   const priceLabel = priceLabelFor(event.fromPriceCents);
 
-  // Clamp only kicks in for genuinely long descriptions — short ones never
-  // show a "Read more" that reveals a line or two.
   const aboutIsLong = (event.description?.length ?? 0) > 400;
 
   async function onShare() {
@@ -183,10 +172,6 @@ export default function EventDetailView({
     <Share2 className="h-5 w-5" />
   );
 
-  // Derived during SSR so the page arrives themed. The wrapper scopes the
-  // overrides and owns the ink — every descendant inherits themed text color
-  // without per-region repeats. The checkout sheet (a portal) and the global
-  // nav sit outside it and stay on brand tokens.
   const themeVars = themeStyle(event.pageTheme, event.flyerPalette);
 
   return (
@@ -294,7 +279,6 @@ export default function EventDetailView({
                 </p>
               )}
 
-              {/* Host up top on mobile; desktop surfaces it in the poster aside. */}
               <p className="mt-3 text-sm text-muted-foreground md:hidden">
                 Hosted by <HostedByInline event={event} />
               </p>
@@ -340,7 +324,6 @@ export default function EventDetailView({
                 <VenueMap event={event} />
               </section>
 
-              {/* Full hosted-by (logo + socials); desktop shows it in the aside. */}
               <section className="mt-10 md:hidden">
                 <SectionHeader>Hosted by</SectionHeader>
                 <HostedBy event={event} />

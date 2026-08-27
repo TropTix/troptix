@@ -1,9 +1,3 @@
-/**
- * Tests the tRPC checkout router through `createCaller` (no HTTP) with an
- * injected fake `prisma` — proving the adapter wiring: zod input validation at
- * the boundary, the service call, and the output shape. The service logic
- * itself is covered by services/checkout.test.ts.
- */
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import { createCaller } from './index';

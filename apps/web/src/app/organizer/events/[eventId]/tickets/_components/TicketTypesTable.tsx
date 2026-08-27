@@ -68,8 +68,6 @@ export function TicketTypesTable({
         </p>
       ) : (
         <>
-          {/* Mobile: a tappable card per type (tables reshape to cards on
-              mobile, never horizontal-scroll spreadsheets — UX plan). */}
           <ul className="space-y-3 md:hidden">
             {visible.map((ticketType) => (
               <li key={ticketType.id}>

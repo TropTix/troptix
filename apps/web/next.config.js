@@ -3,17 +3,12 @@ const nextConfig = {
   async redirects() {
     return [
       {
-        // Checkout consolidation: the legacy /events/[id] checkout is superseded
-        // by the reservation flow at /e/[id] (ADR 0018). Redirect all event
-        // links — including share links already out in the wild — to the new
-        // flow. Permanent (308) now that the legacy /events pages are removed.
+        // Share links in the wild still use the legacy /events/[id] path (ADR 0018).
         source: '/events/:eventId',
         destination: '/e/:eventId',
         permanent: true,
       },
       {
-        // The public /events listing was replaced by /discover. Point stale
-        // bookmarks and old inbound links at the new listing.
         source: '/events',
         destination: '/discover',
         permanent: true,
@@ -65,13 +60,7 @@ const nextConfig = {
       },
     ],
   },
-  transpilePackages: [
-    // Shared workspace packages ship TS source (no build step) — Next must
-    // transpile them. See docs/adr/0009-shared-package-topology.md.
-    '@troptix/db',
-    '@troptix/api',
-    '@troptix/transactional',
-  ],
+  transpilePackages: ['@troptix/db', '@troptix/api', '@troptix/transactional'],
 };
 
 const withVercelToolbar = require('@vercel/toolbar/plugins/next')();

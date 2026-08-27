@@ -1,7 +1,3 @@
-// The actions are thin adapters over @troptix/api's ticket-type write seam —
-// these tests cover the adapter's own duties: session handling (redirect
-// outside try), dollars → cents at the edge, and typed-error → message
-// mapping. Authorization and the paid gate are the service's tests' job.
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
 jest.mock('next/navigation', () => ({
   redirect: jest.fn(() => {

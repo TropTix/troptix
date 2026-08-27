@@ -1,8 +1,3 @@
-/**
- * Unit tests for Organization provisioning over a stateful hand-rolled fake
- * prisma (no Postgres, ADR 0010). Covers lazy-create idempotency, unique-slug
- * generation, the empty-name fallback, and the ownerUserId unique-race recovery.
- */
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import {
@@ -32,7 +27,6 @@ function makeFakePrisma() {
           .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
       findMany: async () => orgs.map((o) => ({ slug: o.slug })),
       create: async ({ data }: any) => {
-        // The DB enforces one org per owner (ADR 0022) — mirror it.
         if (orgs.some((o) => o.ownerUserId === data.ownerUserId)) {
           throw { code: 'P2002' };
         }
@@ -97,7 +91,7 @@ describe('ensureOrganizationForUser', () => {
       displayName: '',
     });
     expect(org.displayName).toBe('Organizer');
-    expect(org.slug).toBe('organizer-2'); // "organizer" is reserved
+    expect(org.slug).toBe('organizer-2');
   });
 
   it('falls back when the name is only whitespace', async () => {
@@ -133,8 +127,8 @@ describe('ensureOrganizationForUser', () => {
         let calls = 0;
         return async (args: any) => {
           calls += 1;
-          if (calls === 1) return null; // the ensure's own existence check
-          return (prisma as any).organization.findFirst(args); // the recovery read
+          if (calls === 1) return null;
+          return (prisma as any).organization.findFirst(args);
         };
       })(),
     };
@@ -393,9 +387,9 @@ describe('updateOrganizationProfile', () => {
           slug: 'island-vibes',
           displayName: 'Island Vibes',
         }),
-        findUnique: async () => null, // check passes…
+        findUnique: async () => null,
         update: async () => {
-          throw { code: 'P2002' }; // …but another write claimed the slug first
+          throw { code: 'P2002' };
         },
       },
     } as unknown as PrismaClient;
