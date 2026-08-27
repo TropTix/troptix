@@ -36,7 +36,12 @@ export {
 export { captureOrderCompleted } from './services/reservations';
 
 export { getCheckoutConfig, applyCode } from './services/checkout';
-export { getEventDetail, listPublicEvents } from './services/events';
+export {
+  getEventDetail,
+  getEventDetailRaw,
+  shapeEventDetail,
+  listPublicEvents,
+} from './services/events';
 export { getDashboard } from './services/organizer-dashboard';
 export { listOrganizerEvents } from './services/organizer-events';
 export { getEventOverview } from './services/organizer-event-overview';

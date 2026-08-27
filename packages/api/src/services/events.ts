@@ -55,10 +55,14 @@ export async function listPublicEvents(
   return events.map(toEventSummary);
 }
 
-export async function getEventDetail(
+/**
+ * Cacheable half of the event read: JSON-safe, no clock-derived fields — those
+ * live in `shapeEventDetail` so a cached row can't freeze a sale transition.
+ */
+export async function getEventDetailRaw(
   prisma: PrismaClient,
   input: EventDetailInput
-): Promise<EventDetail> {
+) {
   const event = await prisma.events.findUnique({
     where: { id: input.eventId },
     select: {
@@ -122,15 +126,38 @@ export async function getEventDetail(
     throw new NotFoundError(`Event with ID ${input.eventId} not found.`);
   }
 
-  const now = new Date();
+  return {
+    ...event,
+    startsAt: event.startsAt.toISOString(),
+    endsAt: event.endsAt.toISOString(),
+    ticketTypes: event.ticketTypes.map((tt) => ({
+      ...tt,
+      saleStartsAt: tt.saleStartsAt.toISOString(),
+      saleEndsAt: tt.saleEndsAt.toISOString(),
+    })),
+  };
+}
+
+export type EventDetailRaw = Awaited<ReturnType<typeof getEventDetailRaw>>;
+
+export function shapeEventDetail(
+  event: EventDetailRaw,
+  now: Date
+): EventDetail {
   const tickets: EventTicket[] = event.ticketTypes
     .map((tt) => {
       // priceCents falls back to price * 100; the sale window needs no fallback
       // — one pair, full timestamps (ADR 0020).
       const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
       const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
+      const saleWindow = {
+        saleStartsAt: new Date(tt.saleStartsAt),
+        saleEndsAt: new Date(tt.saleEndsAt),
+      };
       const saleStatus: EventTicket['saleStatus'] =
-        availability === 0 ? 'soldOut' : SALE_STATUS[getSaleState(tt, now)];
+        availability === 0
+          ? 'soldOut'
+          : SALE_STATUS[getSaleState(saleWindow, now)];
       const maxAllowedToAdd =
         saleStatus === 'onSale' && !event.isDraft
           ? Math.max(0, Math.min(availability, tt.maxPurchasePerUser))
@@ -181,8 +208,8 @@ export async function getEventDetail(
           website: event.organization.website,
         }
       : null,
-    startsAt: event.startsAt.toISOString(),
-    endsAt: event.endsAt.toISOString(),
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
     venue: event.venue,
     address: event.address,
     latitude: event.latitude,
@@ -192,4 +219,11 @@ export async function getEventDetail(
     fromPriceCents,
     tickets,
   };
+}
+
+export async function getEventDetail(
+  prisma: PrismaClient,
+  input: EventDetailInput
+): Promise<EventDetail> {
+  return shapeEventDetail(await getEventDetailRaw(prisma, input), new Date());
 }
