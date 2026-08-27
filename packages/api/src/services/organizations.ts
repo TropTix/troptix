@@ -194,17 +194,6 @@ export async function getOrganizationBySlug(
           startsAt: true,
           endsAt: true,
           venue: true,
-          ticketTypes: {
-            where: {
-              OR: [
-                { discountCode: { equals: null } },
-                { discountCode: { equals: '' } },
-              ],
-            },
-            select: { priceCents: true, price: true },
-            orderBy: { price: 'asc' },
-            take: 1,
-          },
         },
       },
     },
