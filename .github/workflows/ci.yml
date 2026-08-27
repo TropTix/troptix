@@ -45,13 +45,13 @@ jobs:
               - 'packages/db/**'
               - 'supabase/**'
               - 'package.json'
-              - 'yarn.lock'
+              - 'pnpm-lock.yaml'
               - '.github/workflows/ci.yml'
             web:
               - 'apps/web/**'
               - 'packages/**'
               - 'package.json'
-              - 'yarn.lock'
+              - 'pnpm-lock.yaml'
               - '.github/workflows/ci.yml'
 
   # Always runs, unfiltered: its job is catching cross-workspace breakage
@@ -61,14 +61,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: yarn
+          cache: pnpm
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Typecheck all workspaces
-        run: yarn typecheck
+        run: pnpm typecheck
 
   web-tests:
     needs: changes
@@ -76,14 +77,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: yarn
+          cache: pnpm
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Run web unit tests
-        run: yarn workspace web test
+        run: pnpm --filter web test
 
   # The @troptix/api suite is integration tests against a real Postgres.
   # `supabase db start` boots the local database container and applies every
@@ -98,10 +100,11 @@ jobs:
       POSTGRES_PRISMA_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres?sslmode=disable
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: yarn
+          cache: pnpm
       - uses: supabase/setup-cli@v1
         with:
           # Pinned: the action's default lags far behind. Keep roughly in step
@@ -110,6 +113,6 @@ jobs:
       - name: Start local Postgres (migrations + seed)
         run: supabase db start
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Run API integration tests
-        run: yarn workspace @troptix/api test
+        run: pnpm --filter @troptix/api test

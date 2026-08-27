@@ -1,7 +1,7 @@
 /**
  * Integration tests for the reservation primitives. These hit a REAL Postgres
  * (the locking/atomicity behavior is not mockable), so point your env at a
- * preview branch (or the dev branch) before running: `yarn workspace
+ * preview branch (or the dev branch) before running: `pnpm --filter
  * @troptix/api test`. The connection comes from `@troptix/db` (POSTGRES_PRISMA_URL),
  * loaded by vitest.config.ts from apps/web/.env locally / CI env directly.
  *

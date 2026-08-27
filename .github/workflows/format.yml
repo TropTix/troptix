@@ -9,7 +9,7 @@ name: Format
 # reformatted yet, so a whole-repo check would fail on pre-existing files. As
 # code gets touched it gets formatted, so coverage grows organically.
 #
-# Fix locally with `yarn format`, then push.
+# Fix locally with `pnpm format`, then push.
 
 on:
   pull_request:
@@ -26,12 +26,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: yarn
+          cache: pnpm
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Check formatting of changed files
         run: |
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
@@ -47,4 +48,4 @@ jobs:
           fi
           echo "Checking ${#FILES[@]} changed file(s):"
           printf '  %s\n' "${FILES[@]}"
-          yarn prettier --check "${FILES[@]}"
+          pnpm exec prettier --check "${FILES[@]}"

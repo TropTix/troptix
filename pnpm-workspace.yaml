@@ -1,0 +1,21 @@
+packages:
+  - apps/web
+  - packages/*
+# apps/mobile and apps/organizer are standalone Expo apps with their own
+# lockfiles (see CLAUDE.md "Package management") — deliberately not members.
+
+linkWorkspacePackages: true
+
+overrides:
+  stripe: 22.3.0
+  '@types/react': 19.2.7
+  '@types/react-dom': 19.2.3
+
+allowBuilds:
+  '@prisma/engines': true
+  core-js: true
+  esbuild: true
+  ngrok: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true

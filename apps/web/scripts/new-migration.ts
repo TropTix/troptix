@@ -2,9 +2,9 @@
  * Generate a Supabase-format migration from the current Prisma schema.
  *
  * Usage:
- *   yarn db:new <name>                 # diff: schema.prisma @ origin/main -> working schema.prisma
- *   yarn db:new <name> --base=<ref>    # diff against a different git ref (e.g. HEAD, a tag)
- *   yarn db:new <name> --init          # diff: empty -> schema.prisma  (first baseline migration)
+ *   pnpm db:new <name>                 # diff: schema.prisma @ origin/main -> working schema.prisma
+ *   pnpm db:new <name> --base=<ref>    # diff against a different git ref (e.g. HEAD, a tag)
+ *   pnpm db:new <name> --init          # diff: empty -> schema.prisma  (first baseline migration)
  *
  * Writes supabase/migrations/<timestamp>_<name>.sql using `prisma migrate diff`.
  * Plain SQL is the source of truth (docs/adr/0004-supabase-migrations-as-source.md);
@@ -41,7 +41,7 @@ const baseArg = process.argv
 const baseRef = baseArg ?? process.env.MIGRATION_BASE_REF ?? 'origin/main';
 
 if (!rawName || rawName.startsWith('--')) {
-  console.error('Usage: yarn db:new <name> [--base=<ref>] [--init]');
+  console.error('Usage: pnpm db:new <name> [--base=<ref>] [--init]');
   process.exit(1);
 }
 
@@ -136,7 +136,7 @@ try {
   mkdirSync(migrationsDir, { recursive: true });
   writeFileSync(outFile, sql);
   console.log(`Wrote ${outFile} (baseline: ${isInit ? 'empty' : baseRef})`);
-  console.log('Review the SQL, then run `yarn db:apply` to apply it.');
+  console.log('Review the SQL, then run `pnpm db:apply` to apply it.');
 } finally {
   if (baselineFile) rmSync(baselineFile, { force: true });
 }

@@ -2,7 +2,7 @@
  * Apply pending Supabase migrations to the database you're working on.
  *
  * Usage:
- *   yarn db:apply
+ *   pnpm db:apply
  *
  * Thin wrapper over `supabase db push` so the connection string is read from
  * the environment (loaded via `tsx --env-file=.env`) rather than relying on the

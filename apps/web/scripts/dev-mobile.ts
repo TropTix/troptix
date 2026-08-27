@@ -1,4 +1,4 @@
-// Requires NGROK_AUTH_TOKEN in .env; run via `yarn dev:mobile`.
+// Requires NGROK_AUTH_TOKEN in .env; run via `pnpm dev:mobile`.
 import 'dotenv/config';
 import { spawn, ChildProcess } from 'child_process';
 import ngrok from 'ngrok';
@@ -9,7 +9,7 @@ const TIMEOUT_MS = 30000;
 async function run() {
   console.log('🚀 Starting Next.js dev server...');
 
-  const devServer: ChildProcess = spawn('yarn', ['next', 'dev'], {
+  const devServer: ChildProcess = spawn('pnpm', ['exec', 'next', 'dev'], {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env },
   });
