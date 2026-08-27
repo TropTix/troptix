@@ -8,7 +8,7 @@
     "test": "pnpm --filter web test",
     "next": "pnpm --filter web dev",
     "dev": "npm-run-all --parallel next",
-    "typecheck": "pnpm --filter web typecheck && pnpm --filter @troptix/db typecheck && pnpm --filter @troptix/api typecheck && pnpm --filter @troptix/transactional typecheck",
+    "typecheck": "pnpm --filter web typecheck && pnpm --filter @troptix/db typecheck && pnpm --filter @troptix/api typecheck && pnpm --filter @troptix/transactional typecheck && pnpm --filter troptix-mobile typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"
@@ -20,7 +20,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@react-native-async-storage/async-storage": "^1.19.3",
     "typescript": "^5.2.2"
   },
   "devDependencies": {

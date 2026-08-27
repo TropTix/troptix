@@ -1,4 +1,4 @@
-# 25. Adopt pnpm for the root workspace
+# 25. Adopt pnpm for the workspace
 
 - **Status:** Accepted
 - **Date:** 2026-08-27
@@ -19,15 +19,23 @@ lockfiles.
 
 ## Decision
 
-The root workspace (`apps/web` + `packages/*`) uses pnpm 11 with the default
-isolated linker. The version is pinned in the root `packageManager` field and
-activated via Corepack. `pnpm-lock.yaml` (imported from `yarn.lock` to keep
-resolved versions) is the only root lockfile. Settings live in
+The workspace (`apps/web`, `apps/mobile`, `packages/*`) uses pnpm 11 with the
+default isolated linker. The version is pinned in the root `packageManager`
+field and activated via Corepack. `pnpm-lock.yaml` (imported from `yarn.lock`
+to keep resolved versions) is the only root lockfile. Settings live in
 `pnpm-workspace.yaml`: workspace membership, `linkWorkspacePackages` (internal
 deps use plain versions), `overrides` (replacing Yarn `resolutions`), and
 `allowBuilds` (explicit list of dependencies allowed to run postinstall
-scripts). The Expo apps (`apps/mobile`, `apps/organizer`) stay out of the
-workspace on their own lockfiles.
+scripts).
+
+`apps/mobile` (Expo SDK 54, which supports the isolated linker) is a member
+because it imports `@troptix/api` for tRPC router types — an import that only
+resolved by hoisting accident under Yarn. `apps/organizer` (Expo SDK 53, which
+requires a hoisted layout and would force the whole workspace flat) stays out
+on its own `yarn.lock`. `@types/react` and `@types/react-dom` are pinned
+workspace-wide via `overrides`: Radix packages are shared between web and
+mobile, and two peer-instantiated type-flavors of the same component break
+web's typecheck.
 
 ## Consequences
 

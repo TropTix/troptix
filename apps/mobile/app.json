@@ -40,7 +40,8 @@
     ],
     "scheme": "troptix-organizer",
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "autolinkingModuleResolution": true
     },
     "extra": {
       "router": {},

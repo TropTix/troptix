@@ -78,7 +78,7 @@ When editing a file, match its existing comment density — do not add comments 
 - Force transitive dependency versions via `overrides` in `pnpm-workspace.yaml` — not `resolutions`, not npm `overrides`.
 - pnpm's isolated linker means a package can only import what its `package.json` declares. If typecheck fails with a missing module that "should" be there, declare the dependency in that package — never loosen the linker.
 - Dependency postinstall scripts only run if allowed in `allowBuilds` in `pnpm-workspace.yaml`. If a newly added package needs its build script, add it there deliberately.
-- **Exception:** the standalone Expo apps under `apps/` are not workspace members and carry their _own_ lockfile (`apps/organizer` → `yarn.lock`, `apps/mobile` → `package-lock.json`). Match whichever lockfile is already committed in that app and never add a second one. These two are the only sanctioned lockfiles below the root.
+- **Exception:** `apps/organizer` (Expo SDK 53, which can't run under the isolated linker) is not a workspace member and carries its _own_ `yarn.lock` — the only sanctioned lockfile below the root. `apps/mobile` (SDK 54) IS a workspace member like everything else. Never add a lockfile inside a workspace package.
 
 ## Naming
 
