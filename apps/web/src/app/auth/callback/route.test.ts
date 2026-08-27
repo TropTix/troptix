@@ -95,6 +95,12 @@ describe('flow cases', () => {
     const location = res.headers.get('location')!;
 
     expect(location).toBe(`${APP_ORIGIN}/auth/signin?error=auth`);
+
+    // token_hash without its type is equally incomplete — never verified.
+    const resNoType = await GET(makeRequest('?token_hash=tok123&next=/orders'));
+    expect(resNoType.headers.get('location')).toBe(
+      `${APP_ORIGIN}/auth/signin?error=auth`
+    );
   });
 
   it('redirects to sign-in with an error when Supabase returns an error', async () => {
