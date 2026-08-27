@@ -227,7 +227,14 @@ describe('listTicketTypes — shaping', () => {
     const { prisma } = fakePrisma({
       ticketTypes: [
         ticketType({ id: 't-ga', sold: 40, capacity: 100 }),
-        ticketType({ id: 't-vip', sold: 5, capacity: 20 }),
+        // Not yet on sale — must not count toward the onSale total.
+        ticketType({
+          id: 't-vip',
+          sold: 5,
+          capacity: 20,
+          saleStartsAt: new Date('2026-08-01T00:00:00Z'),
+          saleEndsAt: new Date('2026-08-10T00:00:00Z'),
+        }),
       ],
       revenue: [revenue('t-ga', 800), revenue('t-vip', 250)],
     });
@@ -237,7 +244,7 @@ describe('listTicketTypes — shaping', () => {
       sold: 45,
       capacity: 120,
       revenueCents: 105000,
-      onSale: 2,
+      onSale: 1,
     });
     // The header must equal the rows it sits above.
     expect(result.summary.revenueCents).toBe(
