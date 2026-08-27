@@ -14,8 +14,6 @@ export interface EnrichedOrder extends PrismaOrder {
   _count: { tickets: number };
 }
 
-// Receipt ticket rows load separately (getOrderTickets) so free orders, which
-// show no receipt, don't pay for a ticket fetch they discard.
 export async function getOrder(orderId: string): Promise<EnrichedOrder | null> {
   try {
     return await prisma.orders.findUnique({

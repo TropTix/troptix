@@ -1,20 +1,5 @@
-/**
- * Screen E — the `/organizer/events/[id]/tickets` read.
- *
- * The event's ticket types, sales-first: what each one costs, how it's selling, where
- * it sits in its sale window, and what it has earned. Pure over an injected
- * `prisma`; authorization is the shared scope seam, with ownership as the
- * event's where clause.
- *
- * `sold` / `capacity` come from the ticket type's own counters — the one inventory
- * standard (availability = capacity - reserved - sold). Revenue is Σ of the
- * ticket type's completed-ticket subtotals, the same basis the event overview uses,
- * so the two screens report the same number.
- *
- * Read-only: create and edit still run through the existing ticket actions;
- * moving those behind this seam is a follow-up, as are duplicate (#452) and
- * delete, which do not exist yet.
- */
+// Revenue is Σ the ticket type's completed-ticket subtotals — the same basis
+// the event overview uses, so the two screens report the same number.
 import type { PrismaClient, TicketFeeStructure } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type {
@@ -68,7 +53,6 @@ export async function listTicketTypes(
             ticketingFees: true,
             discountCode: true,
           },
-          // Natural creation order; reordering is deferred (UX plan).
           orderBy: { createdAt: 'asc' },
         },
       },
@@ -83,7 +67,6 @@ export async function listTicketTypes(
 
   const ticketTypes = buildTicketTypes(event.ticketTypes, rollups, now);
 
-  // The header totals are the rows summed — one pass, so they can't disagree.
   const summary = ticketTypes.reduce(
     (acc, ticketType) => {
       acc.sold += ticketType.sold;
@@ -124,7 +107,6 @@ function buildTicketTypes(
     const grossPriceCents = ticketType.priceCents ?? toCents(ticketType.price);
 
     return {
-      // The card the event overview also renders — same shape, same basis.
       ...toTicketTypeBreakdown(ticketType, revenueByType),
       grossPriceCents,
       displayPriceCents: displayPriceOf(
@@ -142,11 +124,6 @@ function buildTicketTypes(
   });
 }
 
-/**
- * What the attendee is charged. `PASS_TICKET_FEES` adds the fee on top of the
- * organizer's price; `ABSORB_TICKET_FEES` leaves the price alone and takes the
- * fee out of the payout instead. A free type has no fee either way.
- */
 function displayPriceOf(
   grossPriceCents: number,
   fees: TicketFeeStructure

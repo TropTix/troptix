@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
-// Request bodies for the organizer REST routes consumed by the Expo organizer
-// app. Keep the field names and error messages stable — the mobile client may
-// display them.
+// Field names and error messages here reach the separately shipped Expo
+// organizer app — keep them stable.
 export const scanTicketSchema = z.object({
   ticketId: z.string().min(1),
   eventId: z.string().min(1),

@@ -108,7 +108,6 @@ export default async function OrdersPage() {
   const startMs = (o: UserOrder) =>
     o.event?.startsAt ? new Date(o.event.startsAt).getTime() : 0;
 
-  // Upcoming leads (soonest first — the ticket you're about to use); past trails.
   const upcoming = orders
     .filter((o) => startMs(o) >= now)
     .sort((a, b) => startMs(a) - startMs(b));

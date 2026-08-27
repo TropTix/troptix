@@ -1,27 +1,8 @@
-/**
- * Checkout contracts — the single zod definition of the checkout wire shape.
- *
- * One schema serves three roles (ADR 0009): services `.parse()` inputs at the
- * trust boundary, the tRPC adapter uses them as `.input`/output, and clients
- * derive types via `z.infer`. This is the **contract-freeze point** the Stage 2
- * plan calls out — the Stage 3 checkout redesign builds against these shapes.
- *
- * RN-safe: this module imports zod + `@troptix/db/types` (type-only) ONLY. It
- * must never import the `@troptix/db` runtime entry, so it can live in the
- * type-only barrel a React-Native client may import.
- *
- * Money is integer **cents** everywhere (roadmap 2.12) — matching the
- * reservation service (`unitPriceCents`/`feesCents`) and the new `priceCents`
- * column. The legacy dollar-`Float` `apps/web/src/types/checkout.ts` is retained
- * unchanged for the un-wired legacy routes until the Stage 3 cutover retires it.
- */
 import { z } from 'zod';
 import type { TicketFeeStructure, TicketType } from '@troptix/db/types';
 
-// We can't import the enum *values* from `@troptix/db` (runtime entry) without
-// breaking RN-safety, and `@troptix/db/types` is type-only. So the values are
-// re-declared here; the parity guards below fail to compile if they ever drift
-// from the Prisma definitions.
+// Enum values re-declared, not imported — the `@troptix/db` runtime entry would
+// break RN-safety, and `@troptix/db/types` is type-only.
 
 export const feeStructureSchema = z.enum([
   'ABSORB_TICKET_FEES',
@@ -72,18 +53,14 @@ export const checkoutTicketSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
-  /** Integer cents (← `priceCents`). */
   priceCents: z.number().int(),
-  /** ISO-8601 sale-window bounds — same names as the columns (ADR 0020). */
   saleStartsAt: z.string().datetime(),
   saleEndsAt: z.string().datetime(),
-  /** Quantity the buyer may add now — clamped to availability, max-per-user, sale window, draft state. */
   maxAllowedToAdd: z.number().int(),
   /** Per-ticket fee in integer cents (0 when the organizer absorbs fees). */
   feesCents: z.number().int(),
   feeStructure: feeStructureSchema,
   ticketType: ticketTypeSchema.nullable(),
-  /** True when 0 < availability < 10 — drives the "almost gone" UI hint. */
   ticketQuantityLow: z.boolean(),
   /** Present only on a ticket unlocked via a discount/password code. */
   isPasswordProtected: z.boolean().optional(),
@@ -123,10 +100,6 @@ export const checkoutConfigInputSchema = z.object({
   eventId: z.string().min(1),
 });
 export type CheckoutConfigInput = z.infer<typeof checkoutConfigInputSchema>;
-
-// Frozen here so the Stage 3 initiate rewrite (PR 2c) has the target shape;
-// the service is built in a later PR. Cents + reservation-id, not the legacy
-// dollar/orderId shape.
 
 export const validatedItemSchema = z.object({
   ticketTypeId: z.string(),

@@ -410,7 +410,6 @@ export default function EventDetailScreen() {
         )
       );
       trpc.organizer.checkInTicket.mutate({ ticketId: guestId }).catch(() => {
-        // Revert on error by refetching the full event state
         trpc.organizer.event.query({ id }).then((data) => {
           setGuests(data.guests);
         });

@@ -289,8 +289,6 @@ function RecentOrders({
             No orders yet.
           </p>
         ) : (
-          // Links into the organizer's order detail (Screen G), not the
-          // patron-facing /orders/[id].
           <ul className="divide-y">
             {orders.map((order) => (
               <li key={order.id}>

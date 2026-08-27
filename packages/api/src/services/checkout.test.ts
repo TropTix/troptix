@@ -1,14 +1,7 @@
-/**
- * Unit tests for the read-side checkout services. Unlike reservations.test.ts
- * these need NO Postgres — the services are pure over an injected `prisma`, so
- * we hand them a hand-rolled fake that returns canned rows and assert the
- * mapping / sorting / gating / fee logic (ADR 0010).
- */
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import { applyCode, getCheckoutConfig } from './checkout';
 
-// A wide-open sale window around "now" so tickets are active by default.
 const PAST = new Date(Date.now() - 86_400_000);
 const FUTURE = new Date(Date.now() + 86_400_000);
 
@@ -49,7 +42,6 @@ function row(overrides: Partial<Row> = {}): Row {
   };
 }
 
-/** Minimal PrismaClient stand-in exposing only what the services touch. */
 function fakePrisma(opts: {
   ticketTypes?: Row[];
   matchedTicketType?: Row | null;
@@ -66,7 +58,6 @@ function fakePrisma(opts: {
   } as unknown as PrismaClient;
 }
 
-/** Run getCheckoutConfig over a single ticket-type row and return the mapped ticket. */
 async function firstTicket(ticketType: Row) {
   const { tickets } = await getCheckoutConfig(
     fakePrisma({ ticketTypes: [ticketType] }),
@@ -87,7 +78,7 @@ describe('getCheckoutConfig', () => {
       // 5000*0.08 + 50 = 450 fee (no tax). Literal, not calculateFeesCents(5000),
       // so a wrong fee formula can't pass on both sides.
       feesCents: 450,
-      maxAllowedToAdd: 10, // min(availability 100, maxPurchasePerUser 10)
+      maxAllowedToAdd: 10,
       feeStructure: 'PASS_TICKET_FEES',
       ticketType: 'PAID',
       ticketQuantityLow: false,
@@ -97,7 +88,6 @@ describe('getCheckoutConfig', () => {
   });
 
   it('nets active holds out of availability via reserved + sold', async () => {
-    // capacity 12 − reserved 3 − sold 4 = 5 available → low (<10), clamped.
     const ticket = await firstTicket(
       row({ capacity: 12, reserved: 3, sold: 4 })
     );
@@ -147,7 +137,7 @@ describe('getCheckoutConfig', () => {
       row({
         priceCents: null,
         price: 42,
-        capacity: 7, // → availability 7, low
+        capacity: 7,
       })
     );
     expect(ticket.priceCents).toBe(4200);

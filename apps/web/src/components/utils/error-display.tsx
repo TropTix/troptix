@@ -11,11 +11,8 @@ interface ErrorDisplayProps {
   onReset?: () => void;
 }
 
-/**
- * Branded full-bleed error fallback shared by the App Router error boundaries
- * (`app/error.tsx`, `app/organizer/error.tsx`). Purely presentational and
- * dependency-light so it can render even when app providers have failed.
- */
+// Kept dependency-light so error boundaries can render it even when app
+// providers have failed.
 export function ErrorDisplay({
   title = 'UH OH !!',
   message = "Just pretend you didn't see anything....",

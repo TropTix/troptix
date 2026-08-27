@@ -1,6 +1,5 @@
 // DEPRECATED: legacy REST route for the old `apps/organizer` app; slated for
-// deletion with that app once v2 fully covers it via tRPC.
-// See docs/plans/2026-07-organizer-dashboard-migration.md. Don't build on this.
+// deletion (docs/plans/2026-07-organizer-dashboard-migration.md). Don't build on this.
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
 import { headers } from 'next/headers';
@@ -72,7 +71,6 @@ export async function GET(
 
     return NextResponse.json(orders);
   } catch (error) {
-    // This could catch errors like an invalid UUID format for the eventId
     return NextResponse.json(
       { error: 'An internal server error occurred' },
       { status: 500 }

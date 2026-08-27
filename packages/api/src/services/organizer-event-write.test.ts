@@ -1,10 +1,3 @@
-/**
- * Unit tests for the Screen D event write seam, pure over a hand-rolled fake
- * prisma (ADR 0010). Covers the authorization seam, the paid-ticketing gate,
- * the transaction's row shapes (priceCents + legacy float, FREE/PAID), the
- * ownership-scoped update, and that dates pass through untouched (the
- * matched-pair guarantee: what the form sends is what the row stores).
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -146,8 +139,6 @@ describe('createEvent', () => {
       isPrivate: true,
       name: 'Sunset Cruise',
     });
-    // The matched pair: the instants the caller sent are stored verbatim
-    // (zod clones Date objects, so compare instants, not identity).
     expect(data.startsAt).toStrictEqual(STARTS);
     expect(data.endsAt).toStrictEqual(ENDS);
   });
@@ -223,7 +214,6 @@ describe('updateEvent', () => {
     });
     expect(call.data.startsAt).toStrictEqual(STARTS);
     expect(call.data.endsAt).toStrictEqual(ENDS);
-    // Event fields only — ticket writes belong to Screen E's seam.
     expect(call.data.ticketTypes).toBeUndefined();
   });
 

@@ -1,11 +1,3 @@
-/**
- * Row → DTO shapers shared across the organizer reads, so a card or an order
- * looks the same wherever it appears and a fix lands in one place.
- *
- * Each service still owns its own `where` (which events, which orders) — only
- * the *shape* is shared: the select fragment, the mapping, and, for orders, the
- * newest-first-nulls-last ordering that a plain `desc` would get wrong.
- */
 import type { Prisma } from '@troptix/db';
 import type {
   DashboardRecentOrder,
@@ -17,7 +9,6 @@ import { customerDisplay, toCents } from './organizerMapping';
 
 const RECENT_ORDERS_LIMIT = 5;
 
-/** The columns an event card needs. Shared so every card is the same shape. */
 export const eventCardSelect = {
   id: true,
   name: true,
@@ -68,10 +59,8 @@ type RecentOrderRow = Prisma.OrdersGetPayload<{
 }>;
 
 /**
- * The findMany args for a recent-orders peek. `createdAt` is still nullable
- * (roadmap 2.9), and Postgres sorts NULLs first under a plain `desc` — so
- * undated orders would lead the list. `nulls: 'last'` keeps them out of the way,
- * in the one place every caller shares.
+ * `createdAt` is still nullable, and Postgres sorts NULLs first under a plain
+ * `desc` — undated orders would lead the list without `nulls: 'last'`.
  */
 export function recentOrdersQuery(
   where: Prisma.OrdersWhereInput,
@@ -96,10 +85,6 @@ export function toRecentOrder(order: RecentOrderRow): DashboardRecentOrder {
   };
 }
 
-/**
- * One event's completed tickets, grouped by ticket type. The event overview and
- * the ticket-types screen read the same rollup so they can't drift.
- */
 export function ticketTypeRollupQuery(eventId: string) {
   return {
     by: ['ticketTypeId'],
@@ -115,7 +100,6 @@ export interface TicketTypeRollupRow {
   _sum: { subtotal: number | null };
 }
 
-/** Ticket type id → its share of Ticket revenue. Deleted types key on null. */
 export function revenueCentsByTicketType(rows: TicketTypeRollupRow[]) {
   return new Map(
     rows.map((row) => [row.ticketTypeId, toCents(row._sum.subtotal)])
@@ -123,19 +107,13 @@ export function revenueCentsByTicketType(rows: TicketTypeRollupRow[]) {
 }
 
 /**
- * Every completed ticket **row**, including any whose ticket type was deleted —
- * "tickets issued", the count you check people in against. Deliberately NOT the
- * sum of the types' `sold` counters, which can't include orphans (CONTEXT.md,
- * "Tickets issued vs sold").
+ * Deliberately NOT Σ the types' `sold` counters — those can't include tickets
+ * whose type was deleted (CONTEXT.md, "Tickets issued vs sold").
  */
 export function ticketsIssued(rows: TicketTypeRollupRow[]): number {
   return rows.reduce((total, row) => total + row._count._all, 0);
 }
 
-/**
- * The ticket-type card both screens render. Inventory comes from the type's own
- * counters — the one standard (availability = capacity − reserved − sold).
- */
 export function toTicketTypeBreakdown(
   ticketType: { id: string; name: string; capacity: number; sold: number },
   revenueByType: Map<string | null, number>

@@ -1,10 +1,3 @@
-/**
- * Unit tests for the Screen B events-list read. Pure over an injected fake
- * `prisma` (ADR 0010) — no Postgres. Covers the shared authorization seam
- * (anonymous / scoping / View-as), status derivation across all four states,
- * the capacity fallback, the completed-only sold count, and soft-delete
- * exclusion.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';

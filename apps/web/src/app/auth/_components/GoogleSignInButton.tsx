@@ -19,8 +19,6 @@ export function GoogleSignInButton({
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    // Redirects to Google, then back through /auth/callback. The provisioning
-    // trigger links/creates the Users row by email on first sign-in.
     const { error } = await signInWithGoogle();
     if (error) {
       toast.error('Failed to sign in with Google. Please try again.');

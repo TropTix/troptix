@@ -1,12 +1,5 @@
-/**
- * Organization provisioning: lazy-create on first explicit write (event save or
- * profile save — never on a page view).
- *
- * Prisma is injected (unit-testable, ADR 0013 — no authorization here). Each
- * user owns exactly one Organization, keyed by `ownerUserId`
- * (== `Events.organizerUserId`) and enforced by a unique index (ADR 0022). See
- * docs/plans/2026-06-event-spotlight-and-organizer-brand.md (2, 2b).
- */
+// Organizations are lazy-created on first explicit write (event save or
+// profile save) — never on a page view.
 import type { PrismaClient } from '@troptix/db';
 import type { EventSummary } from '../contracts/events';
 import type {
@@ -24,17 +17,11 @@ type OrganizationRow = Awaited<
 
 const FALLBACK_NAME = 'Organizer';
 
-/** Every existing slug, as a set — the input to `generateUniqueSlug`. */
 async function loadTakenSlugs(prisma: PrismaClient): Promise<Set<string>> {
   const rows = await prisma.organization.findMany({ select: { slug: true } });
   return new Set(rows.map((o) => o.slug));
 }
 
-/**
- * Read-only: the user's Organization, or null before their first write.
- * Oldest wins — the same pick `ensureOrganizationForUser` makes — so every
- * gate and UI read resolves the same org.
- */
 export function findOrganizationForOwner(
   prisma: PrismaClient,
   ownerUserId: string
@@ -45,11 +32,6 @@ export function findOrganizationForOwner(
   });
 }
 
-/**
- * The user's Organization, created on first need with a generated slug.
- * Idempotent. Event-save path only — the profile save creates via
- * `updateOrganizationProfile` with the user's chosen slug instead.
- */
 export async function ensureOrganizationForUser(
   prisma: PrismaClient,
   { ownerUserId, displayName }: { ownerUserId: string; displayName: string }
@@ -58,8 +40,6 @@ export async function ensureOrganizationForUser(
   if (existing) return existing;
 
   const taken = await loadTakenSlugs(prisma);
-  // trim() so a padded name is cleaned and a whitespace-only one falls back
-  // (a bare `|| FALLBACK_NAME` treats "   " as a valid display name).
   const name = displayName.trim() || FALLBACK_NAME;
   const slug = generateUniqueSlug(name, (s) => taken.has(s));
   try {
@@ -98,12 +78,6 @@ const blankToNull = (value: string | null): string | null => {
   return trimmed === '' ? null : trimmed;
 };
 
-/**
- * Save the Organization brand (Profile Info editor, F6) — create-or-update.
- * Validation runs before any write, so a rejected slug never leaves a
- * half-created Organization behind. The unique indexes are the backstop:
- * a slug race maps to `slug_taken`; losing the owner race retries as update.
- */
 export async function updateOrganizationProfile(
   prisma: PrismaClient,
   input: UpdateOrganizationProfileInput
@@ -144,9 +118,8 @@ export async function updateOrganizationProfile(
     }
   } catch (err) {
     if ((err as { code?: string }).code === 'P2002') {
-      // Two uniques can fire. Losing the one-org-per-owner race means a
-      // concurrent first save won — its row exists now, so retry as an update.
-      // Otherwise it's the slug race, and the index is the arbiter.
+      // Two uniques can fire: losing the one-org-per-owner race means a
+      // concurrent first save won — retry as an update. Else it's the slug race.
       if (!org) {
         const winner = await findOrganizationForOwner(
           prisma,
@@ -162,12 +135,6 @@ export async function updateOrganizationProfile(
   return { ok: true, slug: nextSlug };
 }
 
-/**
- * The public organization page read (/o/[slug]): brand header + the org's
- * published events, split into upcoming (soonest first) and past (most-recent
- * first). No authorization (ADR 0013) — always public; drafts and private
- * events are never included.
- */
 export async function getOrganizationBySlug(
   prisma: PrismaClient,
   input: OrganizationDetailInput
@@ -210,7 +177,7 @@ export async function getOrganizationBySlug(
     const bucket = event.endsAt.getTime() > now ? upcomingEvents : pastEvents;
     bucket.push(toEventSummary(event));
   }
-  pastEvents.reverse(); // fetched startsAt asc → most-recent past first
+  pastEvents.reverse();
 
   return {
     slug: org.slug,

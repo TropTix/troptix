@@ -11,7 +11,6 @@ import {
 
 interface TicketSalesChartProps {
   data: SalesPoint[];
-  /** Hourly buckets get a time label; daily buckets get a date. */
   bucket: 'hour' | 'day';
 }
 

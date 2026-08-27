@@ -36,10 +36,8 @@ export default async function OrganizerDashboardPage({
   const actor = await requireOrganizerActor();
 
   const { viewAs, range: rawRange } = await searchParams;
-  // An unknown ?range simply falls back to the service's default.
   const range = dashboardRangeSchema.safeParse(rawRange).data;
 
-  // `viewAs` is honored only for a Platform Owner; the service decides.
   const dashboard = await getDashboard(prisma, actor, {
     viewAsOrganizerUserId: viewAs,
     range,
@@ -181,7 +179,6 @@ function ActiveEvents({ events }: { events: OrganizerEventSummary[] }) {
 function ActiveEventCard({ event }: { event: OrganizerEventSummary }) {
   const soldPercent =
     event.capacity > 0 ? (event.sold / event.capacity) * 100 : 0;
-  // Rows store a bucket path, not a URL — resolve it the way the public card does.
   const flyerUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
   return (
@@ -235,9 +232,6 @@ function RecentOrders({ orders }: { orders: DashboardRecentOrder[] }) {
             No orders yet.
           </p>
         ) : (
-          // Links into the organizer's order detail (Screen G) — the order's
-          // own event, so a cross-event rail lands on the right page. NOT
-          // `/orders/[id]`, which is the patron's view of their own order.
           <ul className="divide-y">
             {orders.map((order) => (
               <li key={order.id}>

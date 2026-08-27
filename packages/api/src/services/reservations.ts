@@ -1,15 +1,6 @@
 /**
- * Reservation-based inventory primitives (roadmap reservation rebuild, Phase B).
- *
- * The only operation that needs a database-level atomicity guarantee is the
- * inventory hold; it is a single race-safe SQL statement (see `reserve`). The
- * rest (`confirm` / `release` / `expire`) are ordinary Prisma transactions — no
- * stored procedures (ADR 0007).
- *
- * Each function takes the Prisma client as its first argument (injected, not
- * imported) so services are framework-agnostic and unit-testable. They are
- * actor-agnostic — they key off reservation / payment-intent ids, so they carry
- * no authorization (ADR 0013); the caller is responsible for who-can-do-what.
+ * Deliberately no authorization (ADR 0013) — these key off reservation /
+ * payment-intent ids; who-can-do-what is the caller's job.
  */
 import {
   OrderStatus,
@@ -32,17 +23,14 @@ import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
 
 /**
- * Server-side hold lifetime. The client shows a shorter deadline (10 min) than
- * this so payments submitted right at the buyer's countdown still have a buffer
- * to settle + have their webhook delivered before the server releases the hold —
- * shrinking the paid-after-expiry refund race (ADR 0018).
+ * Longer than the client's 10-min countdown on purpose: a payment submitted at
+ * the buyer's deadline still has a buffer to settle (ADR 0018).
  */
 export const HOLD_TTL_MINUTES = 12;
 const DEFAULT_TTL_MINUTES = HOLD_TTL_MINUTES;
 
 export interface ReserveItemInput {
   ticketTypeId: string;
-  /** Requested quantity — already clamped to maxPurchasePerUser / sale window by the caller. */
   quantity: number;
   unitPriceCents: number;
   feesCents: number;
@@ -77,18 +65,12 @@ export interface ReserveResult {
   feesCents: number;
   totalCents: number;
   expiresAt: Date;
-  /** True if any quantity was granted; false ⇒ everything was sold out. */
   granted: boolean;
 }
 
 /**
- * Atomically hold `requested` units of one ticket type, returning the granted
- * count (clamped to live availability). One race-safe statement: the `FOR
- * UPDATE` in the CTE serializes concurrent buyers of the same ticket type, so
- * the last ticket can never be granted twice; `GREATEST/LEAST` keep the grant
- * within `[0, capacity - reserved - sold]` (a NULL capacity pre-cutover yields
- * availability 0, so it simply can't oversell). Shared by the initial hold
- * (`reserve`) and the paid-after-expiry re-acquire (`settle`).
+ * FOR UPDATE serializes concurrent buyers of the same ticket type; the clamp
+ * keeps the grant within live availability (NULL pre-cutover capacity → 0).
  */
 async function holdInventoryInTx(
   tx: Prisma.TransactionClient,
@@ -112,16 +94,8 @@ async function holdInventoryInTx(
 }
 
 /**
- * Atomically hold inventory for a set of ticket types.
- *
- * Per item, one race-safe statement clamps the grant to availability
- * (`capacity - reserved - sold`) and increments `reserved`. The `FOR UPDATE`
- * in the CTE serializes concurrent buyers of the same ticket type, so the last
- * ticket can never be granted twice. Returns the granted-per-item breakdown so
- * the caller can surface a "we reduced your quantity" (wasAdjusted) message.
- *
- * Business rules (maxPurchasePerUser, sale window, password gating) are the
- * caller's responsibility — this is purely the inventory hold.
+ * Purely the inventory hold — sale-window, per-user-cap, and gating rules are
+ * the caller's job.
  */
 export async function reserve(
   prisma: PrismaClient,
@@ -166,7 +140,6 @@ export async function reserve(
 
     const totalCents = subtotalCents + feesCents;
 
-    // One write: create the hold with its items and final totals already known.
     await tx.reservation.create({
       data: {
         id: reservationId,
@@ -198,31 +171,20 @@ export async function reserve(
   });
 }
 
-/** The tier columns the pricing authority needs. */
 export type PricedTierRow = {
   id: string;
   priceCents: number | null;
   price: number;
   ticketingFees: string | null;
   maxPurchasePerUser: number;
-  /** The sale window. One pair — ADR 0020. */
   saleStartsAt: Date;
   saleEndsAt: Date;
-  /** Flattened from `event.isDraft` by the caller's row mapping. */
   isDraft: boolean;
 };
 
 /**
- * Server-side pricing authority (pure): map a client selection onto reserve
- * items, deriving unit price + fees from the tier rows (ignoring any client
- * price), gating on the sale window + draft status (mirrors the read path in
- * `checkout.ts`), and clamping the aggregate quantity per tier to max-per-user.
- * Duplicate `ticketTypeId` entries in `items` are summed before clamping, so
- * repeating an entry can't stack past the cap. Output is one item per distinct
- * tier, sorted ascending by `ticketTypeId` for deterministic lock ordering in
- * `reserve()`. Throws `NotFoundError` for any requested tier that wasn't
- * returned (missing, gated, or wrong event) or that isn't currently purchasable
- * (off sale window or the event is a draft).
+ * Prices come from the tier rows, never the client. Duplicate ids sum before
+ * clamping (no cap stacking); sorted output gives deterministic lock order.
  */
 export function deriveReserveItems(
   tiers: PricedTierRow[],
@@ -231,8 +193,6 @@ export function deriveReserveItems(
 ): ReserveItemInput[] {
   const byId = new Map(tiers.map((t) => [t.id, t]));
 
-  // Aggregate requested quantity per tier so duplicate entries can't each
-  // clear the per-purchase cap independently.
   const totals = new Map<string, number>();
   for (const item of items) {
     totals.set(
@@ -269,13 +229,7 @@ export function deriveReserveItems(
     });
 }
 
-/**
- * Create a hold from a client selection. The server is the pricing authority: it
- * ignores any client-sent price and derives unit price + fees from `TicketTypes`,
- * validates each tier is public and belongs to the event, clamps to max-per-user,
- * then calls `reserve()` (which clamps to live availability). `userId` comes from
- * the actor, never the client.
- */
+/** `userId` comes from the actor, never the client. */
 export async function createReservation(
   prisma: PrismaClient,
   input: CreateReservationInput,
@@ -342,29 +296,16 @@ export interface ConfirmInput {
 
 export interface ConfirmResult {
   orderId: string;
-  /** True when this was a duplicate webhook delivery (no-op). */
   alreadyProcessed: boolean;
 }
 
-/**
- * Materialize a paid (or free) order from a held reservation, atomically:
- * move `reserved → sold`, create the Order + one Ticket per unit (VALID), and
- * mark the reservation CONVERTED. The confirmation email is sent by the caller
- * after commit (never inside this transaction).
- *
- * Idempotent: Stripe delivers webhooks at-least-once, so a second call for an
- * already-CONVERTED reservation is a no-op returning the existing order id.
- */
 type ReservationWithItems = Prisma.ReservationGetPayload<{
   include: { items: true };
 }>;
 
 /**
- * Shared order materialization: move reserved → sold, create the Order + one
- * VALID Ticket per unit, mark the reservation CONVERTED, and enqueue the
- * confirmation email. Used by both the paid webhook path (`confirm`) and the
- * free path (`completeFree`). Assumes the caller has already loaded the
- * reservation and checked it is HELD.
+ * Caller has already checked the reservation is HELD. The confirmation email
+ * is the caller's job, after commit — never inside this transaction.
  */
 async function materializeOrder(
   tx: Prisma.TransactionClient,
@@ -379,8 +320,6 @@ async function materializeOrder(
   const orderType = isFree ? OrderType.FREE : OrderType.PAID;
   const ticketsType = isFree ? TicketType.FREE : TicketType.PAID;
 
-  // In one pass per item: move reserved → sold, and build one VALID ticket row
-  // per reserved unit.
   const ticketRows: Prisma.TicketsCreateManyOrderInput[] = [];
   for (const item of reservation.items) {
     await tx.ticketTypes.update({
@@ -500,28 +439,12 @@ export interface SettleInput {
 
 export type SettleResult =
   | { kind: 'converted'; orderId: string; alreadyProcessed: boolean }
-  /** Paid after the hold expired and the tickets could not be re-acquired. */
   | { kind: 'needs_refund' }
-  /** Already auto-refunded on a prior attempt (idempotent). */
   | { kind: 'already_refunded' };
 
 /** Thrown inside `settle`'s transaction to roll back a partial re-acquire. */
 class NeedsRefundError extends Error {}
 
-/**
- * Settle a paid reservation whose payment has succeeded — the Stripe-free core
- * of the paid path, shared by the webhook and the confirmation poll (ADR 0018).
- * The Stripe orchestration (session retrieval, `refunds.create`) lives in
- * `services/payments.ts`; this only touches the database and is fully testable
- * against Postgres alone.
- *
- * - HELD → materialize the order (move `reserved → sold`, create Order +
- *   VALID tickets, mark CONVERTED).
- * - CONVERTED / REFUNDED → idempotent no-op (duplicate webhook / poll race).
- * - EXPIRED or RELEASED → the hold was already released. Re-acquire the exact
- *   quantities atomically; if all are re-granted, materialize as normal, else
- *   roll back and return `needs_refund` so the caller refunds the whole charge.
- */
 export async function settle(
   prisma: PrismaClient,
   input: SettleInput
@@ -533,10 +456,8 @@ export async function settle(
   };
   try {
     return await prisma.$transaction(async (tx) => {
-      // Serialize concurrent settles of the same reservation (the webhook and
-      // the sync-fulfillment poll can race). Without this row lock, both could
-      // read HELD under READ COMMITTED and both materialize — a double order /
-      // oversell. FOR UPDATE makes the loser block, then re-read CONVERTED.
+      // The webhook and sync poll can race; without this row lock both could
+      // read HELD under READ COMMITTED and both materialize — a double order.
       await tx.$queryRaw`SELECT id FROM "Reservation" WHERE id = ${input.reservationId} FOR UPDATE`;
 
       const reservation = await tx.reservation.findUnique({
@@ -568,9 +489,8 @@ export async function settle(
       }
 
       if (reservation.status !== ReservationStatus.HELD) {
-        // EXPIRED / RELEASED — the hold was handed back. Try to re-acquire the
-        // exact quantities; any shortfall rolls back the whole re-acquire (the
-        // throw aborts the transaction) and signals a refund.
+        // EXPIRED / RELEASED — re-acquire the exact quantities; any shortfall
+        // throws to roll back the whole re-acquire and signal a refund.
         for (const item of reservation.items) {
           const granted = await holdInventoryInTx(
             tx,
@@ -599,9 +519,8 @@ export async function settle(
 }
 
 /**
- * Fire the server-side `order_completed` capture for a freshly converted
- * reservation. Called after the converting transaction commits — never inside
- * it — and swallows every error: analytics must never affect checkout.
+ * Called after the converting transaction commits — never inside it — and
+ * swallows every error: analytics must never affect checkout.
  */
 export async function captureOrderCompleted(
   prisma: PrismaClient,
@@ -632,12 +551,6 @@ export async function captureOrderCompleted(
   }
 }
 
-/**
- * Finalize a FREE reservation (no PaymentIntent) by id. Guards that it is HELD
- * and actually free, then materializes the order. Idempotent — a second call for
- * an already-CONVERTED reservation returns the existing order. Returns enough to
- * render the confirmation without a second round-trip.
- */
 export async function completeFree(
   prisma: PrismaClient,
   input: CompleteFreeInput,
@@ -700,11 +613,6 @@ export async function completeFree(
   };
 }
 
-/**
- * Release a single HELD reservation's inventory and mark it `toStatus`.
- * Returns false if the reservation isn't HELD (already converted/released/
- * expired) — making release/expire idempotent and safe against double runs.
- */
 async function releaseHeldInTx(
   tx: Prisma.TransactionClient,
   reservationId: string,
@@ -730,7 +638,6 @@ async function releaseHeldInTx(
   return true;
 }
 
-/** Hand a held reservation's inventory back (e.g. user abandons checkout). */
 export async function release(
   prisma: PrismaClient,
   reservationId: string
@@ -741,9 +648,8 @@ export async function release(
 }
 
 /**
- * Release one HELD reservation's inventory and mark it EXPIRED. The Stripe-free
- * primitive behind the expiry sweep (payments.sweepExpiredHolds). Idempotent —
- * returns false if it wasn't HELD.
+ * Never call on a hold whose Session might still be payable — the sweep
+ * expires the Stripe Session before this.
  */
 export async function expireHold(
   prisma: PrismaClient,
@@ -755,9 +661,8 @@ export async function expireHold(
 }
 
 /**
- * Release inventory held by all HELD reservations past their TTL. Called by the
- * cron. Idempotent and concurrency-safe (each release re-checks status in its
- * own transaction). Returns the number of reservations expired.
+ * Superseded by payments.sweepExpiredHolds for the live app, which expires
+ * Stripe Sessions first. Stays for no-Session holds and tests.
  */
 export async function expire(
   prisma: PrismaClient,

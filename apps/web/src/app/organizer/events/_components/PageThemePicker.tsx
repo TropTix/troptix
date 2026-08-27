@@ -5,8 +5,6 @@ import { deriveThemeVars, leadColor, themeAvailable } from '@/lib/flyerTheme';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// Three fixed treatments, never a color picker — the system owns contrast.
-
 export const THEME_LABELS: Record<EventPageTheme, string> = {
   off: 'Classic',
   wash: 'Tinted wash',
@@ -30,7 +28,6 @@ export function PreviewDots({
   palette: FlyerPalette | null;
 }) {
   const vars = deriveThemeVars(theme, palette);
-  // 'off' previews the brand tokens the page already renders with.
   const colors = vars
     ? [vars['--background'], vars['--primary'], vars['--accent']].map(
         (v) => `hsl(${v})`
@@ -64,11 +61,8 @@ export function PageThemePicker({
   palette: FlyerPalette | null;
   hasFlyer: boolean;
   disabled?: boolean;
-  /** True while extraction is running (upload or the Analyze action). */
   analyzing?: boolean;
-  /** Extract from the stored flyer — for events saved before analysis existed. */
   onAnalyze?: () => void;
-  /** The organizer picked which extracted color leads the theme. */
   onPickAccent?: (hex: string) => void;
 }) {
   const usable = themeAvailable(palette);

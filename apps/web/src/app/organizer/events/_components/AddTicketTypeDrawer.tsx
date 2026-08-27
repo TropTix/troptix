@@ -50,11 +50,8 @@ import { Switch } from '@/components/ui/switch';
 import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
 import { calculateFeesCents, FeeConfig } from '@troptix/api';
 
-// The gross ↔ display pair always means what-you-EARN ↔ what-the-buyer-PAYS,
-// with the platform fee (8% + $0.50) between them in both modes. What varies
-// is the STORED price (the form's `price`, what checkout computes fees on):
-// under PASS it's the earnings (fee added on top for the buyer); under
-// ABSORB it's the sticker the buyer pays (fee comes out of the organizer).
+// The STORED `price` is what checkout computes fees on: the organizer's
+// earnings under PASS, the buyer's sticker under ABSORB.
 type Fees = TicketTypeFormValues['ticketingFees'];
 
 function grossCentsFromStored(storedCents: number, fees: Fees): number {
@@ -69,9 +66,8 @@ function displayCentsFromStored(storedCents: number, fees: Fees): number {
     : storedCents;
 }
 
-// Inverses, rounding to the nearest cent: fee = 8% · stored + 50¢, so
-// PASS solves display = 1.08·stored + 50 and ABSORB solves
-// gross = stored − (0.08·stored + 50) = 0.92·stored − 50.
+// Inverses, rounded to the cent. The fee applies to the STORED price, so
+// solve for it — adding calculateFeesCents to the input is wrong.
 function storedCentsFromGross(grossCents: number, fees: Fees): number {
   if (fees === 'PASS_TICKET_FEES') return grossCents;
   if (grossCents <= 0) return 0;
@@ -96,12 +92,6 @@ const toDollars = (cents: number) => (cents / 100).toFixed(2);
 interface AddTicketTypeDrawerProps {
   open: boolean;
   setOpen: (open: boolean) => void;
-  /**
-   * Receives the validated values (plus the row id when editing). May be
-   * sync (the create form's in-memory array) or async (Screen E's server
-   * actions) — an async result of `{ success: false }` keeps the drawer open
-   * and shows the error.
-   */
   onSubmit: (
     data: TicketTypeFormValues & { id?: string }
   ) =>
@@ -110,13 +100,10 @@ interface AddTicketTypeDrawerProps {
     | Promise<void | { success: boolean; error?: string }>;
   initialData?: Partial<TicketTypeFormValues> & { id?: string };
   ticketSchema: z.ZodType<TicketTypeFormValues>;
-  /** Default sale-window end for new tickets — the event's end, so day-of sales work untouched. */
   defaultSaleEnd: Date;
   paidEventsEnabled: boolean;
 }
 
-// The one ticket-type editor: the create-event form feeds it an in-memory
-// array; Screen E's manager feeds it the server actions.
 export function AddTicketTypeDrawer({
   open,
   setOpen,
@@ -128,9 +115,8 @@ export function AddTicketTypeDrawer({
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
-  // Complete on purpose: the per-open reset seeds {...defaultValues,
-  // ...initialData}, so any field missing here would leak the previous
-  // open's value into a fresh drawer.
+  // Complete on purpose: the per-open reset seeds {...defaultValues, ...initialData},
+  // so a field missing here leaks the previous open's value into a fresh drawer.
   const defaultValues = {
     name: 'General Admission',
     description: '',
@@ -149,10 +135,6 @@ export function AddTicketTypeDrawer({
     defaultValues: initialData || defaultValues,
   });
 
-  // Free is an explicit choice; paid pricing is entered from either end
-  // (gross = what you earn, display = what the buyer pays), linked by the
-  // fee math. Both inputs are views over the STORED price (the form's
-  // `price`), whose meaning follows the fee structure.
   const [isFree, setIsFree] = useState(true);
   const [grossInput, setGrossInput] = useState('');
   const [displayInput, setDisplayInput] = useState('');
@@ -164,10 +146,8 @@ export function AddTicketTypeDrawer({
     });
   };
 
-  // The drawer stays mounted across opens, so the form must be re-seeded per
-  // open — otherwise editing row A shows whatever was last typed (and Save
-  // would overwrite A with it). Seed data without an id is a duplicate: a
-  // create pre-filled from an existing row.
+  // The drawer stays mounted across opens, so re-seed per open — otherwise editing
+  // row A shows the last-typed values and Save would overwrite A with them.
   useEffect(() => {
     if (open) {
       const seed = { ...defaultValues, ...initialData };
@@ -245,8 +225,6 @@ export function AddTicketTypeDrawer({
       }
       setOpen(false);
     } catch {
-      // A thrown (not returned) failure — e.g. the action invocation itself
-      // died on the network. Without this the rejection escapes silently.
       toast.error("Couldn't save — check your connection and try again.");
     } finally {
       setSubmitting(false);

@@ -1,11 +1,6 @@
 /**
- * Paid-checkout orchestration over the Checkout Sessions API (ADR 0018).
- *
- * This is the only service that talks to Stripe; the reservation/inventory
- * primitives (`services/reservations.ts`) stay Stripe-free. The Stripe client is
- * injected (never imported) so these stay framework-agnostic and testable with a
- * fake Stripe. Authorization is the caller's job — a guest authorizes by
- * possession of the unguessable `reservationId` (ADR 0013).
+ * Only this service talks to Stripe. Deliberately no actor: a guest authorizes
+ * by possession of the unguessable `reservationId` (ADR 0013).
  */
 import { ReservationStatus } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
@@ -24,11 +19,8 @@ import type {
 import type { CheckoutAnalytics } from '../contracts/analytics';
 
 /**
- * Card statements show `PREFIX* SUFFIX`, truncated by Stripe at 22 characters
- * total. Our account prefix is TROPTIX (7) plus the `* ` separator (2), which
- * leaves 13 for the event name. Stripe rejects `<>\'"*` and non-Latin
- * characters, so strip them rather than fail the Session create; return null
- * (omit the suffix) when nothing legible survives.
+ * Stripe truncates `PREFIX* SUFFIX` at 22 chars: TROPTIX (7) + `* ` (2) leaves
+ * 13. Stripe rejects `<>\'"*` and non-Latin — strip; null if nothing survives.
  */
 export function statementDescriptorSuffix(eventName: string): string | null {
   const cleaned = eventName
@@ -60,14 +52,6 @@ async function orderCheckoutState(
   };
 }
 
-/**
- * Create (or reuse) the Checkout Session for a held paid reservation and return
- * its client secret. Idempotent: an existing open Session is reused, and the
- * `checkout-<reservationId>` idempotency key means a racing create returns the
- * same Session. Line items are derived from the reservation's server-computed
- * amounts (a line per tier + a single "Service fee" line), so Stripe charges
- * exactly our authoritative total.
- */
 export async function beginPayment(
   prisma: PrismaClient,
   stripe: Stripe,
@@ -95,8 +79,6 @@ export async function beginPayment(
     );
   }
 
-  // Order summary for the payment screen, built from the reservation's tiers so
-  // it survives a resumed/refreshed payment step (where the client cart is gone).
   const [tiers, event] = await Promise.all([
     prisma.ticketTypes.findMany({
       where: { id: { in: reservation.items.map((i) => i.ticketTypeId) } },
@@ -120,12 +102,10 @@ export async function beginPayment(
     })),
   };
 
-  // Committing to pay refreshes the hold window (ADR 0018): a fresh full TTL
-  // from now, so a buyer who browsed a while still gets the whole payment window
-  // — and the server deadline stays ahead of the client countdown.
+  // Committing to pay refreshes the hold to a fresh full TTL (ADR 0018), so
+  // the server deadline stays ahead of the client countdown.
   const extendedExpiresAt = new Date(Date.now() + HOLD_TTL_MINUTES * 60_000);
 
-  // Reuse an existing open Session (refresh / resume / racing call).
   let staleSessionId: string | null = null;
   if (reservation.stripeCheckoutSessionId) {
     const existing = await stripe.checkout.sessions.retrieve(
@@ -142,9 +122,8 @@ export async function beginPayment(
         ...summary,
       };
     }
-    // Non-open (expired / complete): we must mint a fresh Session. Remember the
-    // dead id so the create below uses a distinct idempotency key — the fixed
-    // `checkout-<id>` key would make Stripe replay this dead Session instead.
+    // Non-open (expired / complete): mint a fresh Session — remember the dead
+    // id so the create's key differs, else Stripe replays this dead Session.
     staleSessionId = reservation.stripeCheckoutSessionId;
   }
 
@@ -178,10 +157,8 @@ export async function beginPayment(
       payment_method_types: ['card'],
       return_url: `${input.baseUrl}/e/${reservation.eventId}?reservation=${reservation.id}`,
       metadata: { reservationId: reservation.id, eventId: reservation.eventId },
-      // Backstop cap on a lingering session (Stripe default is 24h; min 30 min).
-      // The sweep expires it far sooner (at the 12-min hold); this only bounds
-      // sessions the sweep never reaches (e.g. cron down). 2h clears our longest
-      // realistic hold-refresh, avoiding a resume onto an auto-expired session.
+      // Backstop for sessions the sweep never reaches (cron down). 2h clears
+      // our longest hold-refresh, so a resume can't land on an auto-expired one.
       expires_at: Math.floor(Date.now() / 1000) + 2 * 60 * 60,
       ...(descriptorSuffix
         ? {
@@ -223,12 +200,8 @@ export async function beginPayment(
 }
 
 /**
- * Fulfill a paid reservation and return its buyer-visible state. Shared by the
- * webhook (canonical) and the confirmation poll (sync fallback) — both converge
- * on the idempotent `settle`. On the expiry race (`needs_refund`), refund the
- * whole PaymentIntent and mark the reservation REFUNDED. Idempotent under
- * at-least-once webhooks + concurrent polls: `settle` guards on status and the
- * `refund-<reservationId>` idempotency key prevents a double refund.
+ * Webhook and confirmation poll both converge on the idempotent `settle`; on
+ * the expiry race the whole PaymentIntent is refunded (`refund-<id>` dedupes).
  */
 export async function confirmPaid(
   prisma: PrismaClient,
@@ -277,11 +250,8 @@ export async function confirmPaid(
 }
 
 /**
- * The buyer-visible state of a checkout — powers both the confirmation poll and
- * resume-from-URL after the payment redirect. If the reservation isn't yet an
- * order but its Session has been paid, fulfill inline (the hybrid-fulfillment
- * sync fallback, per Stripe's fulfillment guide) so tickets appear even when the
- * webhook is slow or down. Never polls Stripe on a loop — one retrieve per call.
+ * Not a pure read: a paid-but-unconverted Session is fulfilled inline (the
+ * sync fallback to the webhook). One Stripe retrieve per call — never a loop.
  */
 export async function getCheckoutState(
   prisma: PrismaClient,
@@ -316,12 +286,10 @@ export async function getCheckoutState(
   if (reservation.status === ReservationStatus.REFUNDED) {
     return { kind: 'refunded' };
   }
-  // RELEASED (buyer abandoned) reads as expired to the UI.
   if (reservation.status === ReservationStatus.RELEASED) {
     return { kind: 'expired' };
   }
 
-  // HELD or EXPIRED: if the Session has been paid, fulfill now (sync fallback).
   if (reservation.stripeCheckoutSessionId) {
     const session = await stripe.checkout.sessions.retrieve(
       reservation.stripeCheckoutSessionId
@@ -356,27 +324,15 @@ export async function getCheckoutState(
 }
 
 export interface SweepResult {
-  /** Holds released back to inventory. */
   released: number;
   /** Holds kept because their Session couldn't be expired (paid / transient). */
   keptLive: number;
 }
 
 /**
- * Expire holds past their TTL — cancel-then-release, so overselling with a live
- * payment is structurally impossible (ADR 0018). For a hold that reached payment
- * (has a Session), expire the Session **before** releasing inventory:
- *
- * - Stripe only expires an OPEN Session, atomically. If expire succeeds, that
- *   Session can never be paid → releasing the tickets is safe.
- * - If expire throws (already paid, or transient), we DON'T release — the hold
- *   stays put and the webhook / sync poll converts it (or the next sweep retries).
- *   Either way there is never "inventory released + a still-payable Session".
- *
- * Pure browsing abandons (no Session) release directly, with no Stripe call — so
- * the Stripe coupling is bounded to holds that actually armed for payment. This
- * supersedes the Stripe-free `expire()` for the live app; that primitive stays
- * for callers with no Session and for tests.
+ * Expire the Stripe Session BEFORE releasing inventory (ADR 0018): Stripe only
+ * expires an OPEN Session, so success proves it can never be paid; on failure
+ * the hold stays put. Never "inventory released + a still-payable Session".
  */
 export async function sweepExpiredHolds(
   prisma: PrismaClient,

@@ -17,8 +17,6 @@ const queryClient = new QueryClient();
 function GlobalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isOrganizer = pathname?.startsWith('/organizer');
-  // Standard pages (and the event page) sit below the fixed header; organizer
-  // pages manage their own top spacing.
   const offsetContent = !isOrganizer;
 
   return (
@@ -31,9 +29,8 @@ function GlobalLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// The reservationId is a bearer capability (it dereferences to the order and
-// ticket QRs). It stays in the URL by design (resume-on-refresh), so strip it
-// from URL properties before they reach PostHog.
+// The reservationId is a bearer capability and stays in the URL by design
+// (resume-on-refresh) — strip it from URL properties before they reach PostHog.
 function stripReservationParam(value: unknown): unknown {
   if (typeof value !== 'string') return value;
   try {
@@ -83,8 +80,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
           <AuthProvider>
-            {/* Honor the OS "Reduce Motion" setting app-wide: disables
-                transform/layout animations while keeping opacity fades. */}
             <MotionConfig reducedMotion="user">
               <GlobalLayout>{children}</GlobalLayout>
             </MotionConfig>

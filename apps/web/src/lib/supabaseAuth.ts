@@ -1,11 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
 
-/**
- * Client-side passwordless auth (ADR 0015). Email magic-link + Google OAuth;
- * no passwords. Both redirect through /auth/callback to establish the session.
- */
-
-/** Send a passwordless sign-in email (magic link + 6-digit code) to `email`. */
 export async function signInWithMagicLink(email: string) {
   const supabase = createClient();
   return supabase.auth.signInWithOtp({

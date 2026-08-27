@@ -74,19 +74,15 @@ import { extractFlyerPaletteFromUrl, themeAvailable } from '@/lib/flyerTheme';
 
 interface EventFormProps {
   initialData?: EventFormValues | null;
-  /** Present in edit mode — its absence is what makes this a create form. */
   eventId?: string;
   ticketTypes?: TicketTypeFormValues[];
   isDraft?: boolean;
   paidEventsEnabled: boolean;
-  /** The organizer's brand — this event's host. Editable at /organizer/profile. */
   organizationName?: string;
 }
 
-/** The drawer's subject: an existing ticket row, or a fresh one when index is null. */
 type DrawerState = {
   index: number | null;
-  /** The row being edited; absent for a new ticket (drawer seeds its defaults). */
   data?: Partial<TicketTypeFormValues>;
 };
 
@@ -106,8 +102,6 @@ function defaultEventValues(): EventFormValues {
     countryCode: '',
     latitude: null,
     longitude: null,
-    // Seeded so a first event isn't blocked on tickets; editable/deletable.
-    // Sale window: now → event end, matching the drawer's defaults.
     tickets: [
       {
         name: 'General Admission',
@@ -131,7 +125,6 @@ function defaultEventValues(): EventFormValues {
 export default function EventForm({
   initialData,
   eventId,
-  // Server-provided ticket types + draft status feed publish validation on edit.
   ticketTypes,
   isDraft,
   paidEventsEnabled,
@@ -142,9 +135,7 @@ export default function EventForm({
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
 
   const isEditing = !!eventId;
-  // useForm only reads defaultValues on mount — compute them once, not per render.
   const [defaults] = useState(() => initialData ?? defaultEventValues());
-  // Open when a theme is already active; a secondary setting otherwise.
   const [themeOpen, setThemeOpen] = useState(
     () => (defaults.pageTheme ?? 'off') !== 'off'
   );
@@ -168,10 +159,8 @@ export default function EventForm({
   const endsAtCtl = useController({ control: form.control, name: 'endsAt' });
   const datesError = startsAtCtl.fieldState.error ?? endsAtCtl.fieldState.error;
 
-  // Extraction runs once per flyer, on the in-memory File when available. The
-  // token discards runs superseded by a newer flyer, and `isExtracting` gates
-  // Save so a mid-extraction submit can't persist the previous palette.
-  // Failure keeps the stored palette — it is not "no usable color".
+  // `isExtracting` gates Save so a mid-extraction submit can't persist a stale
+  // palette. Extraction failure keeps the stored palette — it is not "no usable color".
   const [isExtracting, setIsExtracting] = useState(false);
   const extractSeq = useRef(0);
   const refreshPalette = async (path: string | null, file?: File | null) => {

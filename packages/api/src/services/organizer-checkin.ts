@@ -1,12 +1,5 @@
-/**
- * Check-in writes on the authorization seam (ADR 0013, teams Phase 0).
- *
- * Ownership via `resolveOrganizerScope`, no View-as target (writes never take
- * one, ADR 0018), no platform-owner bypass. One exception remains outside this
- * file: the frozen legacy `checkInTicket` in organizer.ts (the mobile tRPC
- * path, same guards, string errors) — it dies with the app rebuild, and until
- * then Membership (ADR 0022) must land in both places.
- */
+// The frozen legacy `checkInTicket` in organizer.ts duplicates these guards;
+// until the app rebuild retires it, guard changes must land in both places.
 import { TicketStatus, type PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { ConflictError, NotFoundError } from './_shared/errors';
@@ -14,9 +7,7 @@ import { requireOwnedEvent } from './_shared/owned-event';
 import { resolveOrganizerScope } from './organizer-scope';
 
 // Un-checked-in is two statuses mid-cutover: legacy AVAILABLE and the
-// canonical VALID the reservation checkout mints. Annotated as TicketStatus[]
-// so adding an enum member is a compile error at every allow-list below,
-// rather than something an `else` silently absorbs.
+// canonical VALID the reservation checkout mints.
 const UNCHECKED_STATUSES: TicketStatus[] = [
   TicketStatus.AVAILABLE,
   TicketStatus.VALID,
@@ -29,11 +20,8 @@ export type ScanTicketResult = {
   scanSucceeded: boolean;
 };
 
-/**
- * Door scan: atomic check-then-flip, so two simultaneous scans of one QR
- * can't both succeed. A missing/foreign ticket is a failed scan, not an
- * error; an event the actor doesn't own is NotFound.
- */
+// Atomic check-then-flip: the un-checked status is part of the write
+// predicate, so two simultaneous scans of one QR can't both succeed.
 export async function scanTicket(
   prisma: PrismaClient,
   actor: Actor,
@@ -71,12 +59,8 @@ export async function scanTicket(
   };
 }
 
-/**
- * Two-way check-in toggle (the attendee table's switch, and the legacy app's
- * check-in button): flips status and stamps/clears the check-in time. The
- * ticket must belong to an event the actor owns — resolved through the event
- * join, so a foreign ticket id reads as not found rather than forbidden.
- */
+// Ownership is resolved through the event join, so a foreign ticket id reads
+// as not found rather than forbidden.
 export async function toggleTicketCheckIn(
   prisma: PrismaClient,
   actor: Actor,
@@ -95,10 +79,8 @@ export async function toggleTicketCheckIn(
     throw new NotFoundError('Ticket not found');
   }
 
-  // Both directions are allow-listed: a void ticket (USED, CANCELLED,
-  // REFUNDED) is neither checkable-in nor checkable-out, so it can never be
-  // rewritten into a scannable state. Undo restores AVAILABLE, the legacy
-  // un-checked state, as it always has.
+  // Both directions allow-listed: a void ticket (USED/CANCELLED/REFUNDED) can
+  // never be rewritten scannable. Undo restores legacy AVAILABLE, as always.
   const checkingIn = UNCHECKED_STATUSES.includes(ticket.status);
   const checkingOut = CHECKED_IN_STATUSES.includes(ticket.status);
   if (!checkingIn && !checkingOut) {

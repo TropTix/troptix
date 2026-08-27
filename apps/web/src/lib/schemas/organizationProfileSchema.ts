@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
-// Profile Info editor (F6). Format/length only — reserved-slug and uniqueness
-// are enforced server-side (updateOrganizationProfile → slug_invalid/slug_taken).
+// Format/length only — reserved-slug and uniqueness are enforced server-side.
 export const organizationProfileSchema = z.object({
   displayName: z
     .string()

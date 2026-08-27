@@ -34,8 +34,6 @@ export async function saveOrganizationProfile(
   }
 
   const d = parsed.data;
-  // Create-or-update in the service: a first save creates the Organization
-  // with the validated slug; nothing is written when validation fails.
   const result = await updateOrganizationProfile(prisma, {
     ownerUserId: user.uid,
     displayName: d.displayName,

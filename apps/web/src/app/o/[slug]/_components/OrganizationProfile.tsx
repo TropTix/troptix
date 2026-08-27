@@ -5,9 +5,6 @@ import { OrgAvatar } from '@/components/OrgAvatar';
 import { OrgSocialLinks } from '@/components/OrgSocialLinks';
 import EventCard from '@/components/EventCard';
 
-// Public organization page (/o/[slug], surface F5): brand header + the org's
-// upcoming/past events. Always public; drafts never reach here (service-side).
-
 function EventGrid({ events }: { events: EventSummary[] }) {
   return (
     <div className="flex flex-wrap gap-6 sm:gap-8">

@@ -23,11 +23,6 @@ interface ActionResult {
   error?: string;
 }
 
-// Thin adapters over the @troptix/api write seam (Screen D plan): validate the
-// form shape here for field-level messages, convert dollars → integer cents,
-// and let the service own authorization, the paid-ticketing gate, and the
-// transaction.
-
 export async function createEvent(
   formData: EventFormValues
 ): Promise<ActionResult> {
@@ -142,8 +137,6 @@ function failure(error: unknown, fallback: string): ActionResult {
   if (error instanceof UnauthorizedError) {
     return { success: false, error: 'Authentication required.' };
   }
-  // The service re-validates against the contract schema; surface its first
-  // issue instead of the generic fallback if the two schemas ever drift.
   if (error instanceof ZodError) {
     return {
       success: false,

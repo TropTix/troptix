@@ -1,9 +1,3 @@
-/**
- * Unit tests for the Screen G order reads. Pure over an injected fake `prisma`
- * (ADR 0010). Covers the shared authorization seam (anonymous, scoping, View-as,
- * not-found), the cents boundary + the legacy float fallback, ticket-count and
- * line-item grouping, and the payment-method shaping.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -16,9 +10,9 @@ const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 function fakePrisma(
   opts: {
     platformOwner?: boolean;
-    event?: unknown; // undefined → owned; null → not found
+    event?: unknown;
     orders?: unknown[];
-    order?: unknown; // for getOrderDetail; null → not found
+    order?: unknown;
   } = {}
 ) {
   const eventsFindFirst = vi
@@ -155,7 +149,6 @@ describe('getOrderDetail', () => {
   });
 
   it('prices lines from what was paid, not the current ticket type price', async () => {
-    // Ticket type list price is 20, but these were bought at a 15 discount.
     const { prisma } = fakePrisma({
       order: order({
         tickets: [
@@ -214,7 +207,6 @@ describe('getOrderDetail', () => {
       customer: { name: 'Ada Lovelace', email: 'ada@x.com', phone: '555-0100' },
     });
 
-    // The stored order name, when present, wins over the first/last pair.
     const named = await getOrderDetail(
       fakePrisma({ order: order({ name: '  Grace Hopper  ' }) }).prisma,
       OWNER,

@@ -21,7 +21,6 @@ export async function toggleTicketStatus(ticketId: string) {
       ticketId,
     });
 
-    // Path from the mutation's own result — never the client's event param.
     revalidatePath(`/organizer/events/${updatedTicket.eventId}/attendees`);
 
     return {

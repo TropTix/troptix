@@ -2,19 +2,10 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 /**
- * Refresh the Supabase session on every request and propagate the rotated auth
- * cookies (and the no-cache headers) to both the request — for downstream Server
- * Components — and the response, for the browser. This is the @supabase/ssr
- * proxy pattern (https://supabase.com/docs/guides/auth/server-side/creating-a-client),
- * adapted for Next 16 where the middleware entrypoint is `proxy.ts`.
- *
- * Returns `{ response, claims }` so the caller can gate routes on the validated
- * claims without a second round-trip. `getClaims()` verifies the JWT signature
- * locally against the project's published keys — safe to trust server-side.
- *
- * The cookie/header plumbing on `response` MUST be preserved: a caller that
- * builds a different response (e.g. a redirect) has to copy these over, or the
- * session won't persist.
+ * @supabase/ssr proxy pattern: setAll writes the rotated cookies to BOTH the
+ * request (for downstream Server Components) and a rebuilt response (for the
+ * browser) — drop either half and that side silently keeps the stale session.
+ * getClaims() verifies the JWT locally, so the claims are safe to trust.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

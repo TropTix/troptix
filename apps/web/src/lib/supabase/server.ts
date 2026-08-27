@@ -2,12 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 /**
- * Server Supabase client (Server Components, Server Actions, Route Handlers).
- * Create a fresh one per request — it carries that request's cookies.
- *
- * To read the user server-side, use `supabase.auth.getClaims()` (validates the
- * JWT signature against the project's published keys). Never trust
- * `getSession()` server-side. https://supabase.com/docs/guides/auth/server-side
+ * Create a fresh client per request — it carries that request's cookies, so a
+ * shared or cached one leaks sessions across users. Read the user via
+ * `getClaims()` (verifies the JWT locally); never trust `getSession()` here.
  */
 export async function createClient() {
   const cookieStore = await cookies();
@@ -26,9 +23,8 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Called from a Server Component, which can't write cookies. Safe to
-            // ignore — the proxy refreshes the session and writes cookies (plus
-            // the required no-cache headers) on every request.
+            // Called from a Server Component, which can't write cookies — safe:
+            // the proxy refreshes the session and writes them on every request.
           }
         },
       },
@@ -37,9 +33,8 @@ export async function createClient() {
 }
 
 /**
- * Read the verified JWT claims for a request from an arbitrary cookie source
- * (e.g. the Vercel Flags SDK's reader, which isn't `next/headers` cookies()).
- * Read-only — does not refresh or write cookies.
+ * Reads claims from an arbitrary cookie source (e.g. the Vercel Flags SDK's
+ * reader, which isn't `next/headers` cookies()); never refreshes the session.
  */
 export async function readClaimsFromCookies(cookieReader: {
   getAll(): { name: string; value: string }[];

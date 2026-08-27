@@ -6,8 +6,7 @@ import OrganizationProfileForm from './_components/OrganizationProfileForm';
 
 export const metadata = { title: 'Organizer Profile' };
 
-// Read-only on GET: viewing must not create an Organization (ADR 0022) — a
-// first-time organizer sees the empty form; the org is created on save.
+// Viewing must not create an Organization (ADR 0022) — the org is created on save.
 export default async function OrganizerProfilePage() {
   const user = await getUserFromIdTokenCookie();
   if (!user) redirect('/auth/signin');

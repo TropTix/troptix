@@ -1,6 +1,5 @@
 // DEPRECATED: legacy REST route for the old `apps/organizer` app; slated for
-// deletion with that app once v2's check-in is wired to a tRPC mutation.
-// See docs/plans/2026-07-organizer-dashboard-migration.md. Don't build on this.
+// deletion (docs/plans/2026-07-organizer-dashboard-migration.md). Don't build on this.
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';

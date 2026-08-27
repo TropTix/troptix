@@ -7,9 +7,6 @@ import { themeStyle } from '@/lib/flyerTheme';
 import { getDateRangeFormatter } from '@/lib/dateUtils';
 import { priceLabelFor } from '@/lib/utils';
 
-// Miniature of the public page: same derivation, CSS variables, and label
-// formatters, so it stays a true preview by construction.
-
 export function PageThemePreview({
   theme,
   palette,

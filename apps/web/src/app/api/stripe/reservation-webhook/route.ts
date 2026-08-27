@@ -10,14 +10,8 @@ import {
 } from '@/server/lib/email';
 
 /**
- * Reservation checkout webhook (ADR 0018) — the canonical fulfiller for the new
- * `/e/` paid flow. Separate endpoint + signing secret from the legacy
- * `pages/api/stripe/webhook.ts`, so the two flows never interfere.
- *
- * `checkout.session.completed` → `confirmPaid` (idempotent; auto-refunds on the
- * expiry race). We only act on Sessions carrying `metadata.reservationId`, and
- * dedupe by event id — both belt-and-suspenders on top of `settle`'s own
- * idempotency, and enough to avoid re-sending the confirmation email.
+ * Fulfiller for the `/e/` reservation flow (ADR 0018) — separate endpoint and
+ * signing secret from the legacy `pages/api/stripe/webhook.ts`.
  */
 export const runtime = 'nodejs';
 
@@ -41,7 +35,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  // At-least-once delivery: skip an event we've already fully handled.
   const seen = await prisma.processedStripeEvent.findUnique({
     where: { id: event.id },
     select: { id: true },
@@ -115,7 +108,6 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
           );
         }
       } else if (state.kind === 'refunded') {
-        // Lost the expiry race — tell the buyer their payment was refunded.
         await sendRefundNoticeEmail(reservationId);
       }
       return;
@@ -138,7 +130,6 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
     }
 
     default:
-      // Not subscribed / unexpected — acknowledge so Stripe stops retrying.
       return;
   }
 }

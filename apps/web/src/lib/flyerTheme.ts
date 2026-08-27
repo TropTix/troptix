@@ -1,14 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { EventPageTheme, FlyerPalette } from '@troptix/api';
 
-// Flyer-derived page theming. Extraction runs ONCE, client-side, when the
-// organizer uploads a flyer (`extractFlyerPalette`); the palette is stored on
-// the event. Derivation (`deriveThemeVars`) is a pure function of the stored
-// palette — cheap enough to run on every render, server or client — and owns
-// the contrast guardrails: body ink ≥12:1 vs the ground, muted text ≥4.6:1 vs
-// every emitted surface, CTA label ≥4.5:1 on its fill, and the CTA fill (and
-// so --ring) ≥3:1 vs the ground. flyerTheme.test.ts holds these to account.
-
 type HSL = { h: number; s: number; l: number };
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {
@@ -96,12 +88,10 @@ function parseTriplet(value: string): HSL {
   };
 }
 
-/** WCAG contrast between two `"hsl(H S% L%)"` colors (as emitted in ThemeVars). */
 export function tripletContrast(a: string, b: string): number {
   return contrast(parseTriplet(a), parseTriplet(b));
 }
 
-/** Walk lightness until the color clears `target` contrast against `vs`. */
 function solveL(c: HSL, vs: HSL, target: number, dir: 1 | -1): HSL {
   let l = c.l;
   let guard = 0;
@@ -112,9 +102,6 @@ function solveL(c: HSL, vs: HSL, target: number, dir: 1 | -1): HSL {
   return { ...c, l };
 }
 
-// Two independent bars: the fill must read against the page (≥3:1, WCAG
-// non-text — also covers --ring) and the label on the fill (≥4.5:1). The
-// candidate that moves the fill least from the flyer's color wins.
 function solveCta(vib: HSL, bg: HSL): { fill: HSL; ink: HSL } {
   const away: 1 | -1 = bg.l > 0.5 ? -1 : 1;
   const base = solveL(vib, bg, 3, away);
@@ -139,12 +126,9 @@ function hueDist(a: number, b: number): number {
   return d > 180 ? 360 - d : d;
 }
 
-// --- extraction (client-only: needs a canvas) ---------------------------------
-
 /**
- * Sample the flyer's pixels and reduce them to a storable palette. Returns
- * null when the canvas is CORS-tainted or empty. The image must be loaded
- * (naturalWidth > 0) and fetched with crossOrigin="anonymous".
+ * The image must be loaded and fetched with crossOrigin="anonymous" — a tainted
+ * canvas throws and every palette silently comes back null.
  */
 export function extractFlyerPalette(
   img: HTMLImageElement
@@ -196,7 +180,6 @@ export function extractFlyerPalette(
     const vivid = clusters
       .filter((c) => c.s >= 0.22 && c.l >= 0.18 && c.l <= 0.85)
       .sort((a, b) => score(b) - score(a));
-    // Swatch-row candidates: kept only when visually distinct from the rest.
     const candidates: HSL[] = [];
     for (const c of vivid) {
       if (
@@ -218,10 +201,6 @@ export function extractFlyerPalette(
   }
 }
 
-/**
- * Load an image URL and extract its palette. Resolves null on load failure or
- * a CORS-tainted canvas — callers treat that as "no palette".
- */
 export function extractFlyerPaletteFromUrl(
   url: string
 ): Promise<FlyerPalette | null> {
@@ -234,29 +213,22 @@ export function extractFlyerPaletteFromUrl(
   });
 }
 
-// --- derivation (pure; server-safe) --------------------------------------------
-
 // Full hsl() colors: the v4 token wiring maps utilities to var(--x) directly,
 // so a bare "H S% L%" triplet would be an invalid color and silently no-op.
 const t = ({ h, s, l }: HSL) =>
   `hsl(${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
 
-/** shadcn CSS variable overrides, as full `--var: "hsl(H S% L%)"` colors. */
 export type ThemeVars = Record<string, string>;
 
-/** The color that leads the theme: the organizer's pick, else the auto-pick. */
 export function leadColor(palette: FlyerPalette | null): string | null {
   if (!palette) return null;
   return palette.chosenAccent ?? palette.candidates[0] ?? null;
 }
 
-/** Whether a treatment can render for this palette (drives picker states). */
 export function themeAvailable(palette: FlyerPalette | null): boolean {
   return leadColor(palette) !== null;
 }
 
-// The secondary color for chips/highlights: the first candidate far enough in
-// hue from the lead to read as a different color, else the lead itself.
 function accentColor(palette: FlyerPalette, lead: HSL): HSL {
   const hex = palette.candidates.find(
     (c) => hueDist(hexToHsl(c).h, lead.h) > 40
@@ -276,7 +248,6 @@ function deriveWash(
   const H = src.h;
   const S = Math.min(0.5, Math.max(0.22, src.s * 0.5));
   const bg: HSL = { h: H, s: S, l: 0.94 };
-  // The darkest light surface — muted text solved against it clears the rest.
   const secondary: HSL = { h: H, s: S, l: 0.88 };
   const ink = solveL({ h: H, s: 0.3, l: 0.14 }, bg, 12, -1);
   const muted = solveL({ h: H, s: 0.18, l: 0.5 }, secondary, 4.6, -1);
@@ -308,14 +279,11 @@ function deriveDark(
   dominant: HSL,
   lead: HSL
 ): ThemeVars {
-  // Near-gray dominants report hue 0 (red) and the saturation floor would
-  // manufacture color from it — only those hand the hue to the lead color.
   const domDull = dominant.s < 0.15;
   const src = domDull ? lead : dominant;
   const H = src.h;
   const S = Math.min(0.45, Math.max(0.15, src.s * 0.55));
   const bg: HSL = { h: H, s: S, l: 0.1 };
-  // The lightest dark surface — muted text solved against it clears the rest.
   const secondary: HSL = { h: H, s: S * 0.8, l: 0.2 };
   const ink: HSL = { h: H, s: 0.12, l: 0.94 };
   const muted = solveL({ h: H, s: 0.1, l: 0.55 }, secondary, 4.6, 1);
@@ -342,11 +310,6 @@ function deriveDark(
   };
 }
 
-/**
- * The CSS variable overrides for an event's stored theme, or null when the
- * page should render the brand theme (theme off, no palette, or a palette
- * with no usable color).
- */
 export function deriveThemeVars(
   theme: EventPageTheme,
   palette: FlyerPalette | null
@@ -361,7 +324,6 @@ export function deriveThemeVars(
     : deriveDark(palette, dominant, leadHsl);
 }
 
-/** `deriveThemeVars` as a React inline style (undefined = brand theme). */
 export function themeStyle(
   theme: EventPageTheme,
   palette: FlyerPalette | null

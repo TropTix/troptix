@@ -1,15 +1,5 @@
-/**
- * Screen D — the event write seam (docs/plans/2026-07-screen-d-event-form.md).
- *
- * Create and edit an event, pure over an injected `prisma`, authorized on the
- * `Actor` (ADR 0013) with ownership as the boundary. Writes never take a
- * View-as target (ADR 0018).
- *
- * `createEvent` is transactional over the event and its initial ticket types.
- * `updateEvent` touches event fields only — ticket-type editing is Screen E's
- * seam (#452, decided in #465). Both paths pass ticket-bearing input through
- * `assertPaidTicketingAllowed`, the one home of the paid-ticketing gate.
- */
+// `updateEvent` touches event fields only — ticket-type editing belongs to
+// the ticket-type write seam, not here.
 import type { PrismaClient } from '@troptix/db';
 import { Prisma } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -78,14 +68,12 @@ export async function updateEvent(
   const data = updateEventInputSchema.parse(input);
   const organizerUserId = await resolveOrganizerScope(prisma, actor);
 
-  // Ownership check and the org lookup are independent reads — one wave.
-  // Provisioning (a write) waits until ownership has passed, so probing a
+  // Provisioning (a write) must wait until ownership has passed, so probing a
   // foreign event id can't leave side effects.
   const [, existingOrg] = await Promise.all([
     requireOwnedEvent(prisma, organizerUserId, eventId),
     findOrganizationForOwner(prisma, organizerUserId),
   ]);
-  // Keep the event pointed at the organizer's Organization + name mirror.
   const org =
     existingOrg ?? (await provisionOrganization(prisma, organizerUserId));
 
@@ -101,11 +89,6 @@ export async function updateEvent(
   return { organizationSlug: org.slug };
 }
 
-/**
- * The organizer's Organization (auto-created on first write). The email
- * lookup only seeds the display name at that one first creation, so it is
- * only paid when no org exists yet — every later save is a single read.
- */
 async function resolveOrganization(
   prisma: PrismaClient,
   organizerUserId: string

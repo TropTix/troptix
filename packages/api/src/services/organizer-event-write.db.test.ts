@@ -1,10 +1,5 @@
-/**
- * Integration tests for the event write seam against a REAL Postgres — the
- * query-shape check the fake can't give (relations, enum coercion, defaults).
- * Same env expectations as reservations.test.ts: `POSTGRES_PRISMA_URL` via
- * apps/web/.env, loaded by vitest.config.ts. Everything is provisioned under a
- * per-run organizer id and cleaned up in afterAll.
- */
+// Real Postgres via POSTGRES_PRISMA_URL (see reservations.test.ts) — point it
+// at a preview/dev branch, never prod.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import prisma from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -44,7 +39,6 @@ const input = (priceCents: number) => ({
 });
 
 beforeAll(async () => {
-  // Organization.ownerUserId is FK'd to Users — the organizer must exist.
   await prisma.users.create({
     data: { id: OWNER_ID, email: `${OWNER_ID.toLowerCase()}@example.test` },
   });
@@ -71,7 +65,6 @@ describe('createEvent (real DB)', () => {
   });
 
   it('creates event + tickets transactionally once the org is approved, dates intact', async () => {
-    // The failed attempt above auto-provisioned the org; approve it.
     await prisma.organization.updateMany({
       where: { ownerUserId: OWNER_ID },
       data: { paidTicketingEnabled: true },

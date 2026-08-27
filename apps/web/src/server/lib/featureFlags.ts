@@ -3,18 +3,11 @@ import { PostHog } from 'posthog-node';
 import type { FeatureFlagKey } from '@troptix/api';
 
 /**
- * Server-side feature flag check. Fail closed: any error, timeout, or missing
- * flag returns false, which must always mean today's live behavior
- * (docs/runbooks/feature-flags.md, ADR 0023).
- *
- * Remote evaluation on purpose — local evaluation polls definitions per
- * process, which serverless multiplies into cost and latency. One request per
- * check is fine at our volume; memoize per request before reaching for
- * anything cleverer.
- *
- * Pass the signed-in user where you have one: the Supabase user id keeps
- * server and client verdicts identical, and the email person property makes
- * staff targeting work regardless of ingestion lag.
+ * Fail closed: any error, timeout, or missing flag returns false, which must
+ * always mean today's live behavior (ADR 0023, docs/runbooks/feature-flags.md).
+ * Remote evaluation on purpose — local eval polls definitions per process,
+ * which serverless multiplies. Pass the signed-in user where you have one: it
+ * keeps server and client verdicts identical.
  */
 export async function isFlagEnabled(
   flag: FeatureFlagKey,
@@ -47,12 +40,9 @@ export async function isFlagEnabled(
 }
 
 /**
- * The posthog-js cookie carries the browser's anonymous distinct id. Reusing
- * it keeps a percentage rollout consistent between this server check and the
- * same visitor's client hooks. Outside a request scope (cron, webhooks) or
- * with no cookie, fall back to a constant — correct for flags that are off,
- * staff-only, or fully on, which is every flag until a percentage rollout
- * starts.
+ * Reusing the posthog-js cookie's distinct id keeps a percentage rollout
+ * consistent between this server check and the visitor's client hooks. The
+ * constant fallback is correct until a percentage rollout starts.
  */
 async function anonymousDistinctId(apiKey: string): Promise<string> {
   try {

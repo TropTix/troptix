@@ -24,13 +24,8 @@ function hasSupabaseAuthCookie() {
 }
 
 /**
- * Client-side auth state for Client Components (header, checkout). The single
- * source of truth is /api/user/me — the server resolves the Supabase session
- * (getClaims) → the app `Users` row (stable id + role). We re-fetch it whenever
- * the Supabase auth state changes (sign-in / sign-out / token refresh).
- *
- * Protected routes are gated server-side (proxy + getServerUser), so this never
- * blocks rendering — it just hydrates UI that reacts to the signed-in user.
+ * /api/user/me is the single source of truth. Protected routes are gated
+ * server-side (proxy + getServerUser) — this only hydrates UI.
  */
 export default function AuthProvider({
   children,
@@ -79,9 +74,8 @@ export default function AuthProvider({
     }
 
     // onAuthStateChange fires INITIAL_SESSION right after subscribing, so this
-    // loads on mount too — no separate up-front fetch needed. A cookie without
-    // a parseable client session still asks the server: /api/user/me stays the
-    // source of truth.
+    // loads on mount too — no separate up-front fetch. A cookie without a
+    // parseable client session still asks the server.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {

@@ -52,12 +52,12 @@ const SkeletonMetricCard = ({ iconName }: { iconName: string }) => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <Skeleton className="h-4 w-24" /> {/* CardTitle */}
+        <Skeleton className="h-4 w-24" />
         <IconComponent className="h-4 w-4 text-muted-foreground opacity-50" />
       </CardHeader>
       <CardContent>
-        <Skeleton className="h-7 w-16" /> {/* Main Value */}
-        <Skeleton className="h-3 w-12 mt-1" /> {/* Sub-description */}
+        <Skeleton className="h-7 w-16" />
+        <Skeleton className="h-3 w-12 mt-1" />
       </CardContent>
     </Card>
   );
@@ -76,8 +76,7 @@ const SkeletonOrderRow = () => (
     </TableCell>
     <TableCell>
       <Skeleton className="h-6 w-20 rounded-md" />
-    </TableCell>{' '}
-    {/* Badge */}
+    </TableCell>
     <TableCell>
       <Skeleton className="h-5 w-16" />
     </TableCell>
@@ -87,58 +86,51 @@ const SkeletonOrderRow = () => (
 export default function EventOverviewLoading() {
   return (
     <div className="flex flex-col gap-6 md:gap-8">
-      {/* Top Section: Event Info */}
       <section className="flex flex-col gap-3 md:gap-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-1">
-            <Skeleton className="h-8 w-60 md:h-9 md:w-80" /> {/* Event Name */}
+            <Skeleton className="h-8 w-60 md:h-9 md:w-80" />
             <div className="flex items-center gap-2">
-              <Skeleton className="h-5 w-16 rounded-md" /> {/* Badge */}
-              <Skeleton className="h-3 w-32" /> {/* Created Date */}
+              <Skeleton className="h-5 w-16 rounded-md" />
+              <Skeleton className="h-3 w-32" />
             </div>
           </div>
-          <Skeleton className="h-9 w-36 rounded-md" />{' '}
-          {/* View Event Page Button */}
+          <Skeleton className="h-9 w-36 rounded-md" />
         </div>
         <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5">
-          <Skeleton className="h-5 grow" /> {/* Input for Event URL */}
-          <Skeleton className="h-7 w-7 rounded-md" /> {/* Copy Button */}
-          <Skeleton className="h-7 w-7 rounded-md" /> {/* Share Button */}
+          <Skeleton className="h-5 grow" />
+          <Skeleton className="h-7 w-7 rounded-md" />
+          <Skeleton className="h-7 w-7 rounded-md" />
         </div>
       </section>
 
-      {/* Metrics Section */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <SkeletonMetricCard iconName="Ticket" />
         <SkeletonMetricCard iconName="DollarSign" />
         <SkeletonMetricCard iconName="Clock" />
       </section>
 
-      {/* Revenue Over Time Chart Section */}
       <section>
         <Card>
           <CardHeader>
-            <Skeleton className="h-6 w-40" /> {/* CardTitle */}
-            <Skeleton className="h-4 w-64 mt-1" /> {/* CardDescription */}
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-4 w-64 mt-1" />
           </CardHeader>
           <CardContent>
-            <Skeleton className="h-72 w-full" />{' '}
-            {/* DailyRevenueChart Placeholder */}
+            <Skeleton className="h-72 w-full" />
           </CardContent>
         </Card>
       </section>
 
-      {/* Recent Orders Section */}
       <section>
         <Card>
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <Skeleton className="h-6 w-32" /> {/* CardTitle */}
-                <Skeleton className="h-4 w-56 mt-1" /> {/* CardDescription */}
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-56 mt-1" />
               </div>
-              <Skeleton className="h-9 w-36 rounded-md" />{' '}
-              {/* View All Orders Button */}
+              <Skeleton className="h-9 w-36 rounded-md" />
             </div>
           </CardHeader>
           <CardContent>
@@ -172,33 +164,29 @@ export default function EventOverviewLoading() {
         </Card>
       </section>
 
-      {/* Bottom Section: Check-in & Tickets by Type */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <Skeleton className="h-4 w-40" /> {/* CardTitle */}
+            <Skeleton className="h-4 w-40" />
             <CheckCheck className="h-4 w-4 text-muted-foreground opacity-50" />
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center pt-6">
             <div className="text-center">
-              <Skeleton className="h-7 w-24 mb-1" /> {/* Scanned Count */}
-              <Skeleton className="h-3 w-20 mb-4" />{' '}
-              {/* Tickets Scanned Label */}
-              <Skeleton className="h-4 w-48" />{' '}
-              {/* (Check-in data unavailable) */}
+              <Skeleton className="h-7 w-24 mb-1" />
+              <Skeleton className="h-3 w-20 mb-4" />
+              <Skeleton className="h-4 w-48" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <Skeleton className="h-4 w-36" /> {/* CardTitle */}
+            <Skeleton className="h-4 w-36" />
             <PieChartIcon className="h-4 w-4 text-muted-foreground opacity-50" />
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-center h-48">
-              <Skeleton className="h-40 w-40 rounded-full" />{' '}
-              {/* PieChart Placeholder */}
+              <Skeleton className="h-40 w-40 rounded-full" />
             </div>
           </CardContent>
         </Card>

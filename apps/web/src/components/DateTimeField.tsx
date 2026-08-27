@@ -29,7 +29,6 @@ import {
 import { cn } from '@/lib/utils';
 import { combineDateTime, formatTime } from '@/lib/dateUtils';
 
-// 15-minute grid: "HH:mm" values with "h:mma" labels ("5:30pm").
 const TIME_OPTIONS = Array.from({ length: 96 }, (_, i) => {
   const h = Math.floor(i / 4);
   const m = (i % 4) * 15;
@@ -80,12 +79,9 @@ function TimeSelect({
 }
 
 type DateTimeFieldProps = {
-  /** Undefined renders a placeholder, never crashes — form state may be partial. */
   value?: Date;
   onChange: (next: Date) => void;
-  /** Omit when a form's own FormLabel already labels the field. */
   label?: string;
-  /** Days strictly before this date are unselectable (end-after-start guard). */
   disabledBefore?: Date;
   className?: string;
 } & Omit<
@@ -94,13 +90,9 @@ type DateTimeFieldProps = {
 >;
 
 /**
- * One control writing a single Date field: the trigger shows date and time
- * together; the popover holds the calendar and the 15-minute time list.
- * Reading the time out (`formatTime`) and folding it back in
- * (`combineDateTime`) is a matched pair (CLAUDE.md "Dates and times") — this
- * component is the one place that pair lives.
- *
- * Rest props (id, aria-*, ref) land on the trigger button, so a wrapping
+ * `formatTime` out / `combineDateTime` back is a matched pair (CLAUDE.md
+ * "Dates and times") — this component is the one place that pair lives. Rest
+ * props (id, aria-*, ref) must land on the trigger button so a wrapping
  * FormControl's label/error wiring reaches the focusable control.
  */
 export function DateTimeField({
@@ -166,9 +158,8 @@ export function DateTimeField({
 
 const minutesOfDay = (d: Date) => d.getHours() * 60 + d.getMinutes();
 
-// Wall-clock span: calendar days plus clock minutes. Instant arithmetic
-// (getTime deltas) counts DST offsets, which contradicts ADR 0021's "the
-// wall clock is the truth" for venue-local event times.
+// Instant arithmetic (getTime deltas) counts DST offsets — calendar days plus
+// clock minutes keeps ADR 0021's "the wall clock is the truth".
 function wallClockMinutesBetween(from: Date, to: Date): number {
   return (
     differenceInCalendarDays(to, from) * 1440 +
@@ -202,12 +193,6 @@ function formatDuration(mins: number): string {
   return parts.length ? parts.join(' ') : '0m';
 }
 
-/**
- * A linked start–end pair: moving the start shifts the end by the same
- * wall-clock delta so the duration holds; the end calendar can't go before
- * the start; the duration shows on a pill beside the start label. Range
- * validation messages stay with the owning form — the pill only signals.
- */
 export function DateTimeRangeFields({
   start,
   end,
@@ -222,9 +207,7 @@ export function DateTimeRangeFields({
   onChange: (next: { start: Date; end: Date }) => void;
   startLabel?: string;
   endLabel?: string;
-  /** Forwarded to the start trigger (id, aria-*, ref for focus-on-error). */
   startFieldProps?: Omit<DateTimeFieldProps, 'value' | 'onChange'>;
-  /** Forwarded to the end trigger (id, aria-*, ref for focus-on-error). */
   endFieldProps?: Omit<DateTimeFieldProps, 'value' | 'onChange'>;
 }) {
   const durationMins = wallClockMinutesBetween(start, end);
@@ -233,9 +216,6 @@ export function DateTimeRangeFields({
   const invalid = durationMins <= 0;
   return (
     <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-      {/* Both columns get an equal-height label row so the fields align when
-          side by side; the duration pill rides the Starts label, keeping one
-          position at every viewport width. */}
       <div className="grid w-fit gap-2">
         <div className="flex h-5 items-center gap-2">
           <Label>{startLabel}</Label>
