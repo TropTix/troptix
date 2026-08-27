@@ -4,15 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  ArrowLeft,
-  Share2,
-  Check,
-  Calendar,
-  MapPin,
-  ArrowRight,
-  BadgeCheck,
-} from 'lucide-react';
+import { ArrowLeft, Share2, Check, ArrowRight, BadgeCheck } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
 import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
@@ -33,38 +25,34 @@ import VenueMap from './VenueMap';
 const SECTION_LABEL =
   'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
-const META_TILE =
-  'grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground';
-
 const ROUND_BTN =
   'grid h-10 w-10 place-items-center rounded-full text-foreground transition-colors';
 
 function SectionHeader({ children }: { children: ReactNode }) {
+  return <h2 className={SECTION_LABEL}>{children}</h2>;
+}
+
+function MetaRow({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <h2 className={cn('border-b border-border pb-2', SECTION_LABEL)}>
-      {children}
-    </h2>
+    <div className="min-w-0">
+      <div className="font-semibold">{title}</div>
+      <div className="text-sm text-muted-foreground">{subtitle}</div>
+    </div>
   );
 }
 
-function MetaRow({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="flex items-center gap-4">
-      <span className={META_TILE}>{icon}</span>
-      <div className="min-w-0">
-        <div className="font-semibold">{title}</div>
-        <div className="text-sm text-muted-foreground">{subtitle}</div>
-      </div>
-    </div>
-  );
+// Deliberately coarse (days, not minutes) so the SSR and client renders of
+// this label agree in practice; the chip still carries suppressHydrationWarning
+// for the rare boundary crossing.
+function countdownLabel(start: Date, end: Date, eventEnded: boolean) {
+  if (eventEnded) return 'Ended';
+  const now = Date.now();
+  if (now >= start.getTime() && now <= end.getTime()) return 'Happening now';
+  const days = Math.ceil((start.getTime() - now) / 86_400_000);
+  if (days <= 0) return 'Starts today';
+  if (days === 1) return 'Starts tomorrow';
+  if (days < 14) return `Starts in ${days} days`;
+  return `Starts in ${Math.round(days / 7)} weeks`;
 }
 
 // Falls back to the legacy organizer name when there's no linked brand.
@@ -141,6 +129,7 @@ export default function EventDetailView({
   const resumeReservationId = searchParams?.get('reservation') ?? null;
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
+  const [aboutExpanded, setAboutExpanded] = useState(false);
 
   // Resume an in-flight checkout after the Stripe redirect / a refresh (ADR
   // 0018). The param stays in the URL on purpose — scrubbing it would break
@@ -169,14 +158,11 @@ export default function EventDetailView({
 
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
-  const heroChip = `${start.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  })} · ${start.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  })}`;
   const priceLabel = priceLabelFor(event.fromPriceCents);
+
+  // Clamp only kicks in for genuinely long descriptions — short ones never
+  // show a "Read more" that reveals a line or two.
+  const aboutIsLong = (event.description?.length ?? 0) > 400;
 
   async function onShare() {
     const url = typeof window !== 'undefined' ? window.location.href : '';
@@ -252,14 +238,17 @@ export default function EventDetailView({
                 {shareIcon}
               </button>
             </div>
-            <span className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm">
+            <span
+              className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm"
+              suppressHydrationWarning
+            >
               <span
                 className={cn(
                   'h-1.5 w-1.5 rounded-full',
                   eventEnded ? 'bg-card/50' : 'bg-success'
                 )}
               />
-              {heroChip}
+              {countdownLabel(start, end, eventEnded)}
             </span>
           </div>
         </div>
@@ -276,7 +265,7 @@ export default function EventDetailView({
                   className="object-cover"
                 />
               </div>
-              <div className="mt-5 border-t border-border pt-5">
+              <div className="mt-6">
                 <p className={SECTION_LABEL}>Presented by</p>
                 <HostedBy event={event} />
               </div>
@@ -312,12 +301,10 @@ export default function EventDetailView({
 
               <div className="mt-6 space-y-3">
                 <MetaRow
-                  icon={<Calendar className="h-6 w-6" />}
                   title={getDateRangeFormatter(start, end)}
                   subtitle={getTimeRangeFormatter(start, end)}
                 />
                 <MetaRow
-                  icon={<MapPin className="h-6 w-6" />}
                   title={event.venue ?? event.address}
                   subtitle={event.address}
                 />
@@ -326,9 +313,23 @@ export default function EventDetailView({
               {event.description && (
                 <section className="mt-10">
                   <SectionHeader>About Event</SectionHeader>
-                  <p className="mt-4 whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                  <p
+                    className={cn(
+                      'mt-4 whitespace-pre-wrap leading-relaxed text-muted-foreground',
+                      aboutIsLong && !aboutExpanded && 'line-clamp-6'
+                    )}
+                  >
                     {event.description}
                   </p>
+                  {aboutIsLong && (
+                    <button
+                      type="button"
+                      onClick={() => setAboutExpanded((v) => !v)}
+                      className="mt-2 text-sm font-semibold text-primary hover:underline"
+                    >
+                      {aboutExpanded ? 'Show less' : 'Read more'}
+                    </button>
+                  )}
                 </section>
               )}
 
