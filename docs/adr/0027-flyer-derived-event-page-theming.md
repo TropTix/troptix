@@ -1,4 +1,4 @@
-# 23. Event pages may be themed from the flyer, chosen by the organizer
+# 27. Event pages may be themed from the flyer, chosen by the organizer
 
 - **Status:** Accepted
 - **Date:** 2026-07-28

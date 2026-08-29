@@ -83,7 +83,7 @@ are to be **amended to match**:
    surface; colour comes from the poster — a subtle flyer-**sampled** halo behind the desktop
    poster (not a page-wide wash). Light-only per [ADR 0002](../adr/0002-light-only-no-dark-toggle.md),
    indigo per [ADR 0003](../adr/0003-indigo-canonical-brand.md).
-   _Amended by [ADR 0023](../adr/0023-flyer-derived-event-page-theming.md): this stays the
+   _Amended by [ADR 0027](../adr/0027-flyer-derived-event-page-theming.md): this stays the
    default, but organizers may opt an event page into a flyer-derived wash or dark treatment._
 6. **One canonical public read: `getEventDetail`** owns the event + public-tier shaping in a
    single query — decoupled from `getCheckoutConfig` (slated for rework). Client never sees
