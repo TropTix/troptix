@@ -1,8 +1,8 @@
 ---
 title: Organizer Payout Requests
-status: proposed
+status: active
 created: 2026-08-16
-tracking-issue: TBD
+tracking-issue: '#558'
 ---
 
 # Organizer Payout Requests
@@ -97,6 +97,16 @@ paidOut         = Σ amountCents of PAID requests
 Holdback: **20% for 20 days after the event ends** (constants in one module,
 `packages/api/src/services/_shared/payouts.ts`, next to `fees.ts`). See the
 market comparison below for how this sits against other platforms.
+
+**Custom payout timelines** (decided 2026-09-01, pulled forward from "later
+phase"): three override columns on `Organization`, null meaning platform
+default — `payoutReleaseAtSale` (earnings release as orders complete, before
+the event ends; the holdback still anchors to event end),
+`payoutHoldbackPercent`, and `payoutHoldbackDays`. Paying a trusted organizer
+early works by raising their actual available balance — never by an admin
+bypassing the math — so the ledger and request flow are identical for every
+organizer. A Platform Owner edits the policy via `setPayoutPolicy`. See
+[ADR 0028](../adr/0028-request-based-payouts-with-holdback-release.md).
 
 **Absorbed fees are derived at read time.** The DB only records fees the buyer
 paid: checkout sets `feesCents = 0` for `ABSORB_TICKET_FEES` types
@@ -260,6 +270,11 @@ new seam.
   — sets or clears the matching timestamp. Clearing is allowed (a checkbox
   mis-click shouldn't be permanent), but clearing never invalidates existing
   requests — the gate applies only at request time.
+- `setPayoutPolicy(prisma, actor, { organizationId, releaseAtSale, holdbackPercent, holdbackDays })`
+  — the custom-timeline overrides; null resets to the platform default.
+- `listPayoutOrganizations(prisma, actor)` — the setup panel's list:
+  Organizations with paid ticketing enabled or completed paid orders, with
+  setup state and effective policy.
 
 Contracts in `packages/api/src/contracts/payouts.ts` (zod schemas + types),
 re-exported from `index.ts`. Unit tests beside each service, per convention.
@@ -335,4 +350,5 @@ split:
   v1 shows it in the table only.
 - Holdback constants — **20% / 20 days** (decided 2026-08-17, informed by the
   market comparison). They live in one module, so tuning later is a one-line
-  change; per-organizer overrides (graduated trust) are a later phase.
+  change. Per-organizer overrides landed with v1 (see Custom payout timelines
+  above), so graduated trust is a policy edit, not a schema change.

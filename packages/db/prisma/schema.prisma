@@ -82,9 +82,65 @@ model Organization {
   paidTicketingEnabled     Boolean   @default(false)
   paidTicketingRequestedAt DateTime?
 
-  owner       Users        @relation(fields: [ownerUserId], references: [id])
-  events      Events[]
-  memberships Membership[]
+  // Payout setup (checked off manually by a Platform Owner). Complete when
+  // both are set; gates requesting, never balance visibility.
+  payoutMeetingAt    DateTime?
+  payoutBankLinkedAt DateTime?
+
+  // Payout release policy overrides (graduated trust). Null = platform
+  // defaults (PayoutConfig). releaseAtSale releases earnings as orders
+  // complete instead of at event end; the holdback still anchors to event end.
+  payoutReleaseAtSale   Boolean @default(false)
+  payoutHoldbackPercent Int?
+  payoutHoldbackDays    Int?
+
+  owner          Users           @relation(fields: [ownerUserId], references: [id])
+  events         Events[]
+  memberships    Membership[]
+  payoutRequests PayoutRequest[]
+}
+
+enum PayoutRequestStatus {
+  REQUESTED
+  CANCELLED
+  REJECTED
+  PAID
+}
+
+// Where the money actually moved. MERCURY = manual transfer from the ops
+// account; STRIPE joins when the Global Payouts phase lands (reference = the
+// OutboundPayment id), so the paid-trail schema doesn't change at cutover.
+enum PayoutRail {
+  MERCURY
+  STRIPE
+  OTHER
+}
+
+model PayoutRequest {
+  id          String              @id @default(uuid())
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  status      PayoutRequestStatus @default(REQUESTED)
+  amountCents Int
+  // Organizer's free-text note ("wire to the usual account"). Never bank details.
+  note        String?             @db.VarChar(500)
+
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  // The paid trail: which rail the money left on and the bank's transfer id
+  // (Mercury transaction reference today; OutboundPayment id under Stripe).
+  // Both null unless status is PAID.
+  rail             PayoutRail?
+  reference        String?     @db.VarChar(200)
+  // Admin-side note (context for a payment, reason for a rejection).
+  adminNote        String?     @db.VarChar(500)
+
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  organizationId    String
+  requestedByUserId String
+
+  @@index([organizationId])
+  @@index([status])
 }
 
 // Membership roles (ADR 0024). The Owner is never a row here — the
