@@ -76,11 +76,18 @@ export default function UnifiedHeader() {
   ];
 
   if (userIsPlatformOwner) {
-    organizerNavItems.push({
-      label: 'Platform Events',
-      href: '/organizer/platform/events',
-      icon: Shield,
-    });
+    organizerNavItems.push(
+      {
+        label: 'Platform Events',
+        href: '/organizer/platform/events',
+        icon: Shield,
+      },
+      {
+        label: 'Platform Payouts',
+        href: '/organizer/platform/payouts',
+        icon: Shield,
+      }
+    );
   }
 
   const handleSignOut = async () => {
