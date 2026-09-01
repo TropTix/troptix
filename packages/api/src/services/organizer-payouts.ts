@@ -59,10 +59,11 @@ interface Balances {
 
 /**
  * The ledger read (ADR 0028). Absorbed fees are derived here, not stored:
- * checkout writes feesCents = 0 for ABSORB_TICKET_FEES, so the organizer's
- * cut is subtotal minus a recomputed fee per (type, price) group. Fees are
- * computed against each ticket's own stored subtotal, so price edits never
- * rewrite history.
+ * checkout writes fees = 0 on a priced ticket exactly when the type absorbed
+ * them, so a ticket's own stored (subtotal, fees) pair says which mode it
+ * sold under. Classifying from the immutable ticket row — never the type's
+ * current ticketingFees — means later fee-mode edits, price edits, and type
+ * deletion cannot rewrite history.
  */
 async function computeBalances(
   db: Db,
@@ -83,8 +84,8 @@ async function computeBalances(
       GROUP BY e."id", e."endsAt"
     `,
 
-    // Tickets with a deleted type (ticketTypeId null) drop out of the join and
-    // count as no absorbed fee — the passed-fee default.
+    // fees = 0 on a priced ticket ⇔ sold under ABSORB_TICKET_FEES (a passed
+    // fee is never 0 when subtotal > 0, and free tickets absorb nothing).
     db.$queryRaw<AbsorbedGroupRow[]>`
       SELECT t."eventId" AS "eventId",
              t."subtotal" AS "subtotal",
@@ -92,11 +93,11 @@ async function computeBalances(
       FROM "Tickets" t
       JOIN "Orders" o ON o."id" = t."orderId"
       JOIN "Events" e ON e."id" = t."eventId"
-      JOIN "TicketTypes" tt ON tt."id" = t."ticketTypeId"
       WHERE o."status" = 'COMPLETED'
         AND e."organizationId" = ${organizationId}
         AND e."deletedAt" IS NULL
-        AND tt."ticketingFees" = 'ABSORB_TICKET_FEES'
+        AND COALESCE(t."fees", 0) = 0
+        AND t."subtotal" > 0
       GROUP BY t."eventId", t."subtotal"
     `,
 

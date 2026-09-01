@@ -113,16 +113,16 @@ paid: checkout sets `feesCents = 0` for `ABSORB_TICKET_FEES` types
 ([checkout.ts](../../packages/api/src/services/checkout.ts)), so
 `Orders.feesCents` never contains the absorbed cut. The service therefore:
 
-1. Groups `Tickets` rows of `COMPLETED` orders by `(ticketTypeId, subtotal)` in
-   SQL (per event),
-2. applies `calculateFeesCents` (8% + $0.50) in JS to each group where the
-   type's `ticketingFees = 'ABSORB_TICKET_FEES'`,
+1. Groups `Tickets` rows of `COMPLETED` orders by `subtotal` in SQL (per
+   event), keeping the rows where the stored `fees = 0` and `subtotal > 0` —
+   a priced ticket with no buyer-paid fee is exactly a ticket sold under
+   `ABSORB_TICKET_FEES`,
+2. applies `calculateFeesCents` (8% + $0.50) in JS to each group,
 3. sums.
 
-Tickets whose type was deleted (`ticketTypeId` null) can't be attributed; they
-count as no absorbed fee (the passed-fee default). The fee is computed against
-each ticket's own stored `subtotal`, so later price edits don't rewrite
-history. If `FeeConfig` ever changes, past absorbed fees would drift — accepted
+Classification reads the immutable ticket row, never the type's current
+`ticketingFees`, so later fee-mode edits, price edits, and ticket-type
+deletion don't rewrite history. If `FeeConfig` ever changes, past absorbed fees would drift — accepted
 for v1; the request row snapshots `amountCents` at request time, so anything
 already requested or paid is frozen.
 
