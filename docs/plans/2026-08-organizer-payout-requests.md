@@ -1,0 +1,338 @@
+---
+title: Organizer Payout Requests
+status: proposed
+created: 2026-08-16
+tracking-issue: TBD
+---
+
+# Organizer Payout Requests
+
+Give an Organizer a payouts screen: how much they can withdraw now, what is
+still pending, and what has already been paid. They request a payout; TropTix
+sends the money by hand and marks the request paid on a Platform View screen.
+
+This is the **manual rail**. The Stripe Global Payouts automation (decided
+2026-07-22) replaces the "send money by hand" step later; everything else here
+— the earnings math, the request lifecycle, both screens — carries over
+unchanged. This plan deliberately builds the ledger and the workflow, not the
+money movement.
+
+## Non-goals
+
+- No bank details in the database. The request carries a free-text note; the
+  destination is settled off-platform. (Public repo; no encryption story yet.)
+- No Stripe integration, no automatic transfers.
+- No bank APIs. The transfer itself happens in the bank's own dashboard
+  (Mercury today); the request row records the rail and the transfer
+  reference, and nothing in the codebase talks to the bank.
+- No refund netting — refunds are still unmodeled (`OrderStatus` has no
+  `REFUNDED`). When refunds land, they subtract from earned; the math below
+  has one place to add that term.
+- No currency choice. Everything is USD integer cents, as everywhere else.
+
+## Vocabulary
+
+New terms for CONTEXT.md (added when this ships; the existing **Payout** entry
+gets rewritten — it currently says "not computed"):
+
+- **Earnings** (per order): what the Organizer keeps from a `COMPLETED` order —
+  `subtotalCents` minus **absorbed fees**. Passed fees (`PASS_TICKET_FEES`)
+  ride on top of the subtotal and never touch it; absorbed fees
+  (`ABSORB_TICKET_FEES`) come out of it.
+- **Available**: earnings the Organizer can request right now. An event's
+  earnings enter this bucket when the event **ends**, minus a **holdback**;
+  the holdback joins 20 days after the event ends. Open and paid requests
+  subtract from it.
+- **Pending**: earnings not yet available — sales for events that have not
+  ended, plus holdbacks inside their 20-day window.
+- **Paid out**: the sum of `PAID` payout requests.
+- **Payout request**: the Organizer's ask to withdraw some amount of Available.
+  Lifecycle: `REQUESTED → PAID` (admin marks done) or `→ REJECTED` (admin, with
+  a note) or `→ CANCELLED` (organizer, while still `REQUESTED`).
+- **Payout setup**: the per-Organization checklist that must be complete before
+  the first request — done together with TropTix and checked off manually by a
+  Platform Owner. Distinct from **paid ticketing enabled**: that capability
+  gates _selling_, setup gates _withdrawing_ (one meeting can cover both).
+
+## Payout setup
+
+Two steps, both performed off-platform and checked off by a Platform Owner:
+
+1. **Payout meeting** — the organizer talks to TropTix (terms, timing, the
+   holdback, destination account).
+2. **Bank linked** — the organizer's bank details are collected during setup
+   and entered as a recipient in the ops bank (Mercury). The details live in
+   the bank, never in our database.
+
+Modeled as two timestamps on `Organization` — not a task engine. The
+onboarding plan explicitly deferred a general checklist "until there is a real
+second onboarding task"; this is that task, and two nullable timestamps keep
+the same lightweight shape as `paidTicketingRequestedAt`:
+
+```prisma
+// On Organization — payout setup (checked off manually by a Platform Owner).
+payoutMeetingAt    DateTime?
+payoutBankLinkedAt DateTime?
+```
+
+Setup is complete when both are set. `requestPayout` rejects with
+`PayoutSetupIncompleteError` until then; balances are always visible — on the
+organizer screen the checklist card stands in for the request button until
+setup completes.
+
+## Earnings math
+
+The invariant, per Organization:
+
+```
+earned(event)   = Σ subtotalCents − Σ absorbedFeesCents      over COMPLETED orders
+released        = Σ over ended events:
+                    event ended ≥ 20 days ago → earned(event)
+                    event ended < 20 days ago → earned(event) × (1 − 0.20)
+pending         = Σ earned(not-yet-ended events) + the held-back remainder
+available       = released − Σ amountCents of (REQUESTED + PAID) requests
+paidOut         = Σ amountCents of PAID requests
+```
+
+Holdback: **20% for 20 days after the event ends** (constants in one module,
+`packages/api/src/services/_shared/payouts.ts`, next to `fees.ts`). See the
+market comparison below for how this sits against other platforms.
+
+**Absorbed fees are derived at read time.** The DB only records fees the buyer
+paid: checkout sets `feesCents = 0` for `ABSORB_TICKET_FEES` types
+([checkout.ts](../../packages/api/src/services/checkout.ts)), so
+`Orders.feesCents` never contains the absorbed cut. The service therefore:
+
+1. Groups `Tickets` rows of `COMPLETED` orders by `(ticketTypeId, subtotal)` in
+   SQL (per event),
+2. applies `calculateFeesCents` (8% + $0.50) in JS to each group where the
+   type's `ticketingFees = 'ABSORB_TICKET_FEES'`,
+3. sums.
+
+Tickets whose type was deleted (`ticketTypeId` null) can't be attributed; they
+count as no absorbed fee (the passed-fee default). The fee is computed against
+each ticket's own stored `subtotal`, so later price edits don't rewrite
+history. If `FeeConfig` ever changes, past absorbed fees would drift — accepted
+for v1; the request row snapshots `amountCents` at request time, so anything
+already requested or paid is frozen.
+
+All sums are SQL aggregates per the dashboard convention — nothing reduces over
+full ticket tables in JS beyond the per-(type, price) groups.
+
+## Market comparison
+
+What other platforms do, as of August 2026 (from their help centers and
+published comparisons — links in the PR description):
+
+| Platform      | When money moves                                                                                                        | Holdback / reserve                                                                                                                                           |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Eventbrite    | Automatic, ~3–5 business days after the event ends                                                                      | 20% of net sales held until the final payout; discretionary reserves for risky events. Instant Payouts (early access) for eligible US organizers at a 3% fee |
+| Dice          | Automatic, within 5 business days after the event                                                                       | Up to 5% held for 6 months                                                                                                                                   |
+| TickPick      | Automatic, the Wednesday after the event; weekly "Lightning" payouts during the sale window on request + account review | Case-by-case for early payouts                                                                                                                               |
+| Ticket Tailor | Rolling — money lands in the organizer's own Stripe/Square/PayPal as tickets sell                                       | Whatever the processor's reserve rules are (organizer is merchant of record)                                                                                 |
+| TicketSpice   | Automatic, weekly                                                                                                       | Standard risk holds                                                                                                                                          |
+| Posh          | On-demand, same-night or daily                                                                                          | Varies                                                                                                                                                       |
+
+Patterns worth noting:
+
+- **Pay-after-event is the norm** for merchant-of-record platforms (Eventbrite,
+  Dice, TickPick). The ones that pay during the sale either make the organizer
+  the merchant of record (Ticket Tailor) or price the risk in (Posh, Shotgun,
+  Eventbrite's 3% Instant Payouts).
+- **A reserve on top of pay-after-event is also the norm.** Eventbrite's is
+  exactly 20%; Dice holds up to 5% but for 6 months.
+- **Payouts are usually automatic**, not requested. Request-based is our v1
+  simplification because the transfer itself is manual; when the Stripe rail
+  lands, a scheduled auto-payout can replace the request button without
+  touching the ledger.
+
+TropTix's **20% for 20 days** matches Eventbrite's percentage with a much
+shorter tail than Dice's, and is defensible to organizers by pointing at
+Eventbrite. The chargeback window (typically ~120 days) is far longer than any
+of these holds — every platform accepts that tail risk; ours is bounded by
+graduated trust per organizer rather than the holdback alone.
+
+## Schema
+
+One migration (`yarn db:new payout_requests`):
+
+```prisma
+enum PayoutRequestStatus {
+  REQUESTED
+  CANCELLED
+  REJECTED
+  PAID
+}
+
+// Where the money actually moved. MERCURY = manual transfer from the ops
+// account; STRIPE joins when the Global Payouts phase lands (reference = the
+// OutboundPayment id), so the paid-trail schema doesn't change at cutover.
+enum PayoutRail {
+  MERCURY
+  STRIPE
+  OTHER
+}
+
+model PayoutRequest {
+  id          String              @id @default(uuid())
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  status      PayoutRequestStatus @default(REQUESTED)
+  amountCents Int
+  // Organizer's free-text note ("wire to the usual account"). Never bank details.
+  note        String?             @db.VarChar(500)
+
+  // Set when an admin resolves (PAID or REJECTED).
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  // The paid trail: which rail the money left on and the bank's transfer id
+  // (Mercury transaction reference today; OutboundPayment id under Stripe).
+  // Both null unless status is PAID.
+  rail             PayoutRail?
+  reference        String?     @db.VarChar(200)
+  // Admin-side note (context for a payment, reason for a rejection).
+  adminNote        String?  @db.VarChar(500)
+
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  organizationId    String
+  requestedByUserId String
+
+  @@index([organizationId])
+  @@index([status])
+}
+```
+
+The same migration adds the two payout-setup timestamps to `Organization`
+(above). Requests hang off the **Organization** (money is org-level, ADR
+0019/0024); `requestedByUserId` records who clicked. RLS enabled in the
+migration per the convention; the app connects as bypassrls.
+
+`supabase/seed.sql` additions, so a preview branch can exercise both screens:
+an **ended** event (endsAt in the past, > 20 days) with `COMPLETED` orders
+under the demo Organization, plus one `REQUESTED` and one `PAID`
+`PayoutRequest` row — the paid one with rail + reference filled, so both
+resolution renderings are visible (explicit column lists). The demo
+Organization gets both setup timestamps set (so the request flow is
+exercisable); a second organization with setup incomplete shows the checklist
+state on both screens.
+
+## Service layer
+
+Two services, same shape as the rest of the organizer surface (pure over
+injected `prisma`, authorization via the scope seam):
+
+**`packages/api/src/services/organizer-payouts.ts`**
+
+- `getPayouts(prisma, actor, input)` → `OrganizerPayouts`:
+  `{ availableCents, pendingCents, paidOutCents, setup, requests[] }` where
+  `setup` is `{ meetingDone, bankLinked, complete }`. Scoped through
+  `resolveOrganizerScope` (View-as works, read-only), then
+  `organization.findFirst({ ownerUserId })`.
+- `requestPayout(prisma, actor, { amountCents, note })`: rejects with
+  `PayoutSetupIncompleteError` unless payout setup is complete; recomputes
+  `availableCents` **inside a transaction** and rejects
+  `amountCents > available` or `≤ 0` (`InvalidPayoutAmountError`). At most one
+  open (`REQUESTED`) request per Organization — a second ask fails with
+  `PayoutRequestPendingError`; this keeps the concurrent-request race harmless
+  (two opens can't both pass the one-open check on serialized writes).
+- `cancelPayoutRequest(prisma, actor, { id })`: organizer cancels own
+  `REQUESTED` row.
+- Writes never accept a View-as target, per the seam's rule.
+
+Money is **owner-only** (glossary: Owner = "members and money"): the write
+checks the actor owns the Organization. Today the scope already resolves to
+the owner (Membership v1 is schema-only), so this is one explicit check, not a
+new seam.
+
+**`packages/api/src/services/platform-payouts.ts`**
+
+- `listPayoutRequests(prisma, actor)` — every request, newest first, with
+  organization display name + owner email. Gated on `Users.isPlatformOwner`
+  (the Platform View gate; this is a third door only in the sense that
+  Platform View grows a page — same grant, same gate shape as
+  `getAllPlatformEvents`).
+- `resolvePayoutRequest(prisma, actor, { id, outcome: 'PAID' | 'REJECTED', rail?, reference?, adminNote? })`
+  — flips `REQUESTED → PAID/REJECTED`, stamps `resolvedAt`/`resolvedByUserId`,
+  and on `PAID` records the rail (required, default `MERCURY`) and transfer
+  reference. Guarded `updateMany({ where: { id, status: 'REQUESTED' } })` so a
+  double click or an organizer cancel racing the admin resolves exactly once.
+- `setPayoutSetupStep(prisma, actor, { organizationId, step: 'meeting' | 'bank', done })`
+  — sets or clears the matching timestamp. Clearing is allowed (a checkbox
+  mis-click shouldn't be permanent), but clearing never invalidates existing
+  requests — the gate applies only at request time.
+
+Contracts in `packages/api/src/contracts/payouts.ts` (zod schemas + types),
+re-exported from `index.ts`. Unit tests beside each service, per convention.
+
+## Web UI
+
+**Organizer: `/organizer/payouts`** (server component + server actions, like
+the rest of `/organizer`):
+
+- Three stat cards — Available, Pending, Paid out — same `Card` grid as the
+  dashboard.
+- **Setup checklist card** (shown until setup is complete, in place of the
+  request button): the two steps with done/not-done state — "Meet with
+  TropTix" (with a contact link) and "Connect your bank account" (explains the
+  details are collected during setup and held at the bank, not by TropTix).
+  Read-only for the organizer; TropTix checks steps off.
+- "Request payout" button (setup complete only; disabled at $0 or while a
+  request is open) opening a dialog: amount (default = full available,
+  editable down), optional note, and a line stating the holdback rule so
+  Pending is explicable.
+- Requests table: date, amount, status badge, note, resolution — for `PAID`
+  rows, the date plus "via bank transfer, ref …" so the organizer can match it
+  against their bank statement. `REQUESTED` rows get a Cancel action.
+- Server actions in `_actions/payoutActions.ts` follow `eventActions.ts`:
+  validate, `userToActor`, call service, map typed errors to messages,
+  `revalidatePath`.
+- Nav: add a Payouts link to the organizer nav in `unified-header.tsx`.
+
+**Platform View: `/organizer/platform/payouts`**:
+
+- **Setup panel**: Organizations with paid ticketing enabled or any earnings,
+  each with the two setup checkboxes (meeting held, bank linked). Checking a
+  box stamps the timestamp via `setPayoutSetupStep`; the timestamps render so
+  it doubles as a record of when setup happened.
+- Table of all requests (organization, owner email, amount, note, age,
+  status), `REQUESTED` first. `PAID` rows show rail + reference.
+- Per open row: **Mark paid** and **Reject** (note required). Both confirm
+  before writing.
+- The Mark-paid dialog is the manual-transfer cockpit: the amount and a
+  suggested payee memo (`TropTix payout — <org slug> — <request id prefix>`)
+  as copy-to-clipboard fields, an "Open Mercury" link
+  (`https://app.mercury.com`, plain link — no API, nothing prefilled), a rail
+  select (default `MERCURY`), and a reference field for the bank's transaction
+  id pasted back after sending. Confirming writes the resolve. The memo going
+  out with the transfer and the reference coming back in is what makes the
+  request row and the bank statement reconcile both ways.
+- Page-level gate identical to Platform Events (`notFound()` unless
+  `isPlatformOwner`).
+
+Amounts render with the existing `formatCents`; request timestamps are
+operational timestamps (viewer-local, `<LocalTime>` where client rendering is
+needed).
+
+## Decisions to record
+
+When implementation starts, one ADR: _payouts are request-based over an
+event-end + holdback release rule; money movement is manual and off-platform
+for v1_ — capturing the availability formula and the one-open-request
+constraint, and superseding nothing.
+
+## Phases
+
+Single PR is likely fine (one migration + two services + two screens), but if
+split:
+
+1. Migration + services + contracts + tests + seed.
+2. Organizer screen + actions + nav.
+3. Platform View screen + actions.
+
+## Open questions
+
+- Should a `REJECTED` request notify the organizer by email (outbox pattern)?
+  v1 shows it in the table only.
+- Holdback constants — **20% / 20 days** (decided 2026-08-17, informed by the
+  market comparison). They live in one module, so tuning later is a one-line
+  change; per-organizer overrides (graduated trust) are a later phase.
