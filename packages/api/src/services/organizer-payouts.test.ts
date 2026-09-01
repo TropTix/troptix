@@ -182,6 +182,33 @@ describe('getPayouts — earnings math', () => {
     expect(result.paidOutCents).toBe(3000);
   });
 
+  it('clamps a negative per-event earned at zero', async () => {
+    const { prisma } = fakePrisma({
+      earnedRows: [
+        // 100 × $0.50 absorb tickets: derived fee 54¢ > 50¢ subtotal.
+        { eventId: 'e-cheap', endsAt: daysAgo(30), subtotalCents: 5000n },
+        { eventId: 'e-old', endsAt: daysAgo(30), subtotalCents: 10000n },
+      ],
+      absorbedGroups: [{ eventId: 'e-cheap', subtotal: 0.5, quantity: 100n }],
+    });
+
+    const result = await getPayouts(prisma, OWNER, {}, NOW);
+    expect(result.availableCents).toBe(10000);
+  });
+
+  it('floors available at zero when payouts exceed released earnings', async () => {
+    const { prisma } = fakePrisma({
+      earnedRows: [
+        { eventId: 'e-old', endsAt: daysAgo(30), subtotalCents: 10000n },
+      ],
+      requestSums: [{ status: 'PAID', _sum: { amountCents: 15000 } }],
+    });
+
+    const result = await getPayouts(prisma, OWNER, {}, NOW);
+    expect(result.availableCents).toBe(0);
+    expect(result.paidOutCents).toBe(15000);
+  });
+
   it('releases a live event’s earnings under releaseAtSale', async () => {
     const { prisma } = fakePrisma({
       org: { ...DEFAULT_ORG, payoutReleaseAtSale: true },
@@ -278,12 +305,21 @@ describe('requestPayout', () => {
     expect(result.status).toBe('REQUESTED');
   });
 
-  it('recomputes availability inside a Serializable transaction', async () => {
-    const { prisma } = fakePrisma(withReleased);
-    await requestPayout(prisma, OWNER, { amountCents: 100 }, NOW);
-    expect(
-      (prisma.$transaction as ReturnType<typeof vi.fn>).mock.calls[0][1]
-    ).toEqual({ isolationLevel: 'Serializable' });
+  it('rejects a user with no organization as setup-incomplete', async () => {
+    const { prisma } = fakePrisma({ org: null });
+    await expect(
+      requestPayout(prisma, OWNER, { amountCents: 100 }, NOW)
+    ).rejects.toThrow(PayoutSetupIncompleteError);
+  });
+
+  it('maps a unique-index race (P2002) to the pending-request error', async () => {
+    const { prisma, create } = fakePrisma(withReleased);
+    create.mockRejectedValue(
+      Object.assign(new Error('unique constraint'), { code: 'P2002' })
+    );
+    await expect(
+      requestPayout(prisma, OWNER, { amountCents: 100 }, NOW)
+    ).rejects.toThrow(PayoutRequestPendingError);
   });
 });
 

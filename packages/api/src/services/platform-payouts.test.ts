@@ -262,6 +262,8 @@ describe('listPayoutOrganizations', () => {
         payoutBankLinkedAt: null,
         setup: { meetingDone: true, bankLinked: false, complete: false },
         policy: { holdbackPercent: 20, holdbackDays: 20, releaseAtSale: true },
+        holdbackPercentOverride: null,
+        holdbackDaysOverride: null,
         hasCustomPolicy: true,
       },
     ]);

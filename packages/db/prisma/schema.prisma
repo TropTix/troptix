@@ -139,8 +139,9 @@ model PayoutRequest {
   organizationId    String
   requestedByUserId String
 
+  // The migration also creates a partial unique index (one REQUESTED row per
+  // organizationId) that Prisma cannot express — don't add a plain status index.
   @@index([organizationId])
-  @@index([status])
 }
 
 // Membership roles (ADR 0024). The Owner is never a row here — the

@@ -29,9 +29,11 @@ holds exactly 20%, so the number is defensible to organizers.
 
 **Withdrawal is request-based, at most one open request per Organization.**
 The organizer asks for an amount up to `available`; a Platform Owner marks it
-paid (recording rail + bank reference) or rejects it with a note.
-`requestPayout` recomputes `available` inside a Serializable transaction, so
-the one-open-request check also serializes concurrent asks.
+paid (recording rail + bank reference) or rejects it with a note. The
+one-open-request invariant is a partial unique index (one `REQUESTED` row per
+`organizationId`), so no writer — app code, script, or the future Stripe
+auto-payout — can create a second open request; a lost race surfaces as the
+same pending-request error the pre-check gives.
 
 **Custom payout timelines are per-Organization overrides, not admin bypasses**
 (decided 2026-09-01). Three columns on `Organization` — `payoutReleaseAtSale`

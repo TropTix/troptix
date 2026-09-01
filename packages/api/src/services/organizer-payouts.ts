@@ -118,8 +118,12 @@ async function computeBalances(
   let releasedCents = 0;
   let pendingCents = 0;
   for (const row of earnedRows) {
-    const earned =
-      Number(row.subtotalCents) - (absorbedByEvent.get(row.eventId) ?? 0);
+    // Clamped: a cheap absorb tier can derive a fee above its own subtotal,
+    // and one event's deficit must not drain the others' earnings.
+    const earned = Math.max(
+      0,
+      Number(row.subtotalCents) - (absorbedByEvent.get(row.eventId) ?? 0)
+    );
     const split = releaseEarnings(earned, row.endsAt, policy, now);
     releasedCents += split.releasedCents;
     pendingCents += split.pendingCents;
@@ -131,7 +135,12 @@ async function computeBalances(
 
   return {
     releasedCents,
-    availableCents: releasedCents - sumFor('REQUESTED') - paidOutCents,
+    // Floored: released can shrink after money moved (an event soft-deleted,
+    // a policy tightened) — show $0 and block requests, never a negative.
+    availableCents: Math.max(
+      0,
+      releasedCents - sumFor('REQUESTED') - paidOutCents
+    ),
     pendingCents,
     paidOutCents,
   };
@@ -220,8 +229,11 @@ export async function getPayouts(
 
 /**
  * Owner-only (Owner = "members and money"); never accepts a View-as target.
- * Availability is recomputed inside a Serializable transaction so two
- * concurrent asks can't both pass the one-open-request check.
+ * The one-open-request invariant is the partial unique index (one REQUESTED
+ * row per organizationId): concurrent asks race to the insert and the loser's
+ * P2002 maps to the pending-request error, so no isolation level is needed.
+ * A no-org user gets PayoutSetupIncompleteError — no Organization certainly
+ * means setup never happened, and the message points at the fix.
  */
 export async function requestPayout(
   prisma: PrismaClient,
@@ -233,54 +245,49 @@ export async function requestPayout(
     throw new UnauthorizedError('Sign in to request a payout');
   }
 
-  const created = await prisma.$transaction(
-    async (tx) => {
-      const org = await tx.organization.findFirst({
-        where: { ownerUserId: actor.userId },
-        select: ORG_PAYOUT_SELECT,
-      });
-      if (!org) {
-        throw new NotFoundError('No organization for this user');
-      }
-      if (!toSetupState(org).complete) {
-        throw new PayoutSetupIncompleteError();
-      }
+  const org = await prisma.organization.findFirst({
+    where: { ownerUserId: actor.userId },
+    select: ORG_PAYOUT_SELECT,
+  });
+  if (!org || !toSetupState(org).complete) {
+    throw new PayoutSetupIncompleteError();
+  }
 
-      const open = await tx.payoutRequest.count({
-        where: { organizationId: org.id, status: 'REQUESTED' },
-      });
-      if (open > 0) {
-        throw new PayoutRequestPendingError();
-      }
+  const open = await prisma.payoutRequest.count({
+    where: { organizationId: org.id, status: 'REQUESTED' },
+  });
+  if (open > 0) {
+    throw new PayoutRequestPendingError();
+  }
 
-      const balances = await computeBalances(
-        tx,
-        org.id,
-        resolvePayoutPolicy(org),
-        now
-      );
-      if (
-        input.amountCents <= 0 ||
-        input.amountCents > balances.availableCents
-      ) {
-        throw new InvalidPayoutAmountError(
-          'Requested amount exceeds the available balance'
-        );
-      }
-
-      return tx.payoutRequest.create({
-        data: {
-          organizationId: org.id,
-          requestedByUserId: actor.userId,
-          amountCents: input.amountCents,
-          note: input.note?.trim() || null,
-        },
-      });
-    },
-    { isolationLevel: 'Serializable' }
+  const balances = await computeBalances(
+    prisma,
+    org.id,
+    resolvePayoutPolicy(org),
+    now
   );
+  if (input.amountCents <= 0 || input.amountCents > balances.availableCents) {
+    throw new InvalidPayoutAmountError(
+      'Requested amount exceeds the available balance'
+    );
+  }
 
-  return toRequestDto(created);
+  try {
+    const created = await prisma.payoutRequest.create({
+      data: {
+        organizationId: org.id,
+        requestedByUserId: actor.userId,
+        amountCents: input.amountCents,
+        note: input.note?.trim() || null,
+      },
+    });
+    return toRequestDto(created);
+  } catch (err) {
+    if ((err as { code?: string }).code === 'P2002') {
+      throw new PayoutRequestPendingError();
+    }
+    throw err;
+  }
 }
 
 export async function cancelPayoutRequest(

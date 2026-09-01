@@ -31,7 +31,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { formatCents, getDateFormatter } from '@/lib/dateUtils';
+import { formatCents } from '@/lib/dateUtils';
+import { LocalTime } from '@/components/LocalTime';
 import { resolvePayoutRequest } from '../_actions/platformPayoutActions';
 
 const STATUS_VARIANTS = {
@@ -107,7 +108,7 @@ function RequestRow({ request }: { request: PlatformPayoutRequest }) {
           {request.note ?? '—'}
         </TableCell>
         <TableCell className="text-muted-foreground">
-          {getDateFormatter(new Date(request.createdAt), 'MMM d, yyyy')}
+          <LocalTime at={request.createdAt} />
         </TableCell>
         <TableCell>
           <Badge variant={STATUS_VARIANTS[request.status]}>

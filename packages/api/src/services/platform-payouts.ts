@@ -7,31 +7,10 @@ import type {
   SetPayoutPolicyInput,
   SetPayoutSetupStepInput,
 } from '../contracts/payouts';
-import {
-  ConflictError,
-  NotFoundError,
-  UnauthorizedError,
-} from './_shared/errors';
+import { ConflictError, NotFoundError } from './_shared/errors';
 import { resolvePayoutPolicy } from './_shared/payouts';
 import { toRequestDto } from './organizer-payouts';
-
-/** The Platform View gate (`Users.isPlatformOwner`) — same grant as Platform Events. */
-async function requirePlatformOwner(
-  prisma: PrismaClient,
-  actor: Actor
-): Promise<string> {
-  if (actor.kind !== 'user') {
-    throw new UnauthorizedError();
-  }
-  const user = await prisma.users.findUnique({
-    where: { id: actor.userId },
-    select: { isPlatformOwner: true },
-  });
-  if (!user?.isPlatformOwner) {
-    throw new UnauthorizedError();
-  }
-  return actor.userId;
-}
+import { requirePlatformOwner } from './organizer-scope';
 
 export async function listPayoutRequests(
   prisma: PrismaClient,
@@ -182,6 +161,8 @@ export async function listPayoutOrganizations(
       payoutBankLinkedAt: org.payoutBankLinkedAt?.toISOString() ?? null,
       setup: { meetingDone, bankLinked, complete: meetingDone && bankLinked },
       policy: resolvePayoutPolicy(org),
+      holdbackPercentOverride: org.payoutHoldbackPercent,
+      holdbackDaysOverride: org.payoutHoldbackDays,
       hasCustomPolicy:
         org.payoutReleaseAtSale ||
         org.payoutHoldbackPercent !== null ||

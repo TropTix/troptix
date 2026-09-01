@@ -19,7 +19,7 @@ An Organization-level capability (`Organization.paidTicketingEnabled`) that perm
 An Organization-level **trust tick** (`Organization.verified`), admin-granted, attendee-facing — signals an established/trusted brand. **Orthogonal to `paidTicketingEnabled`**: a brand can be verified through a track record of free events without being approved to sell paid, and vice versa. _Avoid_: conflating with paid-ticketing approval.
 
 **Platform Owner**:
-A member of the TropTix team with cross-organizer visibility, used to debug and observe what any Organizer sees. A platform capability, distinct from Organizer — a Platform Owner is not "an Organizer with extra rights." Identified by the explicit `Users.isPlatformOwner` grant (ADR 0024) — never inferred from an email; the grant is spent in exactly two places, the Platform View gate and View-as. _Avoid_: super-user, staff, **admin** (unqualified "Admin" always means the Organization role, never platform staff).
+A member of the TropTix team with cross-organizer visibility, used to debug and observe what any Organizer sees. A platform capability, distinct from Organizer — a Platform Owner is not "an Organizer with extra rights." Identified by the explicit `Users.isPlatformOwner` grant (ADR 0024) — never inferred from an email; the grant is spent in exactly two places, the Platform View gate and View-as, and every service-layer check goes through `organizer-scope.ts` (`requirePlatformOwner`) so the grant has one implementation. _Avoid_: super-user, staff, **admin** (unqualified "Admin" always means the Organization role, never platform staff).
 
 **Promoter**:
 A `Role` that exists in the enum but is currently unmodeled (no granted scopes yet). Deferred to the role×permission matrix (ADR 0013 successor).

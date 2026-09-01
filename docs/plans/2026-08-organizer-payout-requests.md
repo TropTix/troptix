@@ -240,11 +240,11 @@ injected `prisma`, authorization via the scope seam):
   `organization.findFirst({ ownerUserId })`.
 - `requestPayout(prisma, actor, { amountCents, note })`: rejects with
   `PayoutSetupIncompleteError` unless payout setup is complete; recomputes
-  `availableCents` **inside a transaction** and rejects
-  `amountCents > available` or `≤ 0` (`InvalidPayoutAmountError`). At most one
-  open (`REQUESTED`) request per Organization — a second ask fails with
-  `PayoutRequestPendingError`; this keeps the concurrent-request race harmless
-  (two opens can't both pass the one-open check on serialized writes).
+  `availableCents` and rejects `amountCents > available` or `≤ 0`
+  (`InvalidPayoutAmountError`). At most one open (`REQUESTED`) request per
+  Organization — enforced by a partial unique index in the migration, so a
+  second ask fails with `PayoutRequestPendingError` whether it loses the
+  pre-check or the insert race.
 - `cancelPayoutRequest(prisma, actor, { id })`: organizer cancels own
   `REQUESTED` row.
 - Writes never accept a View-as target, per the seam's rule.

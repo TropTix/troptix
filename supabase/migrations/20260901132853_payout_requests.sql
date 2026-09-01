@@ -38,8 +38,14 @@ CREATE TABLE "PayoutRequest" (
 -- CreateIndex
 CREATE INDEX "PayoutRequest_organizationId_idx" ON "PayoutRequest"("organizationId");
 
--- CreateIndex
-CREATE INDEX "PayoutRequest_status_idx" ON "PayoutRequest"("status");
+-- At most one open request per Organization — enforced here so no writer
+-- (app, script, or the future Stripe auto-payout) can create a second one.
+-- Partial indexes aren't expressible in schema.prisma; this is the one
+-- authority. It also serves the open-request lookups that would have used a
+-- status index.
+CREATE UNIQUE INDEX "PayoutRequest_one_open_per_org"
+  ON "PayoutRequest"("organizationId")
+  WHERE status = 'REQUESTED';
 
 -- AddForeignKey
 ALTER TABLE "PayoutRequest" ADD CONSTRAINT "PayoutRequest_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

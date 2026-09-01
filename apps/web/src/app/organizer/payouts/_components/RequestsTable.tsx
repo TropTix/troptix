@@ -14,7 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatCents, getDateFormatter } from '@/lib/dateUtils';
+import { formatCents } from '@/lib/dateUtils';
+import { LocalTime } from '@/components/LocalTime';
 import { cancelPayoutRequest } from '../_actions/payoutActions';
 
 const STATUS_VARIANTS = {
@@ -96,7 +97,7 @@ function RequestRow({
   return (
     <TableRow>
       <TableCell>
-        {getDateFormatter(new Date(request.createdAt), 'MMM d, yyyy')}
+        <LocalTime at={request.createdAt} />
       </TableCell>
       <TableCell className="font-medium">
         {formatCents(request.amountCents)}
@@ -131,10 +132,8 @@ function Resolution({ request }: { request: OrganizerPayoutRequest }) {
   if (request.status === 'PAID') {
     return (
       <span className="text-sm text-muted-foreground">
-        {request.resolvedAt
-          ? getDateFormatter(new Date(request.resolvedAt), 'MMM d, yyyy')
-          : ''}{' '}
-        via bank transfer
+        {request.resolvedAt && <LocalTime at={request.resolvedAt} />} via bank
+        transfer
         {request.reference ? `, ref ${request.reference}` : ''}
       </span>
     );

@@ -114,6 +114,9 @@ export const payoutOrganizationSchema = z.object({
   payoutBankLinkedAt: z.string().datetime().nullable(),
   setup: payoutSetupStateSchema,
   policy: payoutPolicySchema,
+  /** The raw overrides — null means the org follows the platform default. */
+  holdbackPercentOverride: z.number().int().nullable(),
+  holdbackDaysOverride: z.number().int().nullable(),
   hasCustomPolicy: z.boolean(),
 });
 export type PayoutOrganization = z.infer<typeof payoutOrganizationSchema>;

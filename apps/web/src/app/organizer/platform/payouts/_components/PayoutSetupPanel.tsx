@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { getDateFormatter } from '@/lib/dateUtils';
+import { LocalTime } from '@/components/LocalTime';
 import {
   setPayoutPolicy,
   setPayoutSetupStep,
@@ -144,7 +144,7 @@ function SetupToggle({
         <p className="text-sm">{label}</p>
         {checkedAt && (
           <p className="text-xs text-muted-foreground">
-            {getDateFormatter(new Date(checkedAt), 'MMM d, yyyy')}
+            <LocalTime at={checkedAt} />
           </p>
         )}
       </div>
@@ -159,22 +159,42 @@ function PolicyEditor({
   org: PayoutOrganization;
   onDone: () => void;
 }) {
+  // Inputs hold the raw overrides — an empty field means "platform default"
+  // and saves as null, so a defaults org never gets pinned to today's numbers.
   const [releaseAtSale, setReleaseAtSale] = useState(org.policy.releaseAtSale);
-  const [percent, setPercent] = useState(String(org.policy.holdbackPercent));
-  const [days, setDays] = useState(String(org.policy.holdbackDays));
+  const [percent, setPercent] = useState(
+    org.holdbackPercentOverride === null
+      ? ''
+      : String(org.holdbackPercentOverride)
+  );
+  const [days, setDays] = useState(
+    org.holdbackDaysOverride === null ? '' : String(org.holdbackDaysOverride)
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const save = (input: {
-    releaseAtSale: boolean;
-    holdbackPercent: number | null;
-    holdbackDays: number | null;
-  }) =>
+  const parseOverride = (raw: string, max: number): number | null | false => {
+    if (raw.trim() === '') return null;
+    const value = Number.parseInt(raw, 10);
+    return Number.isInteger(value) && value >= 0 && value <= max
+      ? value
+      : false;
+  };
+
+  const submit = () => {
+    const holdbackPercent = parseOverride(percent, 100);
+    const holdbackDays = parseOverride(days, 365);
+    if (holdbackPercent === false || holdbackDays === false) {
+      setError('Holdback must be 0–100% and 0–365 days, or blank for default.');
+      return;
+    }
     startTransition(async () => {
       setError(null);
       const result = await setPayoutPolicy({
         organizationId: org.id,
-        ...input,
+        releaseAtSale,
+        holdbackPercent,
+        holdbackDays,
       });
       if (result.success) {
         onDone();
@@ -182,22 +202,6 @@ function PolicyEditor({
         setError(result.error ?? 'Something went wrong.');
       }
     });
-
-  const submit = () => {
-    const holdbackPercent = Number.parseInt(percent, 10);
-    const holdbackDays = Number.parseInt(days, 10);
-    if (
-      !Number.isInteger(holdbackPercent) ||
-      holdbackPercent < 0 ||
-      holdbackPercent > 100 ||
-      !Number.isInteger(holdbackDays) ||
-      holdbackDays < 0 ||
-      holdbackDays > 365
-    ) {
-      setError('Holdback must be 0–100% and 0–365 days.');
-      return;
-    }
-    save({ releaseAtSale, holdbackPercent, holdbackDays });
   };
 
   return (
@@ -217,10 +221,11 @@ function PolicyEditor({
           <Label htmlFor={`pct-${org.id}`}>Holdback %</Label>
           <Input
             id={`pct-${org.id}`}
-            className="w-24"
+            className="w-28"
             type="number"
             min={0}
             max={100}
+            placeholder="default"
             value={percent}
             onChange={(event) => setPercent(event.target.value)}
           />
@@ -229,30 +234,17 @@ function PolicyEditor({
           <Label htmlFor={`days-${org.id}`}>Holdback days</Label>
           <Input
             id={`days-${org.id}`}
-            className="w-24"
+            className="w-28"
             type="number"
             min={0}
             max={365}
+            placeholder="default"
             value={days}
             onChange={(event) => setDays(event.target.value)}
           />
         </div>
         <Button size="sm" disabled={isPending} onClick={submit}>
           {isPending ? 'Saving…' : 'Save timeline'}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={isPending}
-          onClick={() =>
-            save({
-              releaseAtSale: false,
-              holdbackPercent: null,
-              holdbackDays: null,
-            })
-          }
-        >
-          Reset to defaults
         </Button>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}

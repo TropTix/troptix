@@ -26,8 +26,9 @@ export default async function PlatformPayoutsPage() {
     listPayoutOrganizations(prisma, actor),
   ]);
 
-  const openFirst = [...requests].sort((a, b) =>
-    a.status === b.status ? 0 : a.status === 'REQUESTED' ? -1 : 1
+  const rank = (status: string) => (status === 'REQUESTED' ? 0 : 1);
+  const openFirst = [...requests].sort(
+    (a, b) => rank(a.status) - rank(b.status)
   );
 
   return (
