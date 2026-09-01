@@ -23,6 +23,12 @@ export default async function OrganizerPayoutsPage({
   const actor = await requireOrganizerActor();
   const { viewAs } = await searchParams;
 
+  // Writes never take a View-as target (the seam's rule), so the write
+  // controls disappear when viewing another organizer — they would act on the
+  // viewer's own organization, not the one on screen.
+  const readOnly =
+    Boolean(viewAs) && (actor.kind !== 'user' || viewAs !== actor.userId);
+
   const payouts = await getPayouts(prisma, actor, {
     viewAsOrganizerUserId: viewAs,
   });
@@ -62,16 +68,18 @@ export default async function OrganizerPayoutsPage({
       </section>
 
       {setup.complete ? (
-        <RequestPayoutCard
-          availableCents={payouts.availableCents}
-          hasOpenRequest={hasOpenRequest}
-          holdbackLine={holdbackLine}
-        />
+        !readOnly && (
+          <RequestPayoutCard
+            availableCents={payouts.availableCents}
+            hasOpenRequest={hasOpenRequest}
+            holdbackLine={holdbackLine}
+          />
+        )
       ) : (
         <SetupChecklistCard setup={setup} />
       )}
 
-      <RequestsTable requests={payouts.requests} />
+      <RequestsTable requests={payouts.requests} readOnly={readOnly} />
     </div>
   );
 }

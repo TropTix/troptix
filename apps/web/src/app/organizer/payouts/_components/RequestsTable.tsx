@@ -33,8 +33,10 @@ const STATUS_LABELS = {
 
 export function RequestsTable({
   requests,
+  readOnly = false,
 }: {
   requests: OrganizerPayoutRequest[];
+  readOnly?: boolean;
 }) {
   return (
     <Card>
@@ -59,7 +61,11 @@ export function RequestsTable({
             </TableHeader>
             <TableBody>
               {requests.map((request) => (
-                <RequestRow key={request.id} request={request} />
+                <RequestRow
+                  key={request.id}
+                  request={request}
+                  readOnly={readOnly}
+                />
               ))}
             </TableBody>
           </Table>
@@ -69,7 +75,13 @@ export function RequestsTable({
   );
 }
 
-function RequestRow({ request }: { request: OrganizerPayoutRequest }) {
+function RequestRow({
+  request,
+  readOnly,
+}: {
+  request: OrganizerPayoutRequest;
+  readOnly: boolean;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -100,7 +112,7 @@ function RequestRow({ request }: { request: OrganizerPayoutRequest }) {
       <TableCell>
         <Resolution request={request} />
         {error && <p className="text-xs text-destructive">{error}</p>}
-        {request.status === 'REQUESTED' && (
+        {request.status === 'REQUESTED' && !readOnly && (
           <Button
             variant="ghost"
             size="sm"
