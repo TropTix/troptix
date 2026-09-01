@@ -322,12 +322,16 @@ function CopyField({
   value: string;
   wide?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [result, setResult] = useState<'copied' | 'failed' | null>(null);
 
   const copy = async () => {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(value);
+      setResult('copied');
+    } catch {
+      setResult('failed');
+    }
+    setTimeout(() => setResult(null), 2000);
   };
 
   return (
@@ -338,9 +342,14 @@ function CopyField({
         <Button variant="outline" size="icon" onClick={copy} title="Copy">
           <Copy className="h-3.5 w-3.5" />
         </Button>
-        {copied && (
+        {result === 'copied' && (
           <span className="self-center text-xs text-muted-foreground">
             Copied
+          </span>
+        )}
+        {result === 'failed' && (
+          <span className="self-center text-xs text-destructive">
+            Copy failed — select the field and copy by hand
           </span>
         )}
       </div>
