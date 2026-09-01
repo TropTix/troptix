@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -10,11 +13,32 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCents } from '@/lib/dateUtils';
 import { requestPayout } from '../_actions/payoutActions';
+
+const formSchema = (availableCents: number) =>
+  z.object({
+    amount: z.coerce
+      .number({ invalid_type_error: 'Enter an amount.' })
+      .positive('Enter an amount above $0.')
+      .refine(
+        (dollars) => Math.round(dollars * 100) <= availableCents,
+        'The amount is more than your available balance.'
+      ),
+    note: z.string().trim().max(500).optional(),
+  });
+
+type FormValues = z.infer<ReturnType<typeof formSchema>>;
 
 export function RequestPayoutCard({
   availableCents,
@@ -26,34 +50,29 @@ export function RequestPayoutCard({
   holdbackLine: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState((availableCents / 100).toFixed(2));
-  const [note, setNote] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const disabled = hasOpenRequest || availableCents <= 0;
-  const amountCents = Math.round(Number.parseFloat(amount || '0') * 100);
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema(availableCents)),
+    defaultValues: { amount: availableCents / 100, note: '' },
+  });
 
-  const submit = () => {
-    setError(null);
-    if (!Number.isFinite(amountCents) || amountCents <= 0) {
-      setError('Enter an amount above $0.');
-      return;
-    }
-    if (amountCents > availableCents) {
-      setError('The amount is more than your available balance.');
-      return;
-    }
+  const disabled = hasOpenRequest || availableCents <= 0;
+  const amount = form.watch('amount');
+  const amountCents = Math.round(Number(amount || 0) * 100);
+
+  const submit = (values: FormValues) => {
+    setServerError(null);
     startTransition(async () => {
       const result = await requestPayout({
-        amountCents,
-        note: note.trim() || undefined,
+        amountCents: Math.round(values.amount * 100),
+        note: values.note || undefined,
       });
       if (result.success) {
         setOpen(false);
-        setNote('');
       } else {
-        setError(result.error ?? 'Something went wrong.');
+        setServerError(result.error ?? 'Something went wrong.');
       }
     });
   };
@@ -73,7 +92,8 @@ export function RequestPayoutCard({
           <Button
             disabled={disabled}
             onClick={() => {
-              setAmount((availableCents / 100).toFixed(2));
+              form.reset({ amount: availableCents / 100, note: '' });
+              setServerError(null);
               setOpen(true);
             }}
           >
@@ -83,50 +103,71 @@ export function RequestPayoutCard({
       </CardHeader>
 
       {open && (
-        <CardContent className="space-y-4">
-          <div className="grid gap-2 sm:max-w-xs">
-            <Label htmlFor="payout-amount">
-              Amount (up to {formatCents(availableCents)})
-            </Label>
-            <Input
-              id="payout-amount"
-              type="number"
-              inputMode="decimal"
-              min="0.01"
-              step="0.01"
-              max={(availableCents / 100).toFixed(2)}
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-            />
-          </div>
-          <div className="grid gap-2 sm:max-w-md">
-            <Label htmlFor="payout-note">Note (optional)</Label>
-            <Textarea
-              id="payout-note"
-              placeholder="Anything the TropTix team should know"
-              maxLength={500}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex gap-2">
-            <Button disabled={isPending} onClick={submit}>
-              {isPending
-                ? 'Requesting…'
-                : `Request ${formatCents(amountCents)}`}
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={isPending}
-              onClick={() => {
-                setOpen(false);
-                setError(null);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(submit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem className="sm:max-w-xs">
+                    <FormLabel>
+                      Amount (up to {formatCents(availableCents)})
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        max={(availableCents / 100).toFixed(2)}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="note"
+                render={({ field }) => (
+                  <FormItem className="sm:max-w-md">
+                    <FormLabel>Note (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Anything the TropTix team should know"
+                        maxLength={500}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {serverError && (
+                <p className="text-sm text-destructive">{serverError}</p>
+              )}
+              <div className="flex gap-2">
+                <Button type="submit" disabled={isPending}>
+                  {isPending
+                    ? 'Requesting…'
+                    : `Request ${formatCents(amountCents)}`}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={isPending}
+                  onClick={() => {
+                    setOpen(false);
+                    setServerError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </Form>
         </CardContent>
       )}
     </Card>

@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Copy, ExternalLink } from 'lucide-react';
 import type { PayoutRailDto, PlatformPayoutRequest } from '@troptix/api';
 
@@ -13,6 +16,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -263,6 +274,14 @@ function MarkPaidPanel({
   );
 }
 
+const rejectSchema = z.object({
+  adminNote: z
+    .string()
+    .trim()
+    .min(1, 'A reason is required — the organizer sees it.')
+    .max(500),
+});
+
 function RejectPanel({
   request,
   onDone,
@@ -270,46 +289,57 @@ function RejectPanel({
   request: PlatformPayoutRequest;
   onDone: () => void;
 }) {
-  const [note, setNote] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const confirm = () =>
+  const form = useForm<z.infer<typeof rejectSchema>>({
+    resolver: zodResolver(rejectSchema),
+    defaultValues: { adminNote: '' },
+  });
+
+  const confirm = (values: z.infer<typeof rejectSchema>) => {
+    setServerError(null);
     startTransition(async () => {
       const result = await resolvePayoutRequest({
         id: request.id,
         outcome: 'REJECTED',
-        adminNote: note.trim(),
+        adminNote: values.adminNote,
       });
       if (result.success) {
         onDone();
       } else {
-        setError(result.error ?? 'Something went wrong.');
+        setServerError(result.error ?? 'Something went wrong.');
       }
     });
+  };
 
   return (
-    <div className="space-y-3 rounded-lg bg-muted/40 p-4">
-      <div className="grid gap-1.5 sm:max-w-md">
-        <Label htmlFor={`reject-${request.id}`}>
-          Reason (shown to the organizer)
-        </Label>
-        <Textarea
-          id={`reject-${request.id}`}
-          maxLength={500}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-        />
-      </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      <Button
-        variant="destructive"
-        disabled={isPending || !note.trim()}
-        onClick={confirm}
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(confirm)}
+        className="space-y-3 rounded-lg bg-muted/40 p-4"
       >
-        {isPending ? 'Saving…' : 'Confirm rejection'}
-      </Button>
-    </div>
+        <FormField
+          control={form.control}
+          name="adminNote"
+          render={({ field }) => (
+            <FormItem className="sm:max-w-md">
+              <FormLabel>Reason (shown to the organizer)</FormLabel>
+              <FormControl>
+                <Textarea maxLength={500} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {serverError && (
+          <p className="text-sm text-destructive">{serverError}</p>
+        )}
+        <Button type="submit" variant="destructive" disabled={isPending}>
+          {isPending ? 'Saving…' : 'Confirm rejection'}
+        </Button>
+      </form>
+    </Form>
   );
 }
 
