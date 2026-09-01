@@ -33,11 +33,26 @@ values ('seed_staff_1', now(), now(), 'demo-staff@troptix.test', 'Demo Staff', '
 
 -- Demo organizer's Organization (brand). Approved for paid ticketing to match
 -- the paid festival below (seed_event_1); not verified.
+-- Payout setup complete (both timestamps set) so the request flow is exercisable.
+insert into public."Organization" (
+  id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
+  verified, "paidTicketingEnabled", "payoutMeetingAt", "payoutBankLinkedAt"
+) values (
+  'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer', 'seed_org_1',
+  false, true, now() - interval '40 days', now() - interval '40 days'
+);
+
+-- A second organization with payout setup INCOMPLETE, so both payout screens
+-- show the checklist state (organizer sees the checklist card; Platform View
+-- shows unchecked boxes).
+insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
+values ('seed_org_2', now(), now(), 'demo-organizer-2@troptix.test', 'Island Nights', 'Island', 'Nights', 'ORGANIZER');
+
 insert into public."Organization" (
   id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
   verified, "paidTicketingEnabled"
 ) values (
-  'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer', 'seed_org_1',
+  'seed_organization_2', now(), now(), 'island-nights', 'Island Nights', 'seed_org_2',
   false, true
 );
 
@@ -118,3 +133,96 @@ insert into public."TicketTypes" (
 
   -- seed_event_4: private event still sells by direct link
   ('seed_tt_priv',   'PAID', now(), now(), 'Invite Ticket', 'For link holders',        10, 150, 0,  0, now(), '2026-10-10 20:00:00', 35.00, 3500, 'PASS_TICKET_FEES', null, 'seed_event_4');
+
+-- ── Payout fixtures (docs/plans/2026-08-organizer-payout-requests.md) ────────
+-- Two ENDED events with COMPLETED orders give the demo org every balance
+-- bucket: seed_event_5 ended > 20 days ago (fully released, holdback over);
+-- seed_event_6 ended 5 days ago (80% released, 20% still held → Pending).
+-- Relative dates (now() - interval) so the fixture never goes stale.
+
+insert into public."Events" (
+  id, "createdAt", "updatedAt", "isDraft", "isPrivate", name, description, summary,
+  organizer, "organizerUserId", "startsAt", "endsAt",
+  venue, address, country, "countryCode", "organizationId",
+  "pageTheme", "flyerPalette"
+) values
+  (
+    'seed_event_5', now() - interval '60 days', now(), false, false,
+    'TropTix Carnival Closing', 'An ended paid event with sales, for the payouts ledger.', 'Ended > 20 days ago — fully released',
+    'Demo Organizer', 'seed_org_1',
+    now() - interval '30 days 5 hours', now() - interval '30 days',
+    'Demo Waterfront', '2 Harbour Walk, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
+    'off', null
+  ),
+  (
+    'seed_event_6', now() - interval '45 days', now(), false, false,
+    'TropTix Sunset Session', 'A recently ended paid event, for the payouts holdback window.', 'Ended 5 days ago — holdback still held',
+    'Demo Organizer', 'seed_org_1',
+    now() - interval '5 days 4 hours', now() - interval '5 days',
+    'Demo Rooftop', '18 Skyline Terrace, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
+    'off', null
+  );
+
+-- seed_event_5 mixes fee modes so the derived absorbed-fee math is visible:
+-- GA passes fees to the buyer; VIP absorbs them (feesCents stored as 0, the
+-- organizer's cut computed at read time).
+insert into public."TicketTypes" (
+  id, "ticketType", "createdAt", "updatedAt", name, description,
+  "maxPurchasePerUser", capacity, reserved, sold,
+  "saleStartsAt", "saleEndsAt",
+  price, "priceCents", "ticketingFees", "discountCode", "eventId"
+) values
+  ('seed_tt_past_ga',  'PAID', now() - interval '60 days', now(), 'General Admission', 'Standard entry', 10, 200, 0, 3, now() - interval '60 days', now() - interval '30 days 5 hours', 40.00, 4000, 'PASS_TICKET_FEES',   null, 'seed_event_5'),
+  ('seed_tt_past_vip', 'PAID', now() - interval '60 days', now(), 'VIP',               'Fees absorbed',   4,  50, 0, 2, now() - interval '60 days', now() - interval '30 days 5 hours', 50.00, 5000, 'ABSORB_TICKET_FEES', null, 'seed_event_5'),
+  ('seed_tt_recent',   'PAID', now() - interval '45 days', now(), 'General Admission', 'Standard entry', 10, 150, 0, 2, now() - interval '45 days', now() - interval '5 days 4 hours',  30.00, 3000, 'PASS_TICKET_FEES',   null, 'seed_event_6');
+
+-- Completed orders. Money columns: integer-cents are canonical; the legacy
+-- Float dollars mirror them (the ledger falls back to subtotal * 100 when
+-- subtotalCents is null, so keeping both in sync mimics real checkout rows).
+insert into public."Orders" (
+  id, "createdAt", "updatedAt", status, type,
+  total, subtotal, fees, "totalCents", "subtotalCents", "feesCents",
+  name, "firstName", "lastName", email, "eventId"
+) values
+  -- 3 × GA @ $40.00, fees passed: 3 × (8% × 4000 + 50) = 1110.
+  ('seed_order_1', now() - interval '35 days', now(), 'COMPLETED', 'PAID',
+   131.10, 120.00, 11.10, 13110, 12000, 1110,
+   'Pat Buyer', 'Pat', 'Buyer', 'pat.buyer@troptix.test', 'seed_event_5'),
+  -- 2 × VIP @ $50.00, fees absorbed: buyer pays face value, feesCents 0.
+  ('seed_order_2', now() - interval '33 days', now(), 'COMPLETED', 'PAID',
+   100.00, 100.00, 0.00, 10000, 10000, 0,
+   'Sam Guest', 'Sam', 'Guest', 'sam.guest@troptix.test', 'seed_event_5'),
+  -- 2 × GA @ $30.00, fees passed: 2 × (8% × 3000 + 50) = 580.
+  ('seed_order_3', now() - interval '8 days', now(), 'COMPLETED', 'PAID',
+   65.80, 60.00, 5.80, 6580, 6000, 580,
+   'Ali Fan', 'Ali', 'Fan', 'ali.fan@troptix.test', 'seed_event_6');
+
+insert into public."Tickets" (
+  id, "createdAt", "updatedAt", status, "ticketsType",
+  subtotal, fees, total, "firstName", "lastName", email,
+  "eventId", "orderId", "ticketTypeId"
+) values
+  ('seed_ticket_1', now() - interval '35 days', now(), 'VALID', 'PAID', 40.00, 3.70, 43.70, 'Pat', 'Buyer', 'pat.buyer@troptix.test', 'seed_event_5', 'seed_order_1', 'seed_tt_past_ga'),
+  ('seed_ticket_2', now() - interval '35 days', now(), 'VALID', 'PAID', 40.00, 3.70, 43.70, 'Pat', 'Buyer', 'pat.buyer@troptix.test', 'seed_event_5', 'seed_order_1', 'seed_tt_past_ga'),
+  ('seed_ticket_3', now() - interval '35 days', now(), 'VALID', 'PAID', 40.00, 3.70, 43.70, 'Pat', 'Buyer', 'pat.buyer@troptix.test', 'seed_event_5', 'seed_order_1', 'seed_tt_past_ga'),
+  ('seed_ticket_4', now() - interval '33 days', now(), 'VALID', 'PAID', 50.00, 0.00, 50.00, 'Sam', 'Guest', 'sam.guest@troptix.test', 'seed_event_5', 'seed_order_2', 'seed_tt_past_vip'),
+  ('seed_ticket_5', now() - interval '33 days', now(), 'VALID', 'PAID', 50.00, 0.00, 50.00, 'Sam', 'Guest', 'sam.guest@troptix.test', 'seed_event_5', 'seed_order_2', 'seed_tt_past_vip'),
+  ('seed_ticket_6', now() - interval '8 days', now(), 'VALID', 'PAID', 30.00, 2.90, 32.90, 'Ali', 'Fan', 'ali.fan@troptix.test', 'seed_event_6', 'seed_order_3', 'seed_tt_recent'),
+  ('seed_ticket_7', now() - interval '8 days', now(), 'VALID', 'PAID', 30.00, 2.90, 32.90, 'Ali', 'Fan', 'ali.fan@troptix.test', 'seed_event_6', 'seed_order_3', 'seed_tt_recent');
+
+-- One request in each resolution rendering: an open ask, and a paid one with
+-- the rail + bank reference filled so the paid trail is visible.
+-- Ledger check: event_5 earned 22000 − 900 absorbed = 21100 (fully released);
+-- event_6 earned 6000 → 4800 released + 1200 held. Available =
+-- 25900 − 5000 (PAID) − 2000 (REQUESTED) = 18900.
+insert into public."PayoutRequest" (
+  id, "createdAt", "updatedAt", status, "amountCents", note,
+  "resolvedAt", "resolvedByUserId", rail, reference, "adminNote",
+  "organizationId", "requestedByUserId"
+) values
+  ('seed_payout_req_1', now() - interval '25 days', now(), 'PAID', 5000, 'First payout — wire to the usual account',
+   now() - interval '24 days', 'seed_staff_1', 'MERCURY', 'MERC-SEED-0001', 'Sent from ops account',
+   'seed_organization_1', 'seed_org_1'),
+  ('seed_payout_req_2', now() - interval '2 days', now(), 'REQUESTED', 2000, null,
+   null, null, null, null, null,
+   'seed_organization_1', 'seed_org_1');

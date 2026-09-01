@@ -19,7 +19,7 @@ An Organization-level capability (`Organization.paidTicketingEnabled`) that perm
 An Organization-level **trust tick** (`Organization.verified`), admin-granted, attendee-facing — signals an established/trusted brand. **Orthogonal to `paidTicketingEnabled`**: a brand can be verified through a track record of free events without being approved to sell paid, and vice versa. _Avoid_: conflating with paid-ticketing approval.
 
 **Platform Owner**:
-A member of the TropTix team with cross-organizer visibility, used to debug and observe what any Organizer sees. A platform capability, distinct from Organizer — a Platform Owner is not "an Organizer with extra rights." Identified by the explicit `Users.isPlatformOwner` grant (ADR 0024) — never inferred from an email; the grant is spent in exactly two places, the Platform View gate and View-as. _Avoid_: super-user, staff, **admin** (unqualified "Admin" always means the Organization role, never platform staff).
+A member of the TropTix team with cross-organizer visibility, used to debug and observe what any Organizer sees. A platform capability, distinct from Organizer — a Platform Owner is not "an Organizer with extra rights." Identified by the explicit `Users.isPlatformOwner` grant (ADR 0024) — never inferred from an email; the grant is spent in exactly two places, the Platform View gate and View-as, and every service-layer check goes through `organizer-scope.ts` (`requirePlatformOwner`) so the grant has one implementation. _Avoid_: super-user, staff, **admin** (unqualified "Admin" always means the Organization role, never platform staff).
 
 **Promoter**:
 A `Role` that exists in the enum but is currently unmodeled (no granted scopes yet). Deferred to the role×permission matrix (ADR 0013 successor).
@@ -53,8 +53,17 @@ What a buyer actually paid for one order — `Order.total` = ticket revenue + fe
 **Fees**:
 The platform/ticketing cut TropTix collects (`Order.fees`). Either added on top of the ticket price (`PASS_TICKET_FEES`) or absorbed out of it (`ABSORB_TICKET_FEES`), per ticket type.
 
-**Payout**:
-What an Organizer actually receives — ticket revenue net of absorbed fees and refunds. **Not currently computed** (needs per-order fee attribution); do not conflate with Ticket revenue. Refunds are not modeled at all today (`OrderStatus` has no `REFUNDED`), so no metric nets them.
+**Earnings**:
+What the Organizer keeps from a `COMPLETED` order — `subtotalCents` minus **absorbed fees** (derived at read time; the DB stores `feesCents = 0` for `ABSORB_TICKET_FEES`). Passed fees ride on top of the subtotal and never touch it. Refunds are still unmodeled and will subtract from earnings when they land. _Avoid_: conflating with Ticket revenue (pre-fee).
+
+**Available / Pending / Paid out** (payout buckets):
+The three balances on the payouts screen (ADR 0028). An event's earnings become **Available** when the event ends, minus a **holdback** (platform default 20% for 20 days after event end) that joins when its window elapses; open and paid requests subtract. **Pending** is everything not yet available. **Paid out** is the sum of `PAID` payout requests. Per-Organization **custom payout timelines** override the release rule: `payoutReleaseAtSale` releases earnings as orders complete (before event end), and `payoutHoldbackPercent`/`payoutHoldbackDays` tune the holdback — early payment raises the organizer's real available balance, never bypasses the math.
+
+**Payout request**:
+The Organizer's ask to withdraw some amount of Available. Lifecycle: `REQUESTED → PAID` (Platform Owner marks done, recording the rail + bank transfer reference) or `→ REJECTED` (with a note) or `→ CANCELLED` (organizer, while still `REQUESTED`). At most one open request per Organization. Money moves by hand from the ops bank (Mercury) for v1; no bank details ever enter the database.
+
+**Payout setup**:
+The per-Organization checklist gating the first request — a payout meeting plus bank details entered at the ops bank — checked off manually by a Platform Owner (two timestamps on `Organization`). Distinct from **paid ticketing enabled**: that gates _selling_, setup gates _withdrawing_. Balances are always visible regardless.
 
 ### Ticketing
 

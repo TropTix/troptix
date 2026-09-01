@@ -21,6 +21,7 @@ import {
   Search,
   Shield,
   Ticket,
+  Wallet,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -70,15 +71,23 @@ export default function UnifiedHeader() {
   const organizerNavItems = [
     { label: 'Dashboard', href: '/organizer', icon: Home },
     { label: 'My Events', href: '/organizer/events', icon: Calendar },
+    { label: 'Payouts', href: '/organizer/payouts', icon: Wallet },
     { label: 'Profile', href: '/organizer/profile', icon: Building2 },
   ];
 
   if (userIsPlatformOwner) {
-    organizerNavItems.push({
-      label: 'Platform Events',
-      href: '/organizer/platform/events',
-      icon: Shield,
-    });
+    organizerNavItems.push(
+      {
+        label: 'Platform Events',
+        href: '/organizer/platform/events',
+        icon: Shield,
+      },
+      {
+        label: 'Platform Payouts',
+        href: '/organizer/platform/payouts',
+        icon: Shield,
+      }
+    );
   }
 
   const handleSignOut = async () => {
