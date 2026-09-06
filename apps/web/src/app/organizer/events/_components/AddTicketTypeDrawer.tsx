@@ -500,9 +500,7 @@ export function AddTicketTypeDrawer({
                         placeholder="e.g., VIPLIST"
                         {...field}
                         value={field.value ?? ''}
-                        onChange={(e) =>
-                          field.onChange(e.target.value || undefined)
-                        }
+                        onChange={(e) => field.onChange(e.target.value)}
                       />
                     </FormControl>
                     <FormDescription>
