@@ -32,7 +32,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow TropTix to access your camera to scan ticket QR codes."
+          "cameraPermission": "TropTix uses the camera to scan ticket QR codes for attendee check-in."
         }
       ],
       "expo-asset",
