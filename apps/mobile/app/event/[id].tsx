@@ -6,6 +6,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Linking,
   Platform,
   Pressable,
   RefreshControl,
@@ -154,15 +155,24 @@ function ScannerTab({
   if (!permission) return <View style={styles.flex} />;
 
   if (!permission.granted) {
+    const isDenied = !permission.canAskAgain;
+
     return (
       <View style={styles.permissionWrap}>
         <Ionicons name="camera-outline" size={48} color={colors.textMuted} />
-        <Text style={styles.permissionTitle}>Camera Access Needed</Text>
+        <Text style={styles.permissionTitle}>Camera Access</Text>
         <Text style={styles.permissionSub}>
-          Grant camera access to scan QR codes on guest tickets.
+          {isDenied
+            ? 'Camera access is required to scan ticket QR codes. You can enable access in your device Settings.'
+            : 'Camera access is used to scan ticket QR codes for check-in.'}
         </Text>
-        <Pressable style={styles.permissionBtn} onPress={requestPermission}>
-          <Text style={styles.permissionBtnText}>Grant Access</Text>
+        <Pressable
+          style={styles.permissionBtn}
+          onPress={isDenied ? () => Linking.openSettings() : requestPermission}
+        >
+          <Text style={styles.permissionBtnText}>
+            {isDenied ? 'Open Settings' : 'Continue'}
+          </Text>
         </Pressable>
       </View>
     );
