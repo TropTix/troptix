@@ -37,3 +37,18 @@ async function isPlatformOwner(
   });
   return user?.isPlatformOwner ?? false;
 }
+
+/**
+ * The Platform View gate for service-layer reads and writes. The one other
+ * spend of the grant is View-as above — keep every check on this module so
+ * the grant has a single implementation.
+ */
+export async function requirePlatformOwner(
+  prisma: PrismaClient,
+  actor: Actor
+): Promise<string> {
+  if (actor.kind !== 'user' || !(await isPlatformOwner(prisma, actor.userId))) {
+    throw new UnauthorizedError();
+  }
+  return actor.userId;
+}

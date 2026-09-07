@@ -57,6 +57,18 @@ export {
   getOrganizationBySlug,
   updateOrganizationProfile,
 } from './services/organizations';
+export {
+  getPayouts,
+  requestPayout,
+  cancelPayoutRequest,
+} from './services/organizer-payouts';
+export {
+  listPayoutRequests,
+  listPayoutOrganizations,
+  resolvePayoutRequest,
+  setPayoutSetupStep,
+  setPayoutPolicy,
+} from './services/platform-payouts';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
 export { toCents } from './services/_shared/organizerMapping';
 export {
@@ -64,6 +76,9 @@ export {
   UnauthorizedError,
   ConflictError,
   PaidTicketingNotEnabledError,
+  PayoutSetupIncompleteError,
+  InvalidPayoutAmountError,
+  PayoutRequestPendingError,
 } from './services/_shared/errors';
 
 export { appRouter, createCaller } from './trpc/routers';

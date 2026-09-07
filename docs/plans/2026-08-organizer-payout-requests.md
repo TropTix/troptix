@@ -1,8 +1,8 @@
 ---
 title: Organizer Payout Requests
-status: proposed
+status: active
 created: 2026-08-16
-tracking-issue: TBD
+tracking-issue: '#558'
 ---
 
 # Organizer Payout Requests
@@ -98,21 +98,31 @@ Holdback: **20% for 20 days after the event ends** (constants in one module,
 `packages/api/src/services/_shared/payouts.ts`, next to `fees.ts`). See the
 market comparison below for how this sits against other platforms.
 
+**Custom payout timelines** (decided 2026-09-01, pulled forward from "later
+phase"): three override columns on `Organization`, null meaning platform
+default — `payoutReleaseAtSale` (earnings release as orders complete, before
+the event ends; the holdback still anchors to event end),
+`payoutHoldbackPercent`, and `payoutHoldbackDays`. Paying a trusted organizer
+early works by raising their actual available balance — never by an admin
+bypassing the math — so the ledger and request flow are identical for every
+organizer. A Platform Owner edits the policy via `setPayoutPolicy`. See
+[ADR 0028](../adr/0028-request-based-payouts-with-holdback-release.md).
+
 **Absorbed fees are derived at read time.** The DB only records fees the buyer
 paid: checkout sets `feesCents = 0` for `ABSORB_TICKET_FEES` types
 ([checkout.ts](../../packages/api/src/services/checkout.ts)), so
 `Orders.feesCents` never contains the absorbed cut. The service therefore:
 
-1. Groups `Tickets` rows of `COMPLETED` orders by `(ticketTypeId, subtotal)` in
-   SQL (per event),
-2. applies `calculateFeesCents` (8% + $0.50) in JS to each group where the
-   type's `ticketingFees = 'ABSORB_TICKET_FEES'`,
+1. Groups `Tickets` rows of `COMPLETED` orders by `subtotal` in SQL (per
+   event), keeping the rows where the stored `fees = 0` and `subtotal > 0` —
+   a priced ticket with no buyer-paid fee is exactly a ticket sold under
+   `ABSORB_TICKET_FEES`,
+2. applies `calculateFeesCents` (8% + $0.50) in JS to each group,
 3. sums.
 
-Tickets whose type was deleted (`ticketTypeId` null) can't be attributed; they
-count as no absorbed fee (the passed-fee default). The fee is computed against
-each ticket's own stored `subtotal`, so later price edits don't rewrite
-history. If `FeeConfig` ever changes, past absorbed fees would drift — accepted
+Classification reads the immutable ticket row, never the type's current
+`ticketingFees`, so later fee-mode edits, price edits, and ticket-type
+deletion don't rewrite history. If `FeeConfig` ever changes, past absorbed fees would drift — accepted
 for v1; the request row snapshots `amountCents` at request time, so anything
 already requested or paid is frozen.
 
@@ -230,11 +240,11 @@ injected `prisma`, authorization via the scope seam):
   `organization.findFirst({ ownerUserId })`.
 - `requestPayout(prisma, actor, { amountCents, note })`: rejects with
   `PayoutSetupIncompleteError` unless payout setup is complete; recomputes
-  `availableCents` **inside a transaction** and rejects
-  `amountCents > available` or `≤ 0` (`InvalidPayoutAmountError`). At most one
-  open (`REQUESTED`) request per Organization — a second ask fails with
-  `PayoutRequestPendingError`; this keeps the concurrent-request race harmless
-  (two opens can't both pass the one-open check on serialized writes).
+  `availableCents` and rejects `amountCents > available` or `≤ 0`
+  (`InvalidPayoutAmountError`). At most one open (`REQUESTED`) request per
+  Organization — enforced by a partial unique index in the migration, so a
+  second ask fails with `PayoutRequestPendingError` whether it loses the
+  pre-check or the insert race.
 - `cancelPayoutRequest(prisma, actor, { id })`: organizer cancels own
   `REQUESTED` row.
 - Writes never accept a View-as target, per the seam's rule.
@@ -260,6 +270,11 @@ new seam.
   — sets or clears the matching timestamp. Clearing is allowed (a checkbox
   mis-click shouldn't be permanent), but clearing never invalidates existing
   requests — the gate applies only at request time.
+- `setPayoutPolicy(prisma, actor, { organizationId, releaseAtSale, holdbackPercent, holdbackDays })`
+  — the custom-timeline overrides; null resets to the platform default.
+- `listPayoutOrganizations(prisma, actor)` — the setup panel's list:
+  Organizations with paid ticketing enabled or completed paid orders, with
+  setup state and effective policy.
 
 Contracts in `packages/api/src/contracts/payouts.ts` (zod schemas + types),
 re-exported from `index.ts`. Unit tests beside each service, per convention.
@@ -335,4 +350,5 @@ split:
   v1 shows it in the table only.
 - Holdback constants — **20% / 20 days** (decided 2026-08-17, informed by the
   market comparison). They live in one module, so tuning later is a one-line
-  change; per-organizer overrides (graduated trust) are a later phase.
+  change. Per-organizer overrides landed with v1 (see Custom payout timelines
+  above), so graduated trust is a policy edit, not a schema change.
