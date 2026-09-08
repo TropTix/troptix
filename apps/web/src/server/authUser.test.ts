@@ -10,7 +10,11 @@ jest.mock('@/server/prisma', () => ({
   __esModule: true,
   default: { users: { findUnique: jest.fn() } },
 }));
+jest.mock('next/headers', () => ({
+  cookies: jest.fn(),
+}));
 
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import prisma from '@/server/prisma';
 import {
@@ -20,8 +24,11 @@ import {
 } from './authUser';
 
 const mockCreateClient = createClient as jest.Mock;
+const mockCookies = cookies as jest.Mock;
 const mockFindUnique = prisma.users.findUnique as jest.Mock;
 const mockGetClaims = jest.fn();
+
+const SESSION_COOKIE = { name: 'sb-example-auth-token', value: 'jwt' };
 
 const AUTH_SUB = '11111111-1111-1111-1111-111111111111';
 const APP_USER_ID = 'app-user-1';
@@ -36,6 +43,7 @@ beforeEach(() => {
   mockCreateClient.mockResolvedValue({
     auth: { getClaims: mockGetClaims },
   });
+  mockCookies.mockResolvedValue({ getAll: () => [SESSION_COOKIE] });
 });
 
 afterEach(() => {
@@ -100,6 +108,30 @@ describe('getServerUser', () => {
     expect(mockCreateClient).not.toHaveBeenCalled();
   });
 
+  it('returns null and skips getClaims when no session cookie is present', async () => {
+    mockCookies.mockResolvedValue({
+      getAll: () => [{ name: 'other-cookie', value: 'x' }],
+    });
+
+    const result = await getServerUser();
+
+    expect(result).toBeNull();
+    expect(mockCreateClient).not.toHaveBeenCalled();
+    expect(mockGetClaims).not.toHaveBeenCalled();
+  });
+
+  it('takes the getClaims path when the session cookie is chunked', async () => {
+    mockCookies.mockResolvedValue({
+      getAll: () => [{ name: 'sb-example-auth-token.0', value: 'chunk' }],
+    });
+    mockGetClaims.mockResolvedValue({ data: null });
+
+    const result = await getServerUser();
+
+    expect(result).toBeNull();
+    expect(mockGetClaims).toHaveBeenCalled();
+  });
+
   it('falls back isPlatformOwner to false when the row has it as null', async () => {
     mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });
     mockFindUnique.mockResolvedValue({
@@ -128,6 +160,21 @@ describe('getUserFromIdTokenCookie', () => {
     await getUserFromIdTokenCookie('bearer-token');
 
     expect(mockGetClaims).toHaveBeenCalledWith('bearer-token');
+  });
+
+  it('verifies an explicit token even with no session cookie (Bearer path)', async () => {
+    mockCookies.mockResolvedValue({ getAll: () => [] });
+    mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });
+    mockFindUnique.mockResolvedValue({
+      id: APP_USER_ID,
+      email: 'a@example.com',
+      role: 'PATRON',
+      isPlatformOwner: false,
+    });
+
+    const result = await getUserFromIdTokenCookie('bearer-token');
+
+    expect(result?.uid).toBe(APP_USER_ID);
   });
 
   it('passes undefined to getClaims when no token is given (cookie path)', async () => {
