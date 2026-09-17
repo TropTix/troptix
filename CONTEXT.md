@@ -62,8 +62,11 @@ The three balances on the payouts screen (ADR 0028). An event's earnings become 
 **Payout request**:
 The Organizer's ask to withdraw some amount of Available. Lifecycle: `REQUESTED → PAID` (Platform Owner marks done, recording the rail + bank transfer reference) or `→ REJECTED` (with a note) or `→ CANCELLED` (organizer, while still `REQUESTED`). At most one open request per Organization. Money moves by hand from the ops bank (Mercury) for v1; no bank details ever enter the database.
 
+**Payout rail**:
+The channel a payout's money actually moves on, recorded per paid request. Today one rail is live: a manual transfer from the ops bank (Mercury). Stripe Connect is the planned rail for US organizers; Jamaican organizers stay on the manual rail until a Stripe product can reach Jamaican banks. An Organization has one current rail; the request lifecycle and ledger are rail-agnostic.
+
 **Payout setup**:
-The per-Organization checklist gating the first request — a payout meeting plus bank details entered at the ops bank — checked off manually by a Platform Owner (two timestamps on `Organization`). Distinct from **paid ticketing enabled**: that gates _selling_, setup gates _withdrawing_. Balances are always visible regardless.
+The per-Organization checklist gating the first request — a payout meeting plus a **verified payout destination** (what that is depends on the Organization's payout rail: a recipient entered at the ops bank today; completed Stripe onboarding under Connect). Recorded as two timestamps on `Organization`; today a Platform Owner checks both off by hand. Distinct from **paid ticketing enabled**: that gates _selling_, setup gates _withdrawing_ — but in practice one meeting covers both, so the meeting step is checked off when paid ticketing is approved. The meeting is required on every rail; a self-serve bank connection never bypasses it. Balances are always visible regardless.
 
 ### Ticketing
 
