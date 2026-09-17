@@ -1,8 +1,9 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getPayouts } from '@troptix/api/server';
 import { FeatureFlag } from '@troptix/api';
 import { Banknote, Clock, Wallet } from 'lucide-react';
 import { isFlagEnabled } from '@/server/lib/featureFlags';
+import { getServerUser } from '@/server/authUser';
 
 import {
   Card,
@@ -12,7 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatCents } from '@/lib/dateUtils';
-import { requireOrganizerActor } from '@/server/actor';
+import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
 import { RequestPayoutCard } from './_components/RequestPayoutCard';
 import { RequestsTable } from './_components/RequestsTable';
@@ -23,14 +24,21 @@ export default async function OrganizerPayoutsPage({
 }: {
   searchParams: Promise<{ viewAs?: string }>;
 }) {
-  const actor = await requireOrganizerActor();
+  const user = await getServerUser();
+  if (!user) {
+    redirect('/auth/signin');
+  }
+  // Email included so the staff release condition matches without PostHog
+  // having seen this user before.
   if (
     !(await isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, {
-      id: actor.kind === 'user' ? actor.userId : null,
+      id: user.uid,
+      email: user.email,
     }))
   ) {
     notFound();
   }
+  const actor = userToActor(user);
 
   const { viewAs } = await searchParams;
 
