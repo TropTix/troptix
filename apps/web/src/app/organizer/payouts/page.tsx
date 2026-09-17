@@ -1,5 +1,8 @@
+import { notFound } from 'next/navigation';
 import { getPayouts } from '@troptix/api/server';
+import { FeatureFlag } from '@troptix/api';
 import { Banknote, Clock, Wallet } from 'lucide-react';
+import { isFlagEnabled } from '@/server/lib/featureFlags';
 
 import {
   Card,
@@ -21,6 +24,14 @@ export default async function OrganizerPayoutsPage({
   searchParams: Promise<{ viewAs?: string }>;
 }) {
   const actor = await requireOrganizerActor();
+  if (
+    !(await isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, {
+      id: actor.kind === 'user' ? actor.userId : null,
+    }))
+  ) {
+    notFound();
+  }
+
   const { viewAs } = await searchParams;
 
   // Writes never take a View-as target (the seam's rule), so the write
