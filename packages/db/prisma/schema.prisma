@@ -35,6 +35,8 @@ model Users {
   reservations        Reservation[]
   organizations       Organization[]
   memberships         Membership[]
+  payoutRequests      PayoutRequest[]       @relation("PayoutRequestedBy")
+  payoutsResolved     PayoutRequest[]       @relation("PayoutResolvedBy")
 
   telephoneNumber String?
   billingAddress1 String?
@@ -137,10 +139,13 @@ model PayoutRequest {
 
   organization      Organization @relation(fields: [organizationId], references: [id])
   organizationId    String
+  requestedBy       Users        @relation("PayoutRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
   requestedByUserId String
+  resolvedBy        Users?       @relation("PayoutResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
 
   // The migration also creates a partial unique index (one REQUESTED row per
-  // organizationId) that Prisma cannot express — don't add a plain status index.
+  // organizationId) and CHECK constraints (amountCents > 0, holdback ranges)
+  // that Prisma cannot express — don't add a plain status index.
   @@index([organizationId])
 }
 

@@ -50,6 +50,20 @@ CREATE UNIQUE INDEX "PayoutRequest_one_open_per_org"
 -- AddForeignKey
 ALTER TABLE "PayoutRequest" ADD CONSTRAINT "PayoutRequest_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+-- The audit trail must point at real Users, and deleting a user must never
+-- orphan money history — RESTRICT forces that decision if deletion ever ships.
+ALTER TABLE "PayoutRequest" ADD CONSTRAINT "PayoutRequest_requestedByUserId_fkey" FOREIGN KEY ("requestedByUserId") REFERENCES "Users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PayoutRequest" ADD CONSTRAINT "PayoutRequest_resolvedByUserId_fkey" FOREIGN KEY ("resolvedByUserId") REFERENCES "Users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Shape the app already enforces, held by the database so no other writer
+-- can corrupt the ledger math. NULL passes a CHECK, so the nullable holdback
+-- overrides stay free to mean "platform default".
+ALTER TABLE "PayoutRequest" ADD CONSTRAINT "PayoutRequest_amountCents_positive" CHECK ("amountCents" > 0);
+ALTER TABLE "Organization" ADD CONSTRAINT "Organization_payoutHoldbackPercent_range" CHECK ("payoutHoldbackPercent" BETWEEN 0 AND 100);
+ALTER TABLE "Organization" ADD CONSTRAINT "Organization_payoutHoldbackDays_range" CHECK ("payoutHoldbackDays" BETWEEN 0 AND 365);
+
 -- Defense-only, per the no-policy convention (the app's role bypasses RLS).
 ALTER TABLE "PayoutRequest" ENABLE ROW LEVEL SECURITY;
 
