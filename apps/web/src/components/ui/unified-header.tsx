@@ -21,10 +21,13 @@ import {
   Search,
   Shield,
   Ticket,
+  Wallet,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useContext, useEffect, useState } from 'react';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { FeatureFlag } from '@troptix/api';
 import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
 
@@ -49,6 +52,7 @@ export default function UnifiedHeader() {
   const [hasScrolled, setHasScrolled] = useState<boolean>(false);
   const { user } = useContext(TropTixContext);
   const pathname = usePathname();
+  const payoutsEnabled = useFeatureFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -70,15 +74,26 @@ export default function UnifiedHeader() {
   const organizerNavItems = [
     { label: 'Dashboard', href: '/organizer', icon: Home },
     { label: 'My Events', href: '/organizer/events', icon: Calendar },
+    // Only `=== true` is on — undefined means the flags haven't loaded yet.
+    ...(payoutsEnabled === true
+      ? [{ label: 'Payouts', href: '/organizer/payouts', icon: Wallet }]
+      : []),
     { label: 'Profile', href: '/organizer/profile', icon: Building2 },
   ];
 
   if (userIsPlatformOwner) {
-    organizerNavItems.push({
-      label: 'Platform Events',
-      href: '/organizer/platform/events',
-      icon: Shield,
-    });
+    organizerNavItems.push(
+      {
+        label: 'Platform Events',
+        href: '/organizer/platform/events',
+        icon: Shield,
+      },
+      {
+        label: 'Platform Payouts',
+        href: '/organizer/platform/payouts',
+        icon: Shield,
+      }
+    );
   }
 
   const handleSignOut = async () => {

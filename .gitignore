@@ -38,3 +38,7 @@ docs/technical-roadmap.md
 
 .claude/worktrees/
 .claude/settings.json
+
+# dotenvx private keys (decryption side of supabase/.env.preview)
+supabase/.env.keys
+.env.keys
