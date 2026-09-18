@@ -3,27 +3,20 @@ import prisma from '@/server/prisma';
 import { createClient } from '@/lib/supabase/server';
 
 /**
- * The resolved server-side user. `uid` is the stable app PK (`Users.id`) — it is
- * what callers pass as `organizerUserId` in queries, NOT the Supabase auth id
- * (`sub`/`authUserId`). See ADR 0011/0015.
+ * `uid` is the app PK (`Users.id`) — what queries take as `organizerUserId` —
+ * NOT the Supabase auth id (`sub`/`authUserId`). ADR 0011/0015.
  */
 export interface ServerUser {
   uid: string;
   email?: string;
   role?: Role;
-  /** The explicit Platform Owner grant (`Users.isPlatformOwner`, ADR 0022). */
   isPlatformOwner: boolean;
 }
 
 /**
- * Verify the request's Supabase identity and return its auth id (the `sub`
- * claim). Pass a token for the Bearer path (mobile API routes); omit it to read
- * the session cookie. Returns null when unauthenticated, or when Supabase env is
- * unset (e.g. at build).
- *
  * `createClient()` reads cookies() *outside* the try, so a Server Component's
  * DynamicServerError propagates (opting the route into dynamic rendering)
- * instead of being swallowed as a failure.
+ * instead of being swallowed as an auth failure.
  */
 async function getAuthUserId(token?: string): Promise<string | null> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -39,7 +32,6 @@ async function getAuthUserId(token?: string): Promise<string | null> {
   }
 }
 
-/** Resolve a verified Supabase auth id (`sub`) → the app `Users` row. */
 async function resolveByAuthUserId(
   authUserId: string
 ): Promise<ServerUser | null> {
@@ -60,17 +52,11 @@ async function resolveByAuthUserId(
   };
 }
 
-/** The current user from the session cookie → stable `Users` row. */
 export async function getServerUser(): Promise<ServerUser | null> {
   const sub = await getAuthUserId();
   return sub ? resolveByAuthUserId(sub) : null;
 }
 
-/**
- * Resolve a user from an explicit Supabase access token (the Bearer path the
- * organizer/mobile API routes use). Falls back to the session cookie when no
- * token is passed.
- */
 export async function getUserFromIdTokenCookie(
   token?: string
 ): Promise<ServerUser | null> {
@@ -78,10 +64,6 @@ export async function getUserFromIdTokenCookie(
   return sub ? resolveByAuthUserId(sub) : null;
 }
 
-/**
- * The current user's full profile in a single query — used by /api/user/me to
- * hydrate the client. Skips getServerUser's resolve + a second lookup.
- */
 export async function getCurrentUserProfile() {
   const sub = await getAuthUserId();
   if (!sub) {

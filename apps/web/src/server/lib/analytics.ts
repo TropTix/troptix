@@ -6,11 +6,8 @@ import {
 } from '@troptix/api/analytics';
 
 /**
- * posthog-node implementation of the `CheckoutAnalytics` port. Same
- * per-request client pattern as `featureFlags.ts`: serverless multiplies
- * long-lived clients into leaked sockets, so create, flush (`shutdown`), and
- * discard per capture. Returns undefined when analytics is off (no key), which
- * makes every capture site a no-op.
+ * Create, flush (`shutdown`), and discard a client per capture — a long-lived
+ * client in serverless leaks sockets (same pattern as `featureFlags.ts`).
  */
 export function serverAnalytics(): CheckoutAnalytics | undefined {
   const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
@@ -26,9 +23,8 @@ export function serverAnalytics(): CheckoutAnalytics | undefined {
       });
       try {
         client.capture({
-          // With no browser identity (analytics blocked), fall back to a
-          // server-only id and skip the person profile — the revenue event
-          // still lands without minting a junk person.
+          // No browser identity (analytics blocked): a server-only id with no
+          // person profile still lands the revenue event, no junk person minted.
           distinctId: props.distinctId ?? `server:${props.reservationId}`,
           event: ANALYTICS_EVENTS.orderCompleted,
           properties: {

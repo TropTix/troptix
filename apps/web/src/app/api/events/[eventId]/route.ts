@@ -37,7 +37,6 @@ export async function GET(
 
     return NextResponse.json(event);
   } catch (error) {
-    // This could catch errors like an invalid UUID format for the eventId
     console.error('Error fetching event:', error);
     return NextResponse.json(
       { error: 'An internal server error occurred' },

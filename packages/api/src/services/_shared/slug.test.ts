@@ -40,11 +40,11 @@ describe('isValidSlug', () => {
   });
 
   it('rejects bad characters and hyphen placement', () => {
-    expect(isValidSlug('Eman-Events')).toBe(false); // uppercase
-    expect(isValidSlug('-eman')).toBe(false); // leading hyphen
-    expect(isValidSlug('eman-')).toBe(false); // trailing hyphen
-    expect(isValidSlug('eman--events')).toBe(false); // double hyphen
-    expect(isValidSlug('eman events')).toBe(false); // space
+    expect(isValidSlug('Eman-Events')).toBe(false);
+    expect(isValidSlug('-eman')).toBe(false);
+    expect(isValidSlug('eman-')).toBe(false);
+    expect(isValidSlug('eman--events')).toBe(false);
+    expect(isValidSlug('eman events')).toBe(false);
   });
 
   it('rejects reserved slugs', () => {

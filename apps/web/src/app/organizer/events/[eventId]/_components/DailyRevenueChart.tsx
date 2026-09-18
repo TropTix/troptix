@@ -33,7 +33,7 @@ const formatCurrency = (value: number) =>
 
 const formatDate = (value: string) => {
   try {
-    return format(new Date(value + 'T00:00:00'), 'MMM d'); // e.g., "Apr 25"
+    return format(new Date(value + 'T00:00:00'), 'MMM d');
   } catch (error) {
     console.error('Error formatting date:', value, error);
     return value;
@@ -54,7 +54,7 @@ export function DailyRevenueChart({ data }: DailyRevenueChartProps) {
         accessibilityLayer
         data={data}
         margin={{
-          left: 12, // Space for Y-axis labels
+          left: 12,
           right: 12,
           top: 10,
           bottom: 0,

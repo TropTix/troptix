@@ -22,11 +22,6 @@ import {
 } from '../../services/reservations';
 import { beginPayment, getCheckoutState } from '../../services/payments';
 
-/**
- * The paid-checkout procedures need the injected Stripe client + app origin
- * (ADR 0018). They're optional on the context (reads/free flow and unit tests
- * don't need them), so assert them here rather than widen the whole context.
- */
 function requireStripe(ctx: Context): {
   stripe: NonNullable<Context['stripe']>;
   siteUrl: string;
@@ -41,10 +36,8 @@ function requireStripe(ctx: Context): {
 }
 
 /**
- * Checkout procedures — thin pass-throughs to the services. Reads are public
- * (unauthenticated ticket list / code lookup). The commit mutations are public
- * too: a guest authorizes by possession of the unguessable `reservationId`, and
- * the buyer's `userId` is taken from `ctx.actor`, never the client.
+ * The commit mutations are deliberately public: a guest authorizes by possession
+ * of the unguessable `reservationId`; `userId` comes from `ctx.actor`, never the client.
  */
 export const checkoutRouter = router({
   config: publicProcedure
@@ -71,8 +64,6 @@ export const checkoutRouter = router({
       completeFree(ctx.prisma, input, ctx.analytics)
     ),
 
-  // Hand a held reservation's inventory back (e.g. the buyer abandons or the
-  // commit fails after the hold was taken).
   release: publicProcedure
     .input(releaseInputSchema)
     .mutation(({ ctx, input }) => release(ctx.prisma, input.reservationId)),
@@ -87,8 +78,6 @@ export const checkoutRouter = router({
       });
     }),
 
-  // Buyer-visible checkout state — drives the confirmation poll and the
-  // resume-from-URL after the payment redirect (with sync fulfillment fallback).
   getCheckoutState: publicProcedure
     .input(getCheckoutStateInputSchema)
     .query(({ ctx, input }) => {

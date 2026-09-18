@@ -24,10 +24,6 @@ interface ActionResult {
   error?: string;
 }
 
-// Thin adapters over the @troptix/api ticket-type write seam (#452): validate
-// the form shape for field-level messages, convert dollars → integer cents,
-// and let the service own authorization, the paid gate, and the row shape.
-
 export async function createTicketType(
   eventId: string,
   formData: TicketTypeFormValues
@@ -53,7 +49,6 @@ export async function createTicketType(
     return { success: true };
   } catch (error) {
     return failure(error, {
-      // The create path's NotFound means the EVENT wasn't found/owned.
       notFound: 'Event not found or unauthorized.',
       fallback: 'Failed to create ticket type. Please try again.',
     });

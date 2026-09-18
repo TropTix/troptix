@@ -15,9 +15,6 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/avif';
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/avif'];
 
-// Uploads to the organization-logos bucket and reports back the stored PATH.
-// Preview shows the local file while uploading, then the resolved logo; falls
-// back to a monogram when there's none.
 export function OrganizationLogoUpload({
   value,
   name,

@@ -15,12 +15,6 @@ import {
 import { createTicketType, updateTicketType } from '../_actions/ticketActions';
 import { TicketTypesTable } from './TicketTypesTable';
 
-/**
- * Screen E's write surface: the same drawer the create-event form uses,
- * opened over the ticket-types table for add, edit, and duplicate — no page
- * hops. Duplicate is a create seeded from the source row: inventory counters
- * start at zero by construction, and the paid gate applies like any create.
- */
 export function TicketTypesManager({
   ticketTypes,
   eventId,
@@ -29,7 +23,6 @@ export function TicketTypesManager({
 }: {
   ticketTypes: TicketTypeRow[];
   eventId: string;
-  /** Seeds the drawer's default sale-window end for new tickets. */
   eventEndsAt: Date;
   paidEventsEnabled: boolean;
 }) {
@@ -43,8 +36,6 @@ export function TicketTypesManager({
       ? await updateTicketType(eventId, id, values)
       : await createTicketType(eventId, values);
     if (result.success) {
-      // No router.refresh(): the action's revalidatePath already re-renders
-      // this route and streams the fresh UI back in the same response.
       toast.success(id ? 'Ticket updated.' : 'Ticket added.');
     }
     return result;

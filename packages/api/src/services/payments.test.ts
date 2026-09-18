@@ -1,10 +1,5 @@
-/**
- * Integration tests for the paid-checkout money-state transitions (ADR 0018).
- * These hit a REAL Postgres (the atomicity/idempotency behavior is the point, and
- * isn't mockable) with a FAKE Stripe (injected). Point your env at a preview /
- * dev branch — same setup as reservations.test.ts. Everything is cleaned up by
- * event id in afterAll.
- */
+// Real Postgres (atomicity/idempotency is the point) with a FAKE injected Stripe.
+// Same env setup as reservations.test.ts — point it at a preview/dev branch, never prod.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type Stripe from 'stripe';
 import prisma, { ReservationStatus } from '@troptix/db';
@@ -27,7 +22,6 @@ describe('statementDescriptorSuffix', () => {
     expect(statementDescriptorSuffix('Sunset Cruise 2026')).toBe(
       'SUNSET CRUISE'
     );
-    // A cut landing on a space is trimmed.
     expect(statementDescriptorSuffix('Island Vibes Live')).toBe('ISLAND VIBES');
   });
 
@@ -46,8 +40,6 @@ describe('statementDescriptorSuffix', () => {
 });
 
 const TEST_EVENT_ID = `test-pay-${generateId()}`;
-// Events.organizationId is NOT NULL (ADR 0022) — the fixture needs the full
-// owner chain: Users -> Organization -> Events.
 const TEST_OWNER_ID = `test-pay-owner-${generateId()}`;
 const TEST_ORG_ID = `test-pay-org-${generateId()}`;
 
@@ -107,7 +99,6 @@ async function makeTicketType(capacity: number, priceCents = 1000) {
   });
 }
 
-/** Create a HELD paid reservation with `qty` units of one tier. */
 async function heldPaidReservation(
   ticketTypeId: string,
   qty: number,
@@ -155,7 +146,6 @@ interface FakeSessionState {
   payment_intent: string | null;
 }
 
-/** Minimal fake Stripe; records calls and returns a controllable session. */
 function fakeStripe(
   session?: Partial<FakeSessionState>,
   opts?: { expireThrows?: boolean }
@@ -187,7 +177,6 @@ function fakeStripe(
         },
         expire: async (id: string) => {
           calls.expire.push(id);
-          // Stripe only expires an OPEN session; a paid one throws.
           if (opts?.expireThrows) throw new Error('Session already completed');
           return current;
         },
@@ -209,7 +198,6 @@ function fakeStripe(
   };
 }
 
-/** Create an already-expired (past-TTL) HELD reservation, optionally with a Session id. */
 async function expiredHold(
   ticketTypeId: string,
   qty: number,
@@ -220,7 +208,7 @@ async function expiredHold(
     items: [
       { ticketTypeId, quantity: qty, unitPriceCents: 1000, feesCents: 0 },
     ],
-    ttlMinutes: -1, // already past TTL
+    ttlMinutes: -1,
   });
   if (sessionId) {
     await prisma.reservation.update({
@@ -245,7 +233,6 @@ describe('settle — HELD path (fulfillment)', () => {
     if (first.kind !== 'converted') throw new Error('unreachable');
     expect(first.alreadyProcessed).toBe(false);
 
-    // Duplicate webhook + poll: second call is a no-op returning the same order.
     const second = await settle(prisma, {
       reservationId,
       paymentIntentId: pi,
@@ -276,7 +263,6 @@ describe('settle — HELD path (fulfillment)', () => {
     const reservationId = await heldPaidReservation(tt.id, 2);
     const pi = `pi_test_${generateId()}`;
 
-    // The webhook and the sync-fulfillment poll can fire at the same instant.
     const [a, b] = await Promise.all([
       settle(prisma, { reservationId, paymentIntentId: pi }),
       settle(prisma, { reservationId, paymentIntentId: pi }),
@@ -287,7 +273,6 @@ describe('settle — HELD path (fulfillment)', () => {
     if (a.kind !== 'converted' || b.kind !== 'converted') {
       throw new Error('unreachable');
     }
-    // Same order; exactly one of the two did the real work.
     expect(a.orderId).toBe(b.orderId);
     expect([a.alreadyProcessed, b.alreadyProcessed].sort()).toEqual([
       false,
@@ -299,7 +284,6 @@ describe('settle — HELD path (fulfillment)', () => {
     });
     expect(orders).toHaveLength(1);
 
-    // No oversell / double count.
     const after = await prisma.ticketTypes.findUnique({ where: { id: tt.id } });
     expect(after?.sold).toBe(2);
     expect(after?.reserved).toBe(0);
@@ -310,7 +294,7 @@ describe('settle — expiry race', () => {
   it('re-acquires the exact quantities when stock is available, then converts', async () => {
     const tt = await makeTicketType(2);
     const reservationId = await heldPaidReservation(tt.id, 2);
-    await forceExpire(reservationId); // hold handed back; reserved → 0
+    await forceExpire(reservationId);
 
     const result = await settle(prisma, {
       reservationId,
@@ -328,7 +312,6 @@ describe('settle — expiry race', () => {
     const reservationId = await heldPaidReservation(tt.id, 2);
     await forceExpire(reservationId);
 
-    // Someone else grabs the whole capacity while the buyer was paying.
     const competitor = await reserve(prisma, {
       eventId: TEST_EVENT_ID,
       items: [
@@ -366,7 +349,6 @@ describe('confirmPaid — auto-refund on the expiry race', () => {
     const tt = await makeTicketType(1);
     const reservationId = await heldPaidReservation(tt.id, 1);
     await forceExpire(reservationId);
-    // Stock gone.
     await reserve(prisma, {
       eventId: TEST_EVENT_ID,
       items: [
@@ -398,7 +380,6 @@ describe('confirmPaid — auto-refund on the expiry race', () => {
     expect(res?.status).toBe(ReservationStatus.REFUNDED);
     expect(res?.stripeRefundId).toBeTruthy();
 
-    // Second delivery: already REFUNDED → no second refund call.
     const second = await confirmPaid(prisma, fake.stripe, {
       reservationId,
       paymentIntentId: pi,
@@ -420,18 +401,14 @@ describe('beginPayment — session creation + reuse', () => {
     });
     expect(first.clientSecret).toBeTruthy();
     expect(first.totalCents).toBe(2 * 1500 + 2 * 300);
-    // Order summary (payment-screen), server-sourced from the reservation tiers.
     expect(first.subtotalCents).toBe(2 * 1500);
     expect(first.feesCents).toBe(2 * 300);
     expect(first.items).toEqual([
       { name: 'GA', quantity: 2, unitPriceCents: 1500, feesCents: 300 },
     ]);
     expect(fake.calls.create).toHaveLength(1);
-    // Line items: a tier line + a single service-fee line.
     expect((fake.calls.create[0].params as any).line_items).toHaveLength(2);
     expect((fake.calls.create[0].params as any).ui_mode).toBe('elements');
-    // Event name lands on the card statement: 'Payments Test Event' cleaned,
-    // uppercased, and cut at 13 characters (22 minus the TROPTIX* prefix).
     expect(
       (fake.calls.create[0].params as any).payment_intent_data
         .statement_descriptor_suffix
@@ -447,7 +424,6 @@ describe('beginPayment — session creation + reuse', () => {
       baseUrl: 'https://example.test',
     });
     expect(second.clientSecret).toBe(first.clientSecret);
-    // No second create — the open Session was retrieved and reused.
     expect(fake.calls.create).toHaveLength(1);
     expect(fake.calls.retrieve.length).toBeGreaterThanOrEqual(1);
   });
@@ -455,7 +431,6 @@ describe('beginPayment — session creation + reuse', () => {
   it('refreshes the hold window at payment time', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
-    // Simulate a buyer who browsed a while: only ~2 min left on the hold.
     const nearly = new Date(Date.now() + 2 * 60_000);
     await prisma.reservation.update({
       where: { id: reservationId },
@@ -468,7 +443,6 @@ describe('beginPayment — session creation + reuse', () => {
       baseUrl: 'https://example.test',
     });
 
-    // The returned + persisted deadline is pushed well past the near-expiry one.
     const returned = new Date(result.expiresAt).getTime();
     expect(returned).toBeGreaterThan(nearly.getTime() + 5 * 60_000);
     const res = await prisma.reservation.findUnique({
@@ -480,7 +454,6 @@ describe('beginPayment — session creation + reuse', () => {
   it('mints a fresh Session with a distinct key when the stored one is non-open', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
-    // A previous Session exists but has expired/completed at Stripe.
     const deadSessionId = `cs_dead_${generateId()}`;
     await prisma.reservation.update({
       where: { id: reservationId },
@@ -508,7 +481,6 @@ describe('getCheckoutState', () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
     const fake = fakeStripe({ payment_status: 'unpaid' });
-    // Attach a session id so getCheckoutState retrieves it.
     await prisma.reservation.update({
       where: { id: reservationId },
       data: { stripeCheckoutSessionId: `cs_test_${generateId()}` },
@@ -585,7 +557,6 @@ describe('sweepExpiredHolds — cancel-then-release', () => {
     const sessionId = `cs_test_${generateId()}`;
     const reservationId = await expiredHold(tt.id, 3, sessionId);
 
-    // Session expire throws → the payment won; must NOT release inventory.
     const fake = fakeStripe(undefined, { expireThrows: true });
     const result = await sweepExpiredHolds(prisma, fake.stripe, new Date());
 
@@ -618,7 +589,6 @@ describe('sweepExpiredHolds — cancel-then-release', () => {
       where: { id: reservationId },
     });
     expect(res?.status).toBe(ReservationStatus.EXPIRED);
-    // No session on this hold → it was not passed to sessions.expire.
     expect(fake.calls.expire).not.toContain(reservationId);
   });
 });
@@ -667,7 +637,6 @@ describe('confirmPaid — order_completed capture', () => {
       sessionId: 'ph-session',
     });
 
-    // Redelivery (webhook retry / racing poll): already converted → no recount.
     const second = await confirmPaid(
       prisma,
       fake.stripe,

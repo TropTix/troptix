@@ -3,7 +3,6 @@ import { getProfile } from '../../services/user';
 import { TRPCError } from '@trpc/server';
 
 export const userRouter = router({
-  /** Aligns with what the web app currently fetches via /api/user/me. */
   profile: protectedProcedure.query(async ({ ctx }) => {
     try {
       return await getProfile(ctx.prisma, ctx.actor);

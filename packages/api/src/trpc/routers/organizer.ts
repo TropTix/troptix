@@ -9,10 +9,7 @@ import {
 import { protectedProcedure, router } from '../trpc';
 
 export const organizerRouter = router({
-  /**
-   * All events the signed-in organizer owns. Ownership-only — the old
-   * platform-owner bypass was removed (ADR 0018).
-   */
+  /** Ownership-only — deliberately no platform-owner bypass (ADR 0018). */
   events: protectedProcedure.query(async ({ ctx }) => {
     try {
       return await getEvents(ctx.prisma, ctx.actor);
@@ -27,9 +24,6 @@ export const organizerRouter = router({
     }
   }),
 
-  /**
-   * A single event and its guest list (tickets).
-   */
   event: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {

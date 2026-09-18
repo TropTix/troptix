@@ -1,18 +1,8 @@
-// @troptix/api — TYPE-ONLY BARREL (default entry).
-//
-// RN-safe. This entry exposes only the things every client may import without
-// pulling server runtime: the `AppRouter` *type* (`import type`) and zod
-// contract schemas/types. It must never re-export the router value, the
-// service layer, or anything that transitively imports @troptix/db.
-//
-// Exposes the zod contracts (runtime — zod is RN-safe) and the `AppRouter`
-// *type* (erased — `export type`, so the router value + @trpc/server + DB
-// runtime are NOT pulled into a client/RN bundle). That's the whole RN-safety
-// mechanism: clients import the router's type for their tRPC client, never the
-// value.
+// RN-safe default entry. Never re-export the router value, services, or anything
+// transitively importing @troptix/db — `AppRouter` leaves as an erased type only.
 export * from './contracts';
 export type { AppRouter } from './trpc/routers';
 
-// Fee math is a pure module (no imports, no DB) — safe to expose on the RN-safe
-// entry so clients can render fee estimates from the one authoritative source.
+// Fee math is a pure module (no imports, no DB) — the one service export that
+// is safe on this entry.
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';

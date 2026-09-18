@@ -15,7 +15,6 @@ import { colors, fonts } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { trpc } from '@/lib/trpc';
 
-// Deterministic accent color so each event card has a distinct tint.
 const ACCENT_COLORS = [
   '#4F46E5',
   '#F59E0B',

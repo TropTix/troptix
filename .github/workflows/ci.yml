@@ -12,7 +12,7 @@ name: CI
 # So: every job here is safe to mark as a required check.
 #
 # Lint is deliberately absent — apps/web has pre-existing eslint errors. Add
-# `yarn workspace web lint` to web-tests once those are fixed.
+# `pnpm --filter web lint` to web-tests once those are fixed.
 
 on:
   pull_request:

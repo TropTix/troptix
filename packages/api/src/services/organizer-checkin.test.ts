@@ -1,9 +1,3 @@
-/**
- * Unit tests for the check-in seam over a hand-rolled fake prisma (no
- * Postgres, ADR 0010). Ownership is the boundary: a foreign event or ticket is
- * NotFound, never a bypass. The atomic scan flip and the toggle's
- * stamp-vs-clear are the behaviors the routes used to own.
- */
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -242,7 +236,6 @@ describe('toggleTicketCheckIn', () => {
       await expect(
         toggleTicketCheckIn(prisma, owner, { ticketId: 't1' })
       ).rejects.toBeInstanceOf(ConflictError);
-      // Untouched — a scannable state would let a refunded holder through.
       expect(tickets[0].status).toBe(voidStatus);
       expect(tickets[0].checkinTimestamp).toBeNull();
     }
@@ -251,8 +244,6 @@ describe('toggleTicketCheckIn', () => {
   it('refuses when the row changed between the read and the write', async () => {
     const { events, tickets } = seed();
     const prisma = makeFakePrisma(events, tickets);
-    // A competing scan won the race: the stored row is already checked in,
-    // but this caller's read saw it un-checked.
     tickets[0].status = 'NOT_AVAILABLE';
     tickets[0].checkinTimestamp = new Date();
     const stale = { ...prisma } as any;

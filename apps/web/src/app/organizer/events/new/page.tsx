@@ -9,9 +9,6 @@ export default async function CreateEventPage() {
   if (!user) {
     redirect('/auth/signin');
   }
-  // The event's host brand (shown read-only on the form). Created on first
-  // save. Paid ticketing is the Organization's approval, not a user role —
-  // the same flag the write service's gate enforces.
   const org = await prisma.organization.findFirst({
     where: { ownerUserId: user.uid },
     select: { displayName: true, paidTicketingEnabled: true },

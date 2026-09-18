@@ -91,7 +91,6 @@ const ROTATING_WORDS = [
   },
 ];
 
-/** One line at the headline's size, shrinking only when the phrase is too long. */
 function rotatingWordSize(word: string) {
   const widthEm = (word.length * 0.56).toFixed(2);
   return `min(clamp(2.9rem, 10vw, 5.75rem), calc(min(88vw, 46rem) / ${widthEm}))`;
@@ -203,10 +202,8 @@ function HeroCopy({ prefersReduced }: { prefersReduced: boolean }) {
 }
 
 type Spark = {
-  /** Position, % of the hero. */
   x: number;
   y: number;
-  /** Rendered size in px. */
   size: number;
   kind: 'pixel' | 'star';
   color: string;
@@ -433,11 +430,9 @@ function SparkleField({ prefersReduced }: { prefersReduced: boolean }) {
 type FlyerSpec = {
   id: string;
   art: React.ReactNode;
-  /** Desktop collage placement + tilt. */
   position: string;
   rotate: number;
   size: string;
-  /** Hidden below this breakpoint (corner flyers show from md up). */
   minShow?: 'lg' | 'xl';
   drift: { y: number; duration: number; delay: number };
 };
@@ -489,7 +484,6 @@ function FlyerField({ prefersReduced }: { prefersReduced: boolean }) {
   );
 }
 
-/** Mobile: the same flyers as a slow marquee under the CTA. */
 function FlyerMarquee({ prefersReduced }: { prefersReduced: boolean }) {
   const track = [...FLYERS, ...FLYERS];
 

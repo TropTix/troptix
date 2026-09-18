@@ -4,8 +4,8 @@ import { organizerRouter } from './organizer';
 import { userRouter } from './user';
 
 /**
- * The application router. `confirm`/`expire` are intentionally NOT procedures
- * — the webhook and cron drive them directly (ADR 0007 / the service-layer plan).
+ * `confirm`/`expire` are intentionally NOT procedures — only the webhook and
+ * cron may drive them (ADR 0007).
  */
 export const appRouter = router({
   checkout: checkoutRouter,
@@ -13,8 +13,6 @@ export const appRouter = router({
   user: userRouter,
 });
 
-/** The router *type* — the only thing clients (web/RN) import, via `@troptix/api`. */
 export type AppRouter = typeof appRouter;
 
-/** Server-side caller (server components, tests) — bypasses HTTP. */
 export const createCaller = createCallerFactory(appRouter);
