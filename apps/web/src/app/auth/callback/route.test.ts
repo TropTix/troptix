@@ -1,8 +1,6 @@
 /**
  * @jest-environment node
  */
-// next/server (NextResponse) requires the Node runtime's web APIs, not jsdom
-// (the Jest config sets jsdom globally).
 
 jest.mock('@/lib/supabase/server', () => ({
   createClient: jest.fn(),
@@ -95,6 +93,11 @@ describe('flow cases', () => {
     const location = res.headers.get('location')!;
 
     expect(location).toBe(`${APP_ORIGIN}/auth/signin?error=auth`);
+
+    const resNoType = await GET(makeRequest('?token_hash=tok123&next=/orders'));
+    expect(resNoType.headers.get('location')).toBe(
+      `${APP_ORIGIN}/auth/signin?error=auth`
+    );
   });
 
   it('redirects to sign-in with an error when Supabase returns an error', async () => {

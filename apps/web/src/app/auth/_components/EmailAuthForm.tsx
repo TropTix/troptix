@@ -38,7 +38,6 @@ const codeSchema = z.object({
 type EmailValues = z.infer<typeof emailSchema>;
 type CodeValues = z.infer<typeof codeSchema>;
 
-// Visually-hidden style for the autofill-decoy inputs (see below).
 const decoyStyle: CSSProperties = {
   position: 'absolute',
   width: 1,
@@ -47,11 +46,6 @@ const decoyStyle: CSSProperties = {
   pointerEvents: 'none',
 };
 
-/**
- * Passwordless sign-in / sign-up — one flow for both. Step 1 collects an email
- * and sends a magic link + code. Step 2 lets the user click the link OR enter
- * the 6-digit code here.
- */
 export function EmailAuthForm() {
   const router = useRouter();
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -115,12 +109,8 @@ export function EmailAuthForm() {
 
         <Form {...codeForm}>
           <form onSubmit={submitCode} className="space-y-6" noValidate>
-            {/*
-              Decoy fields: password managers / browser autofill target the first
-              username + password inputs in a form. These absorb that autofill so
-              it doesn't dump the email into the OTP boxes. Rendered (not
-              display:none, which autofill skips) but visually hidden + untabbable.
-            */}
+            {/* Autofill decoys: absorb username/password autofill so it doesn't
+                dump the email into the OTP boxes; display:none would be skipped. */}
             <input
               type="text"
               name="username"

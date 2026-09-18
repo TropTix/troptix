@@ -1,17 +1,12 @@
 import { z } from 'zod';
 
-// The public event-page DTO: event meta + a server-computed "From $X" price.
-// Client-safe by construction — no ticket rows, no discount codes, no gated-tier
-// data ever reaches the browser; the cheapest public price is pre-derived here.
+// Public DTOs — client-safe by construction: no ticket rows, discount codes,
+// raw inventory counts, or gated-tier data may ever appear here.
 
 export const eventDetailInputSchema = z.object({
   eventId: z.string().min(1),
 });
 export type EventDetailInput = z.infer<typeof eventDetailInputSchema>;
-
-// The organizer-chosen page treatment plus the colors extracted once from the
-// flyer at upload. Stored raw (hex) so the derivation — which lives in the web
-// layer — can evolve without a data backfill.
 
 export const eventPageThemeSchema = z.enum(['off', 'wash', 'dark']);
 export type EventPageTheme = z.infer<typeof eventPageThemeSchema>;
@@ -19,25 +14,14 @@ export type EventPageTheme = z.infer<typeof eventPageThemeSchema>;
 const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
 
 export const flyerPaletteSchema = z.object({
-  /** Most frequent color — often the poster's background. */
   dominant: hexColor,
-  /**
-   * Distinct vivid colors, best first — the organizer's swatch row. Empty
-   * means the flyer has no usable color and the themes are unavailable.
-   */
+  /** Best first. Empty means no usable color — the themes are unavailable. */
   candidates: z.array(hexColor).max(5),
-  /**
-   * The candidate the organizer picked to lead the theme; when absent the
-   * lead is `candidates[0]` (the auto-pick).
-   */
+  /** When absent the lead accent is `candidates[0]` (the auto-pick). */
   chosenAccent: hexColor.nullable().optional(),
 });
 export type FlyerPalette = z.infer<typeof flyerPaletteSchema>;
 
-/**
- * Read a stored (JSONB) palette: malformed rows degrade to null — "no
- * palette", the brand theme — instead of breaking the read.
- */
 export function parseStoredFlyerPalette(value: unknown): FlyerPalette | null {
   return flyerPaletteSchema
     .nullable()
@@ -45,27 +29,21 @@ export function parseStoredFlyerPalette(value: unknown): FlyerPalette | null {
     .parse(value ?? null);
 }
 
-// A public ticket tier, shaped for the event page's selection sheet. No
-// discount codes or raw inventory counts — `maxAllowedToAdd` (0 when sold out /
-// off-sale / draft) plus a coarse `saleStatus` is all the client needs.
 export const eventTicketSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
-  /** Integer cents (priceCents, legacy price*100 fallback). */
   priceCents: z.number().int(),
   /** Per-ticket fee in integer cents (0 when the organizer absorbs fees). */
   feesCents: z.number().int(),
-  /** Quantity the buyer may add now — clamped to availability, max-per-user, sale window, draft. */
   maxAllowedToAdd: z.number().int(),
   /** Sold-out wins over the window; ignores draft (that only zeroes `maxAllowedToAdd`). */
   saleStatus: z.enum(['onSale', 'notYetOnSale', 'saleEnded', 'soldOut']),
 });
 export type EventTicket = z.infer<typeof eventTicketSchema>;
 
-// The discovery-listing DTO: just what an event card renders. No tier data —
-// prices live on the event detail page, so listings never depend on tiers.
-
+// Deliberately no tier data on listings — prices live on the event detail
+// page, so listings never depend on tiers.
 export const eventSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -87,9 +65,7 @@ export const eventDetailSchema = z.object({
   isDraft: z.boolean(),
   isPrivate: z.boolean(),
   organizer: z.string(),
-  /** The owning user — used by the page's draft-visibility guard. */
   organizerUserId: z.string(),
-  /** The hosting Organization (brand) for the "Hosted by" block → /o/[slug]. */
   hostedBy: z
     .object({
       slug: z.string(),
@@ -109,13 +85,10 @@ export const eventDetailSchema = z.object({
   address: z.string(),
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
-  /** Cheapest public tier, integer cents. Null = no public tiers. */
+  /** Cheapest public tier. Null = no public tiers, not free. */
   fromPriceCents: z.number().int().nullable(),
-  /** Organizer-chosen page treatment; 'off' renders the brand theme. */
   pageTheme: eventPageThemeSchema,
-  /** Colors extracted from the flyer at upload; null when never extracted. */
   flyerPalette: flyerPaletteSchema.nullable(),
-  /** Public (non-code-gated) tiers, available first then by price. */
   tickets: z.array(eventTicketSchema),
 });
 export type EventDetail = z.infer<typeof eventDetailSchema>;

@@ -4,16 +4,10 @@ import prisma from '@/server/prisma';
 import { getOrganizationBySlug, NotFoundError } from '@troptix/api/server';
 import OrganizationProfile from './_components/OrganizationProfile';
 
-// Public organization page (surface F5). See
-// docs/plans/2026-06-event-spotlight-and-organizer-brand.md.
-
-// ISR: the page is cached but self-heals hourly, so changes made outside the
-// app (SQL backfills/edits, a draft being published) don't stay stale forever.
-// App-driven changes revalidate on demand: profile save → this path, event
-// publish → the toggle-publish route revalidates `/o/[slug]`.
+// ISR self-heal: app-driven changes revalidate this path on demand, but changes
+// made outside the app (SQL backfills/edits) would otherwise stay stale forever.
 export const revalidate = 3600;
 
-// Deduped per request so generateMetadata + the page share one DB read.
 const loadOrg = cache((slug: string) =>
   getOrganizationBySlug(prisma, { slug })
 );

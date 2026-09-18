@@ -1,13 +1,3 @@
-/**
- * Canonical public read for the event page: fetches the event and its public
- * tiers in one query and shapes both here, independent of the read-side checkout
- * services (slated for rework).
- *
- * Prisma is injected (unit-testable). No authorization (ADR 0013) — keyed by
- * `eventId`; the page does its own draft guard via `isDraft`/`organizerUserId`.
- * Only public (non-gated) tiers are returned, with no discount codes; new
- * columns fall back to legacy sources until the Stage-3 backfill.
- */
 import type { PrismaClient } from '@troptix/db';
 import { Prisma } from '@troptix/db';
 import type {
@@ -29,10 +19,6 @@ const SALE_STATUS = {
   Ended: 'saleEnded',
 } as const;
 
-/**
- * Public discovery listing: upcoming, non-draft, non-private events shaped for
- * the cards on `/discover`. Soonest-first. Card fields only — no tier data.
- */
 export async function listPublicEvents(
   prisma: PrismaClient
 ): Promise<EventSummary[]> {
@@ -63,6 +49,8 @@ export async function getEventDetailRaw(
   prisma: PrismaClient,
   input: EventDetailInput
 ) {
+  // Drafts ARE returned: the page does its own draft guard via
+  // isDraft/organizerUserId (organizer preview) — don't filter them here.
   const event = await prisma.events.findUnique({
     where: { id: input.eventId },
     select: {
@@ -75,7 +63,6 @@ export async function getEventDetailRaw(
       isPrivate: true,
       organizer: true,
       organizerUserId: true,
-      // The hosting Organization (brand) for the "Hosted by" block → /o/[slug].
       organization: {
         select: {
           slug: true,
@@ -96,7 +83,6 @@ export async function getEventDetailRaw(
       longitude: true,
       pageTheme: true,
       flyerPalette: true,
-      // Public tiers only (a null/empty discount code means public).
       ticketTypes: {
         where: {
           OR: [
@@ -146,8 +132,6 @@ export function shapeEventDetail(
 ): EventDetail {
   const tickets: EventTicket[] = event.ticketTypes
     .map((tt) => {
-      // priceCents falls back to price * 100; the sale window needs no fallback
-      // — one pair, full timestamps (ADR 0020).
       const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
       const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
       const saleWindow = {

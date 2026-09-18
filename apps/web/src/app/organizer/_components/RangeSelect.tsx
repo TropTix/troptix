@@ -12,10 +12,6 @@ import {
 } from '@/components/ui/select';
 import { RANGE_LABELS } from './ranges';
 
-/**
- * Drives the dashboard's range via the URL, so the page stays a server
- * component and the range survives a refresh or a shared link.
- */
 export function RangeSelect({ value }: { value: DashboardRange }) {
   const router = useRouter();
   const searchParams = useSearchParams();

@@ -1,10 +1,3 @@
-/**
- * Unit tests for the Screen C event-overview read. Pure over an injected fake
- * `prisma` (ADR 0010). Covers the shared authorization seam (anonymous, scoping,
- * View-as, not-found), the two reconciling revenue sources, the per-ticket-type
- * breakdown with its capacity fallback, `sold` counting null-ticketType tickets, the
- * check-in summary, and the zero-filled revenue series.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -18,7 +11,7 @@ const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 
 interface FakeOpts {
   platformOwner?: boolean;
-  event?: unknown; // undefined → a default event; null → not found
+  event?: unknown;
   orderAgg?: { subtotal?: number | null; count?: number };
   rollups?: unknown[];
   series?: { at: Date; tickets: bigint; revenue: number | null }[];
@@ -137,19 +130,14 @@ describe('getEventOverview — vitals & ticketTypes', () => {
   });
 
   it('reports a type’s sold from its counter, and the event’s from ticket rows', async () => {
-    // The counter says 40; only 37 ticket rows exist (3 were issued against a
-    // type that has since been deleted). Per CONTEXT.md these are different
-    // questions, so the two figures are allowed to differ — and must not be
-    // "helpfully" reconciled.
+    // Counter 40 vs 37 rows + 3 orphans on purpose (different questions, per
+    // CONTEXT.md) — aligning the figures kills what this test discriminates.
     const { prisma } = fakePrisma({
       event: {
         ...defaultEvent,
         ticketTypes: [{ id: 't-ga', name: 'GA', capacity: 100, sold: 40 }],
       },
-      rollups: [
-        ticketType('t-ga', 37, 370),
-        ticketType(null as never, 3, 30), // orphaned: type deleted
-      ],
+      rollups: [ticketType('t-ga', 37, 370), ticketType(null as never, 3, 30)],
     });
 
     const result = await getEventOverview(prisma, OWNER, 'e1', {}, NOW);
@@ -165,7 +153,6 @@ describe('getEventOverview — vitals & ticketTypes', () => {
       checkedIn: 10,
     });
     const result = await getEventOverview(prisma, OWNER, 'e1', {}, NOW);
-    // 40 mapped + 3 orphaned = 43, even though only GA renders a row.
     expect(result.vitals.sold).toBe(43);
     expect(result.ticketTypes.map((t) => t.id)).toEqual(['t-ga', 't-vip']);
     expect(result.checkIn).toEqual({ checkedIn: 10, total: 43 });
@@ -174,7 +161,6 @@ describe('getEventOverview — vitals & ticketTypes', () => {
 
 describe('getEventOverview — revenue series', () => {
   it('zero-fills daily from event creation through today, in cents', async () => {
-    // Event created 2026-07-10; NOW is 2026-07-15 → 6 days (10th..15th).
     const { prisma } = fakePrisma({
       series: [
         { at: new Date('2026-07-12T00:00:00Z'), tickets: 4n, revenue: 80 },

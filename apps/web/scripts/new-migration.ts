@@ -1,26 +1,8 @@
 /**
- * Generate a Supabase-format migration from the current Prisma schema.
- *
- * Usage:
- *   yarn db:new <name>                 # diff: schema.prisma @ origin/main -> working schema.prisma
- *   yarn db:new <name> --base=<ref>    # diff against a different git ref (e.g. HEAD, a tag)
- *   yarn db:new <name> --init          # diff: empty -> schema.prisma  (first baseline migration)
- *
- * Writes supabase/migrations/<timestamp>_<name>.sql using `prisma migrate diff`.
- * Plain SQL is the source of truth (docs/adr/0004-supabase-migrations-as-source.md);
- * Prisma is only the generator. Review the emitted SQL before committing.
- *
- * The baseline is a **schema file at a git ref** (`--from-schema`), NOT the live
- * database (`--from-config-datasource`). This is fully offline — no DB, no
- * POSTGRES_URL — and sidesteps Prisma's P4002 on Supabase's `public → auth`
- * cross-schema FK (which only bites live-DB introspection). It relies on the
- * convention that schema.prisma on the base ref reflects all applied migrations
- * (true when every schema change ships with a migration).
- *
- * Caveat — stacked migrations on one branch: the default base (origin/main)
- * produces the delta since main, so a *second* migration on the same branch
- * would re-emit the first. For that case pass `--base=<commit>` pointing at the
- * commit where the previous migration was added.
+ * Deliberately diffs schema.prisma at the base ref (`--from-schema`), never the
+ * live DB — live introspection hits Prisma P4002 on Supabase's `public → auth`
+ * FK (ADR 0004). A second migration stacked on one branch re-emits the first:
+ * pass `--base=<commit that added the previous one>`.
  */
 import { execFileSync } from 'node:child_process';
 import {
@@ -57,10 +39,8 @@ const relSchema = join('packages', 'db', 'prisma', 'schema.prisma');
 const schemaPath = join(repoRoot, relSchema);
 const migrationsDir = join(repoRoot, 'supabase', 'migrations');
 
-// Supabase migration filename convention: <YYYYMMDDHHMMSS>_<name>.sql.
-// The version must sort above every migration on the base ref and on disk:
-// `supabase db push` refuses versions below the remote head, so an older
-// stamp merges green and silently never applies to prod (bit twice).
+// `supabase db push` refuses versions below the remote head — an older stamp
+// merges green and silently never applies to prod (bit twice), hence the clamp.
 const d = new Date();
 const pad = (n: number) => String(n).padStart(2, '0');
 let timestamp =
@@ -85,9 +65,6 @@ const head = baseFiles
 if (head && timestamp <= head) timestamp = String(Number(head) + 1);
 const outFile = join(migrationsDir, `${timestamp}_${name}.sql`);
 
-// Baseline: `--from-empty` for the first migration, else the schema file as of
-// `baseRef`, extracted to a temp file for `--from-schema` (a pure datamodel diff,
-// no database needed).
 let baselineFile: string | undefined;
 let fromArgs: string[];
 if (isInit) {

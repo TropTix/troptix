@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-// Escape hatch reachable by typing the URL when the header control isn't
-// available. The side effect is on POST so a cross-site navigation or prefetch
-// can't end a session.
+// The side effect is on POST so a cross-site navigation or prefetch can't end
+// a session.
 export async function POST(request: Request) {
   const supabase = await createClient();
   await supabase.auth.signOut();

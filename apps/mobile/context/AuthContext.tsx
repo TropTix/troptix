@@ -41,13 +41,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Restore persisted session from AsyncStorage on mount.
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session ? userFromSession(data.session) : null);
       setIsLoading(false);
     });
 
-    // Stay in sync with token refreshes and sign-outs.
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session ? userFromSession(session) : null);

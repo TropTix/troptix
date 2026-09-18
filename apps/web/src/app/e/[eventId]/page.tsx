@@ -13,9 +13,6 @@ import { eventFlyerUrl } from '@/lib/supabase/storage';
 import { eventDetailCacheTag } from '@/server/revalidateEventPages';
 import EventDetailView from './_components/EventDetailView';
 
-// The public event page. Legacy `/events/[eventId]` 308-redirects here
-// (next.config.js). See docs/plans/2026-06-event-page-redesign.md.
-
 // Cached 60s + tag-busted on organizer edits. Availability can be 60s stale —
 // display-only; createReservation re-checks under the inventory lock.
 const loadEventRaw = cache((eventId: string) =>
@@ -32,7 +29,6 @@ export async function generateMetadata(props: {
   const { eventId } = await props.params;
   try {
     const event = await loadEventRaw(eventId);
-    // OG images must be absolute URLs; resolve the stored path (ADR 0016).
     const ogImage = eventFlyerUrl(event.imageUrl);
     return {
       title: event.name,

@@ -1,9 +1,5 @@
-/**
- * Integration tests for the ticket-type write seam against a REAL Postgres.
- * Same env expectations as reservations.test.ts (`POSTGRES_PRISMA_URL` via
- * apps/web/.env). Fixtures are provisioned under a per-run organizer id and
- * cleaned up FK-safe in afterAll.
- */
+// Real Postgres via POSTGRES_PRISMA_URL (see reservations.test.ts) — point it
+// at a preview/dev branch, never prod.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import prisma from '@troptix/db';
 import type { Actor } from '../trpc/context';
