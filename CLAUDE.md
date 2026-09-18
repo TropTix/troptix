@@ -81,6 +81,7 @@ When editing a file, match its existing comment density — do not add comments 
 ## Database changes
 
 - Schema/migration changes go through the flow in [docs/plans/2026-06-migrations-adoption.md](docs/plans/2026-06-migrations-adoption.md) (`yarn db:new` → review SQL → `yarn db:apply`).
+- A new migration's filename must sort above the newest migration on `main`, or the merge-time `supabase db push` silently skips it — `yarn db:new` stamps this correctly, and the `migration-order` CI job enforces it.
 - **When you write a migration, update `supabase/seed.sql` to match it.** That file is the preview-branch init script — it runs on every fresh per-PR preview branch after the migrations, and INSERTs an explicit column list. Keeping it current with the migration is what lets a reviewer actually exercise the schema change on the PR's preview deploy: the seed provides the relevant rows the new/changed columns need. A new NOT NULL / no-default column, or one the reservation/checkout flow reads without a fallback (e.g. `capacity`), MUST be added there or fresh preview branches break. Keep the fixture synthetic — no real/PII data.
 
 ## Dates and times
