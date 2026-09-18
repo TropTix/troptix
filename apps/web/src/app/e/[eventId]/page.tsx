@@ -1,13 +1,26 @@
 import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
+import { connection } from 'next/server';
 import prisma from '@/server/prisma';
-import { getEventDetail, NotFoundError } from '@troptix/api/server';
+import {
+  getEventDetailRaw,
+  shapeEventDetail,
+  NotFoundError,
+} from '@troptix/api/server';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
+import { eventDetailCacheTag } from '@/server/revalidateEventPages';
 import EventDetailView from './_components/EventDetailView';
 
-const loadEvent = cache((eventId: string) =>
-  getEventDetail(prisma, { eventId })
+// Cached 60s + tag-busted on organizer edits. Availability can be 60s stale —
+// display-only; createReservation re-checks under the inventory lock.
+const loadEventRaw = cache((eventId: string) =>
+  unstable_cache(
+    () => getEventDetailRaw(prisma, { eventId }),
+    ['event-detail', eventId],
+    { revalidate: 60, tags: [eventDetailCacheTag(eventId)] }
+  )()
 );
 
 export async function generateMetadata(props: {
@@ -15,7 +28,7 @@ export async function generateMetadata(props: {
 }) {
   const { eventId } = await props.params;
   try {
-    const event = await loadEvent(eventId);
+    const event = await loadEventRaw(eventId);
     const ogImage = eventFlyerUrl(event.imageUrl);
     return {
       title: event.name,
@@ -38,19 +51,24 @@ export default async function EventDetailPage({
 }: {
   params: Promise<{ eventId: string }>;
 }) {
-  const user = await getUserFromIdTokenCookie();
+  // Without this a published event's render could be cached as static forever —
+  // nothing else on the non-draft path is request-bound.
+  await connection();
   const { eventId } = await params;
 
   let event;
   try {
-    event = await loadEvent(eventId);
+    event = shapeEventDetail(await loadEventRaw(eventId), new Date());
   } catch (err) {
     if (err instanceof NotFoundError) notFound();
     throw err;
   }
 
-  if (event.isDraft && user?.uid !== event.organizerUserId) {
-    notFound();
+  if (event.isDraft) {
+    const user = await getUserFromIdTokenCookie();
+    if (user?.uid !== event.organizerUserId) {
+      notFound();
+    }
   }
 
   return (
