@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "packageManager": "pnpm@11.24.0",
+  "packageManager": "pnpm@11.26.0",
   "scripts": {
     "test": "pnpm --filter web test",
     "next": "pnpm --filter web dev",
