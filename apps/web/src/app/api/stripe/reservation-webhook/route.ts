@@ -13,9 +13,11 @@ import {
  * Fulfiller for the `/e/` reservation flow (ADR 0018) — separate endpoint and
  * signing secret from the legacy `pages/api/stripe/webhook.ts`.
  *
- * Shape follows Stripe's webhook guidance: claim the event id first so a
- * concurrent redelivery is a no-op, do only the settle before answering, and
- * push email to `after()` so the 2xx is not held up by Resend or PDF rendering.
+ * Shape follows Stripe's webhook guidance: skip event ids already handled, do
+ * only the settle before answering, and push email to `after()` so the 2xx is
+ * not held up by Resend or PDF rendering. The id is recorded only after the
+ * settle succeeds, so a function that dies mid-handler leaves Stripe's retry
+ * free to run; concurrent duplicates converge on `settle`'s row lock.
  */
 export const runtime = 'nodejs';
 
@@ -39,7 +41,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  if (!(await claimEvent(event))) {
+  const seen = await prisma.processedStripeEvent.findUnique({
+    where: { id: event.id },
+    select: { id: true },
+  });
+  if (seen) {
     return NextResponse.json({ received: true, duplicate: true });
   }
 
@@ -50,26 +56,13 @@ export async function POST(req: Request) {
       `[ReservationWebhook] Handler error for ${event.type} (${event.id}):`,
       err
     );
-    // Release the claim so Stripe's retry gets to run the handler again.
-    await prisma.processedStripeEvent
-      .delete({ where: { id: event.id } })
-      .catch(() => {});
     return NextResponse.json({ error: 'Handler failed' }, { status: 500 });
   }
 
+  await prisma.processedStripeEvent
+    .create({ data: { id: event.id, type: event.type } })
+    .catch(() => {});
   return NextResponse.json({ received: true });
-}
-
-async function claimEvent(event: Stripe.Event): Promise<boolean> {
-  try {
-    await prisma.processedStripeEvent.create({
-      data: { id: event.id, type: event.type },
-    });
-    return true;
-  } catch (err) {
-    if ((err as { code?: string }).code === 'P2002') return false;
-    throw err;
-  }
 }
 
 async function handleEvent(event: Stripe.Event): Promise<void> {

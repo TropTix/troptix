@@ -2,7 +2,7 @@
 import Stripe from 'stripe';
 
 const mockPrisma = {
-  processedStripeEvent: { create: jest.fn(), delete: jest.fn() },
+  processedStripeEvent: { findUnique: jest.fn(), create: jest.fn() },
 };
 const mockConfirmPaid = jest.fn();
 const mockSendConfirmation = jest.fn();
@@ -69,12 +69,12 @@ async function post(payload: unknown, signature?: string) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockAfterTasks.length = 0;
+  mockPrisma.processedStripeEvent.findUnique.mockResolvedValue(null);
   mockPrisma.processedStripeEvent.create.mockResolvedValue({});
-  mockPrisma.processedStripeEvent.delete.mockResolvedValue({});
 });
 
 describe('reservation webhook', () => {
-  it('claims the event, settles, answers 200, and emails after the response', async () => {
+  it('settles, records the event, answers 200, and emails after the response', async () => {
     mockConfirmPaid.mockResolvedValue({
       kind: 'order',
       orderId: 'ord_1',
@@ -97,10 +97,10 @@ describe('reservation webhook', () => {
     expect(mockSendConfirmation).toHaveBeenCalledWith('ord_1');
   });
 
-  it('is a no-op on a redelivery that lost the claim race', async () => {
-    mockPrisma.processedStripeEvent.create.mockRejectedValue(
-      Object.assign(new Error('unique'), { code: 'P2002' })
-    );
+  it('is a no-op on a redelivery of an event already recorded', async () => {
+    mockPrisma.processedStripeEvent.findUnique.mockResolvedValue({
+      id: 'evt_1',
+    });
 
     const res = await post(completedEvent());
 
@@ -109,15 +109,13 @@ describe('reservation webhook', () => {
     expect(mockConfirmPaid).not.toHaveBeenCalled();
   });
 
-  it('releases the claim and answers 500 when settling fails, so Stripe retries', async () => {
+  it('records nothing and answers 500 when settling fails, so Stripe retries', async () => {
     mockConfirmPaid.mockRejectedValue(new Error('db down'));
 
     const res = await post(completedEvent());
 
     expect(res.status).toBe(500);
-    expect(mockPrisma.processedStripeEvent.delete).toHaveBeenCalledWith({
-      where: { id: 'evt_1' },
-    });
+    expect(mockPrisma.processedStripeEvent.create).not.toHaveBeenCalled();
     expect(mockSendConfirmation).not.toHaveBeenCalled();
   });
 
@@ -132,6 +130,6 @@ describe('reservation webhook', () => {
     const res = await post(completedEvent(), 't=1,v1=bad');
 
     expect(res.status).toBe(400);
-    expect(mockPrisma.processedStripeEvent.create).not.toHaveBeenCalled();
+    expect(mockPrisma.processedStripeEvent.findUnique).not.toHaveBeenCalled();
   });
 });
