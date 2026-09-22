@@ -50,6 +50,8 @@ jobs:
             web:
               - 'apps/web/**'
               - 'packages/**'
+              - 'e2e/**'
+              - 'supabase/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - '.github/workflows/ci.yml'
@@ -116,6 +118,57 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Run API integration tests
         run: pnpm --filter @troptix/api test
+
+  # Browser tests for the buyer flow (e2e/). Hermetic: the same local Postgres
+  # the api-tests use, a production build of apps/web, real Stripe test mode.
+  # No webhook forwarding is needed — the checkout page's own poll fulfils the
+  # order (ADR 0029). Every test is recorded; the HTML report and the stitched
+  # proof video are uploaded as the run's artifact. Paid specs skip themselves
+  # when the Stripe test keys are not configured as repo secrets.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CI: 1
+      STRIPE_SECRET_KEY: ${{ secrets.E2E_STRIPE_SECRET_KEY }}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.E2E_STRIPE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.110.0
+      - name: Start local Postgres (migrations + seed)
+        run: supabase db start
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium
+        run: pnpm --filter @troptix/e2e exec playwright install --with-deps chromium
+      - name: Build web
+        run: pnpm --filter @troptix/e2e build:web
+      - name: Run browser tests
+        run: pnpm --filter @troptix/e2e test
+      - name: Stitch proof video
+        if: always()
+        run: pnpm --filter @troptix/e2e proof
+      - name: Upload report and videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: e2e/playwright-report
+          retention-days: 30
 
   # Supabase Branching's merge-time `supabase db push` (no --include-all) only
   # applies migrations whose filenames sort above the newest already-applied

@@ -8,10 +8,11 @@
     "test": "pnpm --filter web test",
     "next": "pnpm --filter web dev",
     "dev": "npm-run-all --parallel next",
-    "typecheck": "pnpm --filter web typecheck && pnpm --filter @troptix/db typecheck && pnpm --filter @troptix/api typecheck && pnpm --filter @troptix/transactional typecheck && pnpm --filter troptix-mobile typecheck",
+    "typecheck": "pnpm --filter web typecheck && pnpm --filter @troptix/db typecheck && pnpm --filter @troptix/api typecheck && pnpm --filter @troptix/transactional typecheck && pnpm --filter troptix-mobile typecheck && pnpm --filter @troptix/e2e typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "e2e": "pnpm --filter @troptix/e2e build:web && pnpm --filter @troptix/e2e test && pnpm --filter @troptix/e2e proof"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,json,css,scss,md,yml,yaml}": "prettier --write"

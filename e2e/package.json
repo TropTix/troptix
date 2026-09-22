@@ -1,0 +1,24 @@
+{
+  "name": "@troptix/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser end-to-end tests for the buyer flow. Runs against a local Postgres (supabase db start) and a production build of apps/web; every test is recorded to video and the run ends with a stitched proof video.",
+  "scripts": {
+    "build:web": "tsx scripts/build-web.ts",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "proof": "tsx scripts/stitch-proof.ts",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.15.5",
+    "ffmpeg-static": "^5.2.0",
+    "pg": "^8.16.3",
+    "tsx": "^4.20.4",
+    "typescript": "^5.9.2"
+  }
+}

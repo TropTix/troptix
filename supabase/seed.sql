@@ -67,7 +67,9 @@ insert into public."Membership" (id, "createdAt", "updatedAt", role, "organizati
 values ('seed_membership_1', now(), now(), 'ADMIN', 'seed_organization_1', 'seed_admin_1');
 
 -- Published events, owned by the demo organizer. `startsAt`/`endsAt` are full
--- timestamps — the only date columns Events has (ADR 0020).
+-- timestamps — the only date columns Events has (ADR 0020). Dates are
+-- now()-relative: an absolute date goes stale, flips the page to "No longer
+-- on sale" and silently breaks checkout and the e2e suite.
 insert into public."Events" (
   id, "createdAt", "updatedAt", "isDraft", "isPrivate", name, description, summary,
   organizer, "organizerUserId", "startsAt", "endsAt",
@@ -78,7 +80,7 @@ insert into public."Events" (
     'seed_event_1', now(), now(), false, false,
     'TropTix Demo Festival', 'A sample paid event seeded for preview branches.', 'Happy-path paid checkout',
     'Demo Organizer', 'seed_org_1',
-    '2026-08-15 18:00:00', '2026-08-15 23:00:00',
+    now() + interval '60 days', now() + interval '60 days 5 hours',
     'Demo Arena', '123 Demo Street, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
     'wash', '{"dominant": "#7A1E2B", "candidates": ["#FF4757", "#FFD23F", "#7A1E2B"], "chosenAccent": null}'
   ),
@@ -86,7 +88,7 @@ insert into public."Events" (
     'seed_event_2', now(), now(), false, false,
     'TropTix Free Community Day', 'A free RSVP event seeded for preview branches.', 'Free RSVP path',
     'Demo Organizer', 'seed_org_1',
-    '2026-09-05 12:00:00', '2026-09-05 18:00:00',
+    now() + interval '75 days', now() + interval '75 days 6 hours',
     'Demo Park', '45 Community Ave, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
     'dark', '{"dominant": "#131020", "candidates": ["#FF4D97", "#FFB454", "#2EE6FF"], "chosenAccent": null}'
   ),
@@ -94,7 +96,7 @@ insert into public."Events" (
     'seed_event_3', now(), now(), false, false,
     'TropTix Edge-Case Showcase', 'Tiers in unusual states for testing the checkout UI.', 'Near-capacity, sold-out, upcoming, gated',
     'Demo Organizer', 'seed_org_1',
-    '2026-09-20 19:00:00', '2026-09-21 01:00:00',
+    now() + interval '90 days', now() + interval '90 days 6 hours',
     'Demo Hall', '9 Edge Lane, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
     'off', null
   ),
@@ -102,7 +104,7 @@ insert into public."Events" (
     'seed_event_4', now(), now(), false, true,
     'TropTix Private Preview', 'A private event: published, but only reachable by direct link (/e/seed_event_4).', 'Private — hidden from listings',
     'Demo Organizer', 'seed_org_1',
-    '2026-10-10 20:00:00', '2026-10-11 00:00:00',
+    now() + interval '100 days', now() + interval '100 days 4 hours',
     'Demo Loft', '7 Hidden Row, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
     'off', null
   );
@@ -115,24 +117,24 @@ insert into public."TicketTypes" (
   price, "priceCents", "ticketingFees", "discountCode", "eventId"
 ) values
   -- seed_event_1: happy-path paid tiers, on sale now, plenty available
-  ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 0, now(), '2026-08-15 18:00:00', 25.00, 2500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
-  ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks',  4,  50, 0, 0, now(), '2026-08-15 18:00:00', 75.00, 7500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
+  ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 0, now(), now() + interval '60 days', 25.00, 2500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
+  ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks',  4,  50, 0, 0, now(), now() + interval '60 days', 75.00, 7500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
 
   -- seed_event_2: free RSVP tier, on sale now, organizer absorbs fees
-  ('seed_tt_rsvp', 'FREE', now(), now(), 'Free RSVP', 'Reserve a free spot',          6, 300, 0, 0, now(), '2026-09-05 12:00:00', 0.00, 0, 'ABSORB_TICKET_FEES', null, 'seed_event_2'),
+  ('seed_tt_rsvp', 'FREE', now(), now(), 'Free RSVP', 'Reserve a free spot',          6, 300, 0, 0, now(), now() + interval '75 days', 0.00, 0, 'ABSORB_TICKET_FEES', null, 'seed_event_2'),
 
   -- seed_event_3: edge-case tiers
   --   near-capacity: capacity - reserved - sold = 2  → "Only 2 left"
-  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity tier',      10, 100, 0, 98, now(), '2026-09-20 19:00:00', 30.00, 3000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity tier',      10, 100, 0, 98, now(), now() + interval '90 days', 30.00, 3000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   sold-out: capacity == sold → availability 0
-  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold tier',          4,  50, 0, 50, now(), '2026-09-20 19:00:00', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold tier',          4,  50, 0, 50, now(), now() + interval '90 days', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   upcoming: sale window opens in the future → not yet on sale
-  ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', '2026-09-20 19:00:00', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', now() + interval '90 days', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   gated: non-empty discountCode → hidden until 'UNLOCK2026' is entered
-  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), '2026-09-20 19:00:00', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3'),
+  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), now() + interval '90 days', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3'),
 
   -- seed_event_4: private event still sells by direct link
-  ('seed_tt_priv',   'PAID', now(), now(), 'Invite Ticket', 'For link holders',        10, 150, 0,  0, now(), '2026-10-10 20:00:00', 35.00, 3500, 'PASS_TICKET_FEES', null, 'seed_event_4');
+  ('seed_tt_priv',   'PAID', now(), now(), 'Invite Ticket', 'For link holders',        10, 150, 0,  0, now(), now() + interval '100 days', 35.00, 3500, 'PASS_TICKET_FEES', null, 'seed_event_4');
 
 -- ── Payout fixtures (docs/plans/2026-08-organizer-payout-requests.md) ────────
 -- Two ENDED events with COMPLETED orders give the demo org every balance

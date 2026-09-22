@@ -2,6 +2,7 @@ packages:
   - apps/mobile
   - apps/web
   - packages/*
+  - e2e
 # apps/organizer (Expo SDK 53) is a standalone app with its own yarn.lock —
 # SDK 53 can't run under the isolated linker, so it stays out of the workspace.
 
@@ -19,6 +20,7 @@ allowBuilds:
   '@prisma/engines': true
   core-js: true
   esbuild: true
+  ffmpeg-static: true
   ngrok: true
   prisma: true
   sharp: true
