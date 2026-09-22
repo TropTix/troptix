@@ -1,8 +1,8 @@
 ---
 title: Stripe Connect — the US payout rail
-status: proposed
+status: active
 created: 2026-09-17
-tracking-issue: TBD
+tracking-issue: '#580'
 ---
 
 # Stripe Connect — the US payout rail
@@ -629,16 +629,9 @@ Two plans follow this one. Neither changes anything these two PRs build.
 Added to CONTEXT.md in this PR: **Connect account** (new), **Payout rail**
 and **Payout setup** (amended).
 
-## Decisions to record
+## Decisions recorded
 
-When implementation starts, one ADR: _separate charges and transfers on the
-platform account; Connect (Accounts v2, recipient-configured, Express) is the
-US rail; rail assignment is derived; Stripe's status is read live, never
-cached_ — amending the 2026-07 Global Payouts decision and recording why
-destination charges were rejected (the ledger, not Stripe, owns release
-timing; one charge path regardless of organizer; the fee model is derived, not
-Stripe-native) and why v1 controller accounts were not used (Stripe's
-direction for new platforms; identical shape; typed thin events).
+[ADR 0030](../adr/0030-stripe-is-the-payout-rail.md) records the rail decision, the charge model, the account shape, derived rail assignment, live status, and the rejected alternatives (destination charges, v1 controller accounts, per-order transfers).
 
 ## Open questions
 
