@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import type Stripe from 'stripe';
 import { confirmPaid } from '@troptix/api/server';
 import prisma from '@/server/prisma';
@@ -12,6 +12,10 @@ import {
 /**
  * Fulfiller for the `/e/` reservation flow (ADR 0018) — separate endpoint and
  * signing secret from the legacy `pages/api/stripe/webhook.ts`.
+ *
+ * Shape follows Stripe's webhook guidance: claim the event id first so a
+ * concurrent redelivery is a no-op, do only the settle before answering, and
+ * push email to `after()` so the 2xx is not held up by Resend or PDF rendering.
  */
 export const runtime = 'nodejs';
 
@@ -35,35 +39,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  const seen = await prisma.processedStripeEvent.findUnique({
-    where: { id: event.id },
-    select: { id: true },
-  });
-  if (seen) {
+  if (!(await claimEvent(event))) {
     return NextResponse.json({ received: true, duplicate: true });
   }
 
   try {
     await handleEvent(event);
   } catch (err) {
-    // 500 → Stripe retries. Fulfillment is idempotent, so a retry is safe.
     console.error(
       `[ReservationWebhook] Handler error for ${event.type} (${event.id}):`,
       err
     );
+    // Release the claim so Stripe's retry gets to run the handler again.
+    await prisma.processedStripeEvent
+      .delete({ where: { id: event.id } })
+      .catch(() => {});
     return NextResponse.json({ error: 'Handler failed' }, { status: 500 });
   }
 
-  // Record only after successful handling; a concurrent delivery may have
-  // recorded it first (unique id) — that's fine.
+  return NextResponse.json({ received: true });
+}
+
+async function claimEvent(event: Stripe.Event): Promise<boolean> {
   try {
     await prisma.processedStripeEvent.create({
       data: { id: event.id, type: event.type },
     });
-  } catch {
-    // Already recorded by a racing delivery.
+    return true;
+  } catch (err) {
+    if ((err as { code?: string }).code === 'P2002') return false;
+    throw err;
   }
-  return NextResponse.json({ received: true });
 }
 
 async function handleEvent(event: Stripe.Event): Promise<void> {
@@ -71,14 +77,8 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
       const reservationId = session.metadata?.reservationId;
-      if (!reservationId) {
-        // Not one of ours — acknowledge without acting.
-        return;
-      }
-      if (session.payment_status === 'unpaid') {
-        // A completed-but-unpaid Session has nothing to fulfill.
-        return;
-      }
+      if (!reservationId) return;
+      if (session.payment_status === 'unpaid') return;
       const paymentIntentId =
         typeof session.payment_intent === 'string'
           ? session.payment_intent
@@ -97,18 +97,19 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
         serverAnalytics()
       );
       if (state.kind === 'order') {
-        // Resend dedupes on `confirmation-${orderId}`, so this is safe to send
-        // here even though the client may also fire it on the success screen.
-        try {
-          await sendEmailConfirmationEmailToUser(state.orderId);
-        } catch (emailErr) {
-          console.error(
-            '[ReservationWebhook] Confirmation email failed (non-fatal):',
-            emailErr
-          );
-        }
+        const { orderId } = state;
+        after(async () => {
+          try {
+            await sendEmailConfirmationEmailToUser(orderId);
+          } catch (emailErr) {
+            console.error(
+              '[ReservationWebhook] Confirmation email failed:',
+              emailErr
+            );
+          }
+        });
       } else if (state.kind === 'refunded') {
-        await sendRefundNoticeEmail(reservationId);
+        after(() => sendRefundNoticeEmail(reservationId));
       }
       return;
     }
