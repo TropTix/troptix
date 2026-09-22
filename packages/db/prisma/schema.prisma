@@ -89,6 +89,10 @@ model Organization {
   payoutMeetingAt    DateTime?
   payoutBankLinkedAt DateTime?
 
+  // The organizer's Stripe account: a Connect account today, a Global Payouts
+  // recipient later. Onboarding state lives in Stripe; this is only the key.
+  stripeAccountId String? @unique
+
   // Payout release policy overrides (graduated trust). Null = platform
   // defaults (PayoutConfig). releaseAtSale releases earnings as orders
   // complete instead of at event end; the holdback still anchors to event end.

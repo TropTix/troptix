@@ -1,17 +1,24 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import prisma from '@/server/prisma';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
+import { stripe } from '@/server/lib/stripe';
+import { isFlagEnabled } from '@/server/lib/featureFlags';
+import { getAppBaseUrl } from '@/lib/appUrl';
 import {
   cancelPayoutRequestInputSchema,
+  FeatureFlag,
   requestPayoutInputSchema,
   type RequestPayoutInput,
 } from '@troptix/api';
 import {
   cancelPayoutRequest as cancelPayoutRequestService,
+  createStripeDashboardLink,
   requestPayout as requestPayoutService,
+  startStripeOnboarding as startStripeOnboardingService,
   InvalidPayoutAmountError,
   NotFoundError,
   PayoutRequestPendingError,
@@ -64,6 +71,60 @@ export async function cancelPayoutRequest(id: string): Promise<ActionResult> {
   } catch (error) {
     return failure(error, 'Failed to cancel the request. Please try again.');
   }
+}
+
+/**
+ * Ends in a redirect to Stripe's single-use link, so the link never crosses
+ * the wire as data. `redirect()` throws and must stay outside the try.
+ */
+export async function startStripeOnboarding(): Promise<ActionResult> {
+  const user = await getServerUser();
+  if (!user) {
+    return { success: false, error: 'Authentication required.' };
+  }
+  if (
+    !(await isFlagEnabled(FeatureFlag.STRIPE_CONNECT_ONBOARDING, {
+      id: user.uid,
+      email: user.email,
+    }))
+  ) {
+    return { success: false, error: 'Stripe payouts are not available yet.' };
+  }
+
+  let url: string;
+  try {
+    ({ url } = await startStripeOnboardingService(
+      prisma,
+      stripe,
+      userToActor(user),
+      { baseUrl: getAppBaseUrl() }
+    ));
+  } catch (error) {
+    return failure(error, 'Could not start Stripe setup. Please try again.');
+  }
+  redirect(url);
+}
+
+export async function openStripeDashboard(): Promise<ActionResult> {
+  const user = await getServerUser();
+  if (!user) {
+    return { success: false, error: 'Authentication required.' };
+  }
+
+  let url: string;
+  try {
+    ({ url } = await createStripeDashboardLink(
+      prisma,
+      stripe,
+      userToActor(user)
+    ));
+  } catch (error) {
+    return failure(
+      error,
+      'Could not open your Stripe dashboard. Please try again.'
+    );
+  }
+  redirect(url);
 }
 
 function failure(error: unknown, fallback: string): ActionResult {

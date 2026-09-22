@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
-import { getPayouts } from '@troptix/api/server';
-import { FeatureFlag } from '@troptix/api';
+import { getConnectSetup, getPayouts } from '@troptix/api/server';
+import { connectReturnOutcomeSchema, FeatureFlag } from '@troptix/api';
 import { Banknote, Clock, Wallet } from 'lucide-react';
 import { isFlagEnabled } from '@/server/lib/featureFlags';
 import { getServerUser } from '@/server/authUser';
@@ -15,6 +15,9 @@ import {
 import { formatCents } from '@/lib/dateUtils';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
+import { stripe } from '@/server/lib/stripe';
+import { ConnectReturnBanner } from './_components/ConnectReturnBanner';
+import { ConnectStatusCard } from './_components/ConnectStatusCard';
 import { RequestPayoutCard } from './_components/RequestPayoutCard';
 import { RequestsTable } from './_components/RequestsTable';
 import { SetupChecklistCard } from './_components/SetupChecklistCard';
@@ -22,7 +25,7 @@ import { SetupChecklistCard } from './_components/SetupChecklistCard';
 export default async function OrganizerPayoutsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ viewAs?: string }>;
+  searchParams: Promise<{ viewAs?: string; stripe?: string }>;
 }) {
   const user = await getServerUser();
   if (!user) {
@@ -30,17 +33,17 @@ export default async function OrganizerPayoutsPage({
   }
   // Email included so the staff release condition matches without PostHog
   // having seen this user before.
-  if (
-    !(await isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, {
-      id: user.uid,
-      email: user.email,
-    }))
-  ) {
+  const flagUser = { id: user.uid, email: user.email };
+  const [payoutsEnabled, connectEnabled] = await Promise.all([
+    isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, flagUser),
+    isFlagEnabled(FeatureFlag.STRIPE_CONNECT_ONBOARDING, flagUser),
+  ]);
+  if (!payoutsEnabled) {
     notFound();
   }
   const actor = userToActor(user);
 
-  const { viewAs } = await searchParams;
+  const { viewAs, stripe: stripeParam } = await searchParams;
 
   // Writes never take a View-as target (the seam's rule), so the write
   // controls disappear when viewing another organizer — they would act on the
@@ -48,10 +51,16 @@ export default async function OrganizerPayoutsPage({
   const readOnly =
     Boolean(viewAs) && (actor.kind !== 'user' || viewAs !== actor.userId);
 
-  const payouts = await getPayouts(prisma, actor, {
-    viewAsOrganizerUserId: viewAs,
-  });
+  const [payouts, connect] = await Promise.all([
+    getPayouts(prisma, actor, { viewAsOrganizerUserId: viewAs }),
+    connectEnabled
+      ? getConnectSetup(prisma, stripe, actor, {
+          viewAsOrganizerUserId: viewAs,
+        })
+      : Promise.resolve(null),
+  ]);
   const { setup, policy } = payouts;
+  const returnOutcome = connectReturnOutcomeSchema.safeParse(stripeParam);
 
   const holdbackLine = policy.releaseAtSale
     ? `Earnings are available as tickets sell; ${policy.holdbackPercent}% is held until ${policy.holdbackDays} days after each event ends.`
@@ -64,6 +73,10 @@ export default async function OrganizerPayoutsPage({
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold tracking-tight">Payouts</h1>
+
+      {connect && returnOutcome.success && (
+        <ConnectReturnBanner outcome={returnOutcome.data} />
+      )}
 
       <section className="grid gap-4 sm:grid-cols-3">
         <StatCard
@@ -88,14 +101,17 @@ export default async function OrganizerPayoutsPage({
 
       {setup.complete ? (
         !readOnly && (
-          <RequestPayoutCard
-            availableCents={payouts.availableCents}
-            hasOpenRequest={hasOpenRequest}
-            holdbackLine={holdbackLine}
-          />
+          <>
+            {connect && <ConnectStatusCard state={connect.state} />}
+            <RequestPayoutCard
+              availableCents={payouts.availableCents}
+              hasOpenRequest={hasOpenRequest}
+              holdbackLine={holdbackLine}
+            />
+          </>
         )
       ) : (
-        <SetupChecklistCard setup={setup} />
+        <SetupChecklistCard setup={setup} connect={readOnly ? null : connect} />
       )}
 
       <RequestsTable requests={payouts.requests} readOnly={readOnly} />
