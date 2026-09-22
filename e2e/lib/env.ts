@@ -16,7 +16,10 @@ export function loadWebEnvFile() {
 
 // The environment both `next build` and `next start` run under. The Supabase
 // values are placeholders: nothing in the buyer flow signs in, and the
-// session-refresh proxy never calls out without a session cookie.
+// session-refresh proxy never calls out without a session cookie. The Stripe
+// and Resend clients throw at construction without a key, which fails the
+// build; placeholders keep it building when the real keys are absent (paid
+// specs skip on the missing publishable key, and no email can leave).
 export function webEnv(): Record<string, string> {
   return {
     ...(process.env as Record<string, string>),
@@ -24,6 +27,8 @@ export function webEnv(): Record<string, string> {
     NEXT_PUBLIC_APP_URL: BASE_URL,
     NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321',
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'e2e-placeholder',
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder',
+    RESEND_API_KEY: process.env.RESEND_API_KEY || 're_placeholder',
     NEXT_TELEMETRY_DISABLED: '1',
   };
 }
