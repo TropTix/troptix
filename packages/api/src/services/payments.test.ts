@@ -13,6 +13,7 @@ import {
   statementDescriptorSuffix,
   sweepExpiredHolds,
 } from './payments';
+import { HoldExpiredError } from './_shared/errors';
 import type {
   CheckoutAnalytics,
   OrderCompletedProps,
@@ -486,13 +487,37 @@ describe('getCheckoutState — pure read', () => {
     expect(state.kind).toBe('held');
   });
 
-  it('reports expired for an expired hold with no payment', async () => {
+  it('reports expired once the sweep has expired the hold', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
     await forceExpire(reservationId);
 
     const state = await getCheckoutState(prisma, { reservationId });
     expect(state.kind).toBe('expired');
+  });
+
+  it('still reports held for a HELD row past its deadline (a paid webhook may be in flight)', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await expiredHold(tt.id, 1);
+
+    const state = await getCheckoutState(prisma, { reservationId });
+    expect(state.kind).toBe('held');
+  });
+});
+
+describe('beginPayment — lapsed hold', () => {
+  it('rejects with HoldExpiredError instead of minting a Session', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await expiredHold(tt.id, 1);
+    const fake = fakeStripe();
+
+    await expect(
+      beginPayment(prisma, fake.stripe, {
+        reservationId,
+        baseUrl: 'https://example.test',
+      })
+    ).rejects.toBeInstanceOf(HoldExpiredError);
+    expect(fake.calls.create).toHaveLength(0);
   });
 });
 

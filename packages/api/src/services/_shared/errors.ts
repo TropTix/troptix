@@ -12,6 +12,14 @@ export class UnauthorizedError extends Error {
   }
 }
 
+/** The hold is no longer open for payment (lapsed, released, or already settled). */
+export class HoldExpiredError extends Error {
+  constructor(reservationId: string) {
+    super(`Reservation ${reservationId} is no longer open for payment.`);
+    this.name = 'HoldExpiredError';
+  }
+}
+
 export class ConflictError extends Error {
   constructor(message: string) {
     super(message);
