@@ -20,7 +20,7 @@ import type {
   BeginPaymentResponse,
   CheckoutState,
 } from '../contracts/payments';
-import type { CheckoutAnalytics } from '../contracts/analytics';
+import type { CheckoutAnalytics, FulfilledVia } from '../contracts/analytics';
 
 /**
  * Stripe truncates `PREFIX* SUFFIX` at 22 chars: TROPTIX (7) + `* ` (2) leaves
@@ -216,6 +216,7 @@ export async function confirmPaid(
   input: {
     reservationId: string;
     paymentIntentId: string;
+    fulfilledVia: Exclude<FulfilledVia, 'free'>;
     cardType?: string | null;
     cardLast4?: string | null;
   },
@@ -236,7 +237,8 @@ export async function confirmPaid(
         prisma,
         analytics,
         input.reservationId,
-        result.orderId
+        result.orderId,
+        input.fulfilledVia
       );
     }
     return orderCheckoutState(prisma, result.orderId);
@@ -252,6 +254,12 @@ export async function confirmPaid(
   await prisma.reservation.update({
     where: { id: input.reservationId },
     data: { status: ReservationStatus.REFUNDED, stripeRefundId: refund.id },
+  });
+  console.warn('[Checkout] expiry-race refund issued', {
+    reservationId: input.reservationId,
+    paymentIntentId: input.paymentIntentId,
+    refundId: refund.id,
+    via: input.fulfilledVia,
   });
   return { kind: 'refunded' };
 }
@@ -357,7 +365,11 @@ export async function finalizePayment(
       return confirmPaid(
         prisma,
         stripe,
-        { reservationId: reservation.id, paymentIntentId },
+        {
+          reservationId: reservation.id,
+          paymentIntentId,
+          fulfilledVia: 'sync',
+        },
         analytics
       );
     }

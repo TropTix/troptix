@@ -1,6 +1,6 @@
 import { NextResponse, after } from 'next/server';
 import type Stripe from 'stripe';
-import { confirmPaid } from '@troptix/api/server';
+import { confirmPaid, paymentIntentIdOf } from '@troptix/api/server';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { serverAnalytics } from '@/server/lib/analytics';
@@ -72,10 +72,7 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
       const reservationId = session.metadata?.reservationId;
       if (!reservationId) return;
       if (session.payment_status === 'unpaid') return;
-      const paymentIntentId =
-        typeof session.payment_intent === 'string'
-          ? session.payment_intent
-          : session.payment_intent?.id;
+      const paymentIntentId = paymentIntentIdOf(session);
       if (!paymentIntentId) {
         console.error(
           `[ReservationWebhook] Session ${session.id} completed with no payment_intent`
@@ -86,7 +83,7 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
       const state = await confirmPaid(
         prisma,
         stripe,
-        { reservationId, paymentIntentId },
+        { reservationId, paymentIntentId, fulfilledVia: 'webhook' },
         serverAnalytics()
       );
       if (state.kind === 'order') {

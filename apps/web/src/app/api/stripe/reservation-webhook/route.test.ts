@@ -10,7 +10,13 @@ const mockSendRefundNotice = jest.fn();
 const mockAfterTasks: Promise<unknown>[] = [];
 
 jest.mock('@/server/prisma', () => ({ __esModule: true, default: mockPrisma }));
-jest.mock('@troptix/api/server', () => ({ confirmPaid: mockConfirmPaid }));
+jest.mock('@troptix/api/server', () => ({
+  confirmPaid: mockConfirmPaid,
+  paymentIntentIdOf: (session: { payment_intent?: string | { id: string } }) =>
+    typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : (session.payment_intent?.id ?? null),
+}));
 jest.mock('@/server/lib/email', () => ({
   sendEmailConfirmationEmailToUser: mockSendConfirmation,
   sendRefundNoticeEmail: mockSendRefundNotice,
@@ -90,7 +96,11 @@ describe('reservation webhook', () => {
     expect(mockConfirmPaid).toHaveBeenCalledWith(
       mockPrisma,
       expect.anything(),
-      { reservationId: 'res_1', paymentIntentId: 'pi_1' },
+      {
+        reservationId: 'res_1',
+        paymentIntentId: 'pi_1',
+        fulfilledVia: 'webhook',
+      },
       undefined
     );
     await Promise.all(mockAfterTasks);

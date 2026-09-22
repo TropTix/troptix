@@ -369,6 +369,7 @@ describe('confirmPaid — auto-refund on the expiry race', () => {
     const first = await confirmPaid(prisma, fake.stripe, {
       reservationId,
       paymentIntentId: pi,
+      fulfilledVia: 'webhook',
     });
     expect(first.kind).toBe('refunded');
     expect(fake.calls.refund).toHaveLength(1);
@@ -385,6 +386,7 @@ describe('confirmPaid — auto-refund on the expiry race', () => {
     const second = await confirmPaid(prisma, fake.stripe, {
       reservationId,
       paymentIntentId: pi,
+      fulfilledVia: 'webhook',
     });
     expect(second.kind).toBe('refunded');
     expect(fake.calls.refund).toHaveLength(1);
@@ -696,7 +698,11 @@ describe('confirmPaid — order_completed capture', () => {
     const first = await confirmPaid(
       prisma,
       fake.stripe,
-      { reservationId: r.reservationId, paymentIntentId: pi },
+      {
+        reservationId: r.reservationId,
+        paymentIntentId: pi,
+        fulfilledVia: 'webhook',
+      },
       analytics
     );
     expect(first.kind).toBe('order');
@@ -711,12 +717,17 @@ describe('confirmPaid — order_completed capture', () => {
       ticketCount: 2,
       distinctId: 'ph-distinct',
       sessionId: 'ph-session',
+      fulfilledVia: 'webhook',
     });
 
     const second = await confirmPaid(
       prisma,
       fake.stripe,
-      { reservationId: r.reservationId, paymentIntentId: pi },
+      {
+        reservationId: r.reservationId,
+        paymentIntentId: pi,
+        fulfilledVia: 'webhook',
+      },
       analytics
     );
     expect(second.kind).toBe('order');
@@ -735,7 +746,11 @@ describe('confirmPaid — order_completed capture', () => {
     const state = await confirmPaid(
       prisma,
       fakeStripe().stripe,
-      { reservationId, paymentIntentId: `pi_test_${generateId()}` },
+      {
+        reservationId,
+        paymentIntentId: `pi_test_${generateId()}`,
+        fulfilledVia: 'sync',
+      },
       analytics
     );
     expect(state.kind).toBe('order');
