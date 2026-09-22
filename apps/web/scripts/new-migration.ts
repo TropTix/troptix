@@ -23,7 +23,7 @@ const baseArg = process.argv
 const baseRef = baseArg ?? process.env.MIGRATION_BASE_REF ?? 'origin/main';
 
 if (!rawName || rawName.startsWith('--')) {
-  console.error('Usage: yarn db:new <name> [--base=<ref>] [--init]');
+  console.error('Usage: pnpm db:new <name> [--base=<ref>] [--init]');
   process.exit(1);
 }
 
@@ -113,7 +113,7 @@ try {
   mkdirSync(migrationsDir, { recursive: true });
   writeFileSync(outFile, sql);
   console.log(`Wrote ${outFile} (baseline: ${isInit ? 'empty' : baseRef})`);
-  console.log('Review the SQL, then run `yarn db:apply` to apply it.');
+  console.log('Review the SQL, then run `pnpm db:apply` to apply it.');
 } finally {
   if (baselineFile) rmSync(baselineFile, { force: true });
 }
