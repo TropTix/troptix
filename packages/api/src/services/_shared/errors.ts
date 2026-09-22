@@ -12,6 +12,14 @@ export class UnauthorizedError extends Error {
   }
 }
 
+/** The reservation's Checkout Session is already complete; finalize, never re-mint. */
+export class AlreadyPaidError extends Error {
+  constructor(reservationId: string) {
+    super(`Reservation ${reservationId} has already been paid.`);
+    this.name = 'AlreadyPaidError';
+  }
+}
+
 /** The hold is no longer open for payment (lapsed, released, or already settled). */
 export class HoldExpiredError extends Error {
   constructor(reservationId: string) {

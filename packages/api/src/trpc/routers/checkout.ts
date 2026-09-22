@@ -26,7 +26,11 @@ import {
   finalizePayment,
   getCheckoutState,
 } from '../../services/payments';
-import { HoldExpiredError, NotFoundError } from '../../services/_shared/errors';
+import {
+  AlreadyPaidError,
+  HoldExpiredError,
+  NotFoundError,
+} from '../../services/_shared/errors';
 
 // The client branches on these codes (expired screen vs. keep waiting), so
 // the service errors that carry that meaning get a code rather than a 500.
@@ -36,6 +40,9 @@ function checkoutError(err: unknown): never {
   }
   if (err instanceof HoldExpiredError) {
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: err.message });
+  }
+  if (err instanceof AlreadyPaidError) {
+    throw new TRPCError({ code: 'CONFLICT', message: err.message });
   }
   throw err;
 }

@@ -232,7 +232,15 @@ export default function CheckoutSheet({
         .mutateAsync({ reservationId: forReservationId })
         .then((payment) => openPayment(payment, forReservationId, resumed))
         .catch((err: unknown) => {
-          if (trpcCode(err) === 'PRECONDITION_FAILED') {
+          const code = trpcCode(err);
+          if (code === 'CONFLICT') {
+            // The Session completed between the row read and the reopen —
+            // it's paid, so finalize it rather than expire the hold.
+            reopenInFlightRef.current = false;
+            void finalize(forReservationId, resumed);
+            return;
+          }
+          if (code === 'PRECONDITION_FAILED') {
             setStep('expired');
             return;
           }

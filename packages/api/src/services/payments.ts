@@ -11,7 +11,11 @@ import {
   expireHold,
   settle,
 } from './reservations';
-import { HoldExpiredError, NotFoundError } from './_shared/errors';
+import {
+  AlreadyPaidError,
+  HoldExpiredError,
+  NotFoundError,
+} from './_shared/errors';
 import type {
   BeginPaymentResponse,
   CheckoutState,
@@ -120,8 +124,13 @@ export async function beginPayment(
         ...summary,
       };
     }
-    // Non-open (expired / complete): mint a fresh Session — remember the dead
-    // id so the create's key differs, else Stripe replays this dead Session.
+    // A complete Session is paid and awaiting fulfilment; a second Session
+    // here would be a second charge that `settle` could never refund.
+    if (existing.status === 'complete') {
+      throw new AlreadyPaidError(reservation.id);
+    }
+    // Expired: mint a fresh Session — remember the dead id so the create's
+    // key differs, else Stripe replays this dead Session.
     staleSessionId = reservation.stripeCheckoutSessionId;
   }
 
