@@ -2,7 +2,7 @@
 title: Checkout payment verification — webhook first, one sync fulfil, no Stripe polling
 status: active
 created: 2026-09-21
-tracking-issue: TBD
+tracking-issue: #567
 ---
 
 # Checkout payment verification
