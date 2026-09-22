@@ -37,7 +37,11 @@ export interface OrderCompletedProps {
   /** Null (analytics blocked) makes the implementation fall back to a server-only id. */
   distinctId: string | null;
   sessionId: string | null;
+  /** Which path materialized the order. A webhook share of zero means the endpoint is dead (ADR 0030). */
+  fulfilledVia: FulfilledVia;
 }
+
+export type FulfilledVia = 'webhook' | 'sync' | 'free';
 
 /**
  * A returned promise is awaited so serverless functions flush before freezing;

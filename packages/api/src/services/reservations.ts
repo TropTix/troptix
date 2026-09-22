@@ -17,7 +17,7 @@ import type {
   CompleteFreeInput,
   CompleteFreeResponse,
 } from '../contracts/reservations';
-import type { CheckoutAnalytics } from '../contracts/analytics';
+import type { CheckoutAnalytics, FulfilledVia } from '../contracts/analytics';
 import { generateId } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
 import { NotFoundError } from './_shared/errors';
@@ -526,7 +526,8 @@ export async function captureOrderCompleted(
   prisma: PrismaClient,
   analytics: CheckoutAnalytics,
   reservationId: string,
-  orderId: string
+  orderId: string,
+  fulfilledVia: FulfilledVia
 ): Promise<void> {
   try {
     const reservation = await prisma.reservation.findUnique({
@@ -545,6 +546,7 @@ export async function captureOrderCompleted(
       ticketCount: reservation.items.reduce((sum, i) => sum + i.quantity, 0),
       distinctId: reservation.posthogDistinctId,
       sessionId: reservation.posthogSessionId,
+      fulfilledVia,
     });
   } catch {
     // Swallow — a failed capture must not surface to the buyer.
@@ -595,7 +597,8 @@ export async function completeFree(
       prisma,
       analytics,
       input.reservationId,
-      orderId
+      orderId,
+      'free'
     );
   }
 
