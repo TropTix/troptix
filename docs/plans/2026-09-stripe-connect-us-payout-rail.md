@@ -59,7 +59,8 @@ movement end to end. The section after the table lists what changed.
 
 ## Decisions
 
-Settled in review on 2026-09-17, revised 2026-09-21:
+Settled in review on 2026-09-17, revised 2026-09-21; items 14 to 16 settled in
+the 2026-09-21 grilling session:
 
 1. **Scope**: Connect is the **US rail**. Jamaican organizers stay on the
    manual rail. Global Payouts is deferred, not superseded.
@@ -145,6 +146,19 @@ Settled in review on 2026-09-17, revised 2026-09-21:
     ADR 0023): merge dark, enable for one friendly US organizer, watch the
     first real transfer land, then open up. The webhook and send rail need no
     flag — they are inert without a connected account.
+14. **Connect is available before the meeting.** The bank step and the
+    meeting step are independent; Stripe's verification takes a day or two,
+    so starting early means the organizer is ready when the meeting is done.
+    The meeting still gates the first request, on every rail.
+15. **Switching an existing manual-rail Organization to Stripe** needs no new
+    UI: a Platform Owner clears the bank step with the existing switch, the
+    fork reappears for the organizer, and requests are blocked until Stripe
+    activates. There is never a moment with two valid destinations.
+16. **Refunds after a Stripe payout net out in the ledger.** A refunded order
+    leaves earnings, so Available shrinks (floored at zero) and the next
+    request is smaller; the platform balance fronts the difference meanwhile.
+    No reversal machinery; a Platform Owner can reverse a transfer by hand in
+    the Stripe Dashboard for a large or final-event case.
 
 ## Non-goals
 
@@ -157,6 +171,9 @@ Settled in review on 2026-09-17, revised 2026-09-21:
 - No tracking of the bank leg (`payout.paid`, `payout.failed`). The Express
   dashboard shows it; if a bank deposit fails, Stripe disables the bank
   account and the organizer fixes it there.
+- No email when a payout is sent. The request row flips to `PAID · via
+  Stripe` and the Express dashboard shows the deposit. One outbox template
+  later, with the rejection email the manual-rail plan deferred.
 - No reversal/dispute machinery beyond what the Stripe dashboard shows.
   Refunds are still unmodeled in the ledger; when they land, the ledger
   subtracts and `transfers.createReversal` becomes the tool.
@@ -205,9 +222,9 @@ and no buttons; it never throws.
    > payout meeting. Your bank details are held at our bank — TropTix never
    > stores them.
    >
-   > _Under "United States":_ Stripe collects your details and bank account
-   > securely. TropTix never sees your bank details. Takes about five minutes;
-   > have your SSN or EIN and a bank account number ready.
+   > _Under "United States":_ We need a U.S. address, an SSN or EIN, and a
+   > U.S. bank account to verify with Stripe. TropTix never sees your bank
+   > details. Takes about five minutes.
 
    The choice is not stored. Picking "Jamaica or elsewhere" only reveals the
    manual copy. Clicking **Connect with Stripe** calls the server action
@@ -528,15 +545,8 @@ Recorded in a runbook (`docs/runbooks/stripe-connect.md`, written in PR 1):
 
 ## Vocabulary (CONTEXT.md, when PR 1 ships)
 
-- **Connect account**: the Stripe Accounts v2 account, recipient-configured
-  with an Express dashboard, that receives an Organization's payouts.
-  `Organization.stripeConnectAccountId`. Never a merchant; TropTix stays
-  merchant of record.
-- **Payout rail** (rewrite): manual today; Stripe Connect for a US
-  Organization whose Connect account can take transfers. Derived from the
-  account id plus a verified destination, never declared.
-- **Payout setup** (amend): the bank step is either done with TropTix at the
-  ops bank or done alone through Stripe-hosted onboarding.
+Added to CONTEXT.md in this PR: **Connect account** (new), **Payout rail**
+and **Payout setup** (amended).
 
 ## Decisions to record
 
@@ -551,12 +561,7 @@ direction for new platforms; identical shape; typed thin events).
 
 ## Open questions
 
-- **Platform account country.** The plan assumes the TropTix Stripe account
-  is a US account. Confirm in the Dashboard before PR 1; a non-US platform
-  cannot transfer to US recipients without cross-border payouts.
-- **Notify the organizer on send?** The Express dashboard and their bank
-  statement both show it. A "your payout is on its way" email through the
-  outbox would be one template; deferred with the rejection email.
+- ~~Platform account country.~~ Confirmed US on 2026-09-21.
 - **Who owns the Connect account if ownership transfer ever lands.** The
   account belongs to the Organization row, so it moves with the row. The
   identity inside it belongs to whoever onboarded; a new owner would onboard
