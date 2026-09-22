@@ -1,8 +1,8 @@
 ---
 title: Payout onboarding — from free events to payable
-status: proposed
+status: active
 created: 2026-09-22
-tracking-issue: TBD
+tracking-issue: '#579'
 ---
 
 # Payout onboarding — from free events to payable
