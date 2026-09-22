@@ -9,6 +9,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { trpc } from '@/lib/trpc';
 import type {
   BeginPaymentResponse,
+  CheckoutState,
   EventDetail,
   ReservationContact,
 } from '@troptix/api';
@@ -47,6 +48,10 @@ type SuccessData = {
   orderId: string;
   tickets: { id: string; ticketTypeName: string | null }[];
 };
+
+function trpcCode(err: unknown): string | undefined {
+  return (err as { data?: { code?: string } })?.data?.code;
+}
 
 function setReservationParam(reservationId: string | null) {
   if (typeof window === 'undefined') return;
@@ -90,7 +95,7 @@ export default function CheckoutSheet({
   } | null>(null);
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const [slowFinalize, setSlowFinalize] = useState(false);
-  const resumeReopenRef = useRef(false);
+  const reopenInFlightRef = useRef(false);
 
   // The browser's PostHog identity, sent with the hold so the server-side
   // conversion capture joins this person/session (see contracts/analytics.ts).
@@ -165,9 +170,11 @@ export default function CheckoutSheet({
   const createReservation = trpc.checkout.createReservation.useMutation();
   const completeFree = trpc.checkout.completeFree.useMutation();
   const beginPayment = trpc.checkout.beginPayment.useMutation();
+  const finalizePayment = trpc.checkout.finalizePayment.useMutation();
   const releaseReservation = trpc.checkout.release.useMutation();
 
-  const polling = step === 'finalizing' && !!reservationId;
+  const polling =
+    step === 'finalizing' && !!reservationId && !finalizePayment.isPending;
   // Errors are not terminal here: the webhook may still land, so the interval
   // keeps checking (no react-query retries — the backoff is the retry).
   const stateQuery = trpc.checkout.getCheckoutState.useQuery(
@@ -191,14 +198,16 @@ export default function CheckoutSheet({
   const resumeTargetRef = useRef(resumeReservationId ?? null);
   useEffect(() => {
     if (!open || !resumeTargetRef.current) return;
-    setReservationId(resumeTargetRef.current);
+    const id = resumeTargetRef.current;
     resumeTargetRef.current = null;
-    setStep('finalizing');
+    void finalize(id, true);
   }, [open]);
 
-  useEffect(() => {
-    if (step !== 'finalizing' || !stateQuery.data) return;
-    const state = stateQuery.data;
+  function applyCheckoutState(
+    state: CheckoutState,
+    forReservationId: string,
+    resumed: boolean
+  ) {
     if (state.kind === 'order') {
       finishCheckout(
         { orderId: state.orderId, tickets: state.tickets },
@@ -206,39 +215,67 @@ export default function CheckoutSheet({
       );
     } else if (state.kind === 'refunded') {
       setStep('refunded');
-      // The poll can be what performs the refund (webhook slow/down) — nudge the
-      // notice here too; idempotent, Resend dedupes on refund-<reservationId>.
-      if (reservationId) {
-        void fetch('/api/checkout/refund-notice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reservationId }),
-        }).catch(() => {});
-      }
+      // The sync finalize can be what performs the refund (webhook slow/down) —
+      // nudge the notice here too; Resend dedupes on refund-<reservationId>.
+      void fetch('/api/checkout/refund-notice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservationId: forReservationId }),
+      }).catch(() => {});
     } else if (state.kind === 'expired') {
       setStep('expired');
-    } else if (
-      state.kind === 'held' &&
-      reservationId &&
-      !resumeReopenRef.current
-    ) {
-      // Resumed onto an unpaid hold — reopen payment instead of spinning;
-      // beginPayment reuses the still-open Session.
-      resumeReopenRef.current = true;
+    } else if (state.kind === 'held' && !reopenInFlightRef.current) {
+      // An unpaid hold — reopen payment instead of spinning; beginPayment
+      // reuses the still-open Session and is the authority on the deadline.
+      reopenInFlightRef.current = true;
       beginPayment
-        .mutateAsync({ reservationId })
-        .then((payment) => openPayment(payment, reservationId, true))
-        .catch(() => {
-          expiredReasonRef.current = 'payment_reopen_failed';
-          setStep('expired');
+        .mutateAsync({ reservationId: forReservationId })
+        .then((payment) => openPayment(payment, forReservationId, resumed))
+        .catch((err: unknown) => {
+          if (trpcCode(err) === 'PRECONDITION_FAILED') {
+            setStep('expired');
+            return;
+          }
+          // Anything else (Stripe down, network): keep waiting for the webhook.
+          reopenInFlightRef.current = false;
         });
     }
-  }, [step, stateQuery.data, reservationId]);
+  }
+
+  // Stripe's landing-page recipe (ADR 0030): one server-side fulfil attempt
+  // while the buyer is here. If it can't conclude, the poll waits for the webhook.
+  async function finalize(forReservationId: string, resumed: boolean) {
+    setReservationId(forReservationId);
+    setStep('finalizing');
+    try {
+      const state = await finalizePayment.mutateAsync({
+        reservationId: forReservationId,
+      });
+      applyCheckoutState(state, forReservationId, resumed);
+    } catch (err) {
+      if (trpcCode(err) === 'NOT_FOUND') {
+        expiredReasonRef.current = 'reservation_not_found';
+        setStep('expired');
+      }
+      // Otherwise stay on finalizing; the webhook still fulfils and the poll will see it.
+    }
+  }
+
+  useEffect(() => {
+    if (step !== 'finalizing' || !reservationId) return;
+    if (trpcCode(stateQuery.error) === 'NOT_FOUND') {
+      expiredReasonRef.current = 'reservation_not_found';
+      setStep('expired');
+      return;
+    }
+    if (stateQuery.data)
+      applyCheckoutState(stateQuery.data, reservationId, true);
+  }, [step, stateQuery.data, stateQuery.error, reservationId]);
 
   // Expired/refunded are set from several places — capture on the step
   // transition so every path counts once.
   const capturedStepRef = useRef<Step | null>(null);
-  const expiredReasonRef = useRef<'hold_expired' | 'payment_reopen_failed'>(
+  const expiredReasonRef = useRef<'hold_expired' | 'reservation_not_found'>(
     'hold_expired'
   );
   useEffect(() => {
@@ -282,11 +319,12 @@ export default function CheckoutSheet({
     setPaymentSummary(null);
     setSuccessData(null);
     setSlowFinalize(false);
-    resumeReopenRef.current = false;
+    reopenInFlightRef.current = false;
     expiredReasonRef.current = 'hold_expired';
     createReservation.reset();
     completeFree.reset();
     beginPayment.reset();
+    finalizePayment.reset();
   }
 
   function handleOpenChange(next: boolean) {
@@ -461,6 +499,9 @@ export default function CheckoutSheet({
                   event={event}
                   summary={paymentSummary}
                   expiresAt={expiresAt}
+                  onPaid={() => {
+                    if (reservationId) void finalize(reservationId, false);
+                  }}
                   onExpired={() => setStep('expired')}
                   onBack={backFromPayment}
                 />

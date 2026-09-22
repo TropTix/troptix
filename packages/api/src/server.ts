@@ -23,7 +23,9 @@ export {
 export {
   beginPayment,
   confirmPaid,
+  finalizePayment,
   getCheckoutState,
+  paymentIntentIdOf,
   sweepExpiredHolds,
   type SweepResult,
 } from './services/payments';

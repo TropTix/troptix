@@ -8,10 +8,12 @@ import { reserve, settle } from './reservations';
 import {
   beginPayment,
   confirmPaid,
+  finalizePayment,
   getCheckoutState,
   statementDescriptorSuffix,
   sweepExpiredHolds,
 } from './payments';
+import { HoldExpiredError } from './_shared/errors';
 import type {
   CheckoutAnalytics,
   OrderCompletedProps,
@@ -476,8 +478,51 @@ describe('beginPayment — session creation + reuse', () => {
   });
 });
 
-describe('getCheckoutState', () => {
-  it('reports held while the Session is unpaid', async () => {
+describe('getCheckoutState — pure read', () => {
+  it('reports held for a live hold', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+
+    const state = await getCheckoutState(prisma, { reservationId });
+    expect(state.kind).toBe('held');
+  });
+
+  it('reports expired once the sweep has expired the hold', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+    await forceExpire(reservationId);
+
+    const state = await getCheckoutState(prisma, { reservationId });
+    expect(state.kind).toBe('expired');
+  });
+
+  it('still reports held for a HELD row past its deadline (a paid webhook may be in flight)', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await expiredHold(tt.id, 1);
+
+    const state = await getCheckoutState(prisma, { reservationId });
+    expect(state.kind).toBe('held');
+  });
+});
+
+describe('beginPayment — lapsed hold', () => {
+  it('rejects with HoldExpiredError instead of minting a Session', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await expiredHold(tt.id, 1);
+    const fake = fakeStripe();
+
+    await expect(
+      beginPayment(prisma, fake.stripe, {
+        reservationId,
+        baseUrl: 'https://example.test',
+      })
+    ).rejects.toBeInstanceOf(HoldExpiredError);
+    expect(fake.calls.create).toHaveLength(0);
+  });
+});
+
+describe('finalizePayment — one sync fulfil attempt', () => {
+  it('reports held after one retrieve when the Session is unpaid', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
     const fake = fakeStripe({ payment_status: 'unpaid' });
@@ -486,13 +531,14 @@ describe('getCheckoutState', () => {
       data: { stripeCheckoutSessionId: `cs_test_${generateId()}` },
     });
 
-    const state = await getCheckoutState(prisma, fake.stripe, {
+    const state = await finalizePayment(prisma, fake.stripe, {
       reservationId,
     });
     expect(state.kind).toBe('held');
+    expect(fake.calls.retrieve).toHaveLength(1);
   });
 
-  it('fulfills inline when the Session is paid but no order exists yet', async () => {
+  it('fulfills when the Session is paid but no order exists yet', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
     const pi = `pi_test_${generateId()}`;
@@ -502,7 +548,7 @@ describe('getCheckoutState', () => {
     });
     const fake = fakeStripe({ payment_status: 'paid', payment_intent: pi });
 
-    const state = await getCheckoutState(prisma, fake.stripe, {
+    const state = await finalizePayment(prisma, fake.stripe, {
       reservationId,
     });
     expect(state.kind).toBe('order');
@@ -515,16 +561,22 @@ describe('getCheckoutState', () => {
     expect(res?.status).toBe(ReservationStatus.CONVERTED);
   });
 
-  it('reports expired for an expired hold with no payment', async () => {
+  it('returns the existing order with no Stripe call once converted', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
-    await forceExpire(reservationId);
-    const fake = fakeStripe();
+    const pi = `pi_test_${generateId()}`;
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { stripeCheckoutSessionId: `cs_test_${generateId()}` },
+    });
+    const fake = fakeStripe({ payment_status: 'paid', payment_intent: pi });
+    await finalizePayment(prisma, fake.stripe, { reservationId });
 
-    const state = await getCheckoutState(prisma, fake.stripe, {
+    const again = await finalizePayment(prisma, fake.stripe, {
       reservationId,
     });
-    expect(state.kind).toBe('expired');
+    expect(again.kind).toBe('order');
+    expect(fake.calls.retrieve).toHaveLength(1);
   });
 });
 
