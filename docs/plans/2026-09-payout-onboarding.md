@@ -49,8 +49,11 @@ has one owner and one way to complete it.
 | 3 | Accept payout terms      | Organizer      | The owner reads the terms in the app and accepts                                               | `payoutTermsAcceptedAt` + `payoutTermsVersion` (new)           |
 | 4 | Connect a payout destination | Organizer, Stripe verifies | Stripe activates the account (US, Connect; later Jamaica, Global Payouts) or, during the transition, TropTix enters a Mercury recipient | `payoutBankLinkedAt` (exists), `stripeAccountId` (Connect plan) |
 
-**Ready** is all four recorded. `requestPayout` gains one more gate (step 3);
-everything else it checks today stays.
+**Payable** is all four recorded. It is the gate for two things: selling paid
+tickets and requesting payouts. Today only step 2 gates selling; from this
+plan on, an Organization sells paid tickets only when it is Payable (decision
+8). `requestPayout` gains the terms check (step 3); everything else it checks
+today stays.
 
 Steps 3 and 4 are independent of each other and of step 2: an organizer can
 accept terms and connect Stripe the day they sign up. Step 1 exists so
@@ -92,7 +95,7 @@ order, not an enforced one.
    step.
 6. **A Platform View onboarding queue replaces database edits.** One page,
    `/organizer/platform/onboarding`, lists every Organization that is not yet
-   Ready, grouped by what they are waiting on: waiting on TropTix (requested,
+   Payable, grouped by what they are waiting on: waiting on TropTix (requested,
    not approved), waiting on the organizer (approved, terms or destination
    missing), waiting on Stripe (account pending or restricted). Each row shows
    the four timestamps, the owner's email, days in the current state, and the
@@ -112,11 +115,34 @@ order, not an enforced one.
      goes to TropTix instead so a human reaches out. Never more than one nudge
      per Organization per day, recorded on the Organization
      (`payoutSetupNudgedAt`).
-8. **Selling is never blocked by payout setup.** An approved organizer can put
-   paid tickets on sale with steps 3 and 4 open. Publishing a paid event with
-   setup incomplete shows one non-blocking notice on the publish confirmation
-   ("You can sell now; finish payout setup to withdraw"). Withholding sales
-   would punish the organizer for TropTix's process.
+8. **Selling paid tickets requires Payable.** Decided 2026-09-22: an
+   Organization may not sell paid tickets until all four steps are recorded.
+   The gate is the existing one, `assertPaidTicketingAllowed` in
+   `_shared/paid-ticketing.ts`, which today reads `paidTicketingEnabled`; it
+   now reads Payable from the same Organization row (approval, meeting, terms
+   at the current version, destination). It stays in the write path — creating
+   or editing a ticket type with `priceCents > 0`, and publishing an event
+   that has one — and reads recorded columns only, never Stripe, so ticket
+   writes never wait on a network call. Three consequences, each deliberate:
+   - **Live sales are never pulled.** An event already on sale keeps selling if
+     a step later lapses (a terms version bump, a Stripe restriction). The
+     gate is on writes, as the file's own comment already says. Pulling
+     tickets from patrons to discipline an organizer would harm the wrong
+     party.
+   - **Existing organizers get a cutover, not a cliff.** The migration stamps
+     `paidTicketingGraceUntil = now() + 30 days` on every Organization that is
+     approved today; the gate passes while the grace holds. The dashboard card
+     shows the deadline, the approval-style email goes out to each of them on
+     launch, and the silence nudges count down to it. After the deadline they
+     cannot create new paid ticket types or publish new paid events until
+     Payable.
+   - **A Stripe account still verifying blocks selling.** Step 4 is recorded
+     when Stripe activates the account, which takes a day or two after the
+     form. The step's `pending` copy says so, and the request flow (step 1)
+     points organizers at steps 3 and 4 before the call so verification runs
+     while they wait for TropTix.
+   A terms version bump gets the same 30-day grace for selling, stamped on the
+   bump, and blocks payout requests at once.
 9. **Every step change is an analytics event** (`payout_setup_step_changed`
    with step, from, to, organization id) so the funnel is readable in PostHog
    from day one. Drop-off between step 2 and step 4 is the number this plan
@@ -150,13 +176,13 @@ current step expanded:
 > TropTix collects on your behalf. [Read and accept]
 > Steps: Requested Jul 3 · Approved Jul 9 · Terms · Bank
 
-The card disappears when Ready. An organizer who has never requested sees
+The card disappears when Payable. An organizer who has never requested sees
 step 1 expanded with the booking link beside the button.
 
 **Payouts page checklist** (replaces the two-step `SetupChecklistCard`). The
 same four steps, full width, each with its state line and action. Step 4
 renders the Connect plan's bank step. The request card appears below it only
-when Ready, as today.
+when Payable, as today.
 
 **Terms page** `/organizer/payouts/terms`: the rendered markdown, the version
 and effective date, the last acceptance (who, when, which version), and an
@@ -170,8 +196,11 @@ confirm with the meeting date defaulting to today), Nudge now (sends the
 silence email regardless of cadence), View as (existing). Stripe rows link to
 the account in the Stripe Dashboard.
 
-**Publish notice**: one line on the publish confirmation for a paid event when
-setup is incomplete, linking to the payouts page.
+**Ticket type and publish gates**: the price field in the ticket-type drawer
+and the publish confirmation for a paid event both show the same block when
+the Organization is not Payable: "Finish payout setup to sell paid tickets",
+naming the missing step, linking to the payouts page. During a grace period
+the block becomes a notice with the deadline. RSVP tickets are never gated.
 
 ## Schema
 
@@ -184,23 +213,32 @@ payoutTermsAcceptedAt DateTime?
 payoutTermsVersion    String?   @db.VarChar(20)
 // Last silence nudge, so the cron never sends twice in a day.
 payoutSetupNudgedAt   DateTime?
+// Selling stays allowed until this instant for an Organization that was
+// approved before the Payable gate, or whose terms version was bumped.
+paidTicketingGraceUntil DateTime?
 ```
+
+The migration backfills `paidTicketingGraceUntil` for every Organization with
+`paidTicketingEnabled = true`, 30 days out. That backfill is the cutover; the
+plan cannot ship without it or every current organizer loses paid ticketing
+on deploy.
 
 `paidTicketingRequestedAt`, `paidTicketingEnabled`, `payoutMeetingAt`, and
 `payoutBankLinkedAt` already exist. `stripeAccountId` comes from the Connect
 plan; this migration must sort after that one.
 
 `supabase/seed.sql`: the demo Organization gets all timestamps set and the
-current terms version, so the preview branch renders Ready; the second
+current terms version, so the preview branch renders Payable; the second
 Organization ("Island Nights") gets `paidTicketingRequestedAt` only, so it
-sits in "waiting on TropTix" and the queue has a row to approve.
+sits in "waiting on TropTix", the queue has a row to approve, and its paid
+ticket writes hit the gate.
 
 ## Service layer
 
 **`packages/api/src/services/organizer-onboarding.ts`**
 
 - `getPayoutSetup(prisma, stripe, actor, { viewAsOrganizerUserId })` →
-  `PayoutSetup`: the four steps, `ready`, `nextAction`. Reads the Connect
+  `PayoutSetup`: the four steps, `payable`, `graceUntil`, `nextAction`. Reads the Connect
   state for step 4 through the Connect plan's `readConnectState`. View-as
   works, read-only.
 - `requestPaidTicketing(prisma, actor)` — owner-only; sets the timestamp if
@@ -213,7 +251,7 @@ sits in "waiting on TropTix" and the queue has a row to approve.
 
 **`packages/api/src/services/platform-onboarding.ts`**
 
-- `listOnboarding(prisma, stripe, actor)` — every Organization not Ready,
+- `listOnboarding(prisma, stripe, actor)` — every Organization not Payable,
   grouped; Stripe state fetched only for rows with a `stripeAccountId`.
 - `approvePaidTicketing(prisma, actor, { organizationId, meetingAt })` —
   Platform-Owner-only; sets `paidTicketingEnabled` and `payoutMeetingAt`;
@@ -226,10 +264,15 @@ sits in "waiting on TropTix" and the queue has a row to approve.
 cron is a route under `apps/web/src/app/api/cron/` that calls one service,
 `sendSilenceNudges(prisma, now)`.
 
-**Gate**: `requestPayout` adds the terms check
-(`payoutTermsAcceptedAt !== null && payoutTermsVersion === current`) and a
-new `PayoutTermsNotAcceptedError`. `PayoutSetupIncompleteError` keeps
-covering the meeting and the destination.
+**Gates**: one pure function, `isPayable(org, now)`, in
+`_shared/paid-ticketing.ts`, reads the five columns plus the grace and returns
+either `true` or the first missing step. `assertPaidTicketingAllowed` calls
+it and `PaidTicketingNotEnabledError` carries the missing step so the drawer
+and the publish route can name it. `requestPayout` calls it too and maps the
+result to `PayoutSetupIncompleteError` (meeting, destination) or the new
+`PayoutTermsNotAcceptedError`; requests ignore the grace. The publish route
+(`toggle-publish`) uses the same function instead of reading the flag
+directly.
 
 Contracts in `packages/api/src/contracts/onboarding.ts`; unit tests beside
 each service with a fake Stripe, as the payout services do.
@@ -283,21 +326,33 @@ is live from the PR A merge; it reads state the app already has.
 ## Verification
 
 - Unit: `getPayoutSetup` for every combination of the four timestamps and
-  every Connect state; `acceptPayoutTerms` rejects a stale version; the
-  request gate rejects a missing or outdated acceptance; the silence cron
-  never sends twice in a day and hands off on the third.
+  every Connect state; `isPayable` for each missing step, inside and outside
+  grace, and for a stale terms version; `acceptPayoutTerms` rejects a stale
+  version; the ticket-type write and the publish route reject a paid ticket
+  for a non-Payable Organization and accept an RSVP one; the request gate
+  ignores grace; the silence cron never sends twice in a day and hands off on
+  the third.
+- Cutover: on the preview branch, an Organization approved before the
+  migration can still create a paid ticket type until its grace date, and
+  cannot after (advance the clock in the test, not the calendar).
 - Preview branch: the seeded "Island Nights" row appears in the queue; approve
   it; sign in as its owner; accept terms; connect a sandbox Stripe account;
   see the card disappear and the request button appear. Both emails arrive in
   the outbox table.
-- Funnel: after two weeks live, the PostHog funnel from step 1 to Ready has a
+- Funnel: after two weeks live, the PostHog funnel from step 1 to Payable has a
   number, and the queue's "waiting on organizer" group has an age
   distribution. Both are inputs to whether the nudges work.
 
 ## Vocabulary (CONTEXT.md, when PR A ships)
 
+- **Payable** (new): an Organization with all four payout-setup steps
+  recorded. The one gate for selling paid tickets and for requesting payouts.
+  _Avoid_: "ready", "approved" (that is step 2 alone).
+- **Paid ticketing enabled** (amend): now the record of step 2, TropTix's
+  approval. It no longer gates selling by itself; Payable does. ADR 0019's
+  "paid ticketing is a capability" still holds; the capability is Payable.
 - **Payout setup** (rewrite): four steps, one per owner, in the order above;
-  Ready when all four are recorded. The meeting and the paid-ticketing
+  Payable when all four are recorded. The meeting and the paid-ticketing
   approval are one action by a Platform Owner.
 - **Payout terms** (new): the versioned agreement under which TropTix
   collects ticket payments as the Organization's agent and pays them out;
@@ -317,3 +372,8 @@ is live from the PR A merge; it reads state the app already has.
   ask for the meeting date. The plan asks, defaulting to today.
 - Whether the terms document lives in the repo or in a CMS. The plan says
   repo: versioned, reviewable, diffable, and the app already renders markdown.
+- The 30-day grace for existing organizers and for a terms bump. Shorter
+  risks cutting off organizers mid-season; longer delays the legal cover the
+  terms step exists to provide.
+- Confirmed 2026-09-22: selling paid tickets requires Payable, and live sales
+  are never pulled when a step lapses.
