@@ -13,7 +13,7 @@ import {
   statementDescriptorSuffix,
   sweepExpiredHolds,
 } from './payments';
-import { HoldExpiredError } from './_shared/errors';
+import { AlreadyPaidError, HoldExpiredError } from './_shared/errors';
 import type {
   CheckoutAnalytics,
   OrderCompletedProps,
@@ -453,7 +453,31 @@ describe('beginPayment — session creation + reuse', () => {
     expect(res?.expiresAt.getTime()).toBe(returned);
   });
 
-  it('mints a fresh Session with a distinct key when the stored one is non-open', async () => {
+  it('refuses to mint a second Session when the stored one is complete', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+    const paidSessionId = `cs_paid_${generateId()}`;
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { stripeCheckoutSessionId: paidSessionId },
+    });
+    const fake = fakeStripe({
+      id: paidSessionId,
+      status: 'complete',
+      payment_status: 'paid',
+      payment_intent: `pi_test_${generateId()}`,
+    });
+
+    await expect(
+      beginPayment(prisma, fake.stripe, {
+        reservationId,
+        baseUrl: 'https://example.test',
+      })
+    ).rejects.toBeInstanceOf(AlreadyPaidError);
+    expect(fake.calls.create).toHaveLength(0);
+  });
+
+  it('mints a fresh Session with a distinct key when the stored one is expired', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
     const deadSessionId = `cs_dead_${generateId()}`;
