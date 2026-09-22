@@ -99,12 +99,14 @@ function PaymentInner({
   event,
   summary,
   expiresAt,
+  onPaid,
   onExpired,
   onBack,
 }: {
   event: EventDetail;
   summary: PaymentSummary;
   expiresAt: string;
+  onPaid: () => void;
   onExpired: () => void;
   onBack: () => void;
 }) {
@@ -156,13 +158,16 @@ function PaymentInner({
   async function pay() {
     setSubmitting(true);
     setError(null);
-    // On success, Stripe redirects to the Session's return_url
-    // (/e/[eventId]?reservation=…); the resume path there finalizes the order.
-    const result = await checkout.confirm();
+    // Cards resolve in place. Only a redirect-based method leaves for the
+    // Session's return_url (/e/[eventId]?reservation=…), where the resume
+    // path runs the same finalize.
+    const result = await checkout.confirm({ redirect: 'if_required' });
     if (result.type === 'error') {
       setError(result.error.message ?? 'Your payment could not be processed.');
       setSubmitting(false);
+      return;
     }
+    onPaid();
   }
 
   return (
@@ -213,6 +218,7 @@ export default function PaymentStep({
   event,
   summary,
   expiresAt,
+  onPaid,
   onExpired,
   onBack,
 }: {
@@ -220,6 +226,7 @@ export default function PaymentStep({
   event: EventDetail;
   summary: PaymentSummary;
   expiresAt: string;
+  onPaid: () => void;
   onExpired: () => void;
   onBack: () => void;
 }) {
@@ -229,6 +236,7 @@ export default function PaymentStep({
         event={event}
         summary={summary}
         expiresAt={expiresAt}
+        onPaid={onPaid}
         onExpired={onExpired}
         onBack={onBack}
       />

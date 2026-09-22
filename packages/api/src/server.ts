@@ -23,6 +23,7 @@ export {
 export {
   beginPayment,
   confirmPaid,
+  finalizePayment,
   getCheckoutState,
   sweepExpiredHolds,
   type SweepResult,

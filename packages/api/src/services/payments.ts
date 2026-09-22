@@ -249,15 +249,10 @@ export async function confirmPaid(
   return { kind: 'refunded' };
 }
 
-/**
- * Not a pure read: a paid-but-unconverted Session is fulfilled inline (the
- * sync fallback to the webhook). One Stripe retrieve per call — never a loop.
- */
+/** Pure read of the reservation row; never talks to Stripe (ADR 0030). */
 export async function getCheckoutState(
   prisma: PrismaClient,
-  stripe: Stripe,
-  input: { reservationId: string },
-  analytics?: CheckoutAnalytics
+  input: { reservationId: string }
 ): Promise<CheckoutState> {
   const reservation = await prisma.reservation.findUnique({
     where: { id: input.reservationId },
@@ -267,7 +262,6 @@ export async function getCheckoutState(
       orderId: true,
       totalCents: true,
       expiresAt: true,
-      stripeCheckoutSessionId: true,
     },
   });
 
@@ -289,8 +283,42 @@ export async function getCheckoutState(
   if (reservation.status === ReservationStatus.RELEASED) {
     return { kind: 'expired' };
   }
+  if (
+    reservation.status === ReservationStatus.HELD &&
+    reservation.expiresAt.getTime() > Date.now()
+  ) {
+    return {
+      kind: 'held',
+      expiresAt: reservation.expiresAt.toISOString(),
+      totalCents: reservation.totalCents,
+    };
+  }
+  return { kind: 'expired' };
+}
 
-  if (reservation.stripeCheckoutSessionId) {
+/**
+ * The one sync fulfil attempt while the buyer is present — Stripe's
+ * landing-page recipe. One Session retrieve, settle if paid, else report the
+ * row. The webhook remains the guaranteed fulfiller (ADR 0030).
+ */
+export async function finalizePayment(
+  prisma: PrismaClient,
+  stripe: Stripe,
+  input: { reservationId: string },
+  analytics?: CheckoutAnalytics
+): Promise<CheckoutState> {
+  const reservation = await prisma.reservation.findUnique({
+    where: { id: input.reservationId },
+    select: { id: true, status: true, stripeCheckoutSessionId: true },
+  });
+  if (!reservation) {
+    throw new NotFoundError(`Reservation ${input.reservationId} not found.`);
+  }
+
+  const settled =
+    reservation.status === ReservationStatus.CONVERTED ||
+    reservation.status === ReservationStatus.REFUNDED;
+  if (!settled && reservation.stripeCheckoutSessionId) {
     const session = await stripe.checkout.sessions.retrieve(
       reservation.stripeCheckoutSessionId
     );
@@ -309,18 +337,7 @@ export async function getCheckoutState(
       }
     }
   }
-
-  if (
-    reservation.status === ReservationStatus.HELD &&
-    reservation.expiresAt.getTime() > Date.now()
-  ) {
-    return {
-      kind: 'held',
-      expiresAt: reservation.expiresAt.toISOString(),
-      totalCents: reservation.totalCents,
-    };
-  }
-  return { kind: 'expired' };
+  return getCheckoutState(prisma, { reservationId: reservation.id });
 }
 
 export interface SweepResult {

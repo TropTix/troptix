@@ -12,6 +12,7 @@ import {
 } from '../../contracts/reservations';
 import {
   beginPaymentInputSchema,
+  finalizePaymentInputSchema,
   getCheckoutStateInputSchema,
 } from '../../contracts/payments';
 import { applyCode, getCheckoutConfig } from '../../services/checkout';
@@ -20,7 +21,11 @@ import {
   completeFree,
   release,
 } from '../../services/reservations';
-import { beginPayment, getCheckoutState } from '../../services/payments';
+import {
+  beginPayment,
+  finalizePayment,
+  getCheckoutState,
+} from '../../services/payments';
 
 function requireStripe(ctx: Context): {
   stripe: NonNullable<Context['stripe']>;
@@ -78,15 +83,21 @@ export const checkoutRouter = router({
       });
     }),
 
-  getCheckoutState: publicProcedure
-    .input(getCheckoutStateInputSchema)
-    .query(({ ctx, input }) => {
+  finalizePayment: publicProcedure
+    .input(finalizePaymentInputSchema)
+    .mutation(({ ctx, input }) => {
       const { stripe } = requireStripe(ctx);
-      return getCheckoutState(
+      return finalizePayment(
         ctx.prisma,
         stripe,
         { reservationId: input.reservationId },
         ctx.analytics
       );
     }),
+
+  getCheckoutState: publicProcedure
+    .input(getCheckoutStateInputSchema)
+    .query(({ ctx, input }) =>
+      getCheckoutState(ctx.prisma, { reservationId: input.reservationId })
+    ),
 });

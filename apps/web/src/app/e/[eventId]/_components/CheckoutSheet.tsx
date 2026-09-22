@@ -9,6 +9,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { trpc } from '@/lib/trpc';
 import type {
   BeginPaymentResponse,
+  CheckoutState,
   EventDetail,
   ReservationContact,
 } from '@troptix/api';
@@ -165,9 +166,11 @@ export default function CheckoutSheet({
   const createReservation = trpc.checkout.createReservation.useMutation();
   const completeFree = trpc.checkout.completeFree.useMutation();
   const beginPayment = trpc.checkout.beginPayment.useMutation();
+  const finalizePayment = trpc.checkout.finalizePayment.useMutation();
   const releaseReservation = trpc.checkout.release.useMutation();
 
-  const polling = step === 'finalizing' && !!reservationId;
+  const polling =
+    step === 'finalizing' && !!reservationId && !finalizePayment.isPending;
   // Errors are not terminal here: the webhook may still land, so the interval
   // keeps checking (no react-query retries — the backoff is the retry).
   const stateQuery = trpc.checkout.getCheckoutState.useQuery(
@@ -191,14 +194,12 @@ export default function CheckoutSheet({
   const resumeTargetRef = useRef(resumeReservationId ?? null);
   useEffect(() => {
     if (!open || !resumeTargetRef.current) return;
-    setReservationId(resumeTargetRef.current);
+    const id = resumeTargetRef.current;
     resumeTargetRef.current = null;
-    setStep('finalizing');
+    void finalize(id);
   }, [open]);
 
-  useEffect(() => {
-    if (step !== 'finalizing' || !stateQuery.data) return;
-    const state = stateQuery.data;
+  function applyCheckoutState(state: CheckoutState, forReservationId: string) {
     if (state.kind === 'order') {
       finishCheckout(
         { orderId: state.orderId, tickets: state.tickets },
@@ -206,33 +207,47 @@ export default function CheckoutSheet({
       );
     } else if (state.kind === 'refunded') {
       setStep('refunded');
-      // The poll can be what performs the refund (webhook slow/down) — nudge the
-      // notice here too; idempotent, Resend dedupes on refund-<reservationId>.
-      if (reservationId) {
-        void fetch('/api/checkout/refund-notice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reservationId }),
-        }).catch(() => {});
-      }
+      // The sync finalize can be what performs the refund (webhook slow/down) —
+      // nudge the notice here too; Resend dedupes on refund-<reservationId>.
+      void fetch('/api/checkout/refund-notice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservationId: forReservationId }),
+      }).catch(() => {});
     } else if (state.kind === 'expired') {
       setStep('expired');
-    } else if (
-      state.kind === 'held' &&
-      reservationId &&
-      !resumeReopenRef.current
-    ) {
+    } else if (state.kind === 'held' && !resumeReopenRef.current) {
       // Resumed onto an unpaid hold — reopen payment instead of spinning;
       // beginPayment reuses the still-open Session.
       resumeReopenRef.current = true;
       beginPayment
-        .mutateAsync({ reservationId })
-        .then((payment) => openPayment(payment, reservationId, true))
+        .mutateAsync({ reservationId: forReservationId })
+        .then((payment) => openPayment(payment, forReservationId, true))
         .catch(() => {
           expiredReasonRef.current = 'payment_reopen_failed';
           setStep('expired');
         });
     }
+  }
+
+  // Stripe's landing-page recipe (ADR 0030): one server-side fulfil attempt
+  // while the buyer is here. If it can't conclude, the poll waits for the webhook.
+  async function finalize(forReservationId: string) {
+    setReservationId(forReservationId);
+    setStep('finalizing');
+    try {
+      const state = await finalizePayment.mutateAsync({
+        reservationId: forReservationId,
+      });
+      applyCheckoutState(state, forReservationId);
+    } catch {
+      // Stay on finalizing; the webhook still fulfils and the poll will see it.
+    }
+  }
+
+  useEffect(() => {
+    if (step !== 'finalizing' || !stateQuery.data || !reservationId) return;
+    applyCheckoutState(stateQuery.data, reservationId);
   }, [step, stateQuery.data, reservationId]);
 
   // Expired/refunded are set from several places — capture on the step
@@ -287,6 +302,7 @@ export default function CheckoutSheet({
     createReservation.reset();
     completeFree.reset();
     beginPayment.reset();
+    finalizePayment.reset();
   }
 
   function handleOpenChange(next: boolean) {
@@ -461,6 +477,9 @@ export default function CheckoutSheet({
                   event={event}
                   summary={paymentSummary}
                   expiresAt={expiresAt}
+                  onPaid={() => {
+                    if (reservationId) void finalize(reservationId);
+                  }}
                   onExpired={() => setStep('expired')}
                   onBack={backFromPayment}
                 />
