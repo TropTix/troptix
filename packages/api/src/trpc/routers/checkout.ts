@@ -26,6 +26,19 @@ import {
   finalizePayment,
   getCheckoutState,
 } from '../../services/payments';
+import { HoldExpiredError, NotFoundError } from '../../services/_shared/errors';
+
+// The client branches on these codes (expired screen vs. keep waiting), so
+// the service errors that carry that meaning get a code rather than a 500.
+function checkoutError(err: unknown): never {
+  if (err instanceof NotFoundError) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: err.message });
+  }
+  if (err instanceof HoldExpiredError) {
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: err.message });
+  }
+  throw err;
+}
 
 function requireStripe(ctx: Context): {
   stripe: NonNullable<Context['stripe']>;
@@ -80,7 +93,7 @@ export const checkoutRouter = router({
       return beginPayment(ctx.prisma, stripe, {
         reservationId: input.reservationId,
         baseUrl: siteUrl,
-      });
+      }).catch(checkoutError);
     }),
 
   finalizePayment: publicProcedure
@@ -92,12 +105,14 @@ export const checkoutRouter = router({
         stripe,
         { reservationId: input.reservationId },
         ctx.analytics
-      );
+      ).catch(checkoutError);
     }),
 
   getCheckoutState: publicProcedure
     .input(getCheckoutStateInputSchema)
     .query(({ ctx, input }) =>
-      getCheckoutState(ctx.prisma, { reservationId: input.reservationId })
+      getCheckoutState(ctx.prisma, {
+        reservationId: input.reservationId,
+      }).catch(checkoutError)
     ),
 });

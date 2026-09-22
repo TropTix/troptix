@@ -11,7 +11,7 @@ import {
   expireHold,
   settle,
 } from './reservations';
-import { NotFoundError } from './_shared/errors';
+import { HoldExpiredError, NotFoundError } from './_shared/errors';
 import type {
   BeginPaymentResponse,
   CheckoutState,
@@ -65,13 +65,11 @@ export async function beginPayment(
   if (!reservation) {
     throw new NotFoundError(`Reservation ${input.reservationId} not found.`);
   }
-  if (reservation.status !== ReservationStatus.HELD) {
-    throw new Error(
-      `Reservation ${reservation.id} is ${reservation.status}; cannot start payment.`
-    );
-  }
-  if (reservation.expiresAt.getTime() <= Date.now()) {
-    throw new Error(`Reservation ${reservation.id} has expired.`);
+  if (
+    reservation.status !== ReservationStatus.HELD ||
+    reservation.expiresAt.getTime() <= Date.now()
+  ) {
+    throw new HoldExpiredError(reservation.id);
   }
   if (reservation.totalCents <= 0) {
     throw new Error(
@@ -249,6 +247,61 @@ export async function confirmPaid(
   return { kind: 'refunded' };
 }
 
+export function paymentIntentIdOf(
+  session: Pick<Stripe.Checkout.Session, 'payment_intent'>
+): string | null {
+  return typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : (session.payment_intent?.id ?? null);
+}
+
+const stateSelect = {
+  id: true,
+  status: true,
+  orderId: true,
+  totalCents: true,
+  expiresAt: true,
+  stripeCheckoutSessionId: true,
+} as const;
+
+type StateRow = {
+  id: string;
+  status: ReservationStatus;
+  orderId: string | null;
+  totalCents: number;
+  expiresAt: Date;
+};
+
+/**
+ * A HELD row past its deadline is still `held`: only the sweep may expire it,
+ * and it only does so after Stripe confirms the Session can no longer be paid.
+ * Reading it as expired here would send a paid buyer to "start over".
+ */
+async function checkoutStateOf(
+  prisma: PrismaClient,
+  reservation: StateRow
+): Promise<CheckoutState> {
+  switch (reservation.status) {
+    case ReservationStatus.CONVERTED:
+      if (!reservation.orderId) {
+        throw new Error(
+          `Reservation ${reservation.id} is CONVERTED but has no orderId`
+        );
+      }
+      return orderCheckoutState(prisma, reservation.orderId);
+    case ReservationStatus.REFUNDED:
+      return { kind: 'refunded' };
+    case ReservationStatus.HELD:
+      return {
+        kind: 'held',
+        expiresAt: reservation.expiresAt.toISOString(),
+        totalCents: reservation.totalCents,
+      };
+    default:
+      return { kind: 'expired' };
+  }
+}
+
 /** Pure read of the reservation row; never talks to Stripe (ADR 0030). */
 export async function getCheckoutState(
   prisma: PrismaClient,
@@ -256,44 +309,12 @@ export async function getCheckoutState(
 ): Promise<CheckoutState> {
   const reservation = await prisma.reservation.findUnique({
     where: { id: input.reservationId },
-    select: {
-      id: true,
-      status: true,
-      orderId: true,
-      totalCents: true,
-      expiresAt: true,
-    },
+    select: stateSelect,
   });
-
   if (!reservation) {
     throw new NotFoundError(`Reservation ${input.reservationId} not found.`);
   }
-
-  if (reservation.status === ReservationStatus.CONVERTED) {
-    if (!reservation.orderId) {
-      throw new Error(
-        `Reservation ${reservation.id} is CONVERTED but has no orderId`
-      );
-    }
-    return orderCheckoutState(prisma, reservation.orderId);
-  }
-  if (reservation.status === ReservationStatus.REFUNDED) {
-    return { kind: 'refunded' };
-  }
-  if (reservation.status === ReservationStatus.RELEASED) {
-    return { kind: 'expired' };
-  }
-  if (
-    reservation.status === ReservationStatus.HELD &&
-    reservation.expiresAt.getTime() > Date.now()
-  ) {
-    return {
-      kind: 'held',
-      expiresAt: reservation.expiresAt.toISOString(),
-      totalCents: reservation.totalCents,
-    };
-  }
-  return { kind: 'expired' };
+  return checkoutStateOf(prisma, reservation);
 }
 
 /**
@@ -309,7 +330,7 @@ export async function finalizePayment(
 ): Promise<CheckoutState> {
   const reservation = await prisma.reservation.findUnique({
     where: { id: input.reservationId },
-    select: { id: true, status: true, stripeCheckoutSessionId: true },
+    select: stateSelect,
   });
   if (!reservation) {
     throw new NotFoundError(`Reservation ${input.reservationId} not found.`);
@@ -322,22 +343,17 @@ export async function finalizePayment(
     const session = await stripe.checkout.sessions.retrieve(
       reservation.stripeCheckoutSessionId
     );
-    if (session.payment_status !== 'unpaid') {
-      const paymentIntentId =
-        typeof session.payment_intent === 'string'
-          ? session.payment_intent
-          : session.payment_intent?.id;
-      if (paymentIntentId) {
-        return confirmPaid(
-          prisma,
-          stripe,
-          { reservationId: reservation.id, paymentIntentId },
-          analytics
-        );
-      }
+    const paymentIntentId = paymentIntentIdOf(session);
+    if (session.payment_status !== 'unpaid' && paymentIntentId) {
+      return confirmPaid(
+        prisma,
+        stripe,
+        { reservationId: reservation.id, paymentIntentId },
+        analytics
+      );
     }
   }
-  return getCheckoutState(prisma, { reservationId: reservation.id });
+  return checkoutStateOf(prisma, reservation);
 }
 
 export interface SweepResult {
