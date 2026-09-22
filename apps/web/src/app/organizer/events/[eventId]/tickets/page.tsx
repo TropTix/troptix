@@ -30,12 +30,8 @@ export default async function EventTicketsPage({
   const { eventId } = await params;
   const { viewAs } = await searchParams;
 
-  // Writes are always self-scoped (never View-as), so the paid gate reads the
-  // acting user's own org — the same flag the write service enforces. Kicked
-  // off alongside the view fetch; independent reads, one wave.
-  // .catch → null so a notFound() bail from the view fetch below can't leave
-  // this floating as an unhandled rejection; the write service stays the
-  // authoritative gate either way.
+  // Writes are self-scoped (never View-as), so the paid gate reads the actor's own
+  // org. The .catch keeps a notFound() bail below from leaving this rejection unhandled.
   const orgPromise =
     actor.kind === 'user'
       ? findOrganizationForOwner(prisma, actor.userId).catch(() => null)

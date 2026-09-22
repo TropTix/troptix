@@ -4,15 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  ArrowLeft,
-  Share2,
-  Check,
-  Calendar,
-  MapPin,
-  ArrowRight,
-  BadgeCheck,
-} from 'lucide-react';
+import { ArrowLeft, Share2, Check, ArrowRight, BadgeCheck } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
 import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
@@ -27,47 +19,38 @@ import { themeStyle } from '@/lib/flyerTheme';
 import CheckoutSheet from './CheckoutSheet';
 import VenueMap from './VenueMap';
 
-// Public event page (Luma-light). Immersive poster hero on mobile, two-column
-// on desktop. See docs/plans/2026-06-event-page-redesign.md.
-
 const SECTION_LABEL =
   'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
-
-const META_TILE =
-  'grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground';
 
 const ROUND_BTN =
   'grid h-10 w-10 place-items-center rounded-full text-foreground transition-colors';
 
 function SectionHeader({ children }: { children: ReactNode }) {
-  return (
-    <h2 className={cn('border-b border-border pb-2', SECTION_LABEL)}>
-      {children}
-    </h2>
-  );
+  return <h2 className={SECTION_LABEL}>{children}</h2>;
 }
 
-function MetaRow({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-}) {
+function MetaRow({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="flex items-center gap-4">
-      <span className={META_TILE}>{icon}</span>
-      <div className="min-w-0">
-        <div className="font-semibold">{title}</div>
-        <div className="text-sm text-muted-foreground">{subtitle}</div>
-      </div>
+    <div className="min-w-0">
+      <div className="font-semibold">{title}</div>
+      <div className="text-sm text-muted-foreground">{subtitle}</div>
     </div>
   );
 }
 
-// Falls back to the legacy organizer name when there's no linked brand.
+// Deliberately coarse (days, not minutes) so the SSR and client renders agree;
+// suppressHydrationWarning on the chip covers the rare boundary crossing.
+function countdownLabel(start: Date, end: Date, eventEnded: boolean) {
+  if (eventEnded) return 'Ended';
+  const now = Date.now();
+  if (now >= start.getTime() && now <= end.getTime()) return 'Happening now';
+  const days = Math.ceil((start.getTime() - now) / 86_400_000);
+  if (days <= 0) return 'Starts today';
+  if (days === 1) return 'Starts tomorrow';
+  if (days < 14) return `Starts in ${days} days`;
+  return `Starts in ${Math.round(days / 7)} weeks`;
+}
+
 function HostedBy({ event }: { event: EventDetail }) {
   if (!event.hostedBy) {
     return <p className="mt-3 font-semibold">{event.organizer}</p>;
@@ -141,16 +124,14 @@ export default function EventDetailView({
   const resumeReservationId = searchParams?.get('reservation') ?? null;
   const [sheetOpen, setSheetOpen] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
+  const [aboutExpanded, setAboutExpanded] = useState(false);
 
-  // Resume an in-flight checkout after the Stripe redirect / a refresh (ADR
-  // 0018). The param stays in the URL on purpose — scrubbing it would break
-  // refresh-resume; the PostHog sanitizer keeps it out of analytics instead.
+  // The param stays in the URL on purpose — scrubbing it would break
+  // refresh-resume; the PostHog sanitizer keeps it out of analytics (ADR 0018).
   useEffect(() => {
     if (resumeReservationId) setSheetOpen(true);
   }, [resumeReservationId]);
 
-  // router.back() is a no-op when there's no in-app history (opened straight
-  // from a shared link), so fall back to Discover in that case.
   const handleBack = () => {
     if (window.history.length > 1) {
       router.back();
@@ -160,23 +141,17 @@ export default function EventDetailView({
   };
 
   const isFree = event.fromPriceCents === 0;
-  // "RSVP" copy is only right when there's nothing to pay for. An event can mix
-  // free and paid tiers (fromPriceCents === 0 yet paid tickets exist), so gate
-  // the reservation wording on whether any paid ticket is on sale.
+  // An event can mix free and paid tiers (fromPriceCents === 0 yet paid tickets
+  // exist), so gate the "RSVP" wording on this rather than isFree.
   const hasPaidTickets = event.tickets.some((t) => t.priceCents > 0);
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
-  const heroChip = `${start.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  })} · ${start.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  })}`;
   const priceLabel = priceLabelFor(event.fromPriceCents);
+
+  const aboutIsLong = (event.description?.length ?? 0) > 400;
 
   async function onShare() {
     const url = typeof window !== 'undefined' ? window.location.href : '';
@@ -197,10 +172,6 @@ export default function EventDetailView({
     <Share2 className="h-5 w-5" />
   );
 
-  // Derived during SSR so the page arrives themed. The wrapper scopes the
-  // overrides and owns the ink — every descendant inherits themed text color
-  // without per-region repeats. The checkout sheet (a portal) and the global
-  // nav sit outside it and stay on brand tokens.
   const themeVars = themeStyle(event.pageTheme, event.flyerPalette);
 
   return (
@@ -252,14 +223,17 @@ export default function EventDetailView({
                 {shareIcon}
               </button>
             </div>
-            <span className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm">
+            <span
+              className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm"
+              suppressHydrationWarning
+            >
               <span
                 className={cn(
                   'h-1.5 w-1.5 rounded-full',
                   eventEnded ? 'bg-card/50' : 'bg-success'
                 )}
               />
-              {heroChip}
+              {countdownLabel(start, end, eventEnded)}
             </span>
           </div>
         </div>
@@ -276,7 +250,7 @@ export default function EventDetailView({
                   className="object-cover"
                 />
               </div>
-              <div className="mt-5 border-t border-border pt-5">
+              <div className="mt-6">
                 <p className={SECTION_LABEL}>Presented by</p>
                 <HostedBy event={event} />
               </div>
@@ -305,19 +279,16 @@ export default function EventDetailView({
                 </p>
               )}
 
-              {/* Host up top on mobile; desktop surfaces it in the poster aside. */}
               <p className="mt-3 text-sm text-muted-foreground md:hidden">
                 Hosted by <HostedByInline event={event} />
               </p>
 
               <div className="mt-6 space-y-3">
                 <MetaRow
-                  icon={<Calendar className="h-6 w-6" />}
                   title={getDateRangeFormatter(start, end)}
                   subtitle={getTimeRangeFormatter(start, end)}
                 />
                 <MetaRow
-                  icon={<MapPin className="h-6 w-6" />}
                   title={event.venue ?? event.address}
                   subtitle={event.address}
                 />
@@ -326,9 +297,23 @@ export default function EventDetailView({
               {event.description && (
                 <section className="mt-10">
                   <SectionHeader>About Event</SectionHeader>
-                  <p className="mt-4 whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                  <p
+                    className={cn(
+                      'mt-4 whitespace-pre-wrap leading-relaxed text-muted-foreground',
+                      aboutIsLong && !aboutExpanded && 'line-clamp-6'
+                    )}
+                  >
                     {event.description}
                   </p>
+                  {aboutIsLong && (
+                    <button
+                      type="button"
+                      onClick={() => setAboutExpanded((v) => !v)}
+                      className="mt-2 text-sm font-semibold text-primary hover:underline"
+                    >
+                      {aboutExpanded ? 'Show less' : 'Read more'}
+                    </button>
+                  )}
                 </section>
               )}
 
@@ -339,7 +324,6 @@ export default function EventDetailView({
                 <VenueMap event={event} />
               </section>
 
-              {/* Full hosted-by (logo + socials); desktop shows it in the aside. */}
               <section className="mt-10 md:hidden">
                 <SectionHeader>Hosted by</SectionHeader>
                 <HostedBy event={event} />

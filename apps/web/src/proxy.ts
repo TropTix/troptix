@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/proxy';
 
-// Auth routes that establish or clear the session — they must always run, so an
-// authenticated user is never bounced off them by the "redirect away from
-// /auth/*" rule.
+// Session-establishing/clearing routes must always run — the redirect-away-from-
+// /auth/* rule would otherwise bounce an authenticated user off signout.
 const MECHANISM_ROUTES = ['/auth/callback', '/auth/signout'];
 
 /**
- * Next 16 middleware (`proxy`). Refreshes the Supabase session every request and
- * redirect-gates protected routes / auth pages on the validated claims.
- *
- * Gating is a redirect heuristic only — pages/routes still do the real check via
- * getServerUser(). Any redirect MUST carry the refreshed cookies from
- * updateSession, or the rotated session is lost.
+ * Gating here is a redirect heuristic only — pages/routes still do the real
+ * check via getServerUser(). Any redirect MUST carry the refreshed cookies from
+ * updateSession, or the rotated session is silently lost.
  */
 export async function proxy(req: NextRequest) {
   const { response, claims } = await updateSession(req);
@@ -42,10 +38,6 @@ export async function proxy(req: NextRequest) {
   return response;
 }
 
-/**
- * Redirect while carrying over any cookies updateSession set on `from` — so a
- * session refreshed during this request still persists across the redirect.
- */
 function redirectPreservingCookies(url: URL, from: NextResponse): NextResponse {
   const redirect = NextResponse.redirect(url);
   from.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
@@ -54,13 +46,6 @@ function redirectPreservingCookies(url: URL, from: NextResponse): NextResponse {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico, sitemap.xml, robots.txt (metadata files)
-     */
     '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
   ],
 };

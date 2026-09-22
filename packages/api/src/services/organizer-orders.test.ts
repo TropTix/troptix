@@ -1,9 +1,3 @@
-/**
- * Unit tests for the Screen G order reads. Pure over an injected fake `prisma`
- * (ADR 0010). Covers the shared authorization seam (anonymous, scoping, View-as,
- * not-found), the cents boundary + the legacy float fallback, ticket-count and
- * line-item grouping, and the payment-method shaping.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -16,9 +10,9 @@ const ADMIN: Actor = { kind: 'user', userId: 'admin-1', role: 'PATRON' };
 function fakePrisma(
   opts: {
     platformOwner?: boolean;
-    event?: unknown; // undefined → owned; null → not found
+    event?: unknown;
     orders?: unknown[];
-    order?: unknown; // for getOrderDetail; null → not found
+    order?: unknown;
   } = {}
 ) {
   const eventsFindFirst = vi
@@ -132,10 +126,17 @@ describe('getOrderDetail', () => {
   });
 
   it('throws NotFound when the order isn’t under the owned event', async () => {
-    const { prisma } = fakePrisma({ order: null });
+    const { prisma, ordersFindFirst } = fakePrisma({ order: null });
     await expect(getOrderDetail(prisma, OWNER, 'e1', 'o1')).rejects.toThrow(
       NotFoundError
     );
+    // Scoped by BOTH the URL's eventId and event ownership — an order must not
+    // be readable through a sibling event.
+    expect(ordersFindFirst.mock.calls[0][0].where).toMatchObject({
+      id: 'o1',
+      eventId: 'e1',
+      event: { organizerUserId: 'owner-1', deletedAt: null },
+    });
   });
 
   it('groups tickets into one line item per ticket type', async () => {
@@ -148,7 +149,6 @@ describe('getOrderDetail', () => {
   });
 
   it('prices lines from what was paid, not the current ticket type price', async () => {
-    // Ticket type list price is 20, but these were bought at a 15 discount.
     const { prisma } = fakePrisma({
       order: order({
         tickets: [
@@ -193,15 +193,27 @@ describe('getOrderDetail', () => {
   });
 
   it('builds the breakdown, payment method, and full name', async () => {
-    const { prisma } = fakePrisma({ order: order() });
+    // Cents columns deliberately disagree with the legacy floats (4000/250/4250)
+    // to prove the cents columns win when both are present.
+    const { prisma } = fakePrisma({
+      order: order({ subtotalCents: 4001, feesCents: 251, totalCents: 4252 }),
+    });
     const detail = await getOrderDetail(prisma, OWNER, 'e1', 'o1');
     expect(detail).toMatchObject({
-      subtotalCents: 4000,
-      feesCents: 250,
-      totalCents: 4250,
+      subtotalCents: 4001,
+      feesCents: 251,
+      totalCents: 4252,
       paymentMethod: 'Visa ····4242',
       customer: { name: 'Ada Lovelace', email: 'ada@x.com', phone: '555-0100' },
     });
+
+    const named = await getOrderDetail(
+      fakePrisma({ order: order({ name: '  Grace Hopper  ' }) }).prisma,
+      OWNER,
+      'e1',
+      'o1'
+    );
+    expect(named.customer.name).toBe('Grace Hopper');
   });
 
   it('falls back to the legacy float columns when the cents columns are null', async () => {
@@ -226,6 +238,16 @@ describe('getOrderDetail', () => {
     });
     const detail = await getOrderDetail(prisma, OWNER, 'e1', 'o1');
     expect(detail.paymentMethod).toBeNull();
+
+    // A half-present card (legacy data) must also read as no payment method.
+    const half = await getOrderDetail(
+      fakePrisma({ order: order({ cardType: 'Visa', cardLast4: null }) })
+        .prisma,
+      OWNER,
+      'e1',
+      'o1'
+    );
+    expect(half.paymentMethod).toBeNull();
     expect(detail.lineItems).toEqual([
       { name: 'Ticket', quantity: 1, unitPriceCents: 0, subtotalCents: 0 },
     ]);

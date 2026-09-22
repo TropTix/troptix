@@ -85,3 +85,27 @@ Before you begin, ensure you have the following installed:
 
 - **Camera Permissions:** If the camera doesn't open, ensure you have granted camera permissions to Expo Go in your device settings.
 - **Network Issues:** If the app cannot connect to the local API, make sure your mobile device and your development machine are on the same Wi-Fi network. You might also need to use your machine's local IP address in the `.env` file instead of `localhost`.
+
+## Building and Publishing
+
+To build the app and submit it to the App Store or Google Play, we use Expo Application Services (EAS).
+
+### iOS Production Build
+
+Run the following command from within the `apps/mobile` directory:
+
+```bash
+npx eas-cli build --platform ios --profile production
+```
+
+_Note: Make sure your Apple Developer account is active and you have the correct bundle identifier (`com.usetroptix.organizerapp`) registered._
+
+### Submitting to App Store
+
+After a successful build, you can submit the app directly to TestFlight and the App Store using:
+
+```bash
+npx eas-cli submit --platform ios
+```
+
+For more detailed information, see the [Expo EAS Documentation](https://docs.expo.dev/build/introduction/).

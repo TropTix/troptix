@@ -14,7 +14,6 @@ import { Progress } from '@/components/ui/progress';
 import { getDateFormatter } from '@/lib/dateUtils';
 import { DEFAULT_EVENT_IMAGE, eventFlyerUrl } from '@/lib/supabase/storage';
 
-// 'All' is the chip; the rest mirror EventStatus. Kept in view order.
 type Filter = 'All' | EventStatus;
 const FILTERS: Filter[] = ['All', 'Active', 'Upcoming', 'Past', 'Draft'];
 

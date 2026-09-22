@@ -69,14 +69,16 @@ When editing a file, match its existing comment density — do not add comments 
 
 - **Prettier is the single source of truth** for code style. Config lives in `.prettierrc`; ignores in `.prettierignore`. Don't hand-tune whitespace/quotes/semicolons — let Prettier decide.
 - A **husky `pre-commit` hook** runs `lint-staged` → `prettier --write` on staged files, so every commit is auto-formatted. This applies to commits Codex makes too.
-- Before committing, run `yarn format` (write) or `yarn format:check` (verify) if you've touched many files. Don't bypass the hook with `--no-verify`.
+- Before committing, run `pnpm format` (write) or `pnpm format:check` (verify) if you've touched many files. Don't bypass the hook with `--no-verify`.
 
 ## Package management
 
-- This is a **Yarn Classic (v1) workspaces** monorepo. The root `yarn.lock` is the single source of truth for dependencies; Vercel and CI both install with Yarn.
-- **Use Yarn, never npm, at the repo root or in any Yarn workspace.** `yarn install` / `yarn add <pkg>` / `yarn upgrade` / `yarn <script>` — never `npm install` / `npm ci`. Running npm generates a stray root `package-lock.json` that silently desyncs from `yarn.lock`. The duplicate tree is never built or deployed, but Dependabot still scans it: it once accounted for **159 of a 299-alert backlog** (53%), all phantom duplicates of deps already locked in `yarn.lock`. If you ever find a root `package-lock.json`, delete it.
-- Force transitive dependency versions via the root `resolutions` field — not npm `overrides`.
-- **Exception:** the standalone Expo apps under `apps/` that can't hoist into the workspace carry their _own_ lockfile (`apps/organizer` → `yarn.lock`, `apps/mobile` → `package-lock.json`). Match whichever lockfile is already committed in that app and never add a second one. These two are the only sanctioned lockfiles below the root; a `package-lock.json` anywhere else, and above all at the root, is the stray one to delete.
+- The root workspace (`apps/web` + `packages/*`) is a **pnpm workspace** (pnpm 11, pinned in the root `packageManager` field — enable via Corepack). The root `pnpm-lock.yaml` is the single source of truth for dependencies; Vercel and CI both install with pnpm. Workspace membership and all pnpm settings live in `pnpm-workspace.yaml`.
+- **Use pnpm, never npm or yarn, at the repo root or in any workspace package.** `pnpm install` / `pnpm add <pkg>` / `pnpm <script>` / `pnpm --filter <pkg> <script>`. A stray root `package-lock.json` or `yarn.lock` silently desyncs from `pnpm-lock.yaml`, and Dependabot scans it: a stray lockfile once accounted for **159 of a 299-alert backlog** (53%), all phantom duplicates. If you ever find one, delete it.
+- Force transitive dependency versions via `overrides` in `pnpm-workspace.yaml` — not `resolutions`, not npm `overrides`.
+- pnpm's isolated linker means a package can only import what its `package.json` declares. If typecheck fails with a missing module that "should" be there, declare the dependency in that package — never loosen the linker.
+- Dependency postinstall scripts only run if allowed in `allowBuilds` in `pnpm-workspace.yaml`. If a newly added package needs its build script, add it there deliberately.
+- **Exception:** `apps/organizer` (Expo SDK 53, which can't run under the isolated linker) is not a workspace member and carries its _own_ `yarn.lock` — the only sanctioned lockfile below the root. `apps/mobile` (SDK 54) IS a workspace member like everything else. Never add a lockfile inside a workspace package.
 
 ## Naming
 

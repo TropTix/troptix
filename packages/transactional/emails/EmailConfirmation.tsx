@@ -57,8 +57,6 @@ export default function EmailConfirmationTemplate({
   baseUrl,
 }: {
   order: EmailOrder;
-  // Absolute origin for in-email links, supplied by the caller so this template
-  // stays environment-agnostic.
   baseUrl: string;
 }) {
   const { event, tickets = [] } = order;
@@ -280,7 +278,6 @@ function formatDate(date: Date, options: Intl.DateTimeFormatOptions) {
   }).format(new Date(date));
 }
 
-// Mock data for the preview server (`yarn email`); never used in production.
 EmailConfirmationTemplate.PreviewProps = {
   order: {
     id: 'TT-2024-001234',

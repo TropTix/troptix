@@ -1,12 +1,3 @@
-/**
- * Screen G — the `/organizer/events/[id]/orders` reads: the orders list and a
- * single order's detail. Pure over an injected `prisma`; authorization is the
- * shared scope seam, and ownership is the event's where clause (an order is only
- * reachable through an event the actor owns).
- *
- * View + breakdown only. The money-moving actions (refund / cancel / comp) and
- * the resend-confirmation write are deferred (see the dashboard UX plan).
- */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type {
@@ -34,8 +25,8 @@ export async function listEventOrders(
     input.viewAsOrganizerUserId
   );
 
-  // Gate on ownership and read the orders in one round-trip. A non-owned or
-  // missing event yields a null gate → NotFound (not a misleading empty list).
+  // A non-owned or missing event yields a null gate → NotFound (not a
+  // misleading empty list).
   const ownedEvent = { organizerUserId, deletedAt: null };
   const [event, rows] = await Promise.all([
     prisma.events.findFirst({
@@ -160,12 +151,8 @@ function fullName(order: {
 }
 
 /**
- * Collapse an order's tickets into one line per ticket type. The line subtotal is the
- * sum of what was actually paid (`Tickets.subtotal`), so the line items
- * reconcile with the order's subtotal — a deleted or repriced ticket type can't drift
- * them apart. Falls back to the ticket type's list price for legacy tickets that
- * predate per-ticket subtotals. The unit price is the per-ticket average, which
- * equals the price when a ticket type's tickets all cost the same (the common case).
+ * Σ what was actually paid, never quantity × list price, so lines reconcile
+ * with the order after repricing/deletion; unit price is a per-ticket average.
  */
 function toLineItems(
   tickets: {

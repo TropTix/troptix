@@ -4,6 +4,7 @@ import {
   Alert,
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -63,6 +64,7 @@ export default function SettingsScreen() {
   const { user, logout } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -79,6 +81,12 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     fetchProfile().finally(() => setLoading(false));
+  }, [fetchProfile]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchProfile();
+    setRefreshing(false);
   }, [fetchProfile]);
 
   const handleSignOut = () => {
@@ -107,7 +115,16 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+          />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Settings</Text>
         </View>
@@ -179,6 +196,7 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingBottom: 40,
+    flexGrow: 1,
   },
   header: {
     paddingHorizontal: 20,

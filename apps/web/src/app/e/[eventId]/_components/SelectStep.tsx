@@ -7,7 +7,6 @@ import type { EventTicket } from '@troptix/api';
 
 const money = (cents: number) => getFormattedCurrency(cents / 100);
 
-// `onSale` covers a live tier that still can't be added (draft preview).
 const UNAVAILABLE_LABEL: Record<EventTicket['saleStatus'], string> = {
   soldOut: 'Sold out',
   saleEnded: 'Sales ended',
@@ -25,11 +24,8 @@ function Stepper({
   onChange: (delta: number) => void;
 }) {
   return (
-    // Fixed-width slot, right-aligned: the pill grows leftward into reserved
-    // space, so opening it never reflows the ticket's title/price.
     <div className="flex w-24 justify-end">
       <div className="flex items-center gap-0.5 rounded-full border border-border bg-card p-0.5">
-        {/* Minus + count are hidden until the first ticket is added, then slide in. */}
         {value > 0 && (
           <div className="flex items-center gap-0.5 duration-500 ease-[cubic-bezier(.34,1.56,.64,1)] animate-in fade-in slide-in-from-right-4">
             <button
@@ -78,7 +74,6 @@ export default function SelectStep({
   eventName: string;
   onContinue: () => void;
 }) {
-  // Empty-selection taps shake the CTA instead of a disabled dead end.
   const [shake, setShake] = useState(false);
   return (
     <>

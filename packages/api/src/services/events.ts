@@ -1,13 +1,3 @@
-/**
- * Canonical public read for the event page: fetches the event and its public
- * tiers in one query and shapes both here, independent of the read-side checkout
- * services (slated for rework).
- *
- * Prisma is injected (unit-testable). No authorization (ADR 0013) — keyed by
- * `eventId`; the page does its own draft guard via `isDraft`/`organizerUserId`.
- * Only public (non-gated) tiers are returned, with no discount codes; new
- * columns fall back to legacy sources until the Stage-3 backfill.
- */
 import type { PrismaClient } from '@troptix/db';
 import { Prisma } from '@troptix/db';
 import type {
@@ -29,12 +19,6 @@ const SALE_STATUS = {
   Ended: 'saleEnded',
 } as const;
 
-/**
- * Public discovery listing: upcoming, non-draft, non-private events shaped for the cards on
- * `/discover`. Soonest-first. The cheapest public price is pre-derived here
- * (`fromPriceCents`) so no tier rows or discount codes reach the browser. New
- * `priceCents` column falls back to legacy `price * 100` until the backfill.
- */
 export async function listPublicEvents(
   prisma: PrismaClient
 ): Promise<EventSummary[]> {
@@ -51,18 +35,6 @@ export async function listPublicEvents(
       startsAt: true,
       endsAt: true,
       venue: true,
-      // Cheapest public tier only (a null/empty discount code means public).
-      ticketTypes: {
-        where: {
-          OR: [
-            { discountCode: { equals: null } },
-            { discountCode: { equals: '' } },
-          ],
-        },
-        select: { priceCents: true, price: true },
-        orderBy: { price: Prisma.SortOrder.asc },
-        take: 1,
-      },
     },
   });
 
@@ -73,6 +45,8 @@ export async function getEventDetail(
   prisma: PrismaClient,
   input: EventDetailInput
 ): Promise<EventDetail> {
+  // Drafts ARE returned: the page does its own draft guard via
+  // isDraft/organizerUserId (organizer preview) — don't filter them here.
   const event = await prisma.events.findUnique({
     where: { id: input.eventId },
     select: {
@@ -85,7 +59,6 @@ export async function getEventDetail(
       isPrivate: true,
       organizer: true,
       organizerUserId: true,
-      // The hosting Organization (brand) for the "Hosted by" block → /o/[slug].
       organization: {
         select: {
           slug: true,
@@ -106,7 +79,6 @@ export async function getEventDetail(
       longitude: true,
       pageTheme: true,
       flyerPalette: true,
-      // Public tiers only (a null/empty discount code means public).
       ticketTypes: {
         where: {
           OR: [
@@ -139,8 +111,6 @@ export async function getEventDetail(
   const now = new Date();
   const tickets: EventTicket[] = event.ticketTypes
     .map((tt) => {
-      // priceCents falls back to price * 100; the sale window needs no fallback
-      // — one pair, full timestamps (ADR 0020).
       const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
       const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
       const saleStatus: EventTicket['saleStatus'] =

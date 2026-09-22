@@ -21,9 +21,8 @@ export interface FetchedTicketData {
   id: string;
   createdAt: Date | null;
   status: TicketStatus;
-  // Whether they are through the door. The status enum is mid-cutover
-  // (AVAILABLE/VALID both mean un-checked-in), so the timestamp is the one
-  // field every check-in path stamps and clears.
+  // The status enum is mid-cutover (AVAILABLE/VALID both mean un-checked-in),
+  // so the timestamp is the one field every check-in path stamps and clears.
   checkinTimestamp: Date | null;
   email: string | null;
   firstName: string | null;
@@ -34,9 +33,8 @@ export interface FetchedTicketData {
 
 import type { ServerUser } from '@/server/authUser';
 
-// Layout and page fetch in parallel, so every read here carries its own
-// ownership scope — the layout's 404 is not protection. Errors propagate: a
-// DB failure must not render as an empty attendee list.
+// The layout's 404 is not protection: this read carries its own ownership scope.
+// A DB failure must not render as an empty attendee list — let errors propagate.
 async function fetchTickets(eventId: string, user: ServerUser) {
   {
     const tickets = await prisma.tickets.findMany({

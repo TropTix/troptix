@@ -6,10 +6,6 @@ import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
 import EventDetailView from './_components/EventDetailView';
 
-// The public event page. Legacy `/events/[eventId]` 308-redirects here
-// (next.config.js). See docs/plans/2026-06-event-page-redesign.md.
-
-// Deduped per request so generateMetadata + the page share one DB read.
 const loadEvent = cache((eventId: string) =>
   getEventDetail(prisma, { eventId })
 );
@@ -20,7 +16,6 @@ export async function generateMetadata(props: {
   const { eventId } = await props.params;
   try {
     const event = await loadEvent(eventId);
-    // OG images must be absolute URLs; resolve the stored path (ADR 0016).
     const ogImage = eventFlyerUrl(event.imageUrl);
     return {
       title: event.name,

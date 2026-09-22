@@ -33,7 +33,7 @@ None of this is optional, and all of it is cheap next to fixing it afterwards. T
 
 ## Phase 1 — Membership and the acting organization
 
-- `Membership`: organization, user, role, timestamps. Unique on the pair. Only `ADMIN` is written in v1; `SCANNER` is reserved.
+- `Membership`: organization, user, role, timestamps. Unique on the pair. The role enum holds only `ADMIN`; Scanner joins it with the mobile rebuild (adding an enum value is one line, dropping one is a type rebuild).
 - The organizer scope stops meaning "the actor" and starts meaning "the acting Organization" — defaulted when a person has only one, remembered across requests, and offered as a choice only to the handful of people who own one Organization and belong to others.
 - Reads and writes resolve through that scope. An Admin sees exactly what the Owner sees.
 - The two owner-only areas refuse Admins: member management, and payouts / Stripe / paid-ticketing approval.
@@ -47,6 +47,7 @@ None of this is optional, and all of it is cheap next to fixing it afterwards. T
 - Delivery is a direct Resend call from the invite action, alongside the order-confirmation mail. The outbox table exists but nothing produces or consumes it; wiring it is a separate job.
 - Accepting requires being signed in as the invited address. A stranger's path is the ordinary passwordless one: the link lands on sign-in, the magic link verifies the address, the signup trigger creates their user row, and the accept button appears. Nobody sets a password.
 - Only the Owner may invite, so nobody can grant a role above their own. The pending-invite list is visible to the Owner alone.
+- The invite action refuses the Owner's own address, comparing both sides lowercased — never Prisma's `mode: 'insensitive'`, which compiles to unescaped ILIKE (the #519 bug). "The Owner is never a Membership row" (ADR 0024) holds here: a plain CHECK cannot cross tables, and a trigger is more than it is worth.
 
 ## Open
 

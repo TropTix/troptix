@@ -1,17 +1,8 @@
 import { z } from 'zod';
 import { eventPageThemeSchema, flyerPaletteSchema } from './events';
 
-// Organizer dashboard contracts, derived from
-// docs/plans/2026-07-organizer-dashboard-ux.md. Each screen's DTOs land with
-// the PR that builds that screen.
-//
-// Conventions:
-//  - **Money is integer cents** everywhere; the web layer formats at the edge.
-//    "Revenue" is always Ticket revenue (Σ Order.subtotal over COMPLETED
-//    orders) — pre-fee, pre-refund. A buyer's Order.total is "amount charged",
-//    a deliberately different number (see CONTEXT.md "Money").
-//  - Timestamps are ISO strings; day-bucketed series use `yyyy-mm-dd`.
-//  - Inventory is `sold` / `capacity`.
+// "Revenue" is Ticket revenue (Σ Order.subtotal over COMPLETED orders), pre-fee,
+// pre-refund — deliberately not Order.total ("amount charged"; CONTEXT.md "Money").
 
 export const eventStatusSchema = z.enum([
   'Draft',
@@ -34,11 +25,8 @@ export const viewAsInputSchema = z.object({
 export type ViewAsInput = z.infer<typeof viewAsInputSchema>;
 
 /**
- * The window the dashboard's stats and sales chart cover. Rolling, not calendar:
- * `week`/`month` are the last 7/30 days through today.
- *
- * Boundaries are UTC — the organizer's own timezone isn't modelled yet, so
- * "today" means the UTC day (worth revisiting for far-from-UTC organizers).
+ * Rolling, not calendar: `week`/`month` are the last 7/30 days through today.
+ * Boundaries are UTC — the organizer's timezone isn't modelled.
  */
 export const dashboardRangeSchema = z.enum([
   'today',
@@ -53,10 +41,6 @@ export const dashboardInputSchema = viewAsInputSchema.extend({
 });
 export type DashboardInput = z.infer<typeof dashboardInputSchema>;
 
-/**
- * An event as a card — the shape both the dashboard's active-events row and the
- * events list (Screen B) render, so a card looks the same wherever it appears.
- */
 export const organizerEventSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -72,11 +56,8 @@ export type OrganizerEventSummary = z.infer<typeof organizerEventSummarySchema>;
 
 export const dashboardRecentOrderSchema = z.object({
   id: z.string(),
-  /** The order's event, so a cross-event rail can link into its detail. */
   eventId: z.string(),
-  /** Name, falling back to email, falling back to 'N/A'. */
   customerDisplay: z.string(),
-  /** What the buyer paid (Order.total) — not revenue. */
   amountChargedCents: z.number().int(),
   /** Nullable because `Orders.createdAt` still is (roadmap 2.9). */
   createdAt: z.string().datetime().nullable(),
@@ -91,7 +72,6 @@ export const salesPointSchema = z.object({
 });
 export type SalesPoint = z.infer<typeof salesPointSchema>;
 
-/** Drives the home screen's setup banner; no banner when both are satisfied. */
 export const organizerSetupStateSchema = z.object({
   profileComplete: z.boolean(),
   paidTicketingEnabled: z.boolean(),
@@ -99,7 +79,6 @@ export const organizerSetupStateSchema = z.object({
 export type OrganizerSetupState = z.infer<typeof organizerSetupStateSchema>;
 
 export const organizerDashboardSchema = z.object({
-  /** Echoed back so the UI can render the selector from the resolved range. */
   range: dashboardRangeSchema,
   /** Scoped to `range` — not all-time. */
   stats: z.object({
@@ -116,9 +95,6 @@ export const organizerDashboardSchema = z.object({
 });
 export type OrganizerDashboard = z.infer<typeof organizerDashboardSchema>;
 
-// --- Screen C — event overview (`/organizer/events/[id]`) ---
-
-/** The event's headline numbers. Money is cents; `sold` is against `capacity`. */
 export const eventVitalsSchema = z.object({
   sold: z.number().int(),
   capacity: z.number().int(),
@@ -127,31 +103,25 @@ export const eventVitalsSchema = z.object({
 });
 export type EventVitals = z.infer<typeof eventVitalsSchema>;
 
-/** A day on the event's revenue-over-time chart. Zero-filled, so no gaps. */
 export const eventRevenuePointSchema = z.object({
-  /** Day start, ISO (UTC — same caveat as the dashboard series). */
+  /** Day start, ISO, UTC. */
   at: z.string().datetime(),
   revenueCents: z.number().int(),
   tickets: z.number().int(),
 });
 export type EventRevenuePoint = z.infer<typeof eventRevenuePointSchema>;
 
-/** One ticket type's inventory + its share of Ticket revenue. */
 export const ticketTypeBreakdownSchema = z.object({
   id: z.string(),
   name: z.string(),
   sold: z.number().int(),
   capacity: z.number().int(),
-  /**
-   * Σ of this ticket type's completed-ticket subtotals. Close to — but not guaranteed
-   * equal to — the event's Ticket revenue: that's Σ Order.subtotal, a different
-   * column, and each is rounded to cents at its own granularity.
-   */
+  /** Σ this type's completed-ticket subtotals — close to, but not guaranteed
+   * cent-equal to, the event's Ticket revenue (Σ Order.subtotal, a different column). */
   revenueCents: z.number().int(),
 });
 export type TicketTypeBreakdown = z.infer<typeof ticketTypeBreakdownSchema>;
 
-/** Door progress: how many of the event's tickets have been checked in. */
 export const checkInSummarySchema = z.object({
   checkedIn: z.number().int(),
   total: z.number().int(),
@@ -172,17 +142,13 @@ export const eventOverviewSchema = z.object({
   revenueSeries: z.array(eventRevenuePointSchema),
   ticketTypes: z.array(ticketTypeBreakdownSchema),
   checkIn: checkInSummarySchema,
-  /** A short peek; the Orders tab is the full surface. NOT range-scoped. */
   recentOrders: z.array(dashboardRecentOrderSchema),
 });
 export type EventOverview = z.infer<typeof eventOverviewSchema>;
 
-// --- Screen G — orders (`/organizer/events/[id]/orders`) ---
-
 export const eventOrderRowSchema = z.object({
   id: z.string(),
   customerDisplay: z.string(),
-  /** What the buyer paid (Order.total). */
   amountChargedCents: z.number().int(),
   ticketCount: z.number().int(),
   createdAt: z.string().datetime().nullable(),
@@ -190,9 +156,8 @@ export const eventOrderRowSchema = z.object({
 });
 export type EventOrderRow = z.infer<typeof eventOrderRowSchema>;
 
-/** One ticket type's slice of an order — the tickets bought at a single price. */
 export const orderLineItemSchema = z.object({
-  /** Ticket type name, or 'Ticket' when the ticketType is gone/unknown. */
+  /** Falls back to 'Ticket' when the ticketType is gone/unknown. */
   name: z.string(),
   quantity: z.number().int(),
   unitPriceCents: z.number().int(),
@@ -200,16 +165,9 @@ export const orderLineItemSchema = z.object({
 });
 export type OrderLineItem = z.infer<typeof orderLineItemSchema>;
 
-/**
- * A single order in full. Money is cents throughout; the breakdown prefers the
- * reservation-era `*Cents` columns and falls back to the legacy float columns
- * for orders written before that cutover.
- */
 export const orderDetailSchema = z.object({
   id: z.string(),
   status: orderStatusSchema,
-  /** Placed. A fuller placed→paid→emailed timeline needs event sourcing we
-   * don't store yet, so it's deferred rather than faked. */
   createdAt: z.string().datetime().nullable(),
   customer: z.object({
     name: z.string().nullable(),
@@ -220,36 +178,22 @@ export const orderDetailSchema = z.object({
   subtotalCents: z.number().int(),
   feesCents: z.number().int(),
   totalCents: z.number().int(),
-  /** e.g. "Visa ····4242", or null for free/legacy orders. */
   paymentMethod: z.string().nullable(),
 });
 export type OrderDetail = z.infer<typeof orderDetailSchema>;
 
-// --- Screen E — ticket types (`/organizer/events/[id]/tickets`) ---
-
-/** Where a ticketType sits in its sale window. */
 export const saleStateSchema = z.enum(['Scheduled', 'OnSale', 'Ended']);
 export type SaleState = z.infer<typeof saleStateSchema>;
 
-/**
- * A ticketType row on the ticket-types screen: the same inventory + revenue shape the
- * event overview shows, plus the price and sale-window state this screen manages.
- */
 export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
-  /** The price the organizer set. What they earn per ticket under PASS. */
+  /** The price the organizer set — not necessarily what the attendee pays. */
   grossPriceCents: z.number().int(),
-  /**
-   * What the attendee is actually charged: gross + fee when the type passes
-   * fees on, gross when it absorbs them (the organizer eats the fee instead).
-   * Equal to `grossPriceCents` for free types, since a $0 ticket has no fee.
-   */
+  /** What the attendee is charged: gross + fee under PASS, gross under ABSORB. */
   displayPriceCents: z.number().int(),
   saleState: saleStateSchema,
-  /** Venue-local sale window (ADR 0021). Both are always set. */
+  /** Venue-local (ADR 0021). */
   saleStartsAt: z.string().datetime(),
   saleEndsAt: z.string().datetime(),
-  // The remaining editable fields, so the manage screen can seed its edit
-  // drawer without a second fetch.
   description: z.string(),
   maxPurchasePerUser: z.number().int(),
   ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
@@ -257,18 +201,13 @@ export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
 });
 export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
 
-// --- Screen D — create / edit event (write inputs) ---
-//
-// Unlike the read DTOs above (ISO strings over the wire), these are inputs to
-// in-process service calls that hand Dates straight to Prisma, so timestamps
-// are `z.date()`. Money stays integer cents; the service derives the legacy
-// float during the 2.12 cutover.
+// Unlike the read DTOs above (ISO strings over the wire), the write inputs below
+// feed in-process service calls that hand Dates straight to Prisma, so timestamps are `z.date()`.
 
 export const ticketTypeInputSchema = z
   .object({
     name: z.string().min(3),
     description: z.string().optional(),
-    /** Gross price the organizer set. 0 = FREE/RSVP; > 0 requires the paid gate. */
     priceCents: z.number().int().min(0),
     capacity: z.number().int().positive(),
     maxPurchasePerUser: z.number().int().positive(),
@@ -295,14 +234,12 @@ const eventFieldsSchema = z.object({
   countryCode: z.string().optional(),
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
-  /** Stored flyer path, not a URL (ADR 0016). Empty/null means no image. */
+  /** Stored flyer path, not a URL (ADR 0016). */
   imageUrl: z.string().nullable().optional(),
-  /** Page treatment + palette extracted from the flyer at upload (see contracts/events.ts). */
   pageTheme: eventPageThemeSchema.optional(),
   flyerPalette: flyerPaletteSchema.nullable().optional(),
 });
 
-// One home for the temporal rule, so create and update can't drift apart.
 const eventEndsAfterStart: [
   (e: { startsAt: Date; endsAt: Date }) => boolean,
   { message: string; path: string[] },
@@ -318,35 +255,21 @@ export const createEventInputSchema = eventFieldsSchema
   .refine(...eventEndsAfterStart);
 export type CreateEventInput = z.infer<typeof createEventInputSchema>;
 
-/**
- * Event fields only — ticket-type editing is Screen E's seam (#452), so
- * `updateEvent` deliberately takes no ticket types (see #465).
- */
+/** Deliberately takes no ticket types — ticket-type editing is its own seam (#452, #465). */
 export const updateEventInputSchema = eventFieldsSchema.refine(
   ...eventEndsAfterStart
 );
 export type UpdateEventInput = z.infer<typeof updateEventInputSchema>;
 
 export const ticketTypesViewSchema = z.object({
-  /**
-   * The event's end — the default sale-window end for new tickets (sell
-   * until the event ends). Carried here so the manage screen needs no
-   * second, seam-bypassing event read.
-   */
   eventEndsAt: z.string().datetime(),
-  /** Natural (creation) order — reordering is deferred (see the UX plan). */
   ticketTypes: z.array(ticketTypeRowSchema),
-  /**
-   * Header summary — the sum of the rows, so it agrees with the table below it.
-   * Its `revenueCents` (Σ Tickets.subtotal) is the same basis as the per-type
-   * rows, but ≈ — not guaranteed cent-equal to — the "Ticket revenue" the
-   * dashboard and event overview report (Σ Order.subtotal, a different column).
-   */
+  /** Sum of the rows, so it agrees with the table. Its `revenueCents` (Σ Tickets.subtotal)
+   * is ≈, not guaranteed cent-equal to, dashboard Ticket revenue (Σ Order.subtotal). */
   summary: z.object({
     sold: z.number().int(),
     capacity: z.number().int(),
     revenueCents: z.number().int(),
-    /** How many types are selling right now — the at-a-glance "is anything live". */
     onSale: z.number().int(),
   }),
 });

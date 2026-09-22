@@ -1,0 +1,25 @@
+packages:
+  - apps/mobile
+  - apps/web
+  - packages/*
+# apps/organizer (Expo SDK 53) is a standalone app with its own yarn.lock —
+# SDK 53 can't run under the isolated linker, so it stays out of the workspace.
+
+linkWorkspacePackages: true
+
+# One @types/react for the whole workspace: Radix packages are shared between
+# web and mobile, and two type-flavors of the same component make web's
+# typecheck fail on "two different types with this name".
+overrides:
+  stripe: 22.3.0
+  '@types/react': 19.2.7
+  '@types/react-dom': 19.2.3
+
+allowBuilds:
+  '@prisma/engines': true
+  core-js: true
+  esbuild: true
+  ngrok: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true

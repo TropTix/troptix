@@ -1,31 +1,19 @@
 /**
- * Generate a Supabase-format migration from the current Prisma schema.
- *
- * Usage:
- *   yarn db:new <name>                 # diff: schema.prisma @ origin/main -> working schema.prisma
- *   yarn db:new <name> --base=<ref>    # diff against a different git ref (e.g. HEAD, a tag)
- *   yarn db:new <name> --init          # diff: empty -> schema.prisma  (first baseline migration)
- *
- * Writes supabase/migrations/<timestamp>_<name>.sql using `prisma migrate diff`.
- * Plain SQL is the source of truth (docs/adr/0004-supabase-migrations-as-source.md);
- * Prisma is only the generator. Review the emitted SQL before committing.
- *
- * The baseline is a **schema file at a git ref** (`--from-schema`), NOT the live
- * database (`--from-config-datasource`). This is fully offline — no DB, no
- * POSTGRES_URL — and sidesteps Prisma's P4002 on Supabase's `public → auth`
- * cross-schema FK (which only bites live-DB introspection). It relies on the
- * convention that schema.prisma on the base ref reflects all applied migrations
- * (true when every schema change ships with a migration).
- *
- * Caveat — stacked migrations on one branch: the default base (origin/main)
- * produces the delta since main, so a *second* migration on the same branch
- * would re-emit the first. For that case pass `--base=<commit>` pointing at the
- * commit where the previous migration was added.
+ * Deliberately diffs schema.prisma at the base ref (`--from-schema`), never the
+ * live DB — live introspection hits Prisma P4002 on Supabase's `public → auth`
+ * FK (ADR 0004). A second migration stacked on one branch re-emits the first:
+ * pass `--base=<commit that added the previous one>`.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 const rawName = process.argv[2];
 const isInit = process.argv.includes('--init');
@@ -35,7 +23,7 @@ const baseArg = process.argv
 const baseRef = baseArg ?? process.env.MIGRATION_BASE_REF ?? 'origin/main';
 
 if (!rawName || rawName.startsWith('--')) {
-  console.error('Usage: yarn db:new <name> [--base=<ref>] [--init]');
+  console.error('Usage: pnpm db:new <name> [--base=<ref>] [--init]');
   process.exit(1);
 }
 
@@ -44,24 +32,39 @@ const name = rawName
   .replace(/[^a-z0-9]+/g, '_')
   .replace(/^_|_$/g, '');
 
-// Supabase migration filename convention: <YYYYMMDDHHMMSS>_<name>.sql
-const d = new Date();
-const pad = (n: number) => String(n).padStart(2, '0');
-const timestamp =
-  `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
-  `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
-
 const webDir = join(__dirname, '..');
 const repoRoot = join(webDir, '..', '..');
 const dbDir = join(repoRoot, 'packages', 'db');
 const relSchema = join('packages', 'db', 'prisma', 'schema.prisma');
 const schemaPath = join(repoRoot, relSchema);
 const migrationsDir = join(repoRoot, 'supabase', 'migrations');
+
+// `supabase db push` refuses versions below the remote head — an older stamp
+// merges green and silently never applies to prod (bit twice), hence the clamp.
+const d = new Date();
+const pad = (n: number) => String(n).padStart(2, '0');
+let timestamp =
+  `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
+  `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
+let baseFiles: string[] = [];
+try {
+  baseFiles = execFileSync(
+    'git',
+    ['ls-tree', '--name-only', baseRef, 'supabase/migrations/'],
+    { cwd: repoRoot, encoding: 'utf8' }
+  ).split('\n');
+} catch {
+  // No usable baseRef (fresh clone, --init): clamp against disk alone.
+}
+const head = baseFiles
+  .concat(existsSync(migrationsDir) ? readdirSync(migrationsDir) : [])
+  .map((f) => basename(f).match(/^(\d{14})_/)?.[1])
+  .filter((v): v is string => !!v)
+  .sort()
+  .pop();
+if (head && timestamp <= head) timestamp = String(Number(head) + 1);
 const outFile = join(migrationsDir, `${timestamp}_${name}.sql`);
 
-// Baseline: `--from-empty` for the first migration, else the schema file as of
-// `baseRef`, extracted to a temp file for `--from-schema` (a pure datamodel diff,
-// no database needed).
 let baselineFile: string | undefined;
 let fromArgs: string[];
 if (isInit) {
@@ -110,7 +113,7 @@ try {
   mkdirSync(migrationsDir, { recursive: true });
   writeFileSync(outFile, sql);
   console.log(`Wrote ${outFile} (baseline: ${isInit ? 'empty' : baseRef})`);
-  console.log('Review the SQL, then run `yarn db:apply` to apply it.');
+  console.log('Review the SQL, then run `pnpm db:apply` to apply it.');
 } finally {
   if (baselineFile) rmSync(baselineFile, { force: true });
 }

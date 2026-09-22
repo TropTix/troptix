@@ -1,9 +1,3 @@
-/**
- * Unit tests for the dashboard read. Pure over an injected fake `prisma`
- * (ADR 0010) — no Postgres. Covers the authorization seam (anonymous, scoping,
- * View-as), the cents boundary, capacity/status shaping, and the zero-filled
- * sales trend.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -116,6 +110,22 @@ describe('getDashboard — shaping', () => {
     const { prisma } = fakePrisma({ subtotalSum: 59.969999999999999 });
     const result = await getDashboard(prisma, OWNER, {}, NOW);
     expect(result.stats.revenueCents).toBe(5997);
+
+    // Values where truncating or ceiling would differ from rounding.
+    const up = await getDashboard(
+      fakePrisma({ subtotalSum: 123.456 }).prisma,
+      OWNER,
+      {},
+      NOW
+    );
+    expect(up.stats.revenueCents).toBe(12346);
+    const down = await getDashboard(
+      fakePrisma({ subtotalSum: 10.443 }).prisma,
+      OWNER,
+      {},
+      NOW
+    );
+    expect(down.stats.revenueCents).toBe(1044);
   });
 
   it('reports zero revenue when there are no completed orders', async () => {
@@ -168,7 +178,7 @@ describe('getDashboard — shaping', () => {
     const result = await getDashboard(prisma, OWNER, {}, NOW);
     expect(result.recentOrders[0]).toMatchObject({
       id: 'o1',
-      customerDisplay: 'buyer@x.com', // falls back to email
+      customerDisplay: 'buyer@x.com',
       amountChargedCents: 2750,
       status: 'COMPLETED',
     });
@@ -214,7 +224,6 @@ describe('getDashboard — shaping', () => {
 
 describe('getDashboard — range', () => {
   const bucketOf = (prismaMock: { $queryRaw: unknown }) =>
-    // The tagged-template call passes the bound values after the strings array.
     (prismaMock.$queryRaw as ReturnType<typeof vi.fn>).mock.calls[0][1];
 
   it('defaults to the past month, bucketed daily', async () => {
@@ -232,7 +241,6 @@ describe('getDashboard — range', () => {
 
     expect(result.range).toBe('today');
     expect(bucketOf(prisma as never)).toBe('hour');
-    // NOW is 12:00Z → hours 00:00..12:00 inclusive.
     expect(result.salesSeries).toHaveLength(13);
     expect(result.salesSeries[0].at).toBe('2026-07-15T00:00:00.000Z');
     expect(result.salesSeries.at(-1)?.at).toBe('2026-07-15T12:00:00.000Z');
@@ -256,8 +264,6 @@ describe('getDashboard — range', () => {
     const { prisma } = fakePrisma();
     const midnight = new Date('2026-07-15T00:00:00.000Z');
 
-    // Today at exactly 00:00 is still one (empty) hour of data, and the month
-    // still ends on today — an off-by-one here silently drops the newest bucket.
     const today = await getDashboard(
       prisma,
       OWNER,
@@ -293,6 +299,11 @@ describe('getDashboard — range', () => {
       .calls[0][0].where;
     expect(where.createdAt.gte).toEqual(new Date('2026-07-15T00:00:00.000Z'));
     expect(where.createdAt.lt).toEqual(NOW);
+    expect(where.status).toBe('COMPLETED');
+    expect(where.event).toMatchObject({
+      organizerUserId: 'owner-1',
+      deletedAt: null,
+    });
   });
 
   it('derives tickets sold from the same buckets the chart uses', async () => {

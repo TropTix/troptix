@@ -6,8 +6,10 @@ import React, { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Linking,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -24,6 +26,7 @@ type Guest = {
   ticketId: string;
   checkedIn: boolean;
   checkedInAt?: string;
+  email?: string;
 };
 
 type Tab = 'scanner' | 'guests';
@@ -152,15 +155,24 @@ function ScannerTab({
   if (!permission) return <View style={styles.flex} />;
 
   if (!permission.granted) {
+    const isDenied = !permission.canAskAgain;
+
     return (
       <View style={styles.permissionWrap}>
         <Ionicons name="camera-outline" size={48} color={colors.textMuted} />
-        <Text style={styles.permissionTitle}>Camera Access Needed</Text>
+        <Text style={styles.permissionTitle}>Camera Access</Text>
         <Text style={styles.permissionSub}>
-          Grant camera access to scan QR codes on guest tickets.
+          {isDenied
+            ? 'Camera access is required to scan ticket QR codes. You can enable access in your device Settings.'
+            : 'Camera access is used to scan ticket QR codes for check-in.'}
         </Text>
-        <Pressable style={styles.permissionBtn} onPress={requestPermission}>
-          <Text style={styles.permissionBtnText}>Grant Access</Text>
+        <Pressable
+          style={styles.permissionBtn}
+          onPress={isDenied ? () => Linking.openSettings() : requestPermission}
+        >
+          <Text style={styles.permissionBtnText}>
+            {isDenied ? 'Open Settings' : 'Continue'}
+          </Text>
         </Pressable>
       </View>
     );
@@ -239,6 +251,11 @@ function GuestRow({
         <Text style={styles.guestName} numberOfLines={1}>
           {guest.name}
         </Text>
+        {guest.email ? (
+          <Text style={styles.guestEmail} numberOfLines={1}>
+            {guest.email}
+          </Text>
+        ) : null}
         <Text
           style={[
             styles.ticketPillText,
@@ -250,13 +267,23 @@ function GuestRow({
       </View>
 
       <View
-        style={[styles.checkCircle, guest.checkedIn && styles.checkCircleIn]}
+        style={[
+          styles.checkPill,
+          guest.checkedIn ? styles.checkPillIn : styles.checkPillOut,
+        ]}
       >
-        <Ionicons
-          name={guest.checkedIn ? 'checkmark' : 'add'}
-          size={15}
-          color={guest.checkedIn ? '#fff' : colors.textMuted}
-        />
+        {guest.checkedIn ? (
+          <>
+            <Ionicons
+              name="checkmark-circle"
+              size={14}
+              color={colors.success}
+            />
+            <Text style={styles.checkPillTextIn}>Checked In</Text>
+          </>
+        ) : (
+          <Text style={styles.checkPillTextOut}>Check In</Text>
+        )}
       </View>
     </Pressable>
   );
@@ -265,9 +292,13 @@ function GuestRow({
 function GuestListTab({
   guests,
   onToggle,
+  refreshing,
+  onRefresh,
 }: {
   guests: Guest[];
   onToggle: (id: string) => void;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }) {
   const [query, setQuery] = useState('');
 
@@ -275,7 +306,8 @@ function GuestListTab({
     ? guests.filter(
         (g) =>
           g.name.toLowerCase().includes(query.toLowerCase()) ||
-          g.ticketId.toLowerCase().includes(query.toLowerCase())
+          g.ticketId.toLowerCase().includes(query.toLowerCase()) ||
+          (g.email && g.email.toLowerCase().includes(query.toLowerCase()))
       )
     : guests;
 
@@ -288,7 +320,7 @@ function GuestListTab({
           <Ionicons name="search-outline" size={15} color={colors.textMuted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Name or ticket ID…"
+            placeholder="Name, email, or ticket ID…"
             placeholderTextColor={colors.textMuted}
             value={query}
             onChangeText={setQuery}
@@ -316,6 +348,15 @@ function GuestListTab({
         data={filtered}
         keyExtractor={(g) => g.id}
         contentContainerStyle={styles.guestList}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={Boolean(refreshing)}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+            />
+          ) : undefined
+        }
         renderItem={({ item }) => <GuestRow guest={item} onToggle={onToggle} />}
         ItemSeparatorComponent={() => <View style={styles.guestSep} />}
         ListEmptyComponent={
@@ -379,7 +420,6 @@ export default function EventDetailScreen() {
         )
       );
       trpc.organizer.checkInTicket.mutate({ ticketId: guestId }).catch(() => {
-        // Revert on error by refetching the full event state
         trpc.organizer.event.query({ id }).then((data) => {
           setGuests(data.guests);
         });
@@ -425,7 +465,6 @@ export default function EventDetailScreen() {
             text: 'Remove',
             style: 'destructive',
             onPress: () => {
-              // The backend has no undo-checkin mutation yet; local state only.
               setGuests((prev) =>
                 prev.map((g) =>
                   g.id === guestId
@@ -433,6 +472,13 @@ export default function EventDetailScreen() {
                     : g
                 )
               );
+              trpc.organizer.undoCheckInTicket
+                .mutate({ ticketId: guestId })
+                .catch(() => {
+                  trpc.organizer.event.query({ id }).then((data) => {
+                    setGuests(data.guests);
+                  });
+                });
             },
           },
         ]
@@ -554,7 +600,12 @@ export default function EventDetailScreen() {
         {activeTab === 'scanner' ? (
           <ScannerTab guests={guests} onCheckIn={handleCheckInByScan} />
         ) : (
-          <GuestListTab guests={guests} onToggle={handleToggleGuest} />
+          <GuestListTab
+            guests={guests}
+            onToggle={handleToggleGuest}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+          />
         )}
       </View>
     </SafeAreaView>
@@ -855,9 +906,12 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: fonts.regular,
     fontSize: 14,
     color: colors.text,
+    letterSpacing: 0,
   },
   guestCount: {},
   guestCountNum: {
@@ -873,6 +927,7 @@ const styles = StyleSheet.create({
   guestList: {
     paddingHorizontal: 16,
     paddingBottom: 32,
+    flexGrow: 1,
   },
   guestRow: {
     flexDirection: 'row',
@@ -914,20 +969,42 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
+  guestEmail: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textSub,
+  },
   ticketPillText: {
     fontFamily: fonts.regular,
     fontSize: 13,
+    marginTop: 2,
   },
-  checkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.border2,
+  checkPill: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
   },
-  checkCircleIn: {
-    backgroundColor: colors.success,
+  checkPillOut: {
+    backgroundColor: colors.accent,
+  },
+  checkPillIn: {
+    backgroundColor: colors.successDim,
+    borderWidth: 1,
+    borderColor: `${colors.success}44`,
+  },
+  checkPillTextOut: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: '#fff',
+  },
+  checkPillTextIn: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    color: colors.success,
   },
   guestSep: {
     height: 1,

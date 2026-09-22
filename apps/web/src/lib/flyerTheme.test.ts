@@ -6,9 +6,6 @@ import {
 } from './flyerTheme';
 import type { FlyerPalette } from '@troptix/api';
 
-// Holds every emitted pairing to the module's promised WCAG ratios, across
-// adversarial palettes where naive derivation is known to fail.
-
 const PALETTES: Record<string, FlyerPalette> = {
   'seeded wash (wine + red + gold)': {
     dominant: '#7A1E2B',

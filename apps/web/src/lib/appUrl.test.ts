@@ -1,9 +1,3 @@
-/**
- * `getAppBaseUrl` resolves the app's absolute origin from Vercel's system env
- * vars with a documented precedence: preview deploy URL → production domain →
- * `NEXT_PUBLIC_APP_URL` → localhost. `absoluteUrl` joins a path onto it. Env is
- * read at call time, so each case just sets the vars it needs.
- */
 import { getAppBaseUrl, absoluteUrl } from './appUrl';
 
 const VERCEL_KEYS = [

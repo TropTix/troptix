@@ -1,8 +1,6 @@
 /**
  * @jest-environment node
  */
-// next/server (NextRequest/NextResponse) requires the Node runtime's web APIs,
-// not jsdom.
 jest.mock('@/server/prisma', () => ({
   __esModule: true,
   default: { events: { findUnique: jest.fn() } },

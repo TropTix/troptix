@@ -13,6 +13,10 @@ interface AuthContextValue {
   isLoading: boolean;
   sendOtp: (email: string) => Promise<{ error: string | null }>;
   verifyOtp: (email: string, code: string) => Promise<{ error: string | null }>;
+  signInWithPassword: (
+    email: string,
+    password: string
+  ) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
 }
 
@@ -37,13 +41,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Restore persisted session from AsyncStorage on mount.
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session ? userFromSession(data.session) : null);
       setIsLoading(false);
     });
 
-    // Stay in sync with token refreshes and sign-outs.
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session ? userFromSession(session) : null);
@@ -67,13 +69,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null };
   };
 
+  const signInWithPassword = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    return { error: error?.message ?? null };
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, sendOtp, verifyOtp, logout }}
+      value={{
+        user,
+        isLoading,
+        sendOtp,
+        verifyOtp,
+        signInWithPassword,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>
