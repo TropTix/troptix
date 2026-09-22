@@ -1,4 +1,7 @@
-jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+  revalidateTag: jest.fn(),
+}));
 jest.mock('next/navigation', () => ({
   redirect: jest.fn(() => {
     throw new Error('NEXT_REDIRECT');
