@@ -12,7 +12,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "e2e": "pnpm --filter @troptix/e2e build:web && pnpm --filter @troptix/e2e test && pnpm --filter @troptix/e2e proof"
+    "e2e": "pnpm --filter @troptix/e2e build:web && (pnpm --filter @troptix/e2e test; status=$?; pnpm --filter @troptix/e2e proof; exit $status)"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,json,css,scss,md,yml,yaml}": "prettier --write"

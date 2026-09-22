@@ -1,8 +1,8 @@
 ---
 title: Browser end-to-end tests for the buyer flow
-status: proposed
+status: active
 created: 2026-09-21
-tracking-issue: TBD
+tracking-issue: PR #568 (single-PR initiative)
 ---
 
 # Browser end-to-end tests for the buyer flow

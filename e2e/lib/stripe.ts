@@ -1,7 +1,3 @@
-export function stripeKeyAvailable(): boolean {
-  return !!process.env.STRIPE_SECRET_KEY;
-}
-
 export type PaymentIntent = {
   id: string;
   status: string;

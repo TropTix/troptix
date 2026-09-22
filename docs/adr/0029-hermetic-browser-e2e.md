@@ -54,5 +54,5 @@ Three facts about the app decide the shape:
   place a flake can come from. Paid specs are few and skip themselves when
   the keys are absent, so the job never blocks on a missing secret.
 - **Bad:** A test-mode PaymentIntent is created per paid run and accumulates
-  in Stripe test data. It is identifiable by its `e2e-` reservation metadata
-  and wiped by hand.
+  in Stripe test data. It is identifiable by its Session metadata (`eventId`
+  starts with `e2e-event-`) and wiped by hand.

@@ -11,9 +11,7 @@ function getPool(): Pool {
       'E2E_DATABASE_URL is not set. Run `supabase db start` and let playwright.config.ts default it.'
     );
   }
-  const url = new URL(raw);
-  url.searchParams.delete('sslmode');
-  pool = new Pool({ connectionString: url.toString(), ssl: undefined, max: 4 });
+  pool = new Pool({ connectionString: raw, max: 4 });
   return pool;
 }
 
@@ -91,9 +89,4 @@ export async function getInventory(ticketTypeId: string): Promise<Inventory> {
   );
   if (!row) throw new Error(`TicketTypes row ${ticketTypeId} not found`);
   return row;
-}
-
-export async function closePool() {
-  await pool?.end();
-  pool = null;
 }

@@ -50,8 +50,14 @@ export async function fillCard(page: Page, number: string) {
   await cardNumber.fill(number);
   await frame.getByRole('textbox', { name: /expir/i }).fill('12 / 34');
   await frame.getByRole('textbox', { name: /security code|cvc/i }).fill('123');
+  // Postal code is optional in the Element and can paint a beat after the
+  // card fields, so wait briefly rather than checking once.
   const zip = frame.getByRole('textbox', { name: /zip|postal/i });
-  if (await zip.isVisible().catch(() => false)) await zip.fill('12345');
+  const hasZip = await zip.waitFor({ state: 'visible', timeout: 3_000 }).then(
+    () => true,
+    () => false
+  );
+  if (hasZip) await zip.fill('12345');
 }
 
 export function reservationIdFromUrl(page: Page): string {

@@ -1,11 +1,12 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import ffmpeg from 'ffmpeg-static';
 
 // Concatenates every recorded test video from the last run into one mp4 a
 // reviewer can watch end to end. Playwright's own ffmpeg is a minimal build
-// without the concat demuxer, hence ffmpeg-static.
+// without the concat demuxer, so this needs a full `ffmpeg` on PATH (the
+// GitHub runner ships one; locally, install it).
+const ffmpeg = process.env.FFMPEG ?? 'ffmpeg';
 const root = path.resolve(__dirname, '..');
 const resultsDir = path.join(root, 'test-results');
 const outDir = path.join(root, 'playwright-report');
@@ -31,8 +32,6 @@ if (videos.length === 0) {
   console.log('No videos under test-results; nothing to stitch.');
   process.exit(0);
 }
-if (!ffmpeg) throw new Error('ffmpeg-static has no binary for this platform');
-
 fs.mkdirSync(outDir, { recursive: true });
 const list = path.join(outDir, 'proof-list.txt');
 fs.writeFileSync(
@@ -66,6 +65,11 @@ const result = spawnSync(
   { stdio: 'inherit' }
 );
 fs.unlinkSync(list);
+if (result.error) {
+  throw new Error(
+    `Could not run ${ffmpeg}: ${result.error.message}. Install ffmpeg or set FFMPEG.`
+  );
+}
 if (result.status !== 0) process.exit(result.status ?? 1);
 console.log(
   `Stitched ${videos.length} video(s) into ${path.relative(root, out)}`

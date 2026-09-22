@@ -16,7 +16,6 @@
     "@playwright/test": "^1.63.0",
     "@types/node": "^24.10.1",
     "@types/pg": "^8.15.5",
-    "ffmpeg-static": "^5.2.0",
     "pg": "^8.16.3",
     "tsx": "^4.20.4",
     "typescript": "^5.9.2"

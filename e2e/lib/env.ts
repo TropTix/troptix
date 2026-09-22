@@ -19,7 +19,9 @@ export function loadWebEnvFile() {
 // session-refresh proxy never calls out without a session cookie. The Stripe
 // and Resend clients throw at construction without a key, which fails the
 // build; placeholders keep it building when the real keys are absent (paid
-// specs skip on the missing publishable key, and no email can leave).
+// specs skip on the missing keys, and no email can leave). The PostHog key is
+// blanked so the server-side order_completed capture never reaches the real
+// project from a test run.
 export function webEnv(): Record<string, string> {
   return {
     ...(process.env as Record<string, string>),
@@ -27,6 +29,7 @@ export function webEnv(): Record<string, string> {
     NEXT_PUBLIC_APP_URL: BASE_URL,
     NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321',
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'e2e-placeholder',
+    NEXT_PUBLIC_POSTHOG_KEY: '',
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder',
     RESEND_API_KEY: process.env.RESEND_API_KEY || 're_placeholder',
     NEXT_TELEMETRY_DISABLED: '1',

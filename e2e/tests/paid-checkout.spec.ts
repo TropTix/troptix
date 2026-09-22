@@ -18,11 +18,14 @@ import {
   getTickets,
   getReservationForOrder,
 } from '../lib/db';
-import { getPaymentIntent, stripeKeyAvailable } from '../lib/stripe';
+import { getPaymentIntent } from '../lib/stripe';
 
+// The browser needs the publishable key and the server the secret; one
+// without the other fails at beginPayment rather than skipping.
 test.skip(
-  !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-  'Paid checkout needs Stripe test keys (apps/web/.env locally, repo secrets on CI).'
+  !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
+    !process.env.STRIPE_SECRET_KEY,
+  'Paid checkout needs both Stripe test keys (apps/web/.env locally, repo secrets on CI).'
 );
 
 // 2 × GA at $25.00 + $2.50 fees = $55.00. Stripe's confirm() ends in a
@@ -90,7 +93,6 @@ test('paid checkout charges the card and records the order', async ({
   });
 
   await chapter('Stripe agrees: the PaymentIntent succeeded', async () => {
-    test.skip(!stripeKeyAvailable(), 'STRIPE_SECRET_KEY not set');
     const order = await getOrder(orderId);
     const intent = await getPaymentIntent(order!.stripePaymentId!);
     expect(intent.status).toBe('succeeded');

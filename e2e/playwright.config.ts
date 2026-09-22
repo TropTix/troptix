@@ -28,7 +28,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
     trace: 'retain-on-failure',
     // Every test is recorded: the videos are the proof artifact, stitched
-    // into playwright-report/proof.webm by scripts/stitch-proof.ts.
+    // into playwright-report/proof.mp4 by scripts/stitch-proof.ts.
     video: {
       mode: 'on',
       size: { width: 1280, height: 720 },
