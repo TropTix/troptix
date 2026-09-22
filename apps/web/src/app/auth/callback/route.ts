@@ -14,14 +14,6 @@ function resolveNext(next: string | null, origin: string): string {
   }
 }
 
-/**
- * Auth callback for both OAuth (Google) and email magic-links. Handles either
- * shape the provider/email template sends:
- *   - `code`        → PKCE / OAuth   → exchangeCodeForSession
- *   - `token_hash`  → email OTP link → verifyOtp
- * On success the session cookies are set and we redirect into the app; on
- * failure, back to sign-in. See the Supabase Next.js server-side auth guide.
- */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');

@@ -1,8 +1,5 @@
-/**
- * Shared shaping for the `EventSummary` discovery-card DTO — used by the public
- * events listing and the organization page. Card-level fields only: listings
- * carry no tier data, so tier writes never invalidate them.
- */
+// Card-level fields only — listings deliberately carry no tier data (#549),
+// so tier writes never invalidate them.
 import type { EventSummary } from '../../contracts/events';
 
 export type EventSummaryRow = {

@@ -7,14 +7,6 @@ import { stripe } from '@/server/lib/stripe';
 import { serverAnalytics } from '@/server/lib/analytics';
 import { getAppBaseUrl } from '@/lib/appUrl';
 
-/**
- * Resolve the request actor from the Authorization header (Bearer token from
- * mobile/API clients) or from the session cookie (web clients). Returns
- * anonymous when no valid session is found.
- *
- * Uses getUserFromIdTokenCookie — the same auth path the REST organizer routes
- * use — so the token verification is consistent and already proven to work.
- */
 async function resolveActor(req: Request): Promise<Actor> {
   try {
     const authHeader = req.headers.get('authorization');

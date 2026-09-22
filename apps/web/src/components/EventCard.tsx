@@ -42,7 +42,6 @@ export default function EventCard({ event }: { event: EventSummary }) {
             className="object-cover transition-transform duration-1200 ease-out group-hover:scale-[1.03]"
           />
 
-          {/* Restrained bottom scrim for metadata legibility */}
           <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/10 to-transparent" />
 
           <div className="absolute inset-x-0 bottom-0 p-5 text-white">

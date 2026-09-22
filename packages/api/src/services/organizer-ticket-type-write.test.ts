@@ -1,9 +1,3 @@
-/**
- * Unit tests for the Screen E ticket-type write seam over a fake prisma
- * (ADR 0010): the authorization seam, the shared paid gate (including the
- * no-org case), ownership query shapes, and the persisted field mapping
- * (cents + legacy float + FREE/PAID + discountCode null-coalescing).
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -34,9 +28,9 @@ const input = (over: Partial<TicketTypeInput> = {}): TicketTypeInput => ({
 function fakePrisma(
   opts: {
     paidEnabled?: boolean;
-    org?: unknown; // null → no Organization row yet
-    event?: unknown; // null → not owned
-    ticketType?: unknown; // null → not owned
+    org?: unknown;
+    event?: unknown;
+    ticketType?: unknown;
   } = {}
 ) {
   const eventsFindFirst = vi

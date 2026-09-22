@@ -1,9 +1,3 @@
-/**
- * The persisted shape of a ticket type from its write input — the one place
- * the FREE/PAID derivation and the legacy float mirror live, shared by the
- * event-create and ticket-type write seams so the 2.12 float retirement is a
- * one-file change.
- */
 import type { TicketTypeInput } from '../../contracts/organizer';
 
 export function ticketTypeWriteFields(input: TicketTypeInput) {

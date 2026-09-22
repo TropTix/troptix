@@ -20,11 +20,11 @@ import { ArrowUpRight, DollarSign, Ticket, CalendarClock } from 'lucide-react';
 const SkeletonMetricCard = () => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <Skeleton className="h-4 w-24" /> {/* CardTitle */}
-      <Skeleton className="h-4 w-4" /> {/* Icon Placeholder */}
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-4 w-4" />
     </CardHeader>
     <CardContent>
-      <Skeleton className="h-7 w-20" /> {/* Main Value */}
+      <Skeleton className="h-7 w-20" />
     </CardContent>
   </Card>
 );
@@ -55,7 +55,7 @@ const SkeletonActiveEventRow = () => (
       <Skeleton className="h-5 w-16 ml-auto" />
     </TableCell>
     <TableCell>
-      <Skeleton className="h-8 w-20 rounded-md" /> {/* Button Placeholder */}
+      <Skeleton className="h-8 w-20 rounded-md" />
     </TableCell>
   </TableRow>
 );
@@ -63,19 +63,16 @@ const SkeletonActiveEventRow = () => (
 export default function OrganizerDashboardLoading() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-9 w-72" /> {/* Page Title: Dashboard Overview */}
+      <Skeleton className="h-9 w-72" />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
-        {/* Left Column (Recent Orders) */}
         <div className="lg:col-span-1 space-y-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
-                <Skeleton className="h-6 w-32 mb-1" />{' '}
-                {/* CardTitle: Recent Orders */}
-                <Skeleton className="h-4 w-48" /> {/* CardDescription */}
+                <Skeleton className="h-6 w-32 mb-1" />
+                <Skeleton className="h-4 w-48" />
               </div>
-              <Skeleton className="h-9 w-24 rounded-md ml-auto" />{' '}
-              {/* View All Button */}
+              <Skeleton className="h-9 w-24 rounded-md ml-auto" />
             </CardHeader>
             <CardContent>
               <Table>
@@ -102,64 +99,53 @@ export default function OrganizerDashboardLoading() {
           </Card>
         </div>
 
-        {/* Right Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* 1. Top Metrics Cards */}
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-24" />{' '}
-                {/* CardTitle: Total Revenue */}
+                <Skeleton className="h-4 w-24" />
                 <DollarSign className="h-4 w-4 text-muted-foreground opacity-50" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-7 w-28" /> {/* Value */}
+                <Skeleton className="h-7 w-28" />
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-20" />{' '}
-                {/* CardTitle: Tickets Sold */}
+                <Skeleton className="h-4 w-20" />
                 <Ticket className="h-4 w-4 text-muted-foreground opacity-50" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-7 w-16" /> {/* Value */}
+                <Skeleton className="h-7 w-16" />
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-24" />{' '}
-                {/* CardTitle: Active Events */}
+                <Skeleton className="h-4 w-24" />
                 <CalendarClock className="h-4 w-4 text-muted-foreground opacity-50" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-7 w-10" /> {/* Value */}
+                <Skeleton className="h-7 w-10" />
               </CardContent>
             </Card>
           </section>
 
-          {/* 2. Chart */}
           <section>
             <Card>
               <CardHeader>
-                {/* You could add a skeleton for a chart title if it has one */}
                 <Skeleton className="h-5 w-40" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-72 w-full" />{' '}
-                {/* Chart Area Placeholder */}
+                <Skeleton className="h-72 w-full" />
               </CardContent>
             </Card>
           </section>
 
-          {/* 3. Active Events List */}
           <section>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-6 w-32" />{' '}
-                {/* CardTitle: Active Events */}
-                <Skeleton className="h-9 w-24 rounded-md ml-auto" />{' '}
-                {/* View All Button */}
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-9 w-24 rounded-md ml-auto" />
               </CardHeader>
               <CardContent>
                 <Table>

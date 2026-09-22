@@ -1,13 +1,3 @@
-/**
- * Screen A — the `/organizer` landing read.
- *
- * Entry-point first: the active events an organizer jumps into, their latest
- * orders, range-scoped stats + sales chart, and the setup state that drives the
- * banner. Pure over an injected `prisma`; authorization is the scope seam
- * (organizer-scope).
- *
- * Every stat is a SQL aggregate — nothing is reduced in JS over a full table.
- */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type {
@@ -31,34 +21,24 @@ import { resolveOrganizerScope } from './organizer-scope';
 const ACTIVE_EVENTS_LIMIT = 5;
 const DEFAULT_RANGE: DashboardRange = 'month';
 
-/** Postgres `date_trunc` unit — one bucket per point on the chart. */
 type Bucket = 'hour' | 'day';
 
 interface RangeWindow {
-  /** Inclusive. */
   from: Date;
-  /** Exclusive. */
   to: Date;
   bucket: Bucket;
   /**
-   * How many buckets the chart plots. Explicit rather than derived from
-   * `to`, so a `now` landing exactly on a boundary can't drop the current
-   * (partial) bucket.
+   * Explicit rather than derived from `to`, so a `now` exactly on a boundary
+   * can't drop the current (partial) bucket.
    */
   points: number;
 }
 
-/** A bucketed ticket count from the raw sales query. */
 interface SalesRow {
   at: Date;
   tickets: bigint;
 }
 
-/**
- * Rolling windows, not calendar ones. Short ranges bucket hourly so "today"
- * is a shape rather than a single point. (`startOfUtcDay`/`addUtcDays` are the
- * shared UTC-day helpers — see organizerMapping.)
- */
 function rangeWindow(range: DashboardRange, now: Date): RangeWindow {
   const startOfToday = startOfUtcDay(now);
 
@@ -123,12 +103,8 @@ export async function getDashboard(
         },
       }),
 
-      // Bucketed in SQL rather than grouping by raw timestamp and folding in JS
-      // (which returns ~a row per ticket). Doubles as the tickets-sold total.
-      //
-      // `AT TIME ZONE 'UTC'` re-tags the truncated naive `timestamp` as a
-      // `timestamptz` so node-postgres parses the bucket as a UTC instant. On a
-      // non-UTC host it would otherwise parse in the process zone, and the
+      // `AT TIME ZONE 'UTC'` re-tags the naive truncated bucket as UTC; a
+      // non-UTC host would otherwise parse it in the process zone and the
       // UTC-keyed zero-fill in buildSalesSeries would miss every bucket.
       prisma.$queryRaw<SalesRow[]>`
         SELECT date_trunc(${window.bucket}, t."createdAt") AT TIME ZONE 'UTC' AS at,
@@ -189,7 +165,6 @@ export async function getDashboard(
   };
 }
 
-/** Zero-fills the window so the chart has a point per bucket, not per sale. */
 function buildSalesSeries(rows: SalesRow[], window: RangeWindow): SalesPoint[] {
   const counts = new Map(
     rows.map((row) => [row.at.toISOString(), Number(row.tickets)])

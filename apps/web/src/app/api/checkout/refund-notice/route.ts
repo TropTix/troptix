@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server';
 import { sendRefundNoticeEmail } from '@/server/lib/email';
 
 /**
- * Sends the auto-refund notice after the expiry race (ADR 0018). The reservation
- * webhook sends it server-side, but when the client's sync-fulfillment poll is
- * what performed the refund (webhook slow/down), the client fires this too.
- * Idempotent: Resend dedupes on `refund-${reservationId}`, so repeated calls
- * never double-send.
+ * The webhook sends this server-side; the client fires it too when its poll is
+ * what performed the refund (ADR 0018). Resend dedupes on `refund-${reservationId}`.
  */
 export async function POST(req: Request) {
   try {

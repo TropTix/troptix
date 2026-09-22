@@ -89,7 +89,6 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Matches the old v3 container config (centered, 2rem padding, 1400px cap). */
 @utility container {
   margin-inline: auto;
   padding-inline: 2rem;
@@ -102,10 +101,9 @@
 }
 
 /*
-  The default border color changed to `currentcolor` in Tailwind v4. This
-  compat layer keeps un-colored `border` utilities looking like v3 until every
-  such element carries an explicit border color (the `border-border` default
-  below covers plain elements; this covers pseudo-elements too).
+  Tailwind v4 changed the default border color to `currentcolor`; this keeps
+  un-colored `border` utilities v3-gray, covering the pseudo-elements the
+  `border-border` default below misses.
 */
 @layer base {
   *,
@@ -132,7 +130,6 @@
   }
 }
 
-/* Blinking caret for the OTP (input-otp) slots. */
 @keyframes caret-blink {
   0%,
   70%,
@@ -148,7 +145,6 @@
   animation: caret-blink 1.25s ease-out infinite;
 }
 
-/* Nudge for the checkout CTA when tapped with nothing selected. */
 @keyframes cta-shake {
   0%,
   100% {

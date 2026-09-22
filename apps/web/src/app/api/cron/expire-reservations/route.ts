@@ -4,19 +4,14 @@ import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 
 /**
- * Expire reservation holds past their TTL (ADR 0018). Cancel-then-release: the
- * sweep expires each hold's Checkout Session before handing inventory back, so a
- * payment can never land after release. Scheduled via Supabase cron (pg_cron +
- * pg_net) — see docs/runbooks/expire-reservations-cron.md.
- *
- * Auth: requires `Authorization: Bearer $CRON_SECRET` (the cron job sends this
- * header). Fails closed if CRON_SECRET is unset — a money-adjacent endpoint must
- * not be open (issue #358).
+ * Cancel-then-release (ADR 0018): the sweep expires each hold's Checkout
+ * Session before handing inventory back, so a payment can never land after release.
  */
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   const secret = process.env.CRON_SECRET;
+  // Fails closed when CRON_SECRET is unset (issue #358).
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

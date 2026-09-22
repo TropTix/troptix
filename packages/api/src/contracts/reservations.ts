@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
-// Reservation/checkout-commit contracts. Cents + ISO strings on the wire (no
-// superjson transformer), shared by the tRPC procedures and the client.
+// No superjson transformer on the wire — ISO strings, never z.date().
 
 export const reservationContactSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
@@ -29,8 +28,7 @@ export const createReservationInputSchema = z.object({
     .max(20),
   contact: reservationContactSchema,
   // PostHog browser identity, stored on the hold so the server-side conversion
-  // capture joins the buyer's person/session. Optional — analytics may be
-  // blocked, and non-web clients don't send it.
+  // capture joins the buyer's person/session.
   analytics: z
     .object({
       distinctId: z.string().min(1).max(200).optional(),
@@ -52,9 +50,7 @@ export const createReservationResponseSchema = z.object({
     })
   ),
   totalCents: z.number().int(),
-  /** ISO-8601 — the hold's TTL. */
   expiresAt: z.string().datetime(),
-  /** True if any granted quantity fell short of what was requested. */
   wasAdjusted: z.boolean(),
 });
 export type CreateReservationResponse = z.infer<

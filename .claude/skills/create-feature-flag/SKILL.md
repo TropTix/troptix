@@ -55,7 +55,7 @@ that runbook first; it wins over this skill on any conflict.
 
    Only `=== true` is on — `undefined` means "not loaded yet".
 
-4. Typecheck (`yarn typecheck` in `apps/web`, `yarn workspace @troptix/api
+4. Typecheck (`pnpm typecheck` in `apps/web`, `pnpm --filter @troptix/api
 typecheck`) and run the touched tests.
 
 ## 4. Create the flag in PostHog

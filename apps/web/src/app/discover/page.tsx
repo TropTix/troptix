@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/button';
 import prisma from '@/server/prisma';
 import EventCard from '@/components/EventCard';
 
-export const revalidate = 86400; // 24 hours in seconds
+export const revalidate = 86400;
 
-// Deduped per request, mirroring the /e/[eventId] read pattern.
 const loadEvents = cache(() => listPublicEvents(prisma));
 
 export const metadata = {

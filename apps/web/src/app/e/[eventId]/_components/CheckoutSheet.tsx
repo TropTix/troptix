@@ -17,10 +17,6 @@ import ContactStep from './ContactStep';
 import PaymentStep from './PaymentStep';
 import SuccessTicket from './SuccessTicket';
 
-// Checkout orchestrator: owns the step machine + selection, calls the tRPC
-// mutations/queries, and drives the presentational steps. Free RSVP completes
-// inline; paid runs select → contact → payment (Checkout Session) → redirect,
-// then the resume path (?reservation=) finalizes into success (ADR 0018).
 type Step =
   | 'select'
   | 'contact'
@@ -62,7 +58,6 @@ export default function CheckoutSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   event: EventDetail;
-  /** When set (from `?reservation=`), resume an in-flight checkout. */
   resumeReservationId?: string | null;
 }) {
   const { user } = useAuth();
@@ -88,7 +83,6 @@ export default function CheckoutSheet({
   } | null>(null);
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const [slowFinalize, setSlowFinalize] = useState(false);
-  // Guards the one-shot "resume found an unpaid hold → reopen payment" branch.
   const resumeReopenRef = useRef(false);
 
   // The browser's PostHog identity, sent with the hold so the server-side
@@ -110,10 +104,8 @@ export default function CheckoutSheet({
     posthog.capture(name, { event_id: event.id, ...props });
   }
 
-  // One entry per funnel step: the fresh contact→payment path and the resume
-  // reopen both land here, so the payment_started capture keeps one shape
-  // (`resumed` always present as a boolean — an absent key doesn't match
-  // `resumed = false` filters in PostHog).
+  // `resumed` is always an explicit boolean: an absent key doesn't match
+  // `resumed = false` filters in PostHog.
   function openPayment(
     payment: BeginPaymentResponse,
     forReservationId: string,
@@ -135,10 +127,8 @@ export default function CheckoutSheet({
     setStep('payment');
   }
 
-  // Shared success landing for the paid (poll) and free paths. The success URL
-  // keeps ?reservation= (resume-on-refresh), so the paid path replays on every
-  // reload — capture only the first sighting of the order, mirroring the
-  // server's alreadyProcessed gate.
+  // The success URL keeps ?reservation=, so the paid path replays on every
+  // reload — capture the order once, mirroring the server's alreadyProcessed gate.
   function finishCheckout(order: SuccessData, orderType: 'FREE' | 'PAID') {
     setSuccessData(order);
     const dedupeKey = `tt_checkout_completed_${order.orderId}`;
@@ -170,20 +160,14 @@ export default function CheckoutSheet({
   const beginPayment = trpc.checkout.beginPayment.useMutation();
   const releaseReservation = trpc.checkout.release.useMutation();
 
-  // Poll the server for the checkout outcome while finalizing (resume path).
   const polling = step === 'finalizing' && !!reservationId;
   const stateQuery = trpc.checkout.getCheckoutState.useQuery(
     { reservationId: reservationId ?? '' },
     { enabled: polling, refetchInterval: polling ? 1500 : false }
   );
 
-  // Resume an in-flight checkout when opened with ?reservation= (post-payment
-  // redirect, refresh, or 3DS return — all full page loads, so the target is
-  // whatever the URL held at mount). Consume-once ref rather than reacting to
-  // the live searchParam: reaching the payment step writes ?reservation= via
-  // replaceState, which Next syncs back into useSearchParams — reacting to
-  // that echo would bounce the buyer payment → finalizing → payment. A
-  // consumed target also can't re-fire when the sheet reopens.
+  // Consume-once, not the live searchParam: the payment step writes ?reservation=
+  // via replaceState, and Next's echo of it would bounce payment → finalizing → payment.
   const resumeTargetRef = useRef(resumeReservationId ?? null);
   useEffect(() => {
     if (!open || !resumeTargetRef.current) return;
@@ -192,7 +176,6 @@ export default function CheckoutSheet({
     setStep('finalizing');
   }, [open]);
 
-  // Map the polled state onto the step machine.
   useEffect(() => {
     if (step !== 'finalizing' || !stateQuery.data) return;
     const state = stateQuery.data;
@@ -203,9 +186,8 @@ export default function CheckoutSheet({
       );
     } else if (state.kind === 'refunded') {
       setStep('refunded');
-      // The webhook normally sends this, but the sync-fulfillment poll can be
-      // what performs the refund (webhook slow/down) — nudge it here too
-      // (idempotent: Resend dedupes on refund-<reservationId>).
+      // The poll can be what performs the refund (webhook slow/down) — nudge the
+      // notice here too; idempotent, Resend dedupes on refund-<reservationId>.
       if (reservationId) {
         void fetch('/api/checkout/refund-notice', {
           method: 'POST',
@@ -220,28 +202,22 @@ export default function CheckoutSheet({
       reservationId &&
       !resumeReopenRef.current
     ) {
-      // Resumed onto an unpaid hold (e.g. refreshed the payment step before
-      // paying) — reopen the Payment Element instead of spinning. beginPayment
-      // reuses the still-open Session.
+      // Resumed onto an unpaid hold — reopen payment instead of spinning;
+      // beginPayment reuses the still-open Session.
       resumeReopenRef.current = true;
       beginPayment
         .mutateAsync({ reservationId })
         .then((payment) => openPayment(payment, reservationId, true))
         .catch(() => {
-          // Not necessarily a real expiry — a transient beginPayment failure
-          // lands here too. Tag the capture so expiry metrics can tell them apart.
           expiredReasonRef.current = 'payment_reopen_failed';
           setStep('expired');
         });
     }
   }, [step, stateQuery.data, reservationId]);
 
-  // Terminal failure states are set from several places (poll, countdown,
-  // resume errors) — capture them on the step transition so every path counts
-  // once, whatever set it.
+  // Expired/refunded are set from several places — capture on the step
+  // transition so every path counts once.
   const capturedStepRef = useRef<Step | null>(null);
-  // Why the sheet landed on 'expired': a real hold expiry, or a transient
-  // beginPayment failure on the resume path routed to the same screen.
   const expiredReasonRef = useRef<'hold_expired' | 'payment_reopen_failed'>(
     'hold_expired'
   );
@@ -256,7 +232,6 @@ export default function CheckoutSheet({
     if (step === 'refunded') capture(ANALYTICS_EVENTS.checkoutRefunded);
   }, [step]);
 
-  // After ~20s still finalizing, reassure the buyer without stopping the poll.
   useEffect(() => {
     if (step !== 'finalizing') {
       setSlowFinalize(false);
@@ -286,8 +261,6 @@ export default function CheckoutSheet({
   function handleOpenChange(next: boolean) {
     onOpenChange(next);
     if (!next) {
-      // Closing mid-funnel is abandonment; closing from a terminal step
-      // (success/expired/refunded) is just dismissal.
       if (step === 'select' || step === 'contact' || step === 'payment') {
         capture(ANALYTICS_EVENTS.checkoutAbandoned, { checkout_step: step });
       }
@@ -315,8 +288,6 @@ export default function CheckoutSheet({
     (sum, t) => sum + selection[t.id] * (t.priceCents + t.feesCents),
     0
   );
-  // Free vs paid is a property of the selection, not the event — an event can
-  // have both free and paid tiers.
   const isFree = totalCents === 0;
 
   async function handleContact(contact: ReservationContact) {
@@ -381,10 +352,8 @@ export default function CheckoutSheet({
     resetState();
   }
 
-  // Back from the Payment step: a reservation already exists, so re-entering
-  // Contact would re-run createReservation (a duplicate hold in the normal flow,
-  // or an empty-items validation error on a resumed load where `selection` is
-  // gone). Instead release the hold and start fresh at ticket selection.
+  // Re-entering Contact would re-run createReservation — a duplicate hold, or an
+  // empty-items error on a resumed load — so release the hold and restart at select.
   function backFromPayment() {
     if (reservationId) releaseReservation.mutate({ reservationId });
     startOver();

@@ -1,24 +1,6 @@
 /**
- * Screen C — the `/organizer/events/[id]` overview read.
- *
- * The event's service center: headline vitals, a revenue-over-time chart, the
- * per-ticket-type breakdown, a door check-in summary, and a peek at recent orders.
- * Pure over an injected `prisma`; authorization is the shared scope seam.
- *
- * Ownership is the where clause: the event is fetched scoped to the resolved
- * organizer, so a stranger (or a platform owner without View-as) gets NotFound
- * rather than someone else's event — the old email-bypass (accessControl's
- * getEventWhereClause) is gone (ADR 0018/0019).
- *
- * Two revenue sources, each canonical for its level:
- *   - vitals.revenueCents — Σ Order.subtotal, the same "Ticket revenue" the
- *     dashboard reports.
- *   - per-ticket-type / series revenue — Σ Tickets.subtotal, so a ticket type
- *     maps to its own tickets.
- * They track closely (an order's subtotal is the sum of its tickets') but
- * aren't guaranteed cent-equal — different columns, each rounded at its own
- * granularity — so treat the per-type column as ≈ the event total, not a
- * checksum.
+ * Two revenue sources: vitals is Σ Order.subtotal; per-type / series is
+ * Σ Tickets.subtotal. Close but not guaranteed cent-equal — never a checksum.
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -41,10 +23,8 @@ import {
 } from './_shared/organizerReads';
 import { resolveOrganizerScope } from './organizer-scope';
 
-/** Chart never shows more than this many days; older events start at day −29. */
 const MAX_SERIES_DAYS = 30;
 
-/** A bucketed day from the revenue-series raw query. */
 interface SeriesRow {
   at: Date;
   tickets: bigint;
@@ -84,8 +64,6 @@ export async function getEventOverview(
     throw new NotFoundError('Event not found');
   }
 
-  // Revenue chart window: event creation through today, capped at 30 days
-  // (older events start at day −29 rather than dragging months of zeros).
   const startOfToday = startOfUtcDay(now);
   const earliest = addUtcDays(startOfToday, -(MAX_SERIES_DAYS - 1));
   const created = startOfUtcDay(event.createdAt);
@@ -101,14 +79,9 @@ export async function getEventOverview(
 
       prisma.tickets.groupBy(ticketTypeRollupQuery(eventId)),
 
-      // Daily revenue + tickets, bucketed in SQL. Revenue is Σ ticket subtotal
-      // so it reconciles with the per-ticket-type breakdown.
-      //
-      // `AT TIME ZONE 'UTC'` re-tags the truncated naive `timestamp` as a
-      // `timestamptz`: without it, node-postgres parses the bucket in the
-      // process zone, and on a non-UTC host `row.at.toISOString()` no longer
-      // equals the UTC-midnight keys buildRevenueSeries generates — the whole
-      // chart would silently zero-fill.
+      // `AT TIME ZONE 'UTC'` re-tags the naive truncated bucket as UTC; a
+      // non-UTC host would otherwise parse it in the process zone and the
+      // whole chart would silently zero-fill.
       prisma.$queryRaw<SeriesRow[]>`
         SELECT date_trunc('day', t."createdAt") AT TIME ZONE 'UTC' AS at,
                count(*)::bigint AS tickets,
@@ -143,10 +116,8 @@ export async function getEventOverview(
     (total, ticketType) => total + ticketType.capacity,
     0
   );
-  // Tickets *issued*, not the sum of the types' `sold` counters: it includes
-  // tickets whose type was deleted, so it matches the daily series and the
-  // check-in total (CONTEXT.md, "Tickets issued vs sold"). It can therefore
-  // exceed what the visible type rows add up to.
+  // Tickets *issued*, not Σ the types' `sold`: includes deleted-type tickets,
+  // matching the series and check-in totals (CONTEXT.md) — can exceed the rows.
   const sold = ticketsIssued(rollups);
 
   return {
@@ -171,7 +142,6 @@ export async function getEventOverview(
   };
 }
 
-/** Zero-fills each day in the window, so the chart has a point per day. */
 function buildRevenueSeries(
   rows: SeriesRow[],
   from: Date,

@@ -30,11 +30,9 @@ export const eventFormSchema = z
     latitude: z.number().nullable().optional(),
     longitude: z.number().nullable().optional(),
     tickets: z.array(ticketTypeSchema).optional(),
-    // Holds a Supabase Storage object PATH, not a URL (ADR 0016), so this is a
-    // plain string — not `.url()`, which would reject the path. Empty string
-    // means "no image". Render via eventFlyerUrl().
+    // A Supabase Storage object PATH, not a URL (ADR 0016) — `.url()` would
+    // reject it. '' means "no image"; render via eventFlyerUrl().
     imageUrl: z.string().nullable().optional(),
-    // Page treatment + palette extracted at upload (see @/lib/flyerTheme).
     pageTheme: eventPageThemeSchema.optional(),
     flyerPalette: flyerPaletteSchema.nullable().optional(),
     isPrivate: z.boolean(),

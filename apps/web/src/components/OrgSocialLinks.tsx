@@ -6,7 +6,6 @@ import {
 } from '@/components/icons/brand';
 import { cn } from '@/lib/utils';
 
-// Organization social links, shared by the org page and the event "Hosted by".
 // instagram/twitter are stored as usernames (URL built here); linkedin/website
 // are full URLs (a scheme is prepended if missing).
 

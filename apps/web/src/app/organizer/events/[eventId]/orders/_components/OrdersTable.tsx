@@ -19,7 +19,6 @@ import { formatCents, getDateFormatter } from '@/lib/dateUtils';
 import { formatOrderNumber } from '@/lib/utils';
 import StatusBadge from './StatusBadge';
 
-// PENDING is excluded server-side (in-flight checkouts aren't orders to manage).
 type Filter = 'All' | 'COMPLETED' | 'CANCELLED';
 const FILTERS: Filter[] = ['All', 'COMPLETED', 'CANCELLED'];
 const FILTER_LABEL: Record<Filter, string> = {
@@ -82,8 +81,6 @@ export function OrdersTable({
         </p>
       ) : (
         <>
-          {/* Mobile: a tappable card per order (tables reshape to cards on
-              mobile, never horizontal-scroll spreadsheets — UX plan). */}
           <ul className="space-y-3 md:hidden">
             {visible.map((order) => (
               <li key={order.id}>

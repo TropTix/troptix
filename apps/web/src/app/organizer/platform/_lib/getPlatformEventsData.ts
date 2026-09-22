@@ -28,8 +28,6 @@ export type PlatformEventData = {
 export async function getAllPlatformEvents(
   user: ServerUser
 ): Promise<PlatformEventData[]> {
-  // The Platform View gate — one of the two doors the explicit grant opens
-  // (the other is View-as in the service seam, ADR 0018/0022).
   if (!user.isPlatformOwner) {
     notFound();
   }
@@ -63,10 +61,7 @@ export async function getAllPlatformEvents(
         },
       },
     },
-    orderBy: [
-      { isDraft: 'asc' }, // Non-drafts first
-      { startsAt: 'desc' },
-    ],
+    orderBy: [{ isDraft: 'asc' }, { startsAt: 'desc' }],
   });
 
   const today = new Date();

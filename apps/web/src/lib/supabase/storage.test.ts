@@ -1,10 +1,5 @@
-/**
- * `eventFlyerUrl` is the single URL-derivation point (ADR 0016). Its contract:
- * falsy → null, absolute URLs pass through (so legacy Firebase rows still
- * render mid-migration), bucket-relative paths become Supabase public URLs.
- * The base is read from env at module load, so each case re-imports in
- * isolation with the env set.
- */
+// PUBLIC_BASE is read from env at module load, so each case re-imports the
+// module in isolation with the env already set.
 const BASE = 'https://proj.supabase.co';
 
 const loadEventFlyerUrl = () => {
