@@ -71,6 +71,12 @@ When editing a file, match its existing comment density — do not add comments 
 - A **husky `pre-commit` hook** runs `lint-staged` → `prettier --write` on staged files, so every commit is auto-formatted. This applies to commits Codex makes too.
 - Before committing, run `pnpm format` (write) or `pnpm format:check` (verify) if you've touched many files. Don't bypass the hook with `--no-verify`.
 
+## Linting
+
+- **oxlint** lints the pnpm workspace from the root: `pnpm lint`, config in `.oxlintrc.json` ([ADR 0029](docs/adr/0029-oxlint-replaces-eslint.md)). CI runs it on every PR and the pre-commit hook runs it on staged files. `apps/organizer` keeps `expo lint`.
+- Fix findings; don't silence them. A `// oxlint-disable-next-line <rule> -- <reason>` is only for what the rule cannot see, and it must sit directly above the flagged line.
+- The oxlint version is pinned exactly. Bump it on purpose, in its own PR, and re-run `pnpm lint`.
+
 ## Package management
 
 - The root workspace (`apps/web` + `packages/*`) is a **pnpm workspace** (pnpm 11, pinned in the root `packageManager` field — enable via Corepack). The root `pnpm-lock.yaml` is the single source of truth for dependencies; Vercel and CI both install with pnpm. Workspace membership and all pnpm settings live in `pnpm-workspace.yaml`.

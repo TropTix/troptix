@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePostHog } from 'posthog-js/react';
 import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -112,60 +112,69 @@ export default function CheckoutSheet({
     }
   }
 
-  function capture(name: string, props?: Record<string, unknown>) {
-    posthog.capture(name, { event_id: event.id, ...props });
-  }
+  const capture = useCallback(
+    (name: string, props?: Record<string, unknown>) => {
+      posthog.capture(name, { event_id: event.id, ...props });
+    },
+    [posthog, event.id]
+  );
 
   // `resumed` is always an explicit boolean: an absent key doesn't match
   // `resumed = false` filters in PostHog.
-  function openPayment(
-    payment: BeginPaymentResponse,
-    forReservationId: string,
-    resumed: boolean
-  ) {
-    setClientSecret(payment.clientSecret);
-    setExpiresAt(payment.expiresAt);
-    setPaymentSummary({
-      items: payment.items,
-      subtotalCents: payment.subtotalCents,
-      feesCents: payment.feesCents,
-      totalCents: payment.totalCents,
-    });
-    capture(ANALYTICS_EVENTS.checkoutPaymentStarted, {
-      reservation_id: forReservationId,
-      total_cents: payment.totalCents,
-      resumed,
-    });
-    setStep('payment');
-  }
+  const openPayment = useCallback(
+    (
+      payment: BeginPaymentResponse,
+      forReservationId: string,
+      resumed: boolean
+    ) => {
+      setClientSecret(payment.clientSecret);
+      setExpiresAt(payment.expiresAt);
+      setPaymentSummary({
+        items: payment.items,
+        subtotalCents: payment.subtotalCents,
+        feesCents: payment.feesCents,
+        totalCents: payment.totalCents,
+      });
+      capture(ANALYTICS_EVENTS.checkoutPaymentStarted, {
+        reservation_id: forReservationId,
+        total_cents: payment.totalCents,
+        resumed,
+      });
+      setStep('payment');
+    },
+    [capture]
+  );
 
   // The success URL keeps ?reservation=, so the paid path replays on every
   // reload — capture the order once, mirroring the server's alreadyProcessed gate.
-  function finishCheckout(order: SuccessData, orderType: 'FREE' | 'PAID') {
-    setSuccessData(order);
-    const dedupeKey = `tt_checkout_completed_${order.orderId}`;
-    let alreadyCaptured = false;
-    try {
-      alreadyCaptured = !!localStorage.getItem(dedupeKey);
-      localStorage.setItem(dedupeKey, '1');
-    } catch {
-      // Storage unavailable (private mode) — fall back to capturing.
-    }
-    if (!alreadyCaptured) {
-      capture(ANALYTICS_EVENTS.checkoutCompleted, {
-        order_id: order.orderId,
-        order_type: orderType,
-        ticket_count: order.tickets.length,
-      });
-    }
-    setStep('success');
-    // Nudge the confirmation email (idempotent server-side).
-    void fetch('/api/checkout/confirmation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId: order.orderId }),
-    }).catch(() => {});
-  }
+  const finishCheckout = useCallback(
+    (order: SuccessData, orderType: 'FREE' | 'PAID') => {
+      setSuccessData(order);
+      const dedupeKey = `tt_checkout_completed_${order.orderId}`;
+      let alreadyCaptured = false;
+      try {
+        alreadyCaptured = !!localStorage.getItem(dedupeKey);
+        localStorage.setItem(dedupeKey, '1');
+      } catch {
+        // Storage unavailable (private mode) — fall back to capturing.
+      }
+      if (!alreadyCaptured) {
+        capture(ANALYTICS_EVENTS.checkoutCompleted, {
+          order_id: order.orderId,
+          order_type: orderType,
+          ticket_count: order.tickets.length,
+        });
+      }
+      setStep('success');
+      // Nudge the confirmation email (idempotent server-side).
+      void fetch('/api/checkout/confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.orderId }),
+      }).catch(() => {});
+    },
+    [capture]
+  );
 
   const createReservation = trpc.checkout.createReservation.useMutation();
   const completeFree = trpc.checkout.completeFree.useMutation();
@@ -269,6 +278,7 @@ export default function CheckoutSheet({
     }
   }
 
+  /* oxlint-disable react/set-state-in-effect -- the step follows the polled server state, an external system */
   useEffect(() => {
     if (step !== 'finalizing' || !reservationId) return;
     if (trpcCode(stateQuery.error) === 'NOT_FOUND') {
@@ -279,6 +289,7 @@ export default function CheckoutSheet({
     if (stateQuery.data)
       applyCheckoutState(stateQuery.data, reservationId, true);
   }, [step, stateQuery.data, stateQuery.error, reservationId]);
+  /* oxlint-enable react/set-state-in-effect */
 
   // Expired/refunded are set from several places — capture on the step
   // transition so every path counts once.
@@ -296,13 +307,10 @@ export default function CheckoutSheet({
     }
     if (step === 'refunded') capture(ANALYTICS_EVENTS.checkoutRefunded);
     if (step === 'pending') capture(ANALYTICS_EVENTS.checkoutFinalizeTimedOut);
-  }, [step]);
+  }, [step, capture]);
 
   useEffect(() => {
-    if (step !== 'finalizing') {
-      setSlowFinalize(false);
-      return;
-    }
+    if (step !== 'finalizing') return;
     const slow = setTimeout(
       () => setSlowFinalize(true),
       FINALIZE_SLOW_AFTER_MS
@@ -314,6 +322,7 @@ export default function CheckoutSheet({
     return () => {
       clearTimeout(slow);
       clearTimeout(giveUp);
+      setSlowFinalize(false);
     };
   }, [step]);
 

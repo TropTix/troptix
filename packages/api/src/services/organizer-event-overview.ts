@@ -7,7 +7,6 @@ import type { Actor } from '../trpc/context';
 import type {
   EventOverview,
   EventRevenuePoint,
-  TicketTypeBreakdown,
   ViewAsInput,
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';

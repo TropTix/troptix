@@ -48,6 +48,68 @@ const getUserInitials = (user?: {
   return 'A';
 };
 
+function UserMenu({
+  user,
+  isOrganizerRoute,
+  onSignOut,
+}: {
+  user: Parameters<typeof getUserInitials>[0];
+  isOrganizerRoute: boolean;
+  onSignOut: () => Promise<void>;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+          <Avatar className="h-10 w-10">
+            <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium leading-none">My Account</p>
+            <p className="text-xs leading-none text-muted-foreground truncate">
+              {user?.email}
+            </p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {!isOrganizerRoute && (
+          <DropdownMenuItem asChild>
+            <Link href="/organizer">
+              <Home className="mr-2 h-4 w-4" />
+              Organizer Dashboard
+            </Link>
+          </DropdownMenuItem>
+        )}
+
+        <DropdownMenuItem asChild>
+          <Link href="/organizer/events/new">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Create Event
+          </Link>
+        </DropdownMenuItem>
+
+        {isOrganizerRoute && (
+          <DropdownMenuItem asChild>
+            <Link href="/">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Home
+            </Link>
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onSignOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign Out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function UnifiedHeader() {
   const [hasScrolled, setHasScrolled] = useState<boolean>(false);
   const { user } = useContext(TropTixContext);
@@ -99,58 +161,6 @@ export default function UnifiedHeader() {
   const handleSignOut = async () => {
     await supabaseSignOut();
   };
-
-  const UserMenu = () => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-          <Avatar className="h-10 w-10">
-            <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">My Account</p>
-            <p className="text-xs leading-none text-muted-foreground truncate">
-              {user?.email}
-            </p>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {!isOrganizerRoute && (
-          <DropdownMenuItem asChild>
-            <Link href="/organizer">
-              <Home className="mr-2 h-4 w-4" />
-              Organizer Dashboard
-            </Link>
-          </DropdownMenuItem>
-        )}
-
-        <DropdownMenuItem asChild>
-          <Link href="/organizer/events/new">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Create Event
-          </Link>
-        </DropdownMenuItem>
-
-        {isOrganizerRoute && (
-          <DropdownMenuItem asChild>
-            <Link href="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
-            </Link>
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut}>
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 
   return (
     <header
@@ -221,7 +231,11 @@ export default function UnifiedHeader() {
           </nav>
 
           {user?.id ? (
-            <UserMenu />
+            <UserMenu
+              user={user}
+              isOrganizerRoute={!!isOrganizerRoute}
+              onSignOut={handleSignOut}
+            />
           ) : (
             <>
               <Button variant="default" className="rounded-full" asChild>

@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { getDashboard } from '@troptix/api/server';
 import {
   dashboardRangeSchema,
-  type DashboardRange,
   type DashboardRecentOrder,
   type OrganizerEventSummary,
 } from '@troptix/api';

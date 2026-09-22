@@ -15,7 +15,6 @@ import {
   getSortedRowModel,
   useReactTable,
   Table as ReactTable,
-  RowData,
   TableMeta,
 } from '@tanstack/react-table';
 
