@@ -16,12 +16,18 @@ import SelectStep from './SelectStep';
 import ContactStep from './ContactStep';
 import PaymentStep from './PaymentStep';
 import SuccessTicket from './SuccessTicket';
+import {
+  FINALIZE_GIVE_UP_AFTER_MS,
+  FINALIZE_SLOW_AFTER_MS,
+  nextFinalizeDelay,
+} from './finalizeWait';
 
 type Step =
   | 'select'
   | 'contact'
   | 'payment'
   | 'finalizing'
+  | 'pending'
   | 'success'
   | 'expired'
   | 'refunded';
@@ -31,6 +37,7 @@ const STEP_TITLE: Record<Step, string> = {
   contact: 'Your details',
   payment: 'Payment',
   finalizing: 'Finalizing',
+  pending: 'Still confirming',
   success: "You're going",
   expired: 'Hold expired',
   refunded: 'Payment refunded',
@@ -161,9 +168,22 @@ export default function CheckoutSheet({
   const releaseReservation = trpc.checkout.release.useMutation();
 
   const polling = step === 'finalizing' && !!reservationId;
+  // Errors are not terminal here: the webhook may still land, so the interval
+  // keeps checking (no react-query retries — the backoff is the retry).
   const stateQuery = trpc.checkout.getCheckoutState.useQuery(
     { reservationId: reservationId ?? '' },
-    { enabled: polling, refetchInterval: polling ? 1500 : false }
+    {
+      enabled: polling,
+      retry: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchInterval: (query) =>
+        polling
+          ? nextFinalizeDelay(
+              query.state.dataUpdateCount + query.state.errorUpdateCount
+            )
+          : false,
+    }
   );
 
   // Consume-once, not the live searchParam: the payment step writes ?reservation=
@@ -230,6 +250,7 @@ export default function CheckoutSheet({
       });
     }
     if (step === 'refunded') capture(ANALYTICS_EVENTS.checkoutRefunded);
+    if (step === 'pending') capture(ANALYTICS_EVENTS.checkoutFinalizeTimedOut);
   }, [step]);
 
   useEffect(() => {
@@ -237,8 +258,18 @@ export default function CheckoutSheet({
       setSlowFinalize(false);
       return;
     }
-    const id = setTimeout(() => setSlowFinalize(true), 20_000);
-    return () => clearTimeout(id);
+    const slow = setTimeout(
+      () => setSlowFinalize(true),
+      FINALIZE_SLOW_AFTER_MS
+    );
+    const giveUp = setTimeout(
+      () => setStep('pending'),
+      FINALIZE_GIVE_UP_AFTER_MS
+    );
+    return () => {
+      clearTimeout(slow);
+      clearTimeout(giveUp);
+    };
   }, [step]);
 
   function resetState() {
@@ -444,6 +475,23 @@ export default function CheckoutSheet({
                     arrive by email shortly.
                   </p>
                 )}
+              </div>
+            )}
+            {step === 'pending' && (
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+                <p className="text-lg font-bold">Still confirming your order</p>
+                <p className="text-sm text-muted-foreground">
+                  If your payment went through, your tickets will arrive by
+                  email shortly. If it didn&rsquo;t, you weren&rsquo;t charged
+                  and you can start over.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleOpenChange(false)}
+                  className="mt-3 text-sm font-semibold text-primary"
+                >
+                  Close
+                </button>
               </div>
             )}
             {step === 'expired' && (

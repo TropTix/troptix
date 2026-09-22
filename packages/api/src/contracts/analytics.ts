@@ -16,6 +16,8 @@ export const ANALYTICS_EVENTS = {
   checkoutExpired: 'checkout_expired',
   /** Only the paid-after-sell-out auto-refund (ADR 0018) — not support refunds. */
   checkoutRefunded: 'checkout_refunded',
+  /** Paid, but no order arrived within the finalizing wait; the webhook finishes it. */
+  checkoutFinalizeTimedOut: 'checkout_finalize_timed_out',
   checkoutAbandoned: 'checkout_abandoned',
   orderCompleted: 'order_completed',
 } as const;
