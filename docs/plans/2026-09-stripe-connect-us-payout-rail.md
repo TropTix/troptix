@@ -13,10 +13,13 @@ ADR 0028) built the ledger, the request lifecycle, and both screens so that
 only the "send money by hand" step would change — this plan changes that step,
 for US organizers only.
 
-This amends the 2026-07 decision to launch on Stripe Global Payouts for
-everyone. Connect becomes the US rail; the manual rail keeps serving
-organizers Stripe cannot reach. Global Payouts stays parked as the eventual
-Jamaican rail, not dead.
+Stripe is the payout rail. Connect serves US organizers now; Global Payouts
+serves Jamaican organizers next; manual Mercury transfers are a transition,
+not a rail. The money-transmission question that Global Payouts raises was
+checked with counsel and cleared on 2026-09-22, so the Jamaican rail is a
+build, not a bet. This narrows the 2026-07 decision to launch on Global
+Payouts for everyone: Connect goes first because Stripe carries the licence
+for it and the product is generally available.
 
 Revised 2026-09-21: every "verify at build time" item from the 2026-09-17
 draft was checked against Stripe's live docs (next section), and the plan now
@@ -62,8 +65,10 @@ movement end to end. The section after the table lists what changed.
 Settled in review on 2026-09-17, revised 2026-09-21; items 14 to 16 settled in
 the 2026-09-21 grilling session:
 
-1. **Scope**: Connect is the **US rail**. Jamaican organizers stay on the
-   manual rail. Global Payouts is deferred, not superseded.
+1. **Scope**: Connect is the **US rail** and the first of two Stripe rails.
+   Jamaican organizers stay on the manual rail only until the Global Payouts
+   rail ships (its own plan; see "What comes after"). Nothing in these two
+   PRs may assume the manual rail is permanent.
 2. **Charge model**: **separate charges and transfers**. Checkout keeps
    charging the platform account exactly as today; sales revenue pools in the
    platform's Stripe balance; paying an organizer is a `transfers.create`
@@ -82,7 +87,7 @@ the 2026-09-21 grilling session:
    account. The Express dashboard is what gives the organizer a place to see
    deposits and change their bank without TropTix building either.
 4. **Rail assignment is derived, never declared.** An Organization is on the
-   Stripe rail when `stripeConnectAccountId` is set and `payoutBankLinkedAt`
+   Stripe rail when `stripeAccountId` is set and `payoutBankLinkedAt`
    is set; otherwise manual. Whether that account can take a transfer right
    now is read live from Stripe at the two moments it matters: rendering the
    organizer's payouts page and the admin clicking send. Nothing caches
@@ -94,8 +99,12 @@ the 2026-09-21 grilling session:
    no double pay) and in the transfer metadata. The resolve is the existing
    guarded `updateMany`; if it writes 0 rows (organizer cancelled in the race
    window), surface the transfer id with the conflict error and recover by
-   hand. `balance_insufficient` is an expected, typed failure: the request
-   stays `REQUESTED` and the admin retries after the floor refills or pays
+   hand. Stripe prunes idempotency keys after 24 hours, so the key alone
+   cannot stop a double pay a week later: every transfer also carries
+   `transfer_group` = the request id, and the send lists transfers for that
+   group first; if one exists, it resolves with it instead of creating
+   another. `balance_insufficient` is an expected, typed failure: the request
+   stays `REQUESTED` and the admin retries after the balance refills or pays
    manually. `payouts_not_allowed`, `transfers_not_allowed`, and
    `capability_not_active` map to a typed "organizer must finish Stripe
    setup" failure. No outbox or worker until payouts become automatic.
@@ -106,7 +115,10 @@ the 2026-09-21 grilling session:
    wrong self-selection never activates and is replaced with a new account.
    No country column on `Organization` — the Connect account holds the fact.
    The payout meeting stays a hard gate on **every** rail (in practice the
-   paid-ticketing meeting, which covers both).
+   paid-ticketing meeting, which covers both). The "Jamaica or elsewhere"
+   branch is a transition: when the Global Payouts rail ships it becomes a
+   second Stripe-hosted form, and the platform panel's manual switch retires.
+   Nobody builds the manual branch out further.
 7. **One event destination, thin events** at `/api/stripe/connect-webhook`
    with its own signing secret (`STRIPE_CONNECT_WEBHOOK_SECRET`), scoped to
    **Your account**, subscribed to
@@ -128,12 +140,17 @@ the 2026-09-21 grilling session:
    payout blocked months later by a missed deadline; Stripe's own guidance
    lists "avoids the possibility of payout and processing issues due to
    missed deadlines" as the reason.
-10. **The platform keeps a balance floor.** Before the first live transfer,
-    the platform account's Balance Settings get a
-    `payments.payouts.minimum_balance_by_currency.usd` at least the size of
-    the largest open request, so the daily sweep to Mercury leaves enough
-    available balance to fund sends. The number is an ops setting in the
-    Stripe Dashboard, recorded in the runbook, not code.
+10. **Money stays at Stripe; a funding policy, not a single floor.** The end
+    state is that sales revenue never leaves Stripe until it is the
+    organizer's or TropTix's: Connect transfers draw on the payments balance,
+    the Global Payouts rail draws on a Treasury financial account funded from
+    that balance (Stripe moves settled balance there instantly, one-off or on
+    a recurring schedule), and only TropTix's own fee is paid out to Mercury.
+    For these two PRs the policy is one rule: the platform account's Balance
+    Settings get a `payments.payouts.minimum_balance_by_currency.usd` at least
+    the size of open requests with headroom, so the daily sweep to Mercury
+    leaves enough available balance to fund sends. The runbook records the
+    rule; the Global Payouts plan adds the second one.
 11. **Connected accounts keep Stripe's default payout schedule** (daily,
     automatic). The organizer sees "on its way" in the Express dashboard the
     day we send; we do not schedule, hold, or track the bank leg in v1.
@@ -158,13 +175,31 @@ the 2026-09-21 grilling session:
     leaves earnings, so Available shrinks (floored at zero) and the next
     request is smaller; the platform balance fronts the difference meanwhile.
     No reversal machinery; a Platform Owner can reverse a transfer by hand in
-    the Stripe Dashboard for a large or final-event case.
+    the Stripe Dashboard for a large or final-event case. A chargeback after a
+    payout is different: Stripe's marketplace guidance is to reverse the
+    transfer promptly, so the runbook carries that step and the reservation
+    webhook listens for `charge.dispute.created` to tell a Platform Owner the
+    day it happens.
+17. **Reconcile daily.** A cron route beside the existing ones lists Stripe
+    transfers carrying a request id in metadata and compares them with
+    `PayoutRequest` rows. Three mismatches are flagged in the platform queue:
+    `PAID` with no transfer, `REQUESTED` with a transfer, and two transfers
+    for one request. This is the safety net under the idempotency rules and
+    under every later automation.
+18. **The queue shows the money before the click.** The platform queue header
+    reads the platform's available balance live and the sum of open requests,
+    and turns amber when the first is below the second. Stripe never retries a
+    failed transfer once funds arrive, so the shortfall must be visible
+    before the send, not after.
+19. **The admin click is a launch control.** It is removed for Stripe-rail
+    Organizations once the reconciliation cron has run clean for a month; the
+    phase after this plan makes sends automatic (see "What comes after").
 
 ## Non-goals
 
 - No change to checkout, fees, or the ledger. The earnings math, holdback,
   per-org overrides, and request lifecycle are rail-agnostic and untouched.
-- No Jamaican Connect accounts, no Global Payouts work.
+- No Global Payouts work in these two PRs. It is the next plan.
 - No automatic payouts. The admin still clicks — the click just does the
   transfer. Automation is the phase after this one and inherits the
   idempotency discipline unchanged.
@@ -193,7 +228,7 @@ can do alone.
 ### States
 
 Everything the screen shows is a function of three facts: the
-`stripeConnectAccountId` column, `payoutBankLinkedAt`, and (only when an
+`stripeAccountId` column, `payoutBankLinkedAt`, and (only when an
 account id exists) the live `stripe_transfers` capability status.
 
 | State           | Facts                                                               | What the bank step shows                                                                                                                                                                                         |
@@ -231,8 +266,8 @@ and no buttons; it never throws.
    `startStripeOnboarding`, which:
    - refuses unless the actor owns the Organization (owner-only, "members and
      money") and the flag is on;
-   - creates the v2 account if `stripeConnectAccountId` is null and stores
-     the id (one row update, guarded on `stripeConnectAccountId IS NULL` so a
+   - creates the v2 account if `stripeAccountId` is null and stores
+     the id (one row update, guarded on `stripeAccountId IS NULL` so a
      double click cannot create two accounts);
    - creates an account link with `configurations: ['recipient']`,
      `collection_options.fields: 'eventually_due'`, `refresh_url` =
@@ -297,7 +332,7 @@ Organizer                TropTix (web)                 Stripe
    |----------------------->| v2 accounts.create          |
    |                        |---------------------------->|
    |                        |<-- acct_…                   |
-   |                        | store stripeConnectAccountId|
+   |                        | store stripeAccountId|
    |                        | v2 accountLinks.create      |
    |                        |---------------------------->|
    |<-- 303 to link url ----|<-- url (single use) --------|
@@ -344,7 +379,7 @@ tables.
 `platform-payouts.ts`, Platform-Owner-only:
 
 1. Load the request with its Organization; require `status: 'REQUESTED'` and
-   a `stripeConnectAccountId`.
+   a `stripeAccountId`.
 2. `stripe.transfers.create(
 { amount: amountCents, currency: 'usd', destination: accountId,
   description: 'TropTix payout — <slug> — <id prefix>',
@@ -390,13 +425,19 @@ right tool.
 
 ## Schema
 
-One migration (`pnpm db:new stripe_connect_account`):
+One migration (`pnpm db:new stripe_account`):
 
 ```prisma
-// On Organization. The Stripe Connect account that receives this
-// Organization's payouts. Onboarding state lives in Stripe; this is the key.
-stripeConnectAccountId String? @unique
+// On Organization. The organizer's Stripe account: a Connect account today,
+// a Global Payouts recipient for Jamaica later. Both are v2 accounts with a
+// recipient configuration; the active capability says which rail applies.
+// Onboarding state lives in Stripe; this is the key.
+stripeAccountId String? @unique
 ```
+
+The name is rail-neutral on purpose. One Organization has one Stripe
+account, and renaming a column after PR 1 costs a migration, the seed, and
+every DTO.
 
 Nothing else. `payoutBankLinkedAt` keeps meaning "a verified payout
 destination exists", whichever rail verified it.
@@ -436,7 +477,7 @@ never View-as):
 
 **`packages/api/src/services/platform-payouts.ts`** gains
 `sendPayoutViaStripe` (above). `listPayoutOrganizations` and
-`listPayoutRequests` add `stripeConnectAccountId` and the derived
+`listPayoutRequests` add `stripeAccountId` and the derived
 `rail: 'stripe' | 'manual'` to their DTOs.
 
 **Contracts** (`packages/api/src/contracts/payouts.ts`): `connectStateSchema`
@@ -529,7 +570,12 @@ Recorded in a runbook (`docs/runbooks/stripe-connect.md`, written in PR 1):
 
 ### PR 2 — the send rail
 
-- `sendPayoutViaStripe` + tests; DTO `rail` fields.
+- `sendPayoutViaStripe` with the `transfer_group` lookup + tests; DTO `rail`
+  fields.
+- The reconciliation cron route and its flags in the platform queue; the
+  queue's balance header.
+- `charge.dispute.created` handling on the reservation webhook (a Platform
+  Owner notice, nothing automatic).
 - Platform cockpit's Stripe branch and override; rail-aware copy on both
   tables; the organizer's deposit line.
 - Balance floor set in the live Dashboard before merge.
@@ -542,6 +588,41 @@ Recorded in a runbook (`docs/runbooks/stripe-connect.md`, written in PR 1):
    end.
 3. Flag to 100%; remove the flag in a cleanup PR (item on the umbrella
    issue from birth, per the flags runbook).
+
+## What comes after
+
+Two plans follow this one. Neither changes anything these two PRs build.
+
+**Unattended payouts** (the phase decision 19 points at):
+
+- Ledger memory through allocations: when a request is created, one row per
+  event it draws from (request id, event id, amount). Answers "which events
+  did this payout cover", makes a refund attributable to a paid event, and
+  freezes history against fee-config drift.
+- A signed balance internally, so a refund after a full payout shows "owed to
+  TropTix" on the platform panel instead of hiding behind the zero floor.
+- Auto-send on the Stripe rail: a request calls the send service at once,
+  no click; then a scheduled job pays the full Available and the request
+  button disappears for Stripe-rail Organizations. The amount field retires
+  with it.
+- A per-event breakdown on the payouts page (event, earned, held until,
+  released, paid) from the rows the ledger already computes.
+- A payouts freeze (`payoutsFrozenAt`, Platform-Owner-set, checked by the
+  send) so a cancelled event cannot be paid out unattended.
+
+**The Global Payouts rail for Jamaica** (cleared with counsel 2026-09-22):
+
+- Treasury activation and a financial account funded from the payments
+  balance on a recurring schedule.
+- A recipient account per Jamaican Organization: the same v2 account with a
+  `recipient` configuration, `bank_accounts.local` requested, onboarded
+  through the same Account Links flow and the same events as Connect; the
+  `stripeAccountId` column holds it.
+- `sendPayout` gains a second branch: an outbound payment from the financial
+  account, reference = the OutboundPayment id, rail `STRIPE`, same
+  idempotency and reconciliation rules.
+- The manual rail, the Mercury cockpit, and the platform panel's bank switch
+  retire when the last manual-rail Organization has moved.
 
 ## Vocabulary (CONTEXT.md, when PR 1 ships)
 
