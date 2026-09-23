@@ -5,7 +5,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import {
   ArrowLeft,
-  Settings,
   Ticket,
   Users,
   ClipboardList,

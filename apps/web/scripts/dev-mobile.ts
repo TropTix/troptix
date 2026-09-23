@@ -8,7 +8,7 @@ const TIMEOUT_MS = 30000;
 async function run() {
   console.log('🚀 Starting Next.js dev server...');
 
-  const devServer: ChildProcess = spawn('yarn', ['next', 'dev'], {
+  const devServer: ChildProcess = spawn('pnpm', ['exec', 'next', 'dev'], {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env },
   });
@@ -94,7 +94,7 @@ async function run() {
         await ngrok.disconnect();
         await ngrok.kill();
         console.log('✅ Ngrok tunnel closed');
-      } catch (error) {
+      } catch {
         // Ignore ngrok cleanup errors - it might already be disconnected
       }
     }

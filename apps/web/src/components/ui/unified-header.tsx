@@ -21,10 +21,13 @@ import {
   Search,
   Shield,
   Ticket,
+  Wallet,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useContext, useEffect, useState } from 'react';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { FeatureFlag } from '@troptix/api';
 import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
 
@@ -45,47 +48,16 @@ const getUserInitials = (user?: {
   return 'A';
 };
 
-export default function UnifiedHeader() {
-  const [hasScrolled, setHasScrolled] = useState<boolean>(false);
-  const { user } = useContext(TropTixContext);
-  const pathname = usePathname();
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setHasScrolled(window.scrollY > 10);
-    };
-    window.addEventListener('scroll', handleScroll);
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  if (pathname?.startsWith('/auth')) {
-    return null;
-  }
-
-  const isOrganizerRoute = pathname?.startsWith('/organizer');
-  // The explicit grant from /api/user/me — display only; the server enforces.
-  const userIsPlatformOwner = user?.isPlatformOwner ?? false;
-
-  const organizerNavItems = [
-    { label: 'Dashboard', href: '/organizer', icon: Home },
-    { label: 'My Events', href: '/organizer/events', icon: Calendar },
-    { label: 'Profile', href: '/organizer/profile', icon: Building2 },
-  ];
-
-  if (userIsPlatformOwner) {
-    organizerNavItems.push({
-      label: 'Platform Events',
-      href: '/organizer/platform/events',
-      icon: Shield,
-    });
-  }
-
-  const handleSignOut = async () => {
-    await supabaseSignOut();
-  };
-
-  const UserMenu = () => (
+function UserMenu({
+  user,
+  isOrganizerRoute,
+  onSignOut,
+}: {
+  user: Parameters<typeof getUserInitials>[0];
+  isOrganizerRoute: boolean;
+  onSignOut: () => Promise<void>;
+}) {
+  return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -129,13 +101,66 @@ export default function UnifiedHeader() {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut}>
+        <DropdownMenuItem onClick={onSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign Out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+export default function UnifiedHeader() {
+  const [hasScrolled, setHasScrolled] = useState<boolean>(false);
+  const { user } = useContext(TropTixContext);
+  const pathname = usePathname();
+  const payoutsEnabled = useFeatureFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setHasScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  if (pathname?.startsWith('/auth')) {
+    return null;
+  }
+
+  const isOrganizerRoute = pathname?.startsWith('/organizer');
+  // The explicit grant from /api/user/me — display only; the server enforces.
+  const userIsPlatformOwner = user?.isPlatformOwner ?? false;
+
+  const organizerNavItems = [
+    { label: 'Dashboard', href: '/organizer', icon: Home },
+    { label: 'My Events', href: '/organizer/events', icon: Calendar },
+    // Only `=== true` is on — undefined means the flags haven't loaded yet.
+    ...(payoutsEnabled === true
+      ? [{ label: 'Payouts', href: '/organizer/payouts', icon: Wallet }]
+      : []),
+    { label: 'Profile', href: '/organizer/profile', icon: Building2 },
+  ];
+
+  if (userIsPlatformOwner) {
+    organizerNavItems.push(
+      {
+        label: 'Platform Events',
+        href: '/organizer/platform/events',
+        icon: Shield,
+      },
+      {
+        label: 'Platform Payouts',
+        href: '/organizer/platform/payouts',
+        icon: Shield,
+      }
+    );
+  }
+
+  const handleSignOut = async () => {
+    await supabaseSignOut();
+  };
 
   return (
     <header
@@ -206,7 +231,11 @@ export default function UnifiedHeader() {
           </nav>
 
           {user?.id ? (
-            <UserMenu />
+            <UserMenu
+              user={user}
+              isOrganizerRoute={!!isOrganizerRoute}
+              onSignOut={handleSignOut}
+            />
           ) : (
             <>
               <Button variant="default" className="rounded-full" asChild>

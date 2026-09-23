@@ -99,12 +99,14 @@ function PaymentInner({
   event,
   summary,
   expiresAt,
+  onPaid,
   onExpired,
   onBack,
 }: {
   event: EventDetail;
   summary: PaymentSummary;
   expiresAt: string;
+  onPaid: () => void;
   onExpired: () => void;
   onBack: () => void;
 }) {
@@ -156,13 +158,30 @@ function PaymentInner({
   async function pay() {
     setSubmitting(true);
     setError(null);
-    // On success, Stripe redirects to the Session's return_url
-    // (/e/[eventId]?reservation=…); the resume path there finalizes the order.
-    const result = await checkout.confirm();
+    // Cards resolve in place. Only a redirect-based method leaves for the
+    // Session's return_url (/e/[eventId]?reservation=…), where the resume
+    // path runs the same finalize.
+    let result: Awaited<ReturnType<typeof checkout.confirm>>;
+    try {
+      result = await checkout.confirm({ redirect: 'if_required' });
+    } catch (err) {
+      // Stripe.js rejects (rather than returning an error result) when it
+      // can't reach Stripe at all; without this the button says Processing…
+      // forever. A payment that actually went through is still fulfilled by
+      // the webhook, and a refresh resumes onto it.
+      console.error('[Checkout] confirm() threw:', err);
+      setError(
+        'We could not reach the payment service. Check your connection and try again; if you were charged, your tickets will arrive by email.'
+      );
+      setSubmitting(false);
+      return;
+    }
     if (result.type === 'error') {
       setError(result.error.message ?? 'Your payment could not be processed.');
       setSubmitting(false);
+      return;
     }
+    onPaid();
   }
 
   return (
@@ -213,6 +232,7 @@ export default function PaymentStep({
   event,
   summary,
   expiresAt,
+  onPaid,
   onExpired,
   onBack,
 }: {
@@ -220,6 +240,7 @@ export default function PaymentStep({
   event: EventDetail;
   summary: PaymentSummary;
   expiresAt: string;
+  onPaid: () => void;
   onExpired: () => void;
   onBack: () => void;
 }) {
@@ -229,6 +250,7 @@ export default function PaymentStep({
         event={event}
         summary={summary}
         expiresAt={expiresAt}
+        onPaid={onPaid}
         onExpired={onExpired}
         onBack={onBack}
       />

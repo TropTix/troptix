@@ -38,6 +38,7 @@ export function serverAnalytics(): CheckoutAnalytics | undefined {
             subtotal_cents: props.subtotalCents,
             fees_cents: props.feesCents,
             ticket_count: props.ticketCount,
+            fulfilled_via: props.fulfilledVia,
             revenue_usd: props.totalCents / 100,
           },
         });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -122,15 +122,11 @@ export default function EventDetailView({
   const searchParams = useSearchParams();
   const posthog = usePostHog();
   const resumeReservationId = searchParams?.get('reservation') ?? null;
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const { copyToClipboard, isCopied } = useCopyToClipboard();
-  const [aboutExpanded, setAboutExpanded] = useState(false);
-
   // The param stays in the URL on purpose — scrubbing it would break
   // refresh-resume; the PostHog sanitizer keeps it out of analytics (ADR 0018).
-  useEffect(() => {
-    if (resumeReservationId) setSheetOpen(true);
-  }, [resumeReservationId]);
+  const [sheetOpen, setSheetOpen] = useState(!!resumeReservationId);
+  const { copyToClipboard, isCopied } = useCopyToClipboard();
+  const [aboutExpanded, setAboutExpanded] = useState(false);
 
   const handleBack = () => {
     if (window.history.length > 1) {

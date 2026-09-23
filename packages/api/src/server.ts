@@ -23,7 +23,9 @@ export {
 export {
   beginPayment,
   confirmPaid,
+  finalizePayment,
   getCheckoutState,
+  paymentIntentIdOf,
   sweepExpiredHolds,
   type SweepResult,
 } from './services/payments';
@@ -31,7 +33,12 @@ export {
 export { captureOrderCompleted } from './services/reservations';
 
 export { getCheckoutConfig, applyCode } from './services/checkout';
-export { getEventDetail, listPublicEvents } from './services/events';
+export {
+  getEventDetail,
+  getEventDetailRaw,
+  shapeEventDetail,
+  listPublicEvents,
+} from './services/events';
 export { getDashboard } from './services/organizer-dashboard';
 export { listOrganizerEvents } from './services/organizer-events';
 export { getEventOverview } from './services/organizer-event-overview';
@@ -57,6 +64,18 @@ export {
   getOrganizationBySlug,
   updateOrganizationProfile,
 } from './services/organizations';
+export {
+  getPayouts,
+  requestPayout,
+  cancelPayoutRequest,
+} from './services/organizer-payouts';
+export {
+  listPayoutRequests,
+  listPayoutOrganizations,
+  resolvePayoutRequest,
+  setPayoutSetupStep,
+  setPayoutPolicy,
+} from './services/platform-payouts';
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
 export { toCents } from './services/_shared/organizerMapping';
 export {
@@ -64,6 +83,9 @@ export {
   UnauthorizedError,
   ConflictError,
   PaidTicketingNotEnabledError,
+  PayoutSetupIncompleteError,
+  InvalidPayoutAmountError,
+  PayoutRequestPendingError,
 } from './services/_shared/errors';
 
 export { appRouter, createCaller } from './trpc/routers';

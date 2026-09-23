@@ -21,7 +21,7 @@ Keep status/ownership in the linked issue — this body answers what & why.
 
 ## Testing
 
-<!-- How you verified this. Automated (`yarn typecheck`, test suite) and/or manual
+<!-- How you verified this. Automated (`pnpm typecheck`, test suite) and/or manual
      steps. State what you did NOT test. -->
 
 -

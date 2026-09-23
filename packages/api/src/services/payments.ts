@@ -11,12 +11,16 @@ import {
   expireHold,
   settle,
 } from './reservations';
-import { NotFoundError } from './_shared/errors';
+import {
+  AlreadyPaidError,
+  HoldExpiredError,
+  NotFoundError,
+} from './_shared/errors';
 import type {
   BeginPaymentResponse,
   CheckoutState,
 } from '../contracts/payments';
-import type { CheckoutAnalytics } from '../contracts/analytics';
+import type { CheckoutAnalytics, FulfilledVia } from '../contracts/analytics';
 
 /**
  * Stripe truncates `PREFIX* SUFFIX` at 22 chars: TROPTIX (7) + `* ` (2) leaves
@@ -65,13 +69,11 @@ export async function beginPayment(
   if (!reservation) {
     throw new NotFoundError(`Reservation ${input.reservationId} not found.`);
   }
-  if (reservation.status !== ReservationStatus.HELD) {
-    throw new Error(
-      `Reservation ${reservation.id} is ${reservation.status}; cannot start payment.`
-    );
-  }
-  if (reservation.expiresAt.getTime() <= Date.now()) {
-    throw new Error(`Reservation ${reservation.id} has expired.`);
+  if (
+    reservation.status !== ReservationStatus.HELD ||
+    reservation.expiresAt.getTime() <= Date.now()
+  ) {
+    throw new HoldExpiredError(reservation.id);
   }
   if (reservation.totalCents <= 0) {
     throw new Error(
@@ -122,8 +124,13 @@ export async function beginPayment(
         ...summary,
       };
     }
-    // Non-open (expired / complete): mint a fresh Session — remember the dead
-    // id so the create's key differs, else Stripe replays this dead Session.
+    // A complete Session is paid and awaiting fulfilment; a second Session
+    // here would be a second charge that `settle` could never refund.
+    if (existing.status === 'complete') {
+      throw new AlreadyPaidError(reservation.id);
+    }
+    // Expired: mint a fresh Session — remember the dead id so the create's
+    // key differs, else Stripe replays this dead Session.
     staleSessionId = reservation.stripeCheckoutSessionId;
   }
 
@@ -209,6 +216,7 @@ export async function confirmPaid(
   input: {
     reservationId: string;
     paymentIntentId: string;
+    fulfilledVia: Exclude<FulfilledVia, 'free'>;
     cardType?: string | null;
     cardLast4?: string | null;
   },
@@ -229,7 +237,8 @@ export async function confirmPaid(
         prisma,
         analytics,
         input.reservationId,
-        result.orderId
+        result.orderId,
+        input.fulfilledVia
       );
     }
     return orderCheckoutState(prisma, result.orderId);
@@ -246,14 +255,91 @@ export async function confirmPaid(
     where: { id: input.reservationId },
     data: { status: ReservationStatus.REFUNDED, stripeRefundId: refund.id },
   });
+  console.warn('[Checkout] expiry-race refund issued', {
+    reservationId: input.reservationId,
+    paymentIntentId: input.paymentIntentId,
+    refundId: refund.id,
+    via: input.fulfilledVia,
+  });
   return { kind: 'refunded' };
 }
 
+export function paymentIntentIdOf(
+  session: Pick<Stripe.Checkout.Session, 'payment_intent'>
+): string | null {
+  return typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : (session.payment_intent?.id ?? null);
+}
+
+const stateSelect = {
+  id: true,
+  status: true,
+  orderId: true,
+  totalCents: true,
+  expiresAt: true,
+  stripeCheckoutSessionId: true,
+} as const;
+
+type StateRow = {
+  id: string;
+  status: ReservationStatus;
+  orderId: string | null;
+  totalCents: number;
+  expiresAt: Date;
+};
+
 /**
- * Not a pure read: a paid-but-unconverted Session is fulfilled inline (the
- * sync fallback to the webhook). One Stripe retrieve per call — never a loop.
+ * A HELD row past its deadline is still `held`: only the sweep may expire it,
+ * and it only does so after Stripe confirms the Session can no longer be paid.
+ * Reading it as expired here would send a paid buyer to "start over".
  */
+async function checkoutStateOf(
+  prisma: PrismaClient,
+  reservation: StateRow
+): Promise<CheckoutState> {
+  switch (reservation.status) {
+    case ReservationStatus.CONVERTED:
+      if (!reservation.orderId) {
+        throw new Error(
+          `Reservation ${reservation.id} is CONVERTED but has no orderId`
+        );
+      }
+      return orderCheckoutState(prisma, reservation.orderId);
+    case ReservationStatus.REFUNDED:
+      return { kind: 'refunded' };
+    case ReservationStatus.HELD:
+      return {
+        kind: 'held',
+        expiresAt: reservation.expiresAt.toISOString(),
+        totalCents: reservation.totalCents,
+      };
+    default:
+      return { kind: 'expired' };
+  }
+}
+
+/** Pure read of the reservation row; never talks to Stripe (ADR 0030). */
 export async function getCheckoutState(
+  prisma: PrismaClient,
+  input: { reservationId: string }
+): Promise<CheckoutState> {
+  const reservation = await prisma.reservation.findUnique({
+    where: { id: input.reservationId },
+    select: stateSelect,
+  });
+  if (!reservation) {
+    throw new NotFoundError(`Reservation ${input.reservationId} not found.`);
+  }
+  return checkoutStateOf(prisma, reservation);
+}
+
+/**
+ * The one sync fulfil attempt while the buyer is present — Stripe's
+ * landing-page recipe. One Session retrieve, settle if paid, else report the
+ * row. The webhook remains the guaranteed fulfiller (ADR 0030).
+ */
+export async function finalizePayment(
   prisma: PrismaClient,
   stripe: Stripe,
   input: { reservationId: string },
@@ -261,66 +347,34 @@ export async function getCheckoutState(
 ): Promise<CheckoutState> {
   const reservation = await prisma.reservation.findUnique({
     where: { id: input.reservationId },
-    select: {
-      id: true,
-      status: true,
-      orderId: true,
-      totalCents: true,
-      expiresAt: true,
-      stripeCheckoutSessionId: true,
-    },
+    select: stateSelect,
   });
-
   if (!reservation) {
     throw new NotFoundError(`Reservation ${input.reservationId} not found.`);
   }
 
-  if (reservation.status === ReservationStatus.CONVERTED) {
-    if (!reservation.orderId) {
-      throw new Error(
-        `Reservation ${reservation.id} is CONVERTED but has no orderId`
-      );
-    }
-    return orderCheckoutState(prisma, reservation.orderId);
-  }
-  if (reservation.status === ReservationStatus.REFUNDED) {
-    return { kind: 'refunded' };
-  }
-  if (reservation.status === ReservationStatus.RELEASED) {
-    return { kind: 'expired' };
-  }
-
-  if (reservation.stripeCheckoutSessionId) {
+  const settled =
+    reservation.status === ReservationStatus.CONVERTED ||
+    reservation.status === ReservationStatus.REFUNDED;
+  if (!settled && reservation.stripeCheckoutSessionId) {
     const session = await stripe.checkout.sessions.retrieve(
       reservation.stripeCheckoutSessionId
     );
-    if (session.payment_status !== 'unpaid') {
-      const paymentIntentId =
-        typeof session.payment_intent === 'string'
-          ? session.payment_intent
-          : session.payment_intent?.id;
-      if (paymentIntentId) {
-        return confirmPaid(
-          prisma,
-          stripe,
-          { reservationId: reservation.id, paymentIntentId },
-          analytics
-        );
-      }
+    const paymentIntentId = paymentIntentIdOf(session);
+    if (session.payment_status !== 'unpaid' && paymentIntentId) {
+      return confirmPaid(
+        prisma,
+        stripe,
+        {
+          reservationId: reservation.id,
+          paymentIntentId,
+          fulfilledVia: 'sync',
+        },
+        analytics
+      );
     }
   }
-
-  if (
-    reservation.status === ReservationStatus.HELD &&
-    reservation.expiresAt.getTime() > Date.now()
-  ) {
-    return {
-      kind: 'held',
-      expiresAt: reservation.expiresAt.toISOString(),
-      totalCents: reservation.totalCents,
-    };
-  }
-  return { kind: 'expired' };
+  return checkoutStateOf(prisma, reservation);
 }
 
 export interface SweepResult {

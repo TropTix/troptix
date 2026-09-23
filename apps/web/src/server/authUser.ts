@@ -1,4 +1,5 @@
 import type { Role } from '@troptix/db';
+import { cookies } from 'next/headers';
 import prisma from '@/server/prisma';
 import { createClient } from '@/lib/supabase/server';
 
@@ -21,6 +22,17 @@ export interface ServerUser {
 async function getAuthUserId(token?: string): Promise<string | null> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return null;
+  }
+  // No session cookie (`sb-<ref>-auth-token`, possibly chunked) means getClaims
+  // can't succeed — skip it.
+  if (!token) {
+    const cookieStore = await cookies();
+    const hasSessionCookie = cookieStore
+      .getAll()
+      .some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'));
+    if (!hasSessionCookie) {
+      return null;
+    }
   }
   const supabase = await createClient();
   try {

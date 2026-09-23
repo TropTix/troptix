@@ -12,10 +12,47 @@ export class UnauthorizedError extends Error {
   }
 }
 
+/** The reservation's Checkout Session is already complete; finalize, never re-mint. */
+export class AlreadyPaidError extends Error {
+  constructor(reservationId: string) {
+    super(`Reservation ${reservationId} has already been paid.`);
+    this.name = 'AlreadyPaidError';
+  }
+}
+
+/** The hold is no longer open for payment (lapsed, released, or already settled). */
+export class HoldExpiredError extends Error {
+  constructor(reservationId: string) {
+    super(`Reservation ${reservationId} is no longer open for payment.`);
+    this.name = 'HoldExpiredError';
+  }
+}
+
 export class ConflictError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ConflictError';
+  }
+}
+
+export class PayoutSetupIncompleteError extends Error {
+  constructor(message = 'Payout setup is not complete for this organization') {
+    super(message);
+    this.name = 'PayoutSetupIncompleteError';
+  }
+}
+
+export class InvalidPayoutAmountError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidPayoutAmountError';
+  }
+}
+
+export class PayoutRequestPendingError extends Error {
+  constructor(message = 'A payout request is already open') {
+    super(message);
+    this.name = 'PayoutRequestPendingError';
   }
 }
 
