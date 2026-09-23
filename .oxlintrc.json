@@ -1,0 +1,34 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    // Only meaningful once the React Compiler is enabled: they describe what
+    // it would skip optimizing, not a defect.
+    "react/incompatible-library": "off",
+    "react/preserve-manual-memoization": "off"
+  },
+  "overrides": [
+    {
+      "files": ["apps/web/**"],
+      "plugins": ["nextjs"]
+    }
+  ],
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/.expo/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "apps/organizer/**",
+    "packages/db/src/generated/**",
+    "supabase/**",
+    ".claude/**",
+    ".agents/**",
+    "plans/**"
+  ]
+}

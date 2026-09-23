@@ -94,7 +94,7 @@ async function run() {
         await ngrok.disconnect();
         await ngrok.kill();
         console.log('✅ Ngrok tunnel closed');
-      } catch (error) {
+      } catch {
         // Ignore ngrok cleanup errors - it might already be disconnected
       }
     }

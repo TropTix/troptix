@@ -56,9 +56,10 @@ export default async function EventDetailPage({
   await connection();
   const { eventId } = await params;
 
+  const now = new Date();
   let event;
   try {
-    event = shapeEventDetail(await loadEventRaw(eventId), new Date());
+    event = shapeEventDetail(await loadEventRaw(eventId), now);
   } catch (err) {
     if (err instanceof NotFoundError) notFound();
     throw err;
@@ -74,7 +75,7 @@ export default async function EventDetailPage({
   return (
     <EventDetailView
       event={event}
-      eventEnded={Date.now() > Date.parse(event.endsAt)}
+      eventEnded={now.getTime() > Date.parse(event.endsAt)}
     />
   );
 }

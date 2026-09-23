@@ -390,13 +390,14 @@ export default function EventDetailScreen() {
       setGuests(data.guests);
     } catch (e: any) {
       setError(e.message ?? 'Failed to load event');
-    } finally {
-      setLoading(false);
     }
   }, [id]);
 
   React.useEffect(() => {
-    fetchEventData();
+    void (async () => {
+      await fetchEventData();
+      setLoading(false);
+    })();
   }, [fetchEventData]);
 
   const handleRefresh = async () => {
