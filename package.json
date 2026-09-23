@@ -28,8 +28,6 @@
     "typescript": "^5.2.2"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.3.0",
-    "@testing-library/react": "^14.1.2",
     "@types/node": "^24.10.1",
     "create-jest": "^29.7.0",
     "husky": "^9.1.7",
