@@ -14,8 +14,14 @@ and [ADR 0030](../adr/0030-stripe-is-the-payout-rail.md).
 3. **Onboarding options → countries**: United States only. Keep "collect bank
    account during onboarding" on.
 4. **Express dashboard features**: payments, refunds, disputes, and manual
-   payouts off. The account never charges anyone.
-5. **Event destination** (Workbench → Webhooks):
+   payouts off. The account carries `card_payments` only because Stripe
+   requires it alongside transfers; nothing charges through it.
+5. **Transfers-only approval (optional)**: Stripe support can approve the
+   platform for accounts that request transfers without `card_payments`.
+   Until then the merchant configuration stays, and hosted onboarding asks
+   for merchant details (business type, statement descriptor); the business
+   URL is prefilled with the Organization's public page.
+6. **Event destination** (Workbench → Webhooks):
    - Events from: **Your account** (not Connected accounts).
    - Payload: **thin**. Thin events need their own endpoint; do not add them
      to the reservation webhook's destination.
@@ -24,7 +30,7 @@ and [ADR 0030](../adr/0030-stripe-is-the-payout-rail.md).
    - URL: `https://<host>/api/stripe/connect-webhook`.
    - Copy the signing secret into `STRIPE_CONNECT_WEBHOOK_SECRET` for that
      environment.
-6. **Balance settings** (before the first live send, PR 2): a USD minimum
+7. **Balance settings** (before the first live send, PR 2): a USD minimum
    balance at least the size of open payout requests, so the daily sweep to
    the ops bank leaves enough to fund transfers.
 

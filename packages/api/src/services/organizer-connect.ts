@@ -18,6 +18,7 @@ import { resolveOrganizerScope } from './organizer-scope';
 const ORG_SELECT = {
   id: true,
   displayName: true,
+  slug: true,
   stripeAccountId: true,
   payoutBankLinkedAt: true,
   owner: { select: { email: true } },
@@ -26,6 +27,7 @@ const ORG_SELECT = {
 interface ConnectOrg {
   id: string;
   displayName: string;
+  slug: string;
   stripeAccountId: string | null;
   payoutBankLinkedAt: Date | null;
   owner: { email: string };
@@ -152,7 +154,7 @@ function onboardingLink(
     use_case: {
       type: 'account_onboarding',
       account_onboarding: {
-        configurations: ['recipient'],
+        configurations: ['recipient', 'merchant'],
         refresh_url: `${baseUrl}/organizer/payouts/stripe/refresh`,
         return_url: `${baseUrl}/organizer/payouts/stripe/return`,
         collection_options: { fields: 'eventually_due' },
@@ -165,11 +167,18 @@ function onboardingLink(
  * Stripe's idempotency key makes a double click return the same account; the
  * guarded update makes the second writer adopt the first's id instead of
  * overwriting it.
+ *
+ * `card_payments` is requested only because Stripe refuses
+ * `stripe_transfers` without it unless the platform has been approved for
+ * transfers-only accounts (error `capability_not_available_without_other_capability`).
+ * Nothing charges through the account; the merchant configuration is
+ * Stripe's precondition, not a product decision (ADR 0030).
  */
 async function createRecipientAccount(
   prisma: PrismaClient,
   stripe: Stripe,
-  org: ConnectOrg
+  org: ConnectOrg,
+  baseUrl: string
 ): Promise<string> {
   const account = await stripe.v2.core.accounts.create(
     {
@@ -182,12 +191,16 @@ async function createRecipientAccount(
           fees_collector: 'application',
           losses_collector: 'application',
         },
+        profile: { business_url: `${baseUrl}/o/${org.slug}` },
       },
       configuration: {
         recipient: {
           capabilities: {
             stripe_balance: { stripe_transfers: { requested: true } },
           },
+        },
+        merchant: {
+          capabilities: { card_payments: { requested: true } },
         },
       },
       metadata: { organizationId: org.id },
@@ -216,7 +229,8 @@ export async function startStripeOnboarding(
 ): Promise<{ url: string }> {
   const org = await ownedOrg(prisma, actor, { provision: true });
   const accountId =
-    org.stripeAccountId ?? (await createRecipientAccount(prisma, stripe, org));
+    org.stripeAccountId ??
+    (await createRecipientAccount(prisma, stripe, org, input.baseUrl));
   const link = await stripe.v2.core.accountLinks.create(
     onboardingLink(accountId, input.baseUrl)
   );

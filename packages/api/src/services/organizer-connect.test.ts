@@ -21,6 +21,7 @@ const BASE = 'https://app.test';
 const ORG = {
   id: 'org-1',
   displayName: 'Island Nights',
+  slug: 'island-nights',
   stripeAccountId: null as string | null,
   payoutBankLinkedAt: null as Date | null,
   owner: { email: 'owner@example.test' },
@@ -244,12 +245,16 @@ describe('startStripeOnboarding', () => {
           fees_collector: 'application',
           losses_collector: 'application',
         },
+        profile: { business_url: `${BASE}/o/island-nights` },
       },
       configuration: {
         recipient: {
           capabilities: {
             stripe_balance: { stripe_transfers: { requested: true } },
           },
+        },
+        merchant: {
+          capabilities: { card_payments: { requested: true } },
         },
       },
       metadata: { organizationId: 'org-1' },
@@ -266,7 +271,7 @@ describe('startStripeOnboarding', () => {
       use_case: {
         type: 'account_onboarding',
         account_onboarding: {
-          configurations: ['recipient'],
+          configurations: ['recipient', 'merchant'],
           refresh_url: `${BASE}/organizer/payouts/stripe/refresh`,
           return_url: `${BASE}/organizer/payouts/stripe/return`,
           collection_options: { fields: 'eventually_due' },
