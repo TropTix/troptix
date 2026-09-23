@@ -119,6 +119,9 @@ export async function openStripeDashboard(): Promise<ActionResult> {
       userToActor(user)
     ));
   } catch (error) {
+    if (error instanceof NotFoundError) {
+      return { success: false, error: 'No Stripe account is connected yet.' };
+    }
     return failure(
       error,
       'Could not open your Stripe dashboard. Please try again.'

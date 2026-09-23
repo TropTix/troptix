@@ -34,17 +34,28 @@ function fakePrisma(
 ) {
   const row = org === null ? null : { ...ORG, ...org };
   const findFirst = vi.fn().mockResolvedValue(row);
+  const findMany = vi.fn().mockResolvedValue([]);
+  const create = vi.fn().mockResolvedValue({ ...ORG, id: 'org-new' });
   const orgFindUnique = vi
     .fn()
     .mockResolvedValue({ stripeAccountId: opts.raceId ?? null });
   const updateMany = vi.fn().mockResolvedValue({ count: opts.claimCount ?? 1 });
   const prisma = {
-    organization: { findFirst, findUnique: orgFindUnique, updateMany },
+    organization: {
+      findFirst,
+      findMany,
+      create,
+      findUnique: orgFindUnique,
+      updateMany,
+    },
     users: {
-      findUnique: vi.fn().mockResolvedValue({ isPlatformOwner: false }),
+      findUnique: vi.fn().mockResolvedValue({
+        isPlatformOwner: false,
+        email: 'owner@example.test',
+      }),
     },
   } as unknown as PrismaClient;
-  return { prisma, findFirst, updateMany };
+  return { prisma, findFirst, create, updateMany };
 }
 
 function fakeStripe(opts: { status?: Status; retrieveThrows?: boolean } = {}) {
@@ -180,18 +191,37 @@ describe('getConnectSetup', () => {
 });
 
 describe('startStripeOnboarding', () => {
-  it('rejects a guest and a user without an organization', async () => {
+  it('rejects a guest', async () => {
     const { stripe } = fakeStripe();
     await expect(
       startStripeOnboarding(fakePrisma().prisma, stripe, NOT_A_USER, {
         baseUrl: BASE,
       })
     ).rejects.toThrow(UnauthorizedError);
-    await expect(
-      startStripeOnboarding(fakePrisma(null).prisma, stripe, OWNER, {
-        baseUrl: BASE,
-      })
-    ).rejects.toThrow(NotFoundError);
+  });
+
+  it('provisions an Organization for a first-time organizer, then connects', async () => {
+    const { prisma, findFirst, create } = fakePrisma(null);
+    findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ ...ORG, id: 'org-new' });
+    const { stripe, calls } = fakeStripe();
+
+    const result = await startStripeOnboarding(prisma, stripe, OWNER, {
+      baseUrl: BASE,
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ownerUserId: 'owner-1',
+        displayName: 'owner@example.test',
+      }),
+    });
+    expect(calls.create[0].params).toMatchObject({
+      metadata: { organizationId: 'org-new' },
+    });
+    expect(result.url).toContain('accounts.stripe.com');
   });
 
   it('creates a recipient-only Express account, claims it, and links onboarding', async () => {

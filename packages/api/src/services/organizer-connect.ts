@@ -12,6 +12,7 @@ import type {
   ConnectState,
 } from '../contracts/payouts';
 import { NotFoundError, UnauthorizedError } from './_shared/errors';
+import { ensureOrganizationForUser } from './organizations';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const ORG_SELECT = {
@@ -111,19 +112,35 @@ export async function getConnectSetup(
   };
 }
 
+/**
+ * A payouts visit can come before the first event, which is what otherwise
+ * provisions the Organization (organizer-event-write). Connecting a bank is
+ * as good a first act as creating an event, so `provision` does the same.
+ */
 async function ownedOrg(
   prisma: PrismaClient,
-  actor: Actor
+  actor: Actor,
+  opts: { provision?: boolean } = {}
 ): Promise<ConnectOrg> {
   if (actor.kind !== 'user') {
     throw new UnauthorizedError('Sign in to manage payouts');
   }
-  const org = await prisma.organization.findFirst({
-    where: { ownerUserId: actor.userId },
-    select: ORG_SELECT,
+  const select = { where: { ownerUserId: actor.userId }, select: ORG_SELECT };
+  const org = await prisma.organization.findFirst(select);
+  if (org) return org;
+  if (!opts.provision) throw new NotFoundError('Organization not found');
+
+  const user = await prisma.users.findUnique({
+    where: { id: actor.userId },
+    select: { email: true },
   });
-  if (!org) throw new NotFoundError('Organization not found');
-  return org;
+  await ensureOrganizationForUser(prisma, {
+    ownerUserId: actor.userId,
+    displayName: user?.email ?? '',
+  });
+  const created = await prisma.organization.findFirst(select);
+  if (!created) throw new NotFoundError('Organization not found');
+  return created;
 }
 
 function onboardingLink(
@@ -197,7 +214,7 @@ export async function startStripeOnboarding(
   actor: Actor,
   input: { baseUrl: string }
 ): Promise<{ url: string }> {
-  const org = await ownedOrg(prisma, actor);
+  const org = await ownedOrg(prisma, actor, { provision: true });
   const accountId =
     org.stripeAccountId ?? (await createRecipientAccount(prisma, stripe, org));
   const link = await stripe.v2.core.accountLinks.create(
