@@ -7,7 +7,7 @@ import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import { stripe } from '@/server/lib/stripe';
 import { isFlagEnabled } from '@/server/lib/featureFlags';
-import { getAppBaseUrl } from '@/lib/appUrl';
+import { getRequestOrigin } from '@/server/lib/requestOrigin';
 import {
   cancelPayoutRequestInputSchema,
   FeatureFlag,
@@ -97,7 +97,7 @@ export async function startStripeOnboarding(): Promise<ActionResult> {
       prisma,
       stripe,
       userToActor(user),
-      { baseUrl: getAppBaseUrl() }
+      { baseUrl: await getRequestOrigin() }
     ));
   } catch (error) {
     return failure(error, 'Could not start Stripe setup. Please try again.');

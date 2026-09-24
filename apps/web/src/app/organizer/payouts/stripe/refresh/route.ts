@@ -4,7 +4,7 @@ import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
-import { getAppBaseUrl } from '@/lib/appUrl';
+import { getRequestOrigin } from '@/server/lib/requestOrigin';
 
 /** An expired or reused Account Link lands here and gets a fresh one. */
 export const runtime = 'nodejs';
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
       prisma,
       stripe,
       userToActor(user),
-      { baseUrl: getAppBaseUrl() }
+      { baseUrl: await getRequestOrigin() }
     );
     if (url) return NextResponse.redirect(url);
   } catch (err) {
