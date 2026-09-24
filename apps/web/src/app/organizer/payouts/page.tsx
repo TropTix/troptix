@@ -73,7 +73,6 @@ export default async function OrganizerPayoutsPage({
     bankLinked,
     complete: payouts.setup.meetingDone && bankLinked,
   };
-  const writableConnect = readOnly ? null : connect;
   const returnOutcome = connectReturnOutcomeSchema.safeParse(stripeParam);
 
   const holdbackLine = policy.releaseAtSale
@@ -104,7 +103,11 @@ export default async function OrganizerPayoutsPage({
       {tab === 'overview' && (
         <>
           {!setup.complete && (
-            <SetupChecklistCard setup={setup} connect={writableConnect} />
+            <SetupChecklistCard
+              setup={setup}
+              connect={connect}
+              readOnly={readOnly}
+            />
           )}
 
           <section className="grid gap-4 sm:grid-cols-3">
@@ -132,28 +135,37 @@ export default async function OrganizerPayoutsPage({
             />
           </section>
 
-          {setup.complete && writableConnect?.state === 'needs_updates' && (
-            <Alert variant="warning">
-              <AlertTriangle />
-              <AlertTitle>Stripe needs updated information</AlertTitle>
-              <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-                <span>
-                  You can still request a payout, but we can&apos;t send it
-                  until Stripe is satisfied.
-                </span>
-                <StripeActionButton action="onboarding" size="sm">
-                  Update with Stripe
-                </StripeActionButton>
-              </AlertDescription>
-            </Alert>
-          )}
+          {!readOnly &&
+            setup.complete &&
+            connect?.state === 'needs_updates' && (
+              <Alert variant="warning">
+                <AlertTriangle />
+                <AlertTitle>Stripe needs updated information</AlertTitle>
+                <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                  <span>
+                    You can still request a payout, but we can&apos;t send it
+                    until Stripe is satisfied.
+                  </span>
+                  <StripeActionButton action="onboarding" size="sm">
+                    Update with Stripe
+                  </StripeActionButton>
+                </AlertDescription>
+              </Alert>
+            )}
 
           <RequestPayoutCard
             availableCents={payouts.availableCents}
             setupComplete={setup.complete}
             hasOpenRequest={Boolean(openRequest)}
             holdbackLine={holdbackLine}
-            readOnly={readOnly}
+            action={
+              !readOnly && (
+                <RequestPayoutDialog
+                  availableCents={payouts.availableCents}
+                  disabled={!canRequest}
+                />
+              )
+            }
           />
         </>
       )}
@@ -182,9 +194,9 @@ export default async function OrganizerPayoutsPage({
       {tab === 'settings' && (
         <PayoutSettings
           setup={setup}
-          connect={writableConnect}
+          connect={connect}
+          readOnly={readOnly}
           holdbackLine={holdbackLine}
-          viaStripe={Boolean(connect?.accountId)}
         />
       )}
     </div>

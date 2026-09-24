@@ -3,6 +3,7 @@ import type { ConnectSetup, PayoutSetupState } from '@troptix/api';
 
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -21,22 +22,22 @@ export function setupStepsDone(setup: PayoutSetupState) {
 export function SetupChecklistCard({
   setup,
   connect,
+  readOnly,
 }: {
   setup: PayoutSetupState;
   connect: ConnectSetup | null;
+  readOnly: boolean;
 }) {
   const done = setupStepsDone(setup);
   return (
     <Card>
-      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1.5">
-          <CardTitle className="text-base">Set up payouts</CardTitle>
-          <CardDescription>
-            Two steps with the TropTix team unlock payout requests. Your
-            balances are already tracked below.
-          </CardDescription>
-        </div>
-        <div className="flex shrink-0 flex-col gap-1.5 sm:items-end">
+      <CardHeader>
+        <CardTitle className="text-base">Set up payouts</CardTitle>
+        <CardDescription>
+          Two steps with the TropTix team unlock payout requests. Your balances
+          are already tracked below.
+        </CardDescription>
+        <CardAction className="flex flex-col items-end gap-1.5">
           <span className="text-xs text-muted-foreground">
             {done} of {SETUP_STEP_COUNT} done
           </span>
@@ -44,7 +45,7 @@ export function SetupChecklistCard({
             value={(done / SETUP_STEP_COUNT) * 100}
             className="h-1.5 w-36"
           />
-        </div>
+        </CardAction>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2">
         <StepCard
@@ -71,7 +72,7 @@ export function SetupChecklistCard({
           active={setup.meetingDone && !setup.bankLinked}
           title="Connect your bank account"
         >
-          <BankStep setup={setup} connect={connect} />
+          <BankStep setup={setup} connect={connect} readOnly={readOnly} />
         </StepCard>
       </CardContent>
     </Card>

@@ -6,47 +6,45 @@ import { StripeActionButton } from './StripeActionButton';
 
 /**
  * The bank step's copy and action, derived live from Stripe (plan decision
- * 4). `connect` is null when the Stripe rail is off for this viewer or the
- * page is read-only; the step then shows the manual-rail copy only.
+ * 4). `connect` is null when the Stripe rail is off for this viewer; the step
+ * then shows the manual-rail copy only. `readOnly` keeps the copy and drops
+ * the actions, which would act on the viewer's own organization.
  */
 export function BankStep({
   setup,
   connect,
+  readOnly = false,
   showDashboard = false,
 }: {
   setup: PayoutSetupState;
   connect: ConnectSetup | null;
+  readOnly?: boolean;
   showDashboard?: boolean;
 }) {
-  if (setup.bankLinked) {
-    if (!connect?.accountId) {
+  if (!connect || connect.state === 'manual') {
+    if (setup.bankLinked) {
       return (
         <p>
           Your bank details are held at our bank — TropTix never stores them.
         </p>
       );
     }
+    if (!connect || readOnly) {
+      return (
+        <p>
+          Your bank details are collected during setup and held at our bank —
+          TropTix never stores them.
+        </p>
+      );
+    }
     return (
       <div className="space-y-2">
         <p>
-          Connected through Stripe. Payouts land in your bank on Stripe&apos;s
-          schedule, usually within two business days of our sending.
+          Add your bank securely through Stripe — TropTix never stores your
+          details.
         </p>
-        {showDashboard && (
-          <StripeActionButton action="dashboard" variant="outline" size="sm">
-            Open Stripe dashboard
-          </StripeActionButton>
-        )}
+        <ConnectBankDialog />
       </div>
-    );
-  }
-
-  if (!connect) {
-    return (
-      <p>
-        Your bank details are collected during setup and held at our bank —
-        TropTix never stores them.
-      </p>
     );
   }
 
@@ -68,35 +66,38 @@ export function BankStep({
       );
     case 'active':
       return (
-        <p>
-          Stripe has verified your account. This step will show as done shortly.
-        </p>
+        <div className="space-y-2">
+          <p>
+            Connected through Stripe. Payouts land in your bank on Stripe&apos;s
+            schedule, usually within two business days of our sending.
+          </p>
+          {showDashboard && !readOnly && (
+            <StripeActionButton action="dashboard" variant="outline" size="sm">
+              Open Stripe dashboard
+            </StripeActionButton>
+          )}
+        </div>
       );
     case 'in_progress':
       return (
         <div className="space-y-2">
           <p>Stripe still needs a few details from you.</p>
-          <StripeActionButton action="onboarding" size="sm">
-            Finish setting up with Stripe
-          </StripeActionButton>
+          {!readOnly && (
+            <StripeActionButton action="onboarding" size="sm">
+              Finish setting up with Stripe
+            </StripeActionButton>
+          )}
         </div>
       );
     case 'needs_updates':
       return (
         <div className="space-y-2">
           <p>Stripe needs updated information before payouts can continue.</p>
-          <StripeActionButton action="onboarding" size="sm">
-            Update with Stripe
-          </StripeActionButton>
-        </div>
-      );
-    case 'manual':
-      return (
-        <div className="space-y-2">
-          <p>
-            Added securely through Stripe — TropTix never stores your details.
-          </p>
-          <ConnectBankDialog />
+          {!readOnly && (
+            <StripeActionButton action="onboarding" size="sm">
+              Update with Stripe
+            </StripeActionButton>
+          )}
         </div>
       );
   }

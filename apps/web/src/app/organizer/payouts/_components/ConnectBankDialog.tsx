@@ -62,14 +62,16 @@ export function ConnectBankDialog({
           </legend>
           <div className="grid gap-2 sm:grid-cols-2">
             <CountryOption
+              value="us"
               selected={country === 'us'}
-              onSelect={() => setCountry('us')}
+              onSelect={setCountry}
               title="United States"
               description="Set up through Stripe in about five minutes."
             />
             <CountryOption
+              value="other"
               selected={country === 'other'}
-              onSelect={() => setCountry('other')}
+              onSelect={setCountry}
               title="Jamaica or elsewhere"
               description="We set this up together."
             />
@@ -121,29 +123,35 @@ export function ConnectBankDialog({
 }
 
 function CountryOption({
+  value,
   selected,
   onSelect,
   title,
   description,
 }: {
+  value: Country;
   selected: boolean;
-  onSelect: () => void;
+  onSelect: (country: Country) => void;
   title: string;
   description: string;
 }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={onSelect}
+    <label
       className={cn(
-        'flex items-start gap-3 rounded-lg border p-3 text-left transition-colors',
+        'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2',
         selected
           ? 'border-primary bg-primary/5 ring-1 ring-primary'
           : 'border-input hover:bg-accent'
       )}
     >
+      <input
+        type="radio"
+        name="bank-country"
+        value={value}
+        checked={selected}
+        onChange={() => onSelect(value)}
+        className="sr-only"
+      />
       <span
         className={cn(
           'mt-0.5 size-4 shrink-0 rounded-full border',
@@ -154,7 +162,7 @@ function CountryOption({
         <span className="text-sm font-medium">{title}</span>
         <span className="text-xs text-muted-foreground">{description}</span>
       </span>
-    </button>
+    </label>
   );
 }
 

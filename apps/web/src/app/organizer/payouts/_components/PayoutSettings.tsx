@@ -9,41 +9,49 @@ import {
 import type { ConnectSetup, PayoutSetupState } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { BankStep } from './BankStep';
 import { SETUP_STEP_COUNT, setupStepsDone } from './SetupChecklistCard';
 
 export function PayoutSettings({
   setup,
   connect,
+  readOnly,
   holdbackLine,
-  viaStripe,
 }: {
   setup: PayoutSetupState;
   connect: ConnectSetup | null;
+  readOnly: boolean;
   holdbackLine: string;
-  viaStripe: boolean;
 }) {
   const done = setupStepsDone(setup);
+  const viaStripe = Boolean(connect?.accountId);
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       <Card className="gap-0 py-0">
-        <CardHeader className="flex flex-row items-start justify-between gap-4 border-b py-6">
-          <div className="space-y-1.5">
-            <CardTitle className="text-base">Payout requirements</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {setup.complete
-                ? 'All set. You can request payouts any time you have a balance.'
-                : 'Two steps with the TropTix team unlock payout requests.'}
-            </p>
-          </div>
-          {setup.complete ? (
-            <Badge className="bg-success/10 text-success">Payouts on</Badge>
-          ) : (
-            <Badge variant="outline">
-              {done} of {SETUP_STEP_COUNT}
-            </Badge>
-          )}
+        <CardHeader className="border-b py-6">
+          <CardTitle className="text-base">Payout requirements</CardTitle>
+          <CardDescription>
+            {setup.complete
+              ? 'All set. You can request payouts any time you have a balance.'
+              : 'Two steps with the TropTix team unlock payout requests.'}
+          </CardDescription>
+          <CardAction>
+            {setup.complete ? (
+              <Badge className="bg-success/10 text-success">Payouts on</Badge>
+            ) : (
+              <Badge variant="outline">
+                {done} of {SETUP_STEP_COUNT}
+              </Badge>
+            )}
+          </CardAction>
         </CardHeader>
         <Requirement done={setup.meetingDone} title="Meet with TropTix">
           {setup.meetingDone ? (
@@ -61,7 +69,12 @@ export function PayoutSettings({
           )}
         </Requirement>
         <Requirement done={setup.bankLinked} title="Bank account" last>
-          <BankStep setup={setup} connect={connect} showDashboard />
+          <BankStep
+            setup={setup}
+            connect={connect}
+            readOnly={readOnly}
+            showDashboard
+          />
         </Requirement>
       </Card>
 

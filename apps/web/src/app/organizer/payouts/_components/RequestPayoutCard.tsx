@@ -1,23 +1,23 @@
 import {
   Card,
+  CardAction,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { RequestPayoutDialog } from './RequestPayoutDialog';
 
 export function RequestPayoutCard({
   availableCents,
   setupComplete,
   hasOpenRequest,
   holdbackLine,
-  readOnly,
+  action,
 }: {
   availableCents: number;
   setupComplete: boolean;
   hasOpenRequest: boolean;
   holdbackLine: string;
-  readOnly: boolean;
+  action?: React.ReactNode;
 }) {
   const line = !setupComplete
     ? 'Finish payout setup to request your balance.'
@@ -29,17 +29,10 @@ export function RequestPayoutCard({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div className="space-y-1.5">
-          <CardTitle className="text-base">Request a payout</CardTitle>
-          <CardDescription>{line}</CardDescription>
-        </div>
-        {!readOnly && (
-          <RequestPayoutDialog
-            availableCents={availableCents}
-            disabled={!setupComplete || hasOpenRequest || availableCents <= 0}
-          />
-        )}
+      <CardHeader>
+        <CardTitle className="text-base">Request a payout</CardTitle>
+        <CardDescription>{line}</CardDescription>
+        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
     </Card>
   );

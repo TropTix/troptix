@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, type ComponentProps } from 'react';
-import { useTransition } from 'react';
+import { useState, useTransition, type ComponentProps } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -63,10 +62,7 @@ export function RequestPayoutDialog({
   });
 
   const amount = form.watch('amount');
-  const amountCents = Math.min(
-    Math.round(Number(amount || 0) * 100),
-    availableCents
-  );
+  const amountCents = Math.round(Number(amount || 0) * 100);
 
   const onOpenChange = (next: boolean) => {
     if (next) {
@@ -116,11 +112,11 @@ export function RequestPayoutDialog({
                   <FormLabel>
                     Amount (up to {formatCents(availableCents)})
                   </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
-                        $
-                      </span>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
+                      $
+                    </span>
+                    <FormControl>
                       <Input
                         type="number"
                         inputMode="decimal"
@@ -130,19 +126,19 @@ export function RequestPayoutDialog({
                         className="px-7 pr-14"
                         {...field}
                       />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          form.setValue('amount', availableCents / 100, {
-                            shouldValidate: true,
-                          })
-                        }
-                        className="absolute inset-y-0 right-3 text-[13px] font-medium text-primary hover:underline"
-                      >
-                        Max
-                      </button>
-                    </div>
-                  </FormControl>
+                    </FormControl>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        form.setValue('amount', availableCents / 100, {
+                          shouldValidate: true,
+                        })
+                      }
+                      className="absolute inset-y-0 right-3 text-[13px] font-medium text-primary hover:underline"
+                    >
+                      Max
+                    </button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
