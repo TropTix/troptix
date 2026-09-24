@@ -92,11 +92,18 @@ export async function getConnectStates(
   return Object.fromEntries(entries);
 }
 
+/**
+ * Verification can finish after the organizer has already returned, and a
+ * preview deploy receives no webhooks, so the page read is the third place
+ * that may see `active` first. It stamps the gate too, unless the viewer is
+ * only looking through View-as.
+ */
 export async function getConnectSetup(
   prisma: PrismaClient,
   stripe: Stripe,
   actor: Actor,
-  input: { viewAsOrganizerUserId?: string } = {}
+  input: { viewAsOrganizerUserId?: string } = {},
+  now: Date = new Date()
 ): Promise<ConnectSetup> {
   const organizerUserId = await resolveOrganizerScope(
     prisma,
@@ -105,13 +112,15 @@ export async function getConnectSetup(
   );
   const org = await prisma.organization.findFirst({
     where: { ownerUserId: organizerUserId },
-    select: { stripeAccountId: true, payoutBankLinkedAt: true },
+    select: { id: true, stripeAccountId: true, payoutBankLinkedAt: true },
   });
   if (!org) return { accountId: null, state: 'manual' };
-  return {
-    accountId: org.stripeAccountId,
-    state: await readConnectState(stripe, org),
-  };
+  const state = await readConnectState(stripe, org);
+  const viewing = actor.kind === 'user' && organizerUserId !== actor.userId;
+  if (state === 'active' && org.payoutBankLinkedAt === null && !viewing) {
+    await stampBankLinked(prisma, org.id, now);
+  }
+  return { accountId: org.stripeAccountId, state };
 }
 
 /**

@@ -59,7 +59,14 @@ export default async function OrganizerPayoutsPage({
         })
       : Promise.resolve(null),
   ]);
-  const { setup, policy } = payouts;
+  const { policy } = payouts;
+  // The Connect read may have just stamped the gate; reflect it in this render.
+  const bankLinked = payouts.setup.bankLinked || connect?.state === 'active';
+  const setup = {
+    ...payouts.setup,
+    bankLinked,
+    complete: payouts.setup.meetingDone && bankLinked,
+  };
   const returnOutcome = connectReturnOutcomeSchema.safeParse(stripeParam);
 
   const holdbackLine = policy.releaseAtSale

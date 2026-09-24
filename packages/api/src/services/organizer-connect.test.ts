@@ -189,6 +189,30 @@ describe('getConnectSetup', () => {
       state: 'active',
     });
   });
+
+  it('stamps the gate when it is the first to see the account active', async () => {
+    const { prisma, updateMany } = fakePrisma({ stripeAccountId: 'acct_1' });
+    const { stripe } = fakeStripe({ status: 'active' });
+    await getConnectSetup(prisma, stripe, OWNER, {}, NOW);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 'org-1', payoutBankLinkedAt: null },
+      data: { payoutBankLinkedAt: NOW },
+    });
+  });
+
+  it.each([
+    [
+      'already linked',
+      { stripeAccountId: 'acct_1', payoutBankLinkedAt: NOW },
+      'active',
+    ],
+    ['still pending', { stripeAccountId: 'acct_1' }, 'pending'],
+  ] as const)('does not stamp when %s', async (_, org, status) => {
+    const { prisma, updateMany } = fakePrisma(org);
+    const { stripe } = fakeStripe({ status });
+    await getConnectSetup(prisma, stripe, OWNER, {}, NOW);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
 });
 
 describe('startStripeOnboarding', () => {
