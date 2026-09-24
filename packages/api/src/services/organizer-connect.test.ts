@@ -280,6 +280,20 @@ describe('startStripeOnboarding', () => {
     });
   });
 
+  it('leaves the business URL to the form when the app runs on http', async () => {
+    const { prisma } = fakePrisma();
+    const { stripe, calls } = fakeStripe();
+
+    await startStripeOnboarding(prisma, stripe, OWNER, {
+      baseUrl: 'http://localhost:3000',
+    });
+
+    const params = calls.create[0].params as {
+      defaults: { profile?: unknown };
+    };
+    expect(params.defaults.profile).toBeUndefined();
+  });
+
   it('reuses an existing account without creating another', async () => {
     const { prisma, updateMany } = fakePrisma({ stripeAccountId: 'acct_have' });
     const { stripe, calls } = fakeStripe();

@@ -180,6 +180,11 @@ async function createRecipientAccount(
   org: ConnectOrg,
   baseUrl: string
 ): Promise<string> {
+  // Stripe rejects localhost as a business URL (url_invalid), so local dev
+  // leaves the field for the form to collect.
+  const profile = baseUrl.startsWith('https://')
+    ? { business_url: `${baseUrl}/o/${org.slug}` }
+    : undefined;
   const account = await stripe.v2.core.accounts.create(
     {
       display_name: org.displayName,
@@ -191,7 +196,7 @@ async function createRecipientAccount(
           fees_collector: 'application',
           losses_collector: 'application',
         },
-        profile: { business_url: `${baseUrl}/o/${org.slug}` },
+        ...(profile ? { profile } : {}),
       },
       configuration: {
         recipient: {
