@@ -620,7 +620,9 @@ Two plans follow this one. Neither changes anything these two PRs build.
 **The Global Payouts rail for Jamaica** (cleared with counsel 2026-09-22):
 
 - Treasury activation and a financial account funded from the payments
-  balance on a recurring schedule.
+  balance on a recurring schedule. The sandbox already has one; see
+  [the 2026-09-24 audit](../audits/2026-09-24-stripe-connect-account-shapes.md),
+  which also shows a Jamaican recipient accepted on the preview API version.
 - A recipient account per Jamaican Organization: the same v2 account with a
   `recipient` configuration, `bank_accounts.local` requested, onboarded
   through the same Account Links flow and the same events as Connect; the
