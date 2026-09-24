@@ -325,7 +325,7 @@ async function labAccounts(): Promise<
       });
     }
   }
-  return [...found.values()];
+  return Array.from(found.values());
 }
 
 async function list(): Promise<void> {
