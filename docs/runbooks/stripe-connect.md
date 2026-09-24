@@ -49,14 +49,15 @@ gate on its own, so the click-through still reaches the right end state.
 
 1. Turn the `stripe-connect-onboarding` flag on for your account (release
    condition on your email; never globally).
-2. `/organizer/payouts` → "Connect your bank account" → United States →
-   **Connect with Stripe**.
+2. `/organizer/payouts` → **Connect bank** → United States → **Continue with
+   Stripe**.
 3. In Stripe's form use the test data: SMS code `000-000`, date of birth
    `1901-01-01`, ID number `000000000`, address line 1 `address_full_match`,
    bank routing `110000000`, account `000123456789`.
 4. Back on the payouts page the banner reads "connected" (or "reviewing" if
    Stripe is still verifying; the webhook stamps the step when it flips).
-5. **Open Stripe dashboard** signs in with SMS code `000-000` in the sandbox.
+5. Settings tab → **Open Stripe dashboard** signs in with SMS code `000-000`
+   in the sandbox.
 6. Platform Payouts → the organization's row shows "Stripe · acct\_… ·
    active" with a link into the Stripe Dashboard.
 

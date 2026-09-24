@@ -1,10 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { getConnectSetup, getPayouts } from '@troptix/api/server';
 import { connectReturnOutcomeSchema, FeatureFlag } from '@troptix/api';
-import { Banknote, Clock, Wallet } from 'lucide-react';
+import { AlertTriangle, Banknote, Clock, Wallet } from 'lucide-react';
 import { isFlagEnabled } from '@/server/lib/featureFlags';
 import { getServerUser } from '@/server/authUser';
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Card,
   CardContent,
@@ -17,15 +18,19 @@ import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { ConnectReturnBanner } from './_components/ConnectReturnBanner';
-import { ConnectStatusCard } from './_components/ConnectStatusCard';
+import { OpenRequestCard } from './_components/OpenRequestCard';
+import { PayoutSettings } from './_components/PayoutSettings';
+import { parsePayoutTab, PayoutsTabs } from './_components/PayoutsTabs';
 import { RequestPayoutCard } from './_components/RequestPayoutCard';
+import { RequestPayoutDialog } from './_components/RequestPayoutDialog';
 import { RequestsTable } from './_components/RequestsTable';
 import { SetupChecklistCard } from './_components/SetupChecklistCard';
+import { StripeActionButton } from './_components/StripeActionButton';
 
 export default async function OrganizerPayoutsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ viewAs?: string; stripe?: string }>;
+  searchParams: Promise<{ viewAs?: string; stripe?: string; tab?: string }>;
 }) {
   const user = await getServerUser();
   if (!user) {
@@ -43,7 +48,8 @@ export default async function OrganizerPayoutsPage({
   }
   const actor = userToActor(user);
 
-  const { viewAs, stripe: stripeParam } = await searchParams;
+  const { viewAs, stripe: stripeParam, tab: tabParam } = await searchParams;
+  const tab = parsePayoutTab(tabParam);
 
   // Writes never take a View-as target (the seam's rule), so the write
   // controls disappear when viewing another organizer — they would act on the
@@ -67,61 +73,120 @@ export default async function OrganizerPayoutsPage({
     bankLinked,
     complete: payouts.setup.meetingDone && bankLinked,
   };
+  const writableConnect = readOnly ? null : connect;
   const returnOutcome = connectReturnOutcomeSchema.safeParse(stripeParam);
 
   const holdbackLine = policy.releaseAtSale
     ? `Earnings are available as tickets sell; ${policy.holdbackPercent}% is held until ${policy.holdbackDays} days after each event ends.`
     : `Earnings become available when an event ends; ${policy.holdbackPercent}% is held for ${policy.holdbackDays} more days.`;
 
-  const hasOpenRequest = payouts.requests.some(
+  const openRequest = payouts.requests.find(
     (request) => request.status === 'REQUESTED'
   );
+  const canRequest =
+    !readOnly && setup.complete && !openRequest && payouts.availableCents > 0;
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight">Payouts</h1>
+      <div className="space-y-4">
+        <h1 className="text-3xl font-bold tracking-tight">Payouts</h1>
+        <PayoutsTabs
+          active={tab}
+          openRequests={openRequest ? 1 : 0}
+          viewAs={viewAs}
+        />
+      </div>
 
       {connect && returnOutcome.success && (
         <ConnectReturnBanner outcome={returnOutcome.data} />
       )}
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Available"
-          value={formatCents(payouts.availableCents)}
-          hint="Ready to request now"
-          icon={<Wallet className="h-5 w-5 text-muted-foreground" />}
-        />
-        <StatCard
-          label="Pending"
-          value={formatCents(payouts.pendingCents)}
-          hint={holdbackLine}
-          icon={<Clock className="h-5 w-5 text-muted-foreground" />}
-        />
-        <StatCard
-          label="Paid out"
-          value={formatCents(payouts.paidOutCents)}
-          hint="All time"
-          icon={<Banknote className="h-5 w-5 text-muted-foreground" />}
-        />
-      </section>
+      {tab === 'overview' && (
+        <>
+          {!setup.complete && (
+            <SetupChecklistCard setup={setup} connect={writableConnect} />
+          )}
 
-      {setup.complete ? (
-        !readOnly && (
-          <>
-            {connect && <ConnectStatusCard state={connect.state} />}
-            <RequestPayoutCard
-              availableCents={payouts.availableCents}
-              hasOpenRequest={hasOpenRequest}
-              holdbackLine={holdbackLine}
+          <section className="grid gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Available"
+              value={formatCents(payouts.availableCents)}
+              hint={
+                openRequest
+                  ? `${formatCents(openRequest.amountCents)} is in an open request`
+                  : 'Ready to request now'
+              }
+              icon={<Wallet className="h-5 w-5 text-muted-foreground" />}
             />
-          </>
-        )
-      ) : (
-        <SetupChecklistCard setup={setup} connect={readOnly ? null : connect} />
+            <StatCard
+              label="Pending"
+              value={formatCents(payouts.pendingCents)}
+              hint={holdbackLine}
+              icon={<Clock className="h-5 w-5 text-muted-foreground" />}
+            />
+            <StatCard
+              label="Paid out"
+              value={formatCents(payouts.paidOutCents)}
+              hint="All time"
+              icon={<Banknote className="h-5 w-5 text-muted-foreground" />}
+            />
+          </section>
+
+          {setup.complete && writableConnect?.state === 'needs_updates' && (
+            <Alert variant="warning">
+              <AlertTriangle />
+              <AlertTitle>Stripe needs updated information</AlertTitle>
+              <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                <span>
+                  You can still request a payout, but we can&apos;t send it
+                  until Stripe is satisfied.
+                </span>
+                <StripeActionButton action="onboarding" size="sm">
+                  Update with Stripe
+                </StripeActionButton>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <RequestPayoutCard
+            availableCents={payouts.availableCents}
+            setupComplete={setup.complete}
+            hasOpenRequest={Boolean(openRequest)}
+            holdbackLine={holdbackLine}
+            readOnly={readOnly}
+          />
+        </>
       )}
 
-      <RequestsTable requests={payouts.requests} readOnly={readOnly} />
+      {tab === 'requests' && (
+        <>
+          {openRequest && (
+            <OpenRequestCard request={openRequest} readOnly={readOnly} />
+          )}
+          <RequestsTable
+            requests={payouts.requests}
+            readOnly={readOnly}
+            action={
+              !readOnly && (
+                <RequestPayoutDialog
+                  availableCents={payouts.availableCents}
+                  disabled={!canRequest}
+                  size="sm"
+                />
+              )
+            }
+          />
+        </>
+      )}
+
+      {tab === 'settings' && (
+        <PayoutSettings
+          setup={setup}
+          connect={writableConnect}
+          holdbackLine={holdbackLine}
+          viaStripe={Boolean(connect?.accountId)}
+        />
+      )}
     </div>
   );
 }

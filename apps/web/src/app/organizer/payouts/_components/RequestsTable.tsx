@@ -35,14 +35,17 @@ const STATUS_LABELS = {
 export function RequestsTable({
   requests,
   readOnly = false,
+  action,
 }: {
   requests: OrganizerPayoutRequest[];
   readOnly?: boolean;
+  action?: React.ReactNode;
 }) {
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
         <CardTitle className="text-base">Payout requests</CardTitle>
+        {action}
       </CardHeader>
       <CardContent>
         {requests.length === 0 ? (
