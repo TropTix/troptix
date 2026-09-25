@@ -106,6 +106,10 @@ Event times are venue-local and render through the shared formatter. Operational
 
 `POST /api/cron/expire-reservations` releases expired ticket holds. A Supabase `pg_cron` job calls it with the `CRON_SECRET` bearer token. Setup and checks are in [docs/runbooks/expire-reservations-cron.md](../../docs/runbooks/expire-reservations-cron.md).
 
+## Deploys
+
+Vercel builds production on every merge to `main`. Before a preview build, Vercel runs `scripts/vercel-ignore-build.sh` and skips the build when nothing the web build reads has changed since the branch's last successful deploy. Changes limited to `docs/`, `supabase/`, `apps/mobile`, `apps/organizer`, `.github/`, Markdown, or test files get no new preview. A branch's first push always builds. Put `[skip preview]` in a commit message to skip on purpose. To build anyway, use **Redeploy** in the Vercel dashboard and untick "Use project's Ignore Build Step".
+
 ## More
 
 - [docs/](../../docs) for the roadmap, ADRs, plans, and runbooks
