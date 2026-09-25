@@ -13,9 +13,8 @@ export const payoutRailSchema = z.enum(['MERCURY', 'STRIPE', 'OTHER']);
 export type PayoutRailDto = z.infer<typeof payoutRailSchema>;
 
 /**
- * What Stripe says about the Organization's account right now, read live at
- * the moments that need it (never cached). `manual` = no account; `unavailable`
- * = Stripe could not be reached, which is never a state to act on.
+ * The Organization's Stripe account as last mirrored from Stripe (ADR 0032).
+ * `manual` = no account.
  */
 export const connectStateSchema = z.enum([
   'manual',
@@ -23,7 +22,6 @@ export const connectStateSchema = z.enum([
   'pending',
   'active',
   'needs_updates',
-  'unavailable',
 ]);
 export type ConnectState = z.infer<typeof connectStateSchema>;
 
@@ -141,6 +139,7 @@ export const payoutOrganizationSchema = z.object({
   payoutMeetingAt: z.string().datetime().nullable(),
   payoutBankLinkedAt: z.string().datetime().nullable(),
   stripeAccountId: z.string().nullable(),
+  stripeTransfersStatus: z.string().nullable(),
   setup: payoutSetupStateSchema,
   policy: payoutPolicySchema,
   /** The raw overrides — null means the org follows the platform default. */

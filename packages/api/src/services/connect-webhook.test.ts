@@ -34,39 +34,47 @@ function notification(type: string, status?: string, id = 'acct_1') {
 
 function fakePrisma(orgId: string | null = 'org-1') {
   const findUnique = vi.fn().mockResolvedValue(orgId ? { id: orgId } : null);
+  const update = vi.fn().mockResolvedValue({ id: orgId });
   const updateMany = vi.fn().mockResolvedValue({ count: 1 });
   const prisma = {
-    organization: { findUnique, updateMany },
+    organization: { findUnique, update, updateMany },
   } as unknown as PrismaClient;
-  return { prisma, findUnique, updateMany };
+  return { prisma, findUnique, update, updateMany };
 }
 
 describe('handleConnectEvent', () => {
   it('ignores event types it is not subscribed to without fetching', async () => {
-    const { prisma, updateMany } = fakePrisma();
+    const { prisma, update, updateMany } = fakePrisma();
     const { notification: n, fetchRelatedObject } = notification(
       'v2.core.account.updated',
       'active'
     );
     await expect(handleConnectEvent(prisma, n, NOW)).resolves.toBe('ignored');
     expect(fetchRelatedObject).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
     expect(updateMany).not.toHaveBeenCalled();
   });
 
-  it.each(['pending', 'restricted', undefined])(
-    'does nothing while transfers are %s',
-    async (status) => {
-      const { prisma, updateMany } = fakePrisma();
+  it.each([
+    ['pending', 'pending'],
+    ['restricted', 'restricted'],
+    [undefined, null],
+  ] as const)(
+    'records transfers %s without stamping the gate',
+    async (status, stored) => {
+      const { prisma, update, updateMany } = fakePrisma();
       const { notification: n } = notification(CAPABILITY_EVENT, status);
-      await expect(handleConnectEvent(prisma, n, NOW)).resolves.toBe(
-        'not_active'
-      );
+      await expect(handleConnectEvent(prisma, n, NOW)).resolves.toBe('synced');
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'org-1' },
+        data: { stripeTransfersStatus: stored },
+      });
       expect(updateMany).not.toHaveBeenCalled();
     }
   );
 
   it('acknowledges an account no organization holds', async () => {
-    const { prisma, findUnique, updateMany } = fakePrisma(null);
+    const { prisma, findUnique, update, updateMany } = fakePrisma(null);
     const { notification: n } = notification(CAPABILITY_EVENT, 'active');
     await expect(handleConnectEvent(prisma, n, NOW)).resolves.toBe(
       'unknown_account'
@@ -75,15 +83,20 @@ describe('handleConnectEvent', () => {
       where: { stripeAccountId: 'acct_1' },
       select: { id: true },
     });
+    expect(update).not.toHaveBeenCalled();
     expect(updateMany).not.toHaveBeenCalled();
   });
 
   it.each([CAPABILITY_EVENT, 'v2.core.account[requirements].updated'])(
-    'stamps the gate once when %s reports transfers active',
+    'records active and stamps the gate once when %s reports it',
     async (type) => {
-      const { prisma, updateMany } = fakePrisma('org-9');
+      const { prisma, update, updateMany } = fakePrisma('org-9');
       const { notification: n } = notification(type, 'active');
-      await expect(handleConnectEvent(prisma, n, NOW)).resolves.toBe('stamped');
+      await expect(handleConnectEvent(prisma, n, NOW)).resolves.toBe('synced');
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'org-9' },
+        data: { stripeTransfersStatus: 'active' },
+      });
       expect(updateMany).toHaveBeenCalledWith({
         where: { id: 'org-9', payoutBankLinkedAt: null },
         data: { payoutBankLinkedAt: NOW },

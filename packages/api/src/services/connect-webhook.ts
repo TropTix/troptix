@@ -1,16 +1,13 @@
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
-import { stampBankLinked, transfersStatus } from './organizer-connect';
+import { recordTransfersStatus, transfersStatus } from './organizer-connect';
 
-export type ConnectEventOutcome =
-  | 'stamped'
-  | 'not_active'
-  | 'unknown_account'
-  | 'ignored';
+export type ConnectEventOutcome = 'synced' | 'unknown_account' | 'ignored';
 
 /**
- * Thin events carry only ids, so the account is fetched fresh; the only fact
- * this handler records is "transfers went active", and only once.
+ * Thin events carry only ids, so the account is fetched fresh. Every
+ * subscribed event mirrors the transfers status into the row, in both
+ * directions; the gate stamps once when it reads active.
  */
 export async function handleConnectEvent(
   prisma: PrismaClient,
@@ -26,14 +23,12 @@ export async function handleConnectEvent(
   }
 
   const account = await notification.fetchRelatedObject();
-  if (transfersStatus(account) !== 'active') return 'not_active';
-
   const org = await prisma.organization.findUnique({
     where: { stripeAccountId: account.id },
     select: { id: true },
   });
   if (!org) return 'unknown_account';
 
-  await stampBankLinked(prisma, org.id, now);
-  return 'stamped';
+  await recordTransfersStatus(prisma, org.id, transfersStatus(account), now);
+  return 'synced';
 }

@@ -42,12 +42,12 @@ builds. It does not touch the ledger, the request lifecycle, or the rails.
 Four steps. Every organizer sees the same four in the same order; each step
 has one owner and one way to complete it.
 
-| # | Step                     | Owner          | Done when                                                                                      | Recorded as                                                    |
-| - | ------------------------ | -------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| 1 | Ask to sell paid tickets | Organizer      | The organizer clicks "Request paid ticketing" and books the call                               | `paidTicketingRequestedAt` (column exists, nothing sets it)    |
-| 2 | Talk to TropTix          | Platform Owner | The call happens and a Platform Owner approves in Platform View                                | `paidTicketingEnabled` + `payoutMeetingAt`, set by one action  |
-| 3 | Accept payout terms      | Organizer      | The owner reads the terms in the app and accepts                                               | `payoutTermsAcceptedAt` + `payoutTermsVersion` (new)           |
-| 4 | Connect a payout destination | Organizer, Stripe verifies | Stripe activates the account (US, Connect; later Jamaica, Global Payouts) or, during the transition, TropTix enters a Mercury recipient | `payoutBankLinkedAt` (exists), `stripeAccountId` (Connect plan) |
+| #   | Step                         | Owner                      | Done when                                                                                                                               | Recorded as                                                     |
+| --- | ---------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1   | Ask to sell paid tickets     | Organizer                  | The organizer clicks "Request paid ticketing" and books the call                                                                        | `paidTicketingRequestedAt` (column exists, nothing sets it)     |
+| 2   | Talk to TropTix              | Platform Owner             | The call happens and a Platform Owner approves in Platform View                                                                         | `paidTicketingEnabled` + `payoutMeetingAt`, set by one action   |
+| 3   | Accept payout terms          | Organizer                  | The owner reads the terms in the app and accepts                                                                                        | `payoutTermsAcceptedAt` + `payoutTermsVersion` (new)            |
+| 4   | Connect a payout destination | Organizer, Stripe verifies | Stripe activates the account (US, Connect; later Jamaica, Global Payouts) or, during the transition, TropTix enters a Mercury recipient | `payoutBankLinkedAt` (exists), `stripeAccountId` (Connect plan) |
 
 **Payable** is all four recorded. It is the gate for two things: selling paid
 tickets and requesting payouts. Today only step 2 gates selling; from this
@@ -141,8 +141,8 @@ order, not an enforced one.
      form. The step's `pending` copy says so, and the request flow (step 1)
      points organizers at steps 3 and 4 before the call so verification runs
      while they wait for TropTix.
-   A terms version bump gets the same 30-day grace for selling, stamped on the
-   bump, and blocks payout requests at once.
+     A terms version bump gets the same 30-day grace for selling, stamped on the
+     bump, and blocks payout requests at once.
 9. **Every step change is an analytics event** (`payout_setup_step_changed`
    with step, from, to, organization id) so the funnel is readable in PostHog
    from day one. Drop-off between step 2 and step 4 is the number this plan
@@ -170,7 +170,7 @@ order, not an enforced one.
 when the flag is on). Shows the four steps as a compact progress row with the
 current step expanded:
 
-> **Get paid for your events**  ●●○○
+> **Get paid for your events** ●●○○
 > Step 3 of 4 · Accept payout terms
 > A short read covering when earnings release, the 20% holdback, and how
 > TropTix collects on your behalf. [Read and accept]
@@ -239,7 +239,7 @@ ticket writes hit the gate.
 
 - `getPayoutSetup(prisma, stripe, actor, { viewAsOrganizerUserId })` →
   `PayoutSetup`: the four steps, `payable`, `graceUntil`, `nextAction`. Reads the Connect
-  state for step 4 through the Connect plan's `readConnectState`. View-as
+  state for step 4 through the Connect plan's `connectStateOf`. View-as
   works, read-only.
 - `requestPaidTicketing(prisma, actor)` — owner-only; sets the timestamp if
   null; enqueues the two step-1 messages. Idempotent.

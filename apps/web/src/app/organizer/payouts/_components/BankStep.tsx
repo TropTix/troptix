@@ -57,13 +57,6 @@ export function BankStep({
           we&apos;ll mark this step done for you.
         </p>
       );
-    case 'unavailable':
-      return (
-        <p>
-          We couldn&apos;t reach Stripe just now. Refresh in a moment to see
-          where your setup stands.
-        </p>
-      );
     case 'active':
       return (
         <div className="space-y-2">
