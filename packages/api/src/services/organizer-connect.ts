@@ -1,7 +1,8 @@
 /**
  * The Stripe rail's onboarding half (docs/plans/2026-09-stripe-connect-us-payout-rail.md).
- * Owner-only writes, never View-as. Stripe's status is read live at the two
- * moments that need it and never cached (ADR 0030).
+ * Owner-only writes, never View-as. Stripe's transfers status is mirrored
+ * into `stripeTransfersStatus` by the webhook and the onboarding return;
+ * every read derives from the row (ADR 0032).
  */
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
@@ -35,7 +36,8 @@ interface ConnectOrg {
 
 interface ConnectRow {
   stripeAccountId: string | null;
-  payoutBankLinkedAt: Date | null;
+  stripeTransfersStatus: string | null;
+  payoutBankLinkedAt: Date | string | null;
 }
 
 const ACCOUNT_INCLUDE: Stripe.V2.Core.AccountRetrieveParams['include'] = [
@@ -50,60 +52,31 @@ export function transfersStatus(
     ?.stripe_transfers?.status;
 }
 
-export function stateFromStatus(
-  status: string | undefined,
-  linked: boolean
-): ConnectState {
-  if (status === 'active') return 'active';
-  if (status === 'pending') return 'pending';
-  return linked ? 'needs_updates' : 'in_progress';
-}
-
-export async function readConnectState(
-  stripe: Stripe,
-  row: ConnectRow
-): Promise<ConnectState> {
+/**
+ * A restriction after the gate was stamped is "needs updates"; the same
+ * status before it is still "in progress". The gate is never cleared.
+ */
+export function connectStateOf(row: ConnectRow): ConnectState {
   if (!row.stripeAccountId) return 'manual';
-  let account: Stripe.V2.Core.Account;
-  try {
-    account = await stripe.v2.core.accounts.retrieve(row.stripeAccountId, {
-      include: ACCOUNT_INCLUDE,
-    });
-  } catch {
-    return 'unavailable';
-  }
-  return stateFromStatus(
-    transfersStatus(account),
-    row.payoutBankLinkedAt !== null
-  );
+  if (row.stripeTransfersStatus === 'active') return 'active';
+  if (row.stripeTransfersStatus === 'pending') return 'pending';
+  return row.payoutBankLinkedAt !== null ? 'needs_updates' : 'in_progress';
 }
 
-export async function getConnectStates(
-  stripe: Stripe,
+export function getConnectStates(
   rows: ReadonlyArray<ConnectRow & { id: string }>
-): Promise<Record<string, ConnectState>> {
-  const entries = await Promise.all(
+): Record<string, ConnectState> {
+  return Object.fromEntries(
     rows
       .filter((row) => row.stripeAccountId)
-      .map(
-        async (row) => [row.id, await readConnectState(stripe, row)] as const
-      )
+      .map((row) => [row.id, connectStateOf(row)] as const)
   );
-  return Object.fromEntries(entries);
 }
 
-/**
- * Verification can finish after the organizer has already returned, and a
- * preview deploy receives no webhooks, so the page read is the third place
- * that may see `active` first. It stamps the gate too, unless the viewer is
- * only looking through View-as.
- */
 export async function getConnectSetup(
   prisma: PrismaClient,
-  stripe: Stripe,
   actor: Actor,
-  input: { viewAsOrganizerUserId?: string } = {},
-  now: Date = new Date()
+  input: { viewAsOrganizerUserId?: string } = {}
 ): Promise<ConnectSetup> {
   const organizerUserId = await resolveOrganizerScope(
     prisma,
@@ -112,15 +85,45 @@ export async function getConnectSetup(
   );
   const org = await prisma.organization.findFirst({
     where: { ownerUserId: organizerUserId },
-    select: { id: true, stripeAccountId: true, payoutBankLinkedAt: true },
+    select: {
+      stripeAccountId: true,
+      stripeTransfersStatus: true,
+      payoutBankLinkedAt: true,
+    },
   });
   if (!org) return { accountId: null, state: 'manual' };
-  const state = await readConnectState(stripe, org);
-  const viewing = actor.kind === 'user' && organizerUserId !== actor.userId;
-  if (state === 'active' && org.payoutBankLinkedAt === null && !viewing) {
-    await stampBankLinked(prisma, org.id, now);
-  }
-  return { accountId: org.stripeAccountId, state };
+  return { accountId: org.stripeAccountId, state: connectStateOf(org) };
+}
+
+/**
+ * The one write both syncs share. Idempotent with itself: the webhook and the
+ * return route may record the same status, and the stamp lands once.
+ */
+export async function recordTransfersStatus(
+  prisma: PrismaClient,
+  organizationId: string,
+  status: string | undefined,
+  now: Date
+): Promise<void> {
+  await prisma.organization.update({
+    where: { id: organizationId },
+    data: { stripeTransfersStatus: status ?? null },
+  });
+  if (status === 'active') await stampBankLinked(prisma, organizationId, now);
+}
+
+async function syncTransfersStatus(
+  prisma: PrismaClient,
+  stripe: Stripe,
+  org: { id: string; stripeAccountId: string },
+  now: Date
+): Promise<string | undefined> {
+  const account = await stripe.v2.core.accounts.retrieve(org.stripeAccountId, {
+    include: ACCOUNT_INCLUDE,
+  });
+  const status = transfersStatus(account);
+  await recordTransfersStatus(prisma, org.id, status, now);
+  return status;
 }
 
 /**
@@ -266,8 +269,7 @@ export async function refreshStripeOnboarding(
   return { url: link.url };
 }
 
-/** Idempotent with the webhook: whichever sees `active` first stamps the gate. */
-export async function stampBankLinked(
+async function stampBankLinked(
   prisma: PrismaClient,
   organizationId: string,
   now: Date
@@ -280,8 +282,10 @@ export async function stampBankLinked(
 
 /**
  * Stripe's return_url carries no state and does not mean the form finished,
- * so the outcome comes from a live read. An unreachable Stripe reads as
- * `pending`: the webhook will still stamp the gate if the account is active.
+ * so this is the one sync outside the webhook (Stripe's return-URL guidance;
+ * it also covers a preview deploy, which receives no events). An unreachable
+ * Stripe leaves the row alone and reads as `pending`: the webhook will still
+ * record the status when it arrives.
  */
 export async function finishStripeOnboardingReturn(
   prisma: PrismaClient,
@@ -291,14 +295,19 @@ export async function finishStripeOnboardingReturn(
 ): Promise<ConnectReturnOutcome> {
   const org = await ownedOrg(prisma, actor);
   if (!org.stripeAccountId) return 'incomplete';
-  const state = await readConnectState(stripe, org);
-  if (state === 'active') {
-    await stampBankLinked(prisma, org.id, now);
-    return 'active';
+  let status: string | undefined;
+  try {
+    status = await syncTransfersStatus(
+      prisma,
+      stripe,
+      { id: org.id, stripeAccountId: org.stripeAccountId },
+      now
+    );
+  } catch {
+    return 'pending';
   }
-  return state === 'pending' || state === 'unavailable'
-    ? 'pending'
-    : 'incomplete';
+  if (status === 'active') return 'active';
+  return status === 'pending' ? 'pending' : 'incomplete';
 }
 
 export async function createStripeDashboardLink(

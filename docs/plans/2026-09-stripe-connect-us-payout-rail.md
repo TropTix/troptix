@@ -50,8 +50,9 @@ movement end to end. The section after the table lists what changed.
   platform pays fees and owns losses), newer API, typed in the pinned SDK.
 - **Thin events, not `account.updated`.** The webhook parses a notification
   and fetches the account; it does not read a snapshot.
-- **Live status, no cached state.** The organizer page and the admin's send
-  action ask Stripe at the moment they need to know. One column is enough.
+- **Status mirrored by the webhook (ADR 0032).** The webhook and the
+  onboarding return write Stripe's transfers status to one column; the
+  organizer page and the platform panel read the row and never call Stripe.
 - **A platform balance floor.** Transfers draw on the platform's available
   balance, which today sweeps to Mercury daily. Without a floor every send
   fails with `balance_insufficient`.
@@ -96,11 +97,11 @@ the 2026-09-21 grilling session:
 4. **Rail assignment is derived, never declared.** An Organization is on the
    Stripe rail when `stripeAccountId` is set and `payoutBankLinkedAt`
    is set; otherwise manual. Whether that account can take a transfer right
-   now is read live from Stripe at the two moments it matters: rendering the
-   organizer's payouts page and the admin clicking send. Nothing caches
-   Stripe's status in our database, so nothing drifts. The per-request `rail`
-   field keeps recording what actually happened, and the mark-paid rail
-   select stays as the per-request override.
+   now comes from `stripeTransfersStatus`, which the webhook and the
+   onboarding return mirror from Stripe (ADR 0032); the admin's send may
+   still retrieve live before moving money. The per-request `rail` field
+   keeps recording what actually happened, and the mark-paid rail select
+   stays as the per-request override.
 5. **Transfer first, resolve second**, with the payout request id as the
    Stripe idempotency key (a retry after a crash returns the same transfer —
    no double pay) and in the transfer metadata. The resolve is the existing
@@ -134,8 +135,8 @@ the 2026-09-21 grilling session:
    and, when `stripe_transfers` is `active`, sets `payoutBankLinkedAt` — the
    same timestamp the manual checkbox sets, so `setup.complete` and
    everything downstream are unchanged. A later restriction never clears
-   `payoutBankLinkedAt` (the gate applies at request time); the live status
-   read shows the organizer a "needs attention" state and the send action
+   `payoutBankLinkedAt` (the gate applies at request time); the mirrored
+   status shows the organizer a "needs attention" state and the send action
    refuses. `ProcessedStripeEvent` dedupes v2 event ids the same way it does
    v1.
 8. **The platform absorbs Connect costs**: $2 per active account-month plus
@@ -234,9 +235,9 @@ can do alone.
 
 ### States
 
-Everything the screen shows is a function of three facts: the
-`stripeAccountId` column, `payoutBankLinkedAt`, and (only when an
-account id exists) the live `stripe_transfers` capability status.
+Everything the screen shows is a function of three columns:
+`stripeAccountId`, `payoutBankLinkedAt`, and `stripeTransfersStatus`, the
+`stripe_transfers` capability status as Stripe last reported it.
 
 | State           | Facts                                                               | What the bank step shows                                                                                                                                                                                         |
 | --------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -246,10 +247,10 @@ account id exists) the live `stripe_transfers` capability status.
 | `active`        | status `active` (and `payoutBankLinkedAt` set by webhook or return) | Step checked. "Bank connected through Stripe." An **Open Stripe dashboard** button (login link) and one line: "Payouts land in your bank on Stripe's schedule, usually within two business days of our sending." |
 | `needs_updates` | linked earlier; status now `restricted` or `unsupported`            | Warning card above the request button: "Stripe needs updated information before we can send your next payout." Button: "Update with Stripe" (new onboarding link). The request button stays enabled.             |
 
-The status read is one `stripe.v2.core.accounts.retrieve(id, { include })`
-per page render when an id exists. If Stripe is unreachable the page shows
-the last known column facts with a muted "Couldn't reach Stripe just now" line
-and no buttons; it never throws.
+The page makes no Stripe call. The status is the mirrored column; the
+webhook and the onboarding return are the only writers (ADR 0032). An
+unreachable Stripe at the return route leaves the column alone and reads as
+pending; it never throws.
 
 ### Screens
 
@@ -327,7 +328,7 @@ and no buttons; it never throws.
    with an account id, the "Bank linked" switch becomes read-only and shows
    "Stripe · acct\_… · <status>" with a link to the account in the Stripe
    Dashboard (`https://dashboard.stripe.com/connect/accounts/<id>`). The
-   status there is the live read too, fetched only for rows with an id. The
+   status there is the mirrored column, shown only for rows with an id. The
    manual switch is unchanged for everyone else. The meeting switch is
    unchanged for everyone.
 
@@ -438,8 +439,9 @@ One migration (`pnpm db:new stripe_account`):
 // On Organization. The organizer's Stripe account: a Connect account today,
 // a Global Payouts recipient for Jamaica later. Both are v2 accounts with a
 // recipient configuration; the active capability says which rail applies.
-// Onboarding state lives in Stripe; this is the key.
-stripeAccountId String? @unique
+// The transfers status is mirrored from Stripe by the webhook (ADR 0032).
+stripeAccountId       String? @unique
+stripeTransfersStatus String?
 ```
 
 The name is rail-neutral on purpose. One Organization has one Stripe
@@ -471,10 +473,12 @@ never View-as):
   `payoutBankLinkedAt` when active and null.
 - `refreshStripeOnboarding(prisma, stripe, actor, { baseUrl })` → `{ url }`.
 - `createStripeDashboardLink(prisma, stripe, actor)` → `{ url }`.
-- `readConnectState(stripe, org)` → the state enum from the table above;
-  used by `getPayouts` (organizer page) and `listPayoutOrganizations`
-  (platform panel, only for rows with an id). Swallows Stripe transport
-  errors into an `unavailable` value.
+- `connectStateOf(row)` → the state enum from the table above, derived from
+  the row's columns; used by `getConnectSetup` (organizer page) and
+  `getConnectStates` (platform panel, only for rows with an id).
+- `recordTransfersStatus(prisma, organizationId, status, now)` → writes the
+  mirrored status and stamps the gate once on `active`; shared by the webhook
+  and the onboarding return.
 
 **`packages/api/src/services/connect-webhook.ts`**:
 
@@ -548,8 +552,8 @@ Recorded in a runbook (`docs/runbooks/stripe-connect.md`, written in PR 1):
 - Unit: the four onboarding service functions, `handleConnectEvent`, and
   `sendPayoutViaStripe` with a fake `stripe` (transfer success,
   `balance_insufficient`, restricted, 0-row resolve, idempotency key
-  asserted). `readConnectState` for every capability status and for a
-  transport error.
+  asserted). `connectStateOf` for every capability status; the return route
+  and the webhook for what they record, and for a transport error.
 - Sandbox walk-through (PR 1 review, on the preview branch): click Connect,
   fill the form with the test data (`000-000`, `1901-01-01`, `000000000`,
   `address_full_match`, routing `110000000` / account `000123456789`), watch

@@ -90,8 +90,11 @@ model Organization {
   payoutBankLinkedAt DateTime?
 
   // The organizer's Stripe account: a Connect account today, a Global Payouts
-  // recipient later. Onboarding state lives in Stripe; this is only the key.
-  stripeAccountId String? @unique
+  // recipient later. The transfers capability status is Stripe's, mirrored
+  // here by the webhook and the onboarding return (ADR 0032); null until the
+  // first sync.
+  stripeAccountId       String? @unique
+  stripeTransfersStatus String?
 
   // Payout release policy overrides (graduated trust). Null = platform
   // defaults (PayoutConfig). releaseAtSale releases earnings as orders

@@ -16,7 +16,6 @@ import {
 import { formatCents } from '@/lib/dateUtils';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
-import { stripe } from '@/server/lib/stripe';
 import { ConnectReturnBanner } from './_components/ConnectReturnBanner';
 import { OpenRequestCard } from './_components/OpenRequestCard';
 import { PayoutSettings } from './_components/PayoutSettings';
@@ -60,19 +59,10 @@ export default async function OrganizerPayoutsPage({
   const [payouts, connect] = await Promise.all([
     getPayouts(prisma, actor, { viewAsOrganizerUserId: viewAs }),
     connectEnabled
-      ? getConnectSetup(prisma, stripe, actor, {
-          viewAsOrganizerUserId: viewAs,
-        })
+      ? getConnectSetup(prisma, actor, { viewAsOrganizerUserId: viewAs })
       : Promise.resolve(null),
   ]);
-  const { policy } = payouts;
-  // The Connect read may have just stamped the gate; reflect it in this render.
-  const bankLinked = payouts.setup.bankLinked || connect?.state === 'active';
-  const setup = {
-    ...payouts.setup,
-    bankLinked,
-    complete: payouts.setup.meetingDone && bankLinked,
-  };
+  const { policy, setup } = payouts;
   const returnOutcome = connectReturnOutcomeSchema.safeParse(stripeParam);
 
   const holdbackLine = policy.releaseAtSale

@@ -3,11 +3,11 @@ import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
 import type { Actor } from '../trpc/context';
 import {
+  connectStateOf,
   createStripeDashboardLink,
   finishStripeOnboardingReturn,
   getConnectSetup,
   getConnectStates,
-  readConnectState,
   refreshStripeOnboarding,
   startStripeOnboarding,
 } from './organizer-connect';
@@ -23,6 +23,7 @@ const ORG = {
   displayName: 'Island Nights',
   slug: 'island-nights',
   stripeAccountId: null as string | null,
+  stripeTransfersStatus: null as string | null,
   payoutBankLinkedAt: null as Date | null,
   owner: { email: 'owner@example.test' },
 };
@@ -41,12 +42,14 @@ function fakePrisma(
     .fn()
     .mockResolvedValue({ stripeAccountId: opts.raceId ?? null });
   const updateMany = vi.fn().mockResolvedValue({ count: opts.claimCount ?? 1 });
+  const update = vi.fn().mockResolvedValue(row);
   const prisma = {
     organization: {
       findFirst,
       findMany,
       create,
       findUnique: orgFindUnique,
+      update,
       updateMany,
     },
     users: {
@@ -56,7 +59,7 @@ function fakePrisma(
       }),
     },
   } as unknown as PrismaClient;
-  return { prisma, findFirst, create, updateMany };
+  return { prisma, findFirst, create, update, updateMany };
 }
 
 function fakeStripe(opts: { status?: Status; retrieveThrows?: boolean } = {}) {
@@ -116,16 +119,15 @@ function fakeStripe(opts: { status?: Status; retrieveThrows?: boolean } = {}) {
   return { stripe, calls };
 }
 
-describe('readConnectState', () => {
-  it('is manual without an account and never calls Stripe', async () => {
-    const { stripe, calls } = fakeStripe();
-    await expect(
-      readConnectState(stripe, {
+describe('connectStateOf', () => {
+  it('is manual without an account', () => {
+    expect(
+      connectStateOf({
         stripeAccountId: null,
+        stripeTransfersStatus: null,
         payoutBankLinkedAt: null,
       })
-    ).resolves.toBe('manual');
-    expect(calls.retrieve).toEqual([]);
+    ).toBe('manual');
   });
 
   it.each([
@@ -134,83 +136,60 @@ describe('readConnectState', () => {
     ['restricted', false, 'in_progress'],
     ['restricted', true, 'needs_updates'],
     ['unsupported', true, 'needs_updates'],
-    ['missing', false, 'in_progress'],
+    [null, false, 'in_progress'],
   ] as const)(
     'maps status %s with linked=%s to %s',
-    async (status, linked, expected) => {
-      const { stripe, calls } = fakeStripe({ status });
-      const state = await readConnectState(stripe, {
-        stripeAccountId: 'acct_1',
-        payoutBankLinkedAt: linked ? NOW : null,
-      });
-      expect(state).toBe(expected);
-      expect(calls.retrieve).toEqual(['acct_1']);
+    (status, linked, expected) => {
+      expect(
+        connectStateOf({
+          stripeAccountId: 'acct_1',
+          stripeTransfersStatus: status,
+          payoutBankLinkedAt: linked ? NOW : null,
+        })
+      ).toBe(expected);
     }
   );
-
-  it('reads as unavailable when Stripe cannot be reached', async () => {
-    const { stripe } = fakeStripe({ retrieveThrows: true });
-    await expect(
-      readConnectState(stripe, {
-        stripeAccountId: 'acct_1',
-        payoutBankLinkedAt: null,
-      })
-    ).resolves.toBe('unavailable');
-  });
 });
 
 describe('getConnectStates', () => {
-  it('fetches only rows with an account', async () => {
-    const { stripe, calls } = fakeStripe({ status: 'pending' });
-    const states = await getConnectStates(stripe, [
-      { id: 'a', stripeAccountId: 'acct_a', payoutBankLinkedAt: null },
-      { id: 'b', stripeAccountId: null, payoutBankLinkedAt: null },
+  it('maps only rows with an account', () => {
+    const states = getConnectStates([
+      {
+        id: 'a',
+        stripeAccountId: 'acct_a',
+        stripeTransfersStatus: 'pending',
+        payoutBankLinkedAt: null,
+      },
+      {
+        id: 'b',
+        stripeAccountId: null,
+        stripeTransfersStatus: null,
+        payoutBankLinkedAt: null,
+      },
     ]);
     expect(states).toEqual({ a: 'pending' });
-    expect(calls.retrieve).toEqual(['acct_a']);
   });
 });
 
 describe('getConnectSetup', () => {
   it('is manual for a user without an organization', async () => {
     const { prisma } = fakePrisma(null);
-    const { stripe } = fakeStripe();
-    await expect(getConnectSetup(prisma, stripe, OWNER)).resolves.toEqual({
+    await expect(getConnectSetup(prisma, OWNER)).resolves.toEqual({
       accountId: null,
       state: 'manual',
     });
   });
 
-  it('returns the account id with its live state', async () => {
-    const { prisma } = fakePrisma({ stripeAccountId: 'acct_1' });
-    const { stripe } = fakeStripe({ status: 'active' });
-    await expect(getConnectSetup(prisma, stripe, OWNER)).resolves.toEqual({
+  it('returns the account id with the mirrored state and writes nothing', async () => {
+    const { prisma, update, updateMany } = fakePrisma({
+      stripeAccountId: 'acct_1',
+      stripeTransfersStatus: 'active',
+    });
+    await expect(getConnectSetup(prisma, OWNER)).resolves.toEqual({
       accountId: 'acct_1',
       state: 'active',
     });
-  });
-
-  it('stamps the gate when it is the first to see the account active', async () => {
-    const { prisma, updateMany } = fakePrisma({ stripeAccountId: 'acct_1' });
-    const { stripe } = fakeStripe({ status: 'active' });
-    await getConnectSetup(prisma, stripe, OWNER, {}, NOW);
-    expect(updateMany).toHaveBeenCalledWith({
-      where: { id: 'org-1', payoutBankLinkedAt: null },
-      data: { payoutBankLinkedAt: NOW },
-    });
-  });
-
-  it.each([
-    [
-      'already linked',
-      { stripeAccountId: 'acct_1', payoutBankLinkedAt: NOW },
-      'active',
-    ],
-    ['still pending', { stripeAccountId: 'acct_1' }, 'pending'],
-  ] as const)('does not stamp when %s', async (_, org, status) => {
-    const { prisma, updateMany } = fakePrisma(org);
-    const { stripe } = fakeStripe({ status });
-    await getConnectSetup(prisma, stripe, OWNER, {}, NOW);
+    expect(update).not.toHaveBeenCalled();
     expect(updateMany).not.toHaveBeenCalled();
   });
 });
@@ -370,14 +349,21 @@ describe('finishStripeOnboardingReturn', () => {
     expect(calls.retrieve).toEqual([]);
   });
 
-  it('stamps the gate once when transfers are active', async () => {
-    const { prisma, updateMany } = fakePrisma({ stripeAccountId: 'acct_1' });
-    const { stripe } = fakeStripe({ status: 'active' });
+  it('records the status and stamps the gate once when transfers are active', async () => {
+    const { prisma, update, updateMany } = fakePrisma({
+      stripeAccountId: 'acct_1',
+    });
+    const { stripe, calls } = fakeStripe({ status: 'active' });
 
     await expect(
       finishStripeOnboardingReturn(prisma, stripe, OWNER, NOW)
     ).resolves.toBe('active');
 
+    expect(calls.retrieve).toEqual(['acct_1']);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'org-1' },
+      data: { stripeTransfersStatus: 'active' },
+    });
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: 'org-1', payoutBankLinkedAt: null },
       data: { payoutBankLinkedAt: NOW },
@@ -387,21 +373,42 @@ describe('finishStripeOnboardingReturn', () => {
   it.each([
     ['pending', 'pending'],
     ['restricted', 'incomplete'],
-  ] as const)('maps %s to %s without stamping', async (status, expected) => {
-    const { prisma, updateMany } = fakePrisma({ stripeAccountId: 'acct_1' });
+  ] as const)('records %s as %s without stamping', async (status, expected) => {
+    const { prisma, update, updateMany } = fakePrisma({
+      stripeAccountId: 'acct_1',
+    });
     const { stripe } = fakeStripe({ status });
     await expect(
       finishStripeOnboardingReturn(prisma, stripe, OWNER, NOW)
     ).resolves.toBe(expected);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'org-1' },
+      data: { stripeTransfersStatus: status },
+    });
     expect(updateMany).not.toHaveBeenCalled();
   });
 
-  it('treats an unreachable Stripe as pending, leaving the webhook to stamp', async () => {
-    const { prisma, updateMany } = fakePrisma({ stripeAccountId: 'acct_1' });
+  it('records a missing capability as null', async () => {
+    const { prisma, update } = fakePrisma({ stripeAccountId: 'acct_1' });
+    const { stripe } = fakeStripe({ status: 'missing' });
+    await expect(
+      finishStripeOnboardingReturn(prisma, stripe, OWNER, NOW)
+    ).resolves.toBe('incomplete');
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'org-1' },
+      data: { stripeTransfersStatus: null },
+    });
+  });
+
+  it('treats an unreachable Stripe as pending and leaves the row alone', async () => {
+    const { prisma, update, updateMany } = fakePrisma({
+      stripeAccountId: 'acct_1',
+    });
     const { stripe } = fakeStripe({ retrieveThrows: true });
     await expect(
       finishStripeOnboardingReturn(prisma, stripe, OWNER, NOW)
     ).resolves.toBe('pending');
+    expect(update).not.toHaveBeenCalled();
     expect(updateMany).not.toHaveBeenCalled();
   });
 });
