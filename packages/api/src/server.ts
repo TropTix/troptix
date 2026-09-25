@@ -70,6 +70,15 @@ export {
   cancelPayoutRequest,
 } from './services/organizer-payouts';
 export {
+  getConnectSetup,
+  getConnectStates,
+  startStripeOnboarding,
+  refreshStripeOnboarding,
+  finishStripeOnboardingReturn,
+  createStripeDashboardLink,
+} from './services/organizer-connect';
+export { handleConnectEvent } from './services/connect-webhook';
+export {
   listPayoutRequests,
   listPayoutOrganizations,
   resolvePayoutRequest,

@@ -5,7 +5,13 @@ import type { OrganizerPayoutRequest } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -35,14 +41,17 @@ const STATUS_LABELS = {
 export function RequestsTable({
   requests,
   readOnly = false,
+  action,
 }: {
   requests: OrganizerPayoutRequest[];
   readOnly?: boolean;
+  action?: React.ReactNode;
 }) {
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Payout requests</CardTitle>
+        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent>
         {requests.length === 0 ? (

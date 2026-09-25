@@ -1,65 +1,111 @@
 import { CheckCircle2, Circle } from 'lucide-react';
-import type { PayoutSetupState } from '@troptix/api';
+import type { ConnectSetup, PayoutSetupState } from '@troptix/api';
 
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
+import { BankStep } from './BankStep';
 
-export function SetupChecklistCard({ setup }: { setup: PayoutSetupState }) {
+export const SETUP_STEP_COUNT = 2;
+
+export function setupStepsDone(setup: PayoutSetupState) {
+  return Number(setup.meetingDone) + Number(setup.bankLinked);
+}
+
+export function SetupChecklistCard({
+  setup,
+  connect,
+  readOnly,
+}: {
+  setup: PayoutSetupState;
+  connect: ConnectSetup | null;
+  readOnly: boolean;
+}) {
+  const done = setupStepsDone(setup);
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Set up payouts</CardTitle>
         <CardDescription>
           Two steps with the TropTix team unlock payout requests. Your balances
-          are already tracked above.
+          are already tracked below.
         </CardDescription>
+        <CardAction className="flex flex-col items-end gap-1.5">
+          <span className="text-xs text-muted-foreground">
+            {done} of {SETUP_STEP_COUNT} done
+          </span>
+          <Progress
+            value={(done / SETUP_STEP_COUNT) * 100}
+            className="h-1.5 w-36"
+          />
+        </CardAction>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <ChecklistStep done={setup.meetingDone} title="Meet with TropTix">
-          A short call to cover terms, timing, and where the money goes.{' '}
-          <a
-            className="underline underline-offset-2 hover:text-foreground"
-            href="mailto:info@usetroptix.com?subject=Payout setup"
-          >
-            Contact us to schedule it.
-          </a>
-        </ChecklistStep>
-        <ChecklistStep
+      <CardContent className="grid gap-4 sm:grid-cols-2">
+        <StepCard
+          done={setup.meetingDone}
+          active={!setup.meetingDone}
+          title="Meet with TropTix"
+        >
+          {setup.meetingDone ? (
+            'Terms, timing, and where the money goes.'
+          ) : (
+            <>
+              A short call to cover terms, timing, and where the money goes.{' '}
+              <a
+                className="underline underline-offset-2 hover:text-foreground"
+                href="mailto:info@usetroptix.com?subject=Payout setup"
+              >
+                Contact us to schedule it.
+              </a>
+            </>
+          )}
+        </StepCard>
+        <StepCard
           done={setup.bankLinked}
+          active={setup.meetingDone && !setup.bankLinked}
           title="Connect your bank account"
         >
-          Your bank details are collected during setup and held at our bank —
-          TropTix never stores them.
-        </ChecklistStep>
+          <BankStep setup={setup} connect={connect} readOnly={readOnly} />
+        </StepCard>
       </CardContent>
     </Card>
   );
 }
 
-function ChecklistStep({
+function StepCard({
   done,
+  active,
   title,
   children,
 }: {
   done: boolean;
+  active: boolean;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      {done ? (
-        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-      ) : (
-        <Circle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+    <div
+      className={cn(
+        'flex items-start gap-3 rounded-lg p-4',
+        done ? 'bg-muted/50' : 'border',
+        active && 'border-primary/30'
       )}
-      <div>
+    >
+      {done ? (
+        <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
+      ) : (
+        <Circle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+      )}
+      <div className="min-w-0 flex-1 space-y-1">
         <p className="font-medium">{title}</p>
-        <p className="text-sm text-muted-foreground">{children}</p>
+        <div className="text-sm text-muted-foreground">{children}</div>
       </div>
     </div>
   );

@@ -34,10 +34,14 @@ Verifying that against Stripe's docs in 2026-09 changed the picture:
    revenue pools in the platform balance; paying an organizer is a
    `transfers.create` from that balance for the request's full amount. The
    ledger, not Stripe, decides when money is available (ADR 0028 stands).
-3. **Accounts v2, recipient configuration only, Express dashboard.** The
-   Connect account requests `stripe_balance.stripe_transfers` and nothing
-   else. Platform pays fees and owns losses. Hosted onboarding through Account
-   Links; status through thin events on an event destination.
+3. **Accounts v2, recipient plus merchant configuration, Express dashboard.**
+   The Connect account requests `stripe_balance.stripe_transfers` (the rail)
+   and `card_payments`, the latter only because Stripe refuses transfers
+   without it unless the platform has been approved for transfers-only
+   accounts (`capability_not_available_without_other_capability`; the v1 API
+   says the same in words: "Your platform needs approval"). Nothing charges
+   through the account. Platform pays fees and owns losses. Hosted onboarding
+   through Account Links; status through thin events on an event destination.
 4. **Rail assignment is derived, never declared.** One column,
    `Organization.stripeAccountId`, rail-neutral because the Global Payouts
    recipient is the same v2 account object. An Organization is on the Stripe
@@ -69,6 +73,12 @@ Verifying that against Stripe's docs in 2026-09 changed the picture:
   TropTix. Rejected while any organizer is off Connect.
 - Destination charges were rejected for the same reason: they move money at
   charge time, and the release rule is TropTix's.
+- Requesting `card_payments` means hosted onboarding also collects merchant
+  fields (business type, statement descriptor, a business URL, which the
+  platform prefills with the Organization's public page) and Stripe may set a
+  merchant category code. If Stripe support ever approves transfers-only
+  accounts for the platform, the merchant configuration can be dropped for
+  new accounts without touching anything downstream.
 - Accounts v1 controller properties would have produced an identical account
   shape. Rejected because Stripe's direction for new platforms is v2, the
   shape maps one-to-one, and thin events are typed in the SDK.

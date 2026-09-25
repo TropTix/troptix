@@ -12,6 +12,34 @@ export type PayoutRequestStatusDto = z.infer<typeof payoutRequestStatusSchema>;
 export const payoutRailSchema = z.enum(['MERCURY', 'STRIPE', 'OTHER']);
 export type PayoutRailDto = z.infer<typeof payoutRailSchema>;
 
+/**
+ * What Stripe says about the Organization's account right now, read live at
+ * the moments that need it (never cached). `manual` = no account; `unavailable`
+ * = Stripe could not be reached, which is never a state to act on.
+ */
+export const connectStateSchema = z.enum([
+  'manual',
+  'in_progress',
+  'pending',
+  'active',
+  'needs_updates',
+  'unavailable',
+]);
+export type ConnectState = z.infer<typeof connectStateSchema>;
+
+export const connectSetupSchema = z.object({
+  accountId: z.string().nullable(),
+  state: connectStateSchema,
+});
+export type ConnectSetup = z.infer<typeof connectSetupSchema>;
+
+export const connectReturnOutcomeSchema = z.enum([
+  'active',
+  'pending',
+  'incomplete',
+]);
+export type ConnectReturnOutcome = z.infer<typeof connectReturnOutcomeSchema>;
+
 export const payoutSetupStateSchema = z.object({
   meetingDone: z.boolean(),
   bankLinked: z.boolean(),
@@ -112,6 +140,7 @@ export const payoutOrganizationSchema = z.object({
   ownerEmail: z.string().nullable(),
   payoutMeetingAt: z.string().datetime().nullable(),
   payoutBankLinkedAt: z.string().datetime().nullable(),
+  stripeAccountId: z.string().nullable(),
   setup: payoutSetupStateSchema,
   policy: payoutPolicySchema,
   /** The raw overrides — null means the org follows the platform default. */

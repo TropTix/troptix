@@ -1,10 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
-import { getPayouts } from '@troptix/api/server';
-import { FeatureFlag } from '@troptix/api';
-import { Banknote, Clock, Wallet } from 'lucide-react';
+import { getConnectSetup, getPayouts } from '@troptix/api/server';
+import { connectReturnOutcomeSchema, FeatureFlag } from '@troptix/api';
+import { AlertTriangle, Banknote, Clock, Wallet } from 'lucide-react';
 import { isFlagEnabled } from '@/server/lib/featureFlags';
 import { getServerUser } from '@/server/authUser';
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Card,
   CardContent,
@@ -15,14 +16,21 @@ import {
 import { formatCents } from '@/lib/dateUtils';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
+import { stripe } from '@/server/lib/stripe';
+import { ConnectReturnBanner } from './_components/ConnectReturnBanner';
+import { OpenRequestCard } from './_components/OpenRequestCard';
+import { PayoutSettings } from './_components/PayoutSettings';
+import { parsePayoutTab, PayoutsTabs } from './_components/PayoutsTabs';
 import { RequestPayoutCard } from './_components/RequestPayoutCard';
+import { RequestPayoutDialog } from './_components/RequestPayoutDialog';
 import { RequestsTable } from './_components/RequestsTable';
 import { SetupChecklistCard } from './_components/SetupChecklistCard';
+import { StripeActionButton } from './_components/StripeActionButton';
 
 export default async function OrganizerPayoutsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ viewAs?: string }>;
+  searchParams: Promise<{ viewAs?: string; stripe?: string; tab?: string }>;
 }) {
   const user = await getServerUser();
   if (!user) {
@@ -30,17 +38,18 @@ export default async function OrganizerPayoutsPage({
   }
   // Email included so the staff release condition matches without PostHog
   // having seen this user before.
-  if (
-    !(await isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, {
-      id: user.uid,
-      email: user.email,
-    }))
-  ) {
+  const flagUser = { id: user.uid, email: user.email };
+  const [payoutsEnabled, connectEnabled] = await Promise.all([
+    isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, flagUser),
+    isFlagEnabled(FeatureFlag.STRIPE_CONNECT_ONBOARDING, flagUser),
+  ]);
+  if (!payoutsEnabled) {
     notFound();
   }
   const actor = userToActor(user);
 
-  const { viewAs } = await searchParams;
+  const { viewAs, stripe: stripeParam, tab: tabParam } = await searchParams;
+  const tab = parsePayoutTab(tabParam);
 
   // Writes never take a View-as target (the seam's rule), so the write
   // controls disappear when viewing another organizer — they would act on the
@@ -48,57 +57,148 @@ export default async function OrganizerPayoutsPage({
   const readOnly =
     Boolean(viewAs) && (actor.kind !== 'user' || viewAs !== actor.userId);
 
-  const payouts = await getPayouts(prisma, actor, {
-    viewAsOrganizerUserId: viewAs,
-  });
-  const { setup, policy } = payouts;
+  const [payouts, connect] = await Promise.all([
+    getPayouts(prisma, actor, { viewAsOrganizerUserId: viewAs }),
+    connectEnabled
+      ? getConnectSetup(prisma, stripe, actor, {
+          viewAsOrganizerUserId: viewAs,
+        })
+      : Promise.resolve(null),
+  ]);
+  const { policy } = payouts;
+  // The Connect read may have just stamped the gate; reflect it in this render.
+  const bankLinked = payouts.setup.bankLinked || connect?.state === 'active';
+  const setup = {
+    ...payouts.setup,
+    bankLinked,
+    complete: payouts.setup.meetingDone && bankLinked,
+  };
+  const returnOutcome = connectReturnOutcomeSchema.safeParse(stripeParam);
 
   const holdbackLine = policy.releaseAtSale
     ? `Earnings are available as tickets sell; ${policy.holdbackPercent}% is held until ${policy.holdbackDays} days after each event ends.`
     : `Earnings become available when an event ends; ${policy.holdbackPercent}% is held for ${policy.holdbackDays} more days.`;
 
-  const hasOpenRequest = payouts.requests.some(
+  const openRequest = payouts.requests.find(
     (request) => request.status === 'REQUESTED'
   );
+  const canRequest =
+    !readOnly && setup.complete && !openRequest && payouts.availableCents > 0;
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight">Payouts</h1>
+      <div className="space-y-4">
+        <h1 className="text-3xl font-bold tracking-tight">Payouts</h1>
+        <PayoutsTabs
+          active={tab}
+          openRequests={openRequest ? 1 : 0}
+          viewAs={viewAs}
+        />
+      </div>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Available"
-          value={formatCents(payouts.availableCents)}
-          hint="Ready to request now"
-          icon={<Wallet className="h-5 w-5 text-muted-foreground" />}
-        />
-        <StatCard
-          label="Pending"
-          value={formatCents(payouts.pendingCents)}
-          hint={holdbackLine}
-          icon={<Clock className="h-5 w-5 text-muted-foreground" />}
-        />
-        <StatCard
-          label="Paid out"
-          value={formatCents(payouts.paidOutCents)}
-          hint="All time"
-          icon={<Banknote className="h-5 w-5 text-muted-foreground" />}
-        />
-      </section>
-
-      {setup.complete ? (
-        !readOnly && (
-          <RequestPayoutCard
-            availableCents={payouts.availableCents}
-            hasOpenRequest={hasOpenRequest}
-            holdbackLine={holdbackLine}
-          />
-        )
-      ) : (
-        <SetupChecklistCard setup={setup} />
+      {connect && returnOutcome.success && (
+        <ConnectReturnBanner outcome={returnOutcome.data} />
       )}
 
-      <RequestsTable requests={payouts.requests} readOnly={readOnly} />
+      {tab === 'overview' && (
+        <>
+          {!setup.complete && (
+            <SetupChecklistCard
+              setup={setup}
+              connect={connect}
+              readOnly={readOnly}
+            />
+          )}
+
+          <section className="grid gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Available"
+              value={formatCents(payouts.availableCents)}
+              hint={
+                openRequest
+                  ? `${formatCents(openRequest.amountCents)} is in an open request`
+                  : 'Ready to request now'
+              }
+              icon={<Wallet className="h-5 w-5 text-muted-foreground" />}
+            />
+            <StatCard
+              label="Pending"
+              value={formatCents(payouts.pendingCents)}
+              hint={holdbackLine}
+              icon={<Clock className="h-5 w-5 text-muted-foreground" />}
+            />
+            <StatCard
+              label="Paid out"
+              value={formatCents(payouts.paidOutCents)}
+              hint="All time"
+              icon={<Banknote className="h-5 w-5 text-muted-foreground" />}
+            />
+          </section>
+
+          {!readOnly &&
+            setup.complete &&
+            connect?.state === 'needs_updates' && (
+              <Alert variant="warning">
+                <AlertTriangle />
+                <AlertTitle>Stripe needs updated information</AlertTitle>
+                <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                  <span>
+                    You can still request a payout, but we can&apos;t send it
+                    until Stripe is satisfied.
+                  </span>
+                  <StripeActionButton action="onboarding" size="sm">
+                    Update with Stripe
+                  </StripeActionButton>
+                </AlertDescription>
+              </Alert>
+            )}
+
+          <RequestPayoutCard
+            availableCents={payouts.availableCents}
+            setupComplete={setup.complete}
+            hasOpenRequest={Boolean(openRequest)}
+            holdbackLine={holdbackLine}
+            action={
+              !readOnly && (
+                <RequestPayoutDialog
+                  availableCents={payouts.availableCents}
+                  disabled={!canRequest}
+                />
+              )
+            }
+          />
+        </>
+      )}
+
+      {tab === 'requests' && (
+        <>
+          {openRequest && (
+            <OpenRequestCard request={openRequest} readOnly={readOnly} />
+          )}
+          <RequestsTable
+            requests={payouts.requests}
+            readOnly={readOnly}
+            action={
+              !readOnly && (
+                <RequestPayoutDialog
+                  availableCents={payouts.availableCents}
+                  disabled={!canRequest}
+                  size="sm"
+                />
+              )
+            }
+          />
+        </>
+      )}
+
+      {tab === 'settings' && (
+        <PayoutSettings
+          setup={setup}
+          connect={connect}
+          readOnly={readOnly}
+          holdbackLine={holdbackLine}
+        />
+      )}
     </div>
   );
 }
