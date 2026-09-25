@@ -42,8 +42,10 @@ and [ADR 0030](../adr/0030-stripe-is-the-payout-rail.md).
 | `STRIPE_CONNECT_WEBHOOK_SECRET` | production, preview, development | Signing secret of the thin-event destination for that mode |
 
 Previews share one sandbox destination pointed at a stable non-production
-host; a per-PR preview never receives events. The return route stamps the
-gate on its own, so the click-through still reaches the right end state.
+host; a per-PR preview never receives events. The return route syncs the
+status and stamps the gate on its own, so the click-through still reaches the
+right end state; anything Stripe decides after that never reaches the preview
+(ADR 0032).
 
 ## Sandbox walk-through
 
@@ -72,12 +74,15 @@ Put the printed secret in `apps/web/.env` as `STRIPE_CONNECT_WEBHOOK_SECRET`.
 
 ## When something is wrong
 
-- **"Couldn't reach Stripe just now" on the payouts page**: the live read
-  failed. Nothing is cached, so a refresh after Stripe recovers is enough.
-- **An organizer's step never turns done**: check the event destination's
-  delivery log in Workbench, then the account's capability status in the
-  Stripe Dashboard. The return route and the webhook both stamp the gate;
-  neither having run means the capability is not `active`.
+- **The payouts page shows a stale state**: the page reads
+  `Organization.stripeTransfersStatus`, which only the webhook and the return
+  route write. Check the event destination's delivery log in Workbench; a
+  failed delivery is retried by Stripe. Sending the organizer back through
+  **Connect bank** resyncs on return.
+- **An organizer's step never turns done**: check the delivery log, then the
+  account's capability status in the Stripe Dashboard. The return route and
+  the webhook both stamp the gate; neither having run means the capability is
+  not `active`.
 - **A restricted account**: the organizer sees "Update with Stripe" and gets a
   fresh onboarding link. The platform panel shows the account state and a
   link to the account in the Stripe Dashboard.

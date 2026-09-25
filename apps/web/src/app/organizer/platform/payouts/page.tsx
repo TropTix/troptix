@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
-import { stripe } from '@/server/lib/stripe';
 import { PayoutSetupPanel } from './_components/PayoutSetupPanel';
 import { PlatformRequestsTable } from './_components/PlatformRequestsTable';
 
@@ -27,16 +26,7 @@ export default async function PlatformPayoutsPage() {
     listPayoutRequests(prisma, actor),
     listPayoutOrganizations(prisma, actor),
   ]);
-  const connectStates = await getConnectStates(
-    stripe,
-    organizations.map((org) => ({
-      id: org.id,
-      stripeAccountId: org.stripeAccountId,
-      payoutBankLinkedAt: org.payoutBankLinkedAt
-        ? new Date(org.payoutBankLinkedAt)
-        : null,
-    }))
-  );
+  const connectStates = getConnectStates(organizations);
 
   const rank = (status: string) => (status === 'REQUESTED' ? 0 : 1);
   const openFirst = [...requests].sort(

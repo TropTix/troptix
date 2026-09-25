@@ -159,7 +159,6 @@ const CONNECT_LABELS: Record<ConnectState, string> = {
   pending: 'Stripe reviewing',
   active: 'active',
   needs_updates: 'needs updates',
-  unavailable: 'Stripe unreachable',
 };
 
 /** Read-only on the Stripe rail: Stripe's verification checks this step off, not a switch. */

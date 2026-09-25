@@ -36,10 +36,12 @@ values ('seed_staff_1', now(), now(), 'demo-staff@troptix.test', 'Demo Staff', '
 -- Payout setup complete (both timestamps set) so the request flow is exercisable.
 insert into public."Organization" (
   id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
-  verified, "paidTicketingEnabled", "payoutMeetingAt", "payoutBankLinkedAt", "stripeAccountId"
+  verified, "paidTicketingEnabled", "payoutMeetingAt", "payoutBankLinkedAt",
+  "stripeAccountId", "stripeTransfersStatus"
 ) values (
   'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer', 'seed_org_1',
-  false, true, now() - interval '40 days', now() - interval '40 days', null
+  false, true, now() - interval '40 days', now() - interval '40 days',
+  null, null
 );
 
 -- A second organization with payout setup INCOMPLETE, so both payout screens
@@ -50,10 +52,10 @@ values ('seed_org_2', now(), now(), 'demo-organizer-2@troptix.test', 'Island Nig
 
 insert into public."Organization" (
   id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
-  verified, "paidTicketingEnabled", "stripeAccountId"
+  verified, "paidTicketingEnabled", "stripeAccountId", "stripeTransfersStatus"
 ) values (
   'seed_organization_2', now(), now(), 'island-nights', 'Island Nights', 'seed_org_2',
-  false, true, null
+  false, true, null, null
 );
 
 -- Demo Admin: holds a Membership in the demo Organization (teams Phase 1).
