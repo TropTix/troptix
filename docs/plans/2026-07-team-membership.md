@@ -1,9 +1,11 @@
 ---
 title: Team membership — Owner and Admin
-status: active
+status: superseded
 created: 2026-07-27
 tracking-issue: '#481'
 ---
+
+Superseded by [2026-09-teams-and-co-hosts.md](2026-09-teams-and-co-hosts.md). Phase 0 and the Membership table landed under this plan and carry over.
 
 ## What this is
 
