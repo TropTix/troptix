@@ -133,6 +133,43 @@ export async function sendRefundNoticeEmail(reservationId: string) {
   }
 }
 
+/**
+ * A chargeback after a payout is the one case Stripe's marketplace guidance
+ * says to act on the same day (reverse the transfer). Nothing automatic here:
+ * the notice tells a Platform Owner; the runbook carries the steps.
+ */
+export async function sendDisputeNoticeEmail(dispute: {
+  id: string;
+  amount: number;
+  currency: string;
+  reason: string;
+  charge: string;
+}) {
+  const amount = `${(dispute.amount / 100).toFixed(2)} ${dispute.currency.toUpperCase()}`;
+  const html = `
+    <p>A buyer disputed a charge: <strong>${amount}</strong>, reason <code>${dispute.reason}</code>.</p>
+    <p>Dispute <a href="https://dashboard.stripe.com/payments/${dispute.charge}">${dispute.id}</a> on charge <code>${dispute.charge}</code>.</p>
+    <p>If the organizer has already been paid for this event, reverse that
+    transfer today. Steps are in docs/runbooks/stripe-connect.md.</p>`;
+
+  try {
+    const { error } = await resend.emails.send(
+      {
+        from: 'TropTix <info@usetroptix.com>',
+        to: 'info@usetroptix.com',
+        subject: `Chargeback opened: ${amount} (${dispute.id})`,
+        html,
+      },
+      { idempotencyKey: `dispute-${dispute.id}` }
+    );
+    if (error && !isConcurrentIdempotencyConflict(error)) {
+      console.error('[Dispute] Resend failed to send dispute notice:', error);
+    }
+  } catch (error) {
+    console.error('[Dispute] Failed to send dispute notice email:', error);
+  }
+}
+
 async function getOrderDetails(orderId: string) {
   return await prisma.orders.findUnique({
     where: {

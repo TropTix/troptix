@@ -5,6 +5,7 @@ import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { serverAnalytics } from '@/server/lib/analytics';
 import {
+  sendDisputeNoticeEmail,
   sendEmailConfirmationEmailToUser,
   sendRefundNoticeEmail,
 } from '@/server/lib/email';
@@ -101,6 +102,17 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
       } else if (state.kind === 'refunded') {
         after(() => sendRefundNoticeEmail(reservationId));
       }
+      return;
+    }
+
+    case 'charge.dispute.created': {
+      const dispute = event.data.object as Stripe.Dispute;
+      const charge =
+        typeof dispute.charge === 'string' ? dispute.charge : dispute.charge.id;
+      console.error(
+        `[ReservationWebhook] Dispute ${dispute.id} opened on charge ${charge}`
+      );
+      after(() => sendDisputeNoticeEmail({ ...dispute, charge }));
       return;
     }
 

@@ -99,6 +99,8 @@ export const platformPayoutRequestSchema = organizerPayoutRequestSchema.extend({
   organizationName: z.string(),
   organizationSlug: z.string(),
   ownerEmail: z.string().nullable(),
+  stripeAccountId: z.string().nullable(),
+  connectState: connectStateSchema,
 });
 export type PlatformPayoutRequest = z.infer<typeof platformPayoutRequestSchema>;
 
@@ -112,6 +114,34 @@ export const resolvePayoutRequestInputSchema = z.object({
 export type ResolvePayoutRequestInput = z.infer<
   typeof resolvePayoutRequestInputSchema
 >;
+
+export const sendPayoutViaStripeInputSchema = z.object({
+  id: z.string().min(1),
+});
+export type SendPayoutViaStripeInput = z.infer<
+  typeof sendPayoutViaStripeInputSchema
+>;
+
+/**
+ * A row and Stripe's transfers disagree (plan decision 17). Computed from
+ * Stripe at read time, never stored.
+ */
+export const payoutMismatchSchema = z.object({
+  requestId: z.string(),
+  kind: z.enum([
+    'paid_without_transfer',
+    'requested_with_transfer',
+    'duplicate_transfer',
+  ]),
+  transferIds: z.array(z.string()),
+});
+export type PayoutMismatch = z.infer<typeof payoutMismatchSchema>;
+
+export const platformPayoutBalanceSchema = z.object({
+  availableCents: z.number().int(),
+  openRequestsCents: z.number().int(),
+});
+export type PlatformPayoutBalance = z.infer<typeof platformPayoutBalanceSchema>;
 
 export const setPayoutSetupStepInputSchema = z.object({
   organizationId: z.string().min(1),

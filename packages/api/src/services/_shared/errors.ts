@@ -62,3 +62,23 @@ export class PaidTicketingNotEnabledError extends Error {
     this.name = 'PaidTicketingNotEnabledError';
   }
 }
+
+/** The platform balance cannot fund the transfer; the request row is untouched. */
+export class InsufficientPlatformBalanceError extends Error {
+  constructor(public readonly shortfallCents: number | null) {
+    super(
+      shortfallCents === null
+        ? 'The platform balance cannot cover this payout'
+        : `The platform balance is short by ${shortfallCents} cents`
+    );
+    this.name = 'InsufficientPlatformBalanceError';
+  }
+}
+
+/** Stripe refuses transfers to the account until the organizer updates their details. */
+export class StripeAccountRestrictedError extends Error {
+  constructor(message = 'Stripe has paused transfers to this account') {
+    super(message);
+    this.name = 'StripeAccountRestrictedError';
+  }
+}

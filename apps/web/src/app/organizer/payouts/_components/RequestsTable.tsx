@@ -41,10 +41,12 @@ const STATUS_LABELS = {
 export function RequestsTable({
   requests,
   readOnly = false,
+  viaStripe = false,
   action,
 }: {
   requests: OrganizerPayoutRequest[];
   readOnly?: boolean;
+  viaStripe?: boolean;
   action?: React.ReactNode;
 }) {
   return (
@@ -79,6 +81,12 @@ export function RequestsTable({
               ))}
             </TableBody>
           </Table>
+        )}
+        {viaStripe && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Stripe deposits payouts to your bank within about two business days.
+            Open your Stripe dashboard to track them.
+          </p>
         )}
       </CardContent>
     </Card>
@@ -141,9 +149,10 @@ function Resolution({ request }: { request: OrganizerPayoutRequest }) {
   if (request.status === 'PAID') {
     return (
       <span className="text-sm text-muted-foreground">
-        {request.resolvedAt && <LocalTime at={request.resolvedAt} />} via bank
-        transfer
-        {request.reference ? `, ref ${request.reference}` : ''}
+        {request.resolvedAt && <LocalTime at={request.resolvedAt} />}
+        {request.rail === 'STRIPE'
+          ? ` via Stripe${request.reference ? `, ${request.reference}` : ''}`
+          : ` via bank transfer${request.reference ? `, ref ${request.reference}` : ''}`}
       </span>
     );
   }
