@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { Shield } from 'lucide-react';
 import {
   getConnectStates,
@@ -19,6 +20,14 @@ import { stripe } from '@/server/lib/stripe';
 import { PayoutSetupPanel } from './_components/PayoutSetupPanel';
 import { PlatformRequestsTable } from './_components/PlatformRequestsTable';
 
+// Walks every transfer in the window, so a few minutes stale beats a Stripe
+// round-trip per page view. The cron runs the same check daily.
+const reconcileCached = unstable_cache(
+  () => reconcileStripePayouts(prisma, stripe),
+  ['payout-reconciliation'],
+  { revalidate: 300 }
+);
+
 export default async function PlatformPayoutsPage() {
   const user = await getUserFromIdTokenCookie();
   if (!user) {
@@ -38,7 +47,7 @@ export default async function PlatformPayoutsPage() {
     listPayoutRequests(prisma, actor),
     listPayoutOrganizations(prisma, actor),
     readPlatformPayoutBalance(prisma, stripe, actor).catch(unavailable),
-    reconcileStripePayouts(prisma, stripe).catch(unavailable),
+    reconcileCached().catch(unavailable),
   ]);
   const connectStates = getConnectStates(organizations);
   const mismatches = Object.fromEntries(
@@ -100,20 +109,25 @@ function BalanceHeader({
           value={balance ? formatCents(balance.availableCents) : 'Unavailable'}
         />
         <Stat
-          label="Open requests"
+          label="Open Stripe requests"
           value={balance ? formatCents(balance.openRequestsCents) : '—'}
         />
-        <p className="text-muted-foreground">
-          {balance === null
-            ? "Couldn't reach Stripe. Refresh before sending."
-            : short
-              ? 'Short: wait for the next sweep to leave the floor, or top up, before sending.'
-              : mismatches === null
-                ? 'Reconciliation unavailable; check Stripe by hand before sending.'
-                : mismatches.length === 0
-                  ? 'Transfers and requests agree.'
-                  : `${mismatches.length} request${mismatches.length === 1 ? '' : 's'} disagree with Stripe; see the flags below.`}
-        </p>
+        <div className="space-y-0.5 text-muted-foreground">
+          <p>
+            {balance === null
+              ? "Couldn't reach Stripe. Refresh before sending."
+              : short
+                ? 'Short: wait for the next sweep to leave the floor, or top up, before sending.'
+                : 'Enough to send every open Stripe request.'}
+          </p>
+          <p>
+            {mismatches === null
+              ? 'Reconciliation unavailable; check Stripe by hand before sending.'
+              : mismatches.length === 0
+                ? 'Transfers and requests agree.'
+                : `${mismatches.length} ${mismatches.length === 1 ? 'request disagrees' : 'requests disagree'} with Stripe; see the flags below.`}
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

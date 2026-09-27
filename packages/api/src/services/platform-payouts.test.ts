@@ -68,6 +68,7 @@ function fakePrisma(opts: FakeOpts = {}) {
     .mockResolvedValue({ _sum: { amountCents: opts.openSumCents ?? null } });
   const orgFindMany = vi.fn().mockResolvedValue(opts.organizations ?? []);
 
+  const lock = vi.fn().mockResolvedValue([]);
   const prisma = {
     users: {
       findUnique: vi
@@ -81,14 +82,24 @@ function fakePrisma(opts: FakeOpts = {}) {
       updateMany: requestUpdateMany,
     },
     organization: { findMany: orgFindMany, updateMany: orgUpdateMany },
+    $queryRaw: lock,
+    $transaction: vi.fn((fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
   } as unknown as PrismaClient;
 
-  return { prisma, requestUpdateMany, orgUpdateMany, orgFindMany };
+  return {
+    prisma,
+    requestUpdateMany,
+    requestAggregate,
+    orgUpdateMany,
+    orgFindMany,
+    lock,
+  };
 }
 
 interface FakeTransfer {
   id: string;
   metadata?: Record<string, string>;
+  reversed?: boolean;
 }
 
 function listResult(items: FakeTransfer[]) {
@@ -140,6 +151,8 @@ const OPEN_REQUEST = {
     id: 'org-1',
     slug: 'island-nights',
     stripeAccountId: 'acct_1',
+    stripeTransfersStatus: 'active',
+    payoutBankLinkedAt: new Date('2026-09-01T00:00:00Z'),
   },
 };
 
@@ -225,8 +238,10 @@ describe('listPayoutRequests', () => {
 describe('sendPayoutViaStripe', () => {
   const NOW = new Date('2026-09-27T12:00:00Z');
 
-  it('creates the transfer with the request id as key and group, then resolves the row', async () => {
-    const { prisma, requestUpdateMany } = fakePrisma({ request: OPEN_REQUEST });
+  it('locks the row, creates the transfer in the request group with a fresh key, then resolves', async () => {
+    const { prisma, requestUpdateMany, lock } = fakePrisma({
+      request: OPEN_REQUEST,
+    });
     const { stripe, create, list } = fakeStripe();
 
     const result = await sendPayoutViaStripe(
@@ -238,21 +253,23 @@ describe('sendPayoutViaStripe', () => {
     );
 
     expect(result).toEqual({ transferId: 'tr_new' });
+    expect(lock).toHaveBeenCalledTimes(1);
     expect(list).toHaveBeenCalledWith({
       transfer_group: 'payout-request-req-1',
-      limit: 1,
+      limit: 10,
     });
-    expect(create).toHaveBeenCalledWith(
-      {
-        amount: 25000,
-        currency: 'usd',
-        destination: 'acct_1',
-        description: 'TropTix payout — island-nights — req-1',
-        transfer_group: 'payout-request-req-1',
-        metadata: { payoutRequestId: 'req-1', organizationId: 'org-1' },
-      },
-      { idempotencyKey: 'payout-request-req-1' }
-    );
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0]).toEqual({
+      amount: 25000,
+      currency: 'usd',
+      destination: 'acct_1',
+      description: 'TropTix payout — island-nights — req-1',
+      transfer_group: 'payout-request-req-1',
+      metadata: { payoutRequestId: 'req-1', organizationId: 'org-1' },
+    });
+    expect(
+      (create.mock.calls[0][1] as { idempotencyKey: string }).idempotencyKey
+    ).toMatch(/^payout-request-req-1-[0-9a-f-]{36}$/);
     expect(requestUpdateMany).toHaveBeenCalledWith({
       where: { id: 'req-1', status: 'REQUESTED' },
       data: {
@@ -265,7 +282,7 @@ describe('sendPayoutViaStripe', () => {
     });
   });
 
-  it('reuses a transfer already in the group instead of creating a second one', async () => {
+  it('reuses a live transfer already in the group instead of creating a second one', async () => {
     const { prisma, requestUpdateMany } = fakePrisma({ request: OPEN_REQUEST });
     const { stripe, create } = fakeStripe({ existing: [{ id: 'tr_old' }] });
 
@@ -276,6 +293,31 @@ describe('sendPayoutViaStripe', () => {
     expect(result.transferId).toBe('tr_old');
     expect(create).not.toHaveBeenCalled();
     expect(requestUpdateMany.mock.calls[0][0].data.reference).toBe('tr_old');
+  });
+
+  it('does not reuse a reversed transfer', async () => {
+    const { prisma } = fakePrisma({ request: OPEN_REQUEST });
+    const { stripe, create } = fakeStripe({
+      existing: [{ id: 'tr_reversed', reversed: true }],
+    });
+
+    const result = await sendPayoutViaStripe(prisma, stripe, STAFF, {
+      id: 'req-1',
+    });
+
+    expect(result.transferId).toBe('tr_new');
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses a different idempotency key on each attempt so a cached failure is not replayed', async () => {
+    const { prisma } = fakePrisma({ request: OPEN_REQUEST });
+    const { stripe, create } = fakeStripe();
+    await sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' });
+    await sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' });
+    const keys = create.mock.calls.map(
+      (call) => (call[1] as { idempotencyKey: string }).idempotencyKey
+    );
+    expect(keys[0]).not.toBe(keys[1]);
   });
 
   it('maps balance_insufficient to the typed error with the shortfall and leaves the row alone', async () => {
@@ -296,14 +338,36 @@ describe('sendPayoutViaStripe', () => {
     expect(requestUpdateMany).not.toHaveBeenCalled();
   });
 
-  it('maps a restricted account to the typed error', async () => {
+  it.each([
+    'transfers_not_allowed',
+    'insufficient_capabilities_for_transfer',
+    'account_invalid',
+  ])('maps %s to the restricted-account error', async (code) => {
     const { prisma } = fakePrisma({ request: OPEN_REQUEST });
-    const { stripe } = fakeStripe({
-      createError: stripeError('transfers_not_allowed'),
-    });
+    const { stripe } = fakeStripe({ createError: stripeError(code) });
     await expect(
       sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' })
     ).rejects.toThrow(StripeAccountRestrictedError);
+  });
+
+  it('refuses an organization whose account is not active without touching Stripe', async () => {
+    const { stripe, create, list } = fakeStripe();
+    for (const status of ['pending', 'restricted', null]) {
+      const { prisma } = fakePrisma({
+        request: {
+          ...OPEN_REQUEST,
+          organization: {
+            ...OPEN_REQUEST.organization,
+            stripeTransfersStatus: status,
+          },
+        },
+      });
+      await expect(
+        sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' })
+      ).rejects.toThrow(ConflictError);
+    }
+    expect(list).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('rethrows any other Stripe failure untouched', async () => {
@@ -358,12 +422,19 @@ describe('sendPayoutViaStripe', () => {
 });
 
 describe('readPlatformPayoutBalance', () => {
-  it('sums the USD available balance against open requests', async () => {
-    const { prisma } = fakePrisma({ openSumCents: 30000 });
+  it('sums the USD available balance against open Stripe-rail requests only', async () => {
+    const { prisma, requestAggregate } = fakePrisma({ openSumCents: 30000 });
     const { stripe } = fakeStripe({ availableUsd: 12345 });
     await expect(
       readPlatformPayoutBalance(prisma, stripe, STAFF)
     ).resolves.toEqual({ availableCents: 12345, openRequestsCents: 30000 });
+    expect(requestAggregate.mock.calls[0][0].where).toEqual({
+      status: 'REQUESTED',
+      organization: {
+        stripeAccountId: { not: null },
+        stripeTransfersStatus: 'active',
+      },
+    });
   });
 
   it('reads zero open requests as zero', async () => {
@@ -377,11 +448,14 @@ describe('readPlatformPayoutBalance', () => {
 describe('reconcileStripePayouts', () => {
   const NOW = new Date('2026-09-27T12:00:00Z');
   const rows = [
-    { id: 'open-clean', status: 'REQUESTED' },
-    { id: 'open-sent', status: 'REQUESTED' },
-    { id: 'paid-clean', status: 'PAID' },
-    { id: 'paid-missing', status: 'PAID' },
-    { id: 'paid-twice', status: 'PAID' },
+    { id: 'open-clean', status: 'REQUESTED', rail: null },
+    { id: 'open-sent', status: 'REQUESTED', rail: null },
+    { id: 'paid-clean', status: 'PAID', rail: 'STRIPE' },
+    { id: 'paid-missing', status: 'PAID', rail: 'STRIPE' },
+    { id: 'paid-twice', status: 'PAID', rail: 'STRIPE' },
+    { id: 'paid-reversed-only', status: 'PAID', rail: 'STRIPE' },
+    { id: 'cancelled-sent', status: 'CANCELLED', rail: null },
+    { id: 'paid-mercury-sent', status: 'PAID', rail: 'MERCURY' },
   ];
   const transfers: FakeTransfer[] = [
     { id: 'tr_a', metadata: { payoutRequestId: 'open-sent' } },
@@ -389,9 +463,17 @@ describe('reconcileStripePayouts', () => {
     { id: 'tr_c', metadata: { payoutRequestId: 'paid-twice' } },
     { id: 'tr_d', metadata: { payoutRequestId: 'paid-twice' } },
     { id: 'tr_e', metadata: {} },
+    {
+      id: 'tr_f',
+      metadata: { payoutRequestId: 'paid-reversed-only' },
+      reversed: true,
+    },
+    { id: 'tr_g', metadata: { payoutRequestId: 'cancelled-sent' } },
+    { id: 'tr_h', metadata: { payoutRequestId: 'paid-mercury-sent' } },
+    { id: 'tr_i', metadata: { payoutRequestId: 'deleted-row' } },
   ];
 
-  it('flags the three mismatch kinds and nothing else', async () => {
+  it('flags every mismatch kind, ignores reversed transfers, and nothing else', async () => {
     const { prisma } = fakePrisma({ requests: rows });
     const { stripe, list } = fakeStripe({ all: transfers });
 
@@ -416,6 +498,26 @@ describe('reconcileStripePayouts', () => {
         kind: 'duplicate_transfer',
         transferIds: ['tr_c', 'tr_d'],
       },
+      {
+        requestId: 'paid-reversed-only',
+        kind: 'paid_without_transfer',
+        transferIds: [],
+      },
+      {
+        requestId: 'cancelled-sent',
+        kind: 'closed_with_transfer',
+        transferIds: ['tr_g'],
+      },
+      {
+        requestId: 'paid-mercury-sent',
+        kind: 'closed_with_transfer',
+        transferIds: ['tr_h'],
+      },
+      {
+        requestId: 'deleted-row',
+        kind: 'transfer_without_request',
+        transferIds: ['tr_i'],
+      },
     ]);
     expect(list).toHaveBeenCalledWith({
       created: { gte: Math.floor((NOW.getTime() - 35 * 86_400_000) / 1000) },
@@ -425,12 +527,25 @@ describe('reconcileStripePayouts', () => {
 
   it('returns nothing when rows and transfers agree', async () => {
     const { prisma } = fakePrisma({
-      requests: [{ id: 'paid-clean', status: 'PAID' }],
+      requests: [{ id: 'paid-clean', status: 'PAID', rail: 'STRIPE' }],
     });
-    const { stripe } = fakeStripe({ all: transfers });
+    const { stripe } = fakeStripe({
+      all: [{ id: 'tr_b', metadata: { payoutRequestId: 'paid-clean' } }],
+    });
     await expect(
       reconcileStripePayouts(prisma, stripe, { now: NOW })
     ).resolves.toEqual([]);
+  });
+
+  it('asks the database for the rows the transfers point at', async () => {
+    const { prisma } = fakePrisma();
+    const { stripe } = fakeStripe({
+      all: [{ id: 'tr_z', metadata: { payoutRequestId: 'some-row' } }],
+    });
+    await reconcileStripePayouts(prisma, stripe, { now: NOW });
+    const where = (prisma.payoutRequest.findMany as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0].where;
+    expect(where.OR[2]).toEqual({ id: { in: ['some-row'] } });
   });
 });
 

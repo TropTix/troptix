@@ -168,7 +168,7 @@ export default async function OrganizerPayoutsPage({
           <RequestsTable
             requests={payouts.requests}
             readOnly={readOnly}
-            viaStripe={Boolean(connect?.accountId)}
+            viaStripe={connect?.state === 'active'}
             action={
               !readOnly && (
                 <RequestPayoutDialog

@@ -102,20 +102,22 @@ the 2026-09-21 grilling session:
    still retrieve live before moving money. The per-request `rail` field
    keeps recording what actually happened, and the mark-paid rail select
    stays as the per-request override.
-5. **Transfer first, resolve second**, with the payout request id as the
-   Stripe idempotency key (a retry after a crash returns the same transfer —
-   no double pay) and in the transfer metadata. The resolve is the existing
-   guarded `updateMany`; if it writes 0 rows (organizer cancelled in the race
+5. **Transfer first, resolve second**, with the payout request id in the
+   transfer metadata and as its `transfer_group`. The send takes a row lock
+   on the request, lists the group first, and reuses a live (not reversed)
+   transfer it finds instead of creating another; the lock serializes two
+   admins, the lookup catches a transfer whose response was lost. The
+   idempotency key is per attempt (ADR 0033): Stripe replays a cached
+   failure under a reused key for 24 hours, which would have made "top up,
+   then retry" impossible for a day. The resolve is the existing guarded
+   `updateMany`; if it writes 0 rows (organizer cancelled in the race
    window), surface the transfer id with the conflict error and recover by
-   hand. Stripe prunes idempotency keys after 24 hours, so the key alone
-   cannot stop a double pay a week later: every transfer also carries
-   `transfer_group` = the request id, and the send lists transfers for that
-   group first; if one exists, it resolves with it instead of creating
-   another. `balance_insufficient` is an expected, typed failure: the request
+   hand. `balance_insufficient` is an expected, typed failure: the request
    stays `REQUESTED` and the admin retries after the balance refills or pays
-   manually. `payouts_not_allowed`, `transfers_not_allowed`, and
-   `capability_not_active` map to a typed "organizer must finish Stripe
-   setup" failure. No outbox or worker until payouts become automatic.
+   manually. `payouts_not_allowed`, `transfers_not_allowed`,
+   `insufficient_capabilities_for_transfer`, and `account_invalid` map to a
+   typed "organizer must finish Stripe setup" failure. No outbox or worker
+   until payouts become automatic.
 6. **Country is self-selected** at the bank step. The checklist's bank step
    forks: "US bank account → Connect with Stripe" creates the account with
    `identity.country: 'US'` and hands off to hosted onboarding; anything else
@@ -190,10 +192,12 @@ the 2026-09-21 grilling session:
     day it happens.
 17. **Reconcile daily.** A cron route beside the existing ones lists Stripe
     transfers carrying a request id in metadata and compares them with
-    `PayoutRequest` rows. Three mismatches are flagged in the platform queue:
-    `PAID` with no transfer, `REQUESTED` with a transfer, and two transfers
-    for one request. This is the safety net under the idempotency rules and
-    under every later automation.
+    `PayoutRequest` rows, ignoring reversed transfers. Five mismatches are
+    flagged in the platform queue: `PAID` on Stripe with no transfer,
+    `REQUESTED` with a transfer, two transfers for one request, a cancelled,
+    rejected, or manually paid row with a transfer, and a transfer pointing
+    at no row. This is the safety net under the idempotency rules and under
+    every later automation.
 18. **The queue shows the money before the click.** The platform queue header
     reads the platform's available balance live and the sum of open requests,
     and turns amber when the first is below the second. Stripe never retries a
@@ -391,8 +395,11 @@ tables.
 2. `stripe.transfers.create(
 { amount: amountCents, currency: 'usd', destination: accountId,
   description: 'TropTix payout — <slug> — <id prefix>',
+  transfer_group: 'payout-request-' + id,
   metadata: { payoutRequestId, organizationId } },
-{ idempotencyKey: 'payout-request-' + id })`.
+{ idempotencyKey: 'payout-request-' + id + '-' + <fresh uuid> })`,
+   inside a transaction that holds `SELECT … FOR UPDATE` on the request row,
+   after listing the group and finding no live transfer.
 3. The existing guarded resolve: `status: 'PAID'`, `rail: 'STRIPE'`,
    `reference: transfer.id`, `resolvedAt`, `resolvedByUserId`.
 4. Errors, all typed and all leaving the row `REQUESTED`:
@@ -406,9 +413,9 @@ tables.
    - resolve wrote 0 rows → `ConflictError` whose message carries
      `transfer.id`. The money moved; the admin reconciles by hand (reverse the
      transfer or re-mark the row).
-   - anything else → rethrown; the idempotency key makes the retry safe.
+   - anything else → rethrown; the group lookup makes the retry safe.
 
-The idempotency key and the metadata together are the audit trail: from a
+The transfer group and the metadata together are the audit trail: from a
 request id you can find its transfer in Stripe, and from a transfer you can
 find its request.
 

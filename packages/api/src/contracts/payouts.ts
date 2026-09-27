@@ -132,6 +132,8 @@ export const payoutMismatchSchema = z.object({
     'paid_without_transfer',
     'requested_with_transfer',
     'duplicate_transfer',
+    'closed_with_transfer',
+    'transfer_without_request',
   ]),
   transferIds: z.array(z.string()),
 });

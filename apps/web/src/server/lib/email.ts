@@ -5,6 +5,7 @@ import {
   type EmailAttachment,
 } from '@troptix/transactional';
 import { getAppBaseUrl } from '@/lib/appUrl';
+import { formatCents } from '@/lib/dateUtils';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
 import { Resend } from 'resend';
 
@@ -145,7 +146,10 @@ export async function sendDisputeNoticeEmail(dispute: {
   reason: string;
   charge: string;
 }) {
-  const amount = `${(dispute.amount / 100).toFixed(2)} ${dispute.currency.toUpperCase()}`;
+  const amount =
+    dispute.currency === 'usd'
+      ? formatCents(dispute.amount)
+      : `${dispute.amount} ${dispute.currency.toUpperCase()} (minor units)`;
   const html = `
     <p>A buyer disputed a charge: <strong>${amount}</strong>, reason <code>${dispute.reason}</code>.</p>
     <p>Dispute <a href="https://dashboard.stripe.com/payments/${dispute.charge}">${dispute.id}</a> on charge <code>${dispute.charge}</code>.</p>

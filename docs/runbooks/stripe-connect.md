@@ -75,9 +75,11 @@ right end state; anything Stripe decides after that never reaches the preview
    the Connect fee; **Send via Stripe** creates the transfer and marks the row
    paid with the transfer id as its reference. **Pay another way** opens the
    manual cockpit.
-2. The request id is the transfer's idempotency key and `transfer_group`, so
-   a retry after any failure is safe: the send looks the group up first and
-   reuses the transfer it finds.
+2. The request id is the transfer's `transfer_group`, so a retry after any
+   failure is safe: the send looks the group up first and reuses a live
+   transfer it finds. A reversed transfer is never reused. The idempotency
+   key is fresh on every attempt (ADR 0033), so a retry after topping up the
+   balance is not answered with the cached failure.
 3. Failures leave the row open and say why: the platform balance is short
    (wait for the sweep to leave the floor, or top up), or Stripe has paused
    the account (the organizer sees **Update with Stripe**). "Transfer tr\_…

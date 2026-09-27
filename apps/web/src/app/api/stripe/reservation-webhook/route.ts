@@ -112,7 +112,15 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
       console.error(
         `[ReservationWebhook] Dispute ${dispute.id} opened on charge ${charge}`
       );
-      after(() => sendDisputeNoticeEmail({ ...dispute, charge }));
+      after(() =>
+        sendDisputeNoticeEmail({
+          id: dispute.id,
+          amount: dispute.amount,
+          currency: dispute.currency,
+          reason: dispute.reason,
+          charge,
+        })
+      );
       return;
     }
 

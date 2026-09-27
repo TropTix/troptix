@@ -70,6 +70,8 @@ const MISMATCH_LABELS: Record<PayoutMismatch['kind'], string> = {
   paid_without_transfer: 'Marked paid, no Stripe transfer found',
   requested_with_transfer: 'A Stripe transfer exists but the request is open',
   duplicate_transfer: 'More than one Stripe transfer for this request',
+  closed_with_transfer: 'Resolved off Stripe, but a Stripe transfer exists',
+  transfer_without_request: 'A Stripe transfer points at no request',
 };
 
 /** Stripe's Connect pricing for a transfer: 0.25% plus 25¢, absorbed by TropTix. */
