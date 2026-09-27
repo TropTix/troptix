@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { PAYOUT_TERMS } from '../legal/payoutTerms';
+import { PayoutConfig } from './_shared/payouts';
 import {
   acceptPayoutTerms,
   currentPayoutTerms,
@@ -28,6 +29,23 @@ describe('payout terms', () => {
     expect(terms.version).toBe(PAYOUT_TERMS.version);
     expect(terms.sections.length).toBeGreaterThan(3);
     expect(terms.sections[0].heading).toMatch(/appoint TropTix/);
+  });
+
+  it('states the holdback from PayoutConfig, never a number of its own', () => {
+    const holdback = PAYOUT_TERMS.sections.find(
+      (section) => section.heading === 'Holdback'
+    );
+    expect(holdback?.body).toContain(
+      `${PayoutConfig.HOLDBACK_PERCENT}% for ${PayoutConfig.HOLDBACK_DAYS} days`
+    );
+    const numbers = PAYOUT_TERMS.sections
+      .map((section) => section.body)
+      .join(' ')
+      .match(/\b\d+%|\b\d+ days\b/g);
+    expect(numbers).toEqual([
+      `${PayoutConfig.HOLDBACK_PERCENT}%`,
+      `${PayoutConfig.HOLDBACK_DAYS} days`,
+    ]);
   });
 
   it('counts only the current version as accepted', () => {

@@ -1,9 +1,12 @@
 import type { PayoutTerms } from '../contracts/payouts';
+import { PayoutConfig } from '../services/_shared/payouts';
 
 /**
  * The text is counsel's; the product only records assent to a version. Bump
  * `version` when the words change in substance: every organizer then has to
- * accept again before their next payout request.
+ * accept again before their next payout request. The holdback numbers come
+ * from PayoutConfig so they cannot drift from the ledger; changing them there
+ * changes these words and needs the same bump.
  */
 export const PAYOUT_TERMS: PayoutTerms = {
   version: '2026-09-27',
@@ -19,7 +22,7 @@ export const PAYOUT_TERMS: PayoutTerms = {
     },
     {
       heading: 'Holdback',
-      body: 'TropTix holds back a share of each event’s earnings for a period after the event ends to cover refunds and chargebacks. The default is 10% for 14 days. Whatever remains is then released to your available balance.',
+      body: `TropTix holds back a share of each event’s earnings for a period after the event ends to cover refunds and chargebacks. The default is ${PayoutConfig.HOLDBACK_PERCENT}% for ${PayoutConfig.HOLDBACK_DAYS} days. Whatever remains is then released to your available balance.`,
     },
     {
       heading: 'Requesting a payout',
