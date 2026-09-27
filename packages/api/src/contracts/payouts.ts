@@ -41,9 +41,26 @@ export type ConnectReturnOutcome = z.infer<typeof connectReturnOutcomeSchema>;
 export const payoutSetupStateSchema = z.object({
   meetingDone: z.boolean(),
   bankLinked: z.boolean(),
+  /** True only for the current terms version. */
+  termsAccepted: z.boolean(),
+  termsAcceptedAt: z.string().datetime().nullable(),
   complete: z.boolean(),
 });
 export type PayoutSetupState = z.infer<typeof payoutSetupStateSchema>;
+
+export const payoutTermsSchema = z.object({
+  version: z.string().min(1),
+  effective: z.string().min(1),
+  sections: z.array(z.object({ heading: z.string(), body: z.string() })),
+});
+export type PayoutTerms = z.infer<typeof payoutTermsSchema>;
+
+export const acceptPayoutTermsInputSchema = z.object({
+  version: z.string().min(1),
+});
+export type AcceptPayoutTermsInput = z.infer<
+  typeof acceptPayoutTermsInputSchema
+>;
 
 /** The org's effective release rule — overrides already folded in. */
 export const payoutPolicySchema = z.object({
@@ -170,6 +187,8 @@ export const payoutOrganizationSchema = z.object({
   ownerEmail: z.string().nullable(),
   payoutMeetingAt: z.string().datetime().nullable(),
   payoutBankLinkedAt: z.string().datetime().nullable(),
+  payoutTermsAcceptedAt: z.string().datetime().nullable(),
+  payoutTermsVersion: z.string().nullable(),
   stripeAccountId: z.string().nullable(),
   stripeTransfersStatus: z.string().nullable(),
   setup: payoutSetupStateSchema,

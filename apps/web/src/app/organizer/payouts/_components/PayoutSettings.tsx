@@ -6,7 +6,7 @@ import {
   Info,
   Mail,
 } from 'lucide-react';
-import type { ConnectSetup, PayoutSetupState } from '@troptix/api';
+import type { ConnectSetup, PayoutSetupState, PayoutTerms } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,16 +18,22 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { BankStep } from './BankStep';
-import { SETUP_STEP_COUNT, setupStepsDone } from './SetupChecklistCard';
+import {
+  SETUP_STEP_COUNT,
+  setupStepsDone,
+  TermsStep,
+} from './SetupChecklistCard';
 
 export function PayoutSettings({
   setup,
   connect,
+  terms,
   readOnly,
   holdbackLine,
 }: {
   setup: PayoutSetupState;
   connect: ConnectSetup | null;
+  terms: PayoutTerms;
   readOnly: boolean;
   holdbackLine: string;
 }) {
@@ -41,7 +47,7 @@ export function PayoutSettings({
           <CardDescription>
             {setup.complete
               ? 'All set. You can request payouts any time you have a balance.'
-              : 'Two steps with the TropTix team unlock payout requests.'}
+              : 'Three steps with the TropTix team unlock payout requests.'}
           </CardDescription>
           <CardAction>
             {setup.complete ? (
@@ -68,13 +74,16 @@ export function PayoutSettings({
             </>
           )}
         </Requirement>
-        <Requirement done={setup.bankLinked} title="Bank account" last>
+        <Requirement done={setup.bankLinked} title="Bank account">
           <BankStep
             setup={setup}
             connect={connect}
             readOnly={readOnly}
             showDashboard
           />
+        </Requirement>
+        <Requirement done={setup.termsAccepted} title="Payout terms" last>
+          <TermsStep setup={setup} terms={terms} readOnly={readOnly} />
         </Requirement>
       </Card>
 

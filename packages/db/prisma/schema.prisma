@@ -89,6 +89,11 @@ model Organization {
   payoutMeetingAt    DateTime?
   payoutBankLinkedAt DateTime?
 
+  // Payout terms, versioned. Null = never accepted. A version bump in
+  // packages/api/src/legal/payoutTerms.ts turns the step back to todo.
+  payoutTermsAcceptedAt DateTime?
+  payoutTermsVersion    String?   @db.VarChar(20)
+
   // The organizer's Stripe account: a Connect account today, a Global Payouts
   // recipient later. The transfers capability status is Stripe's, mirrored
   // here by the webhook and the onboarding return (ADR 0032); null until the

@@ -33,14 +33,18 @@ values ('seed_staff_1', now(), now(), 'demo-staff@troptix.test', 'Demo Staff', '
 
 -- Demo organizer's Organization (brand). Approved for paid ticketing to match
 -- the paid festival below (seed_event_1); not verified.
--- Payout setup complete (both timestamps set) so the request flow is exercisable.
+-- Payout setup complete (meeting, bank, and the current terms version) so the
+-- request flow is exercisable. Keep the version in step with
+-- packages/api/src/legal/payoutTerms.ts.
 insert into public."Organization" (
   id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
   verified, "paidTicketingEnabled", "payoutMeetingAt", "payoutBankLinkedAt",
+  "payoutTermsAcceptedAt", "payoutTermsVersion",
   "stripeAccountId", "stripeTransfersStatus"
 ) values (
   'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer', 'seed_org_1',
   false, true, now() - interval '40 days', now() - interval '40 days',
+  now() - interval '40 days', '2026-09-27',
   null, null
 );
 
@@ -52,10 +56,11 @@ values ('seed_org_2', now(), now(), 'demo-organizer-2@troptix.test', 'Island Nig
 
 insert into public."Organization" (
   id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
-  verified, "paidTicketingEnabled", "stripeAccountId", "stripeTransfersStatus"
+  verified, "paidTicketingEnabled", "payoutTermsAcceptedAt", "payoutTermsVersion",
+  "stripeAccountId", "stripeTransfersStatus"
 ) values (
   'seed_organization_2', now(), now(), 'island-nights', 'Island Nights', 'seed_org_2',
-  false, true, null, null
+  false, true, null, null, null, null
 );
 
 -- Demo Admin: holds a Membership in the demo Organization (teams Phase 1).

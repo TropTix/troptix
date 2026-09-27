@@ -5,6 +5,7 @@ import type {
   GetPayoutsInput,
   OrganizerPayoutRequest,
   OrganizerPayouts,
+  PayoutSetupState,
   RequestPayoutInput,
 } from '../contracts/payouts';
 import {
@@ -12,6 +13,7 @@ import {
   NotFoundError,
   PayoutRequestPendingError,
   PayoutSetupIncompleteError,
+  PayoutTermsNotAcceptedError,
   UnauthorizedError,
 } from './_shared/errors';
 import { calculateFeesCents } from './_shared/fees';
@@ -22,6 +24,7 @@ import {
   type PayoutPolicy,
 } from './_shared/payouts';
 import { resolveOrganizerScope } from './organizer-scope';
+import { termsAccepted } from './payout-terms';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -29,14 +32,12 @@ const ORG_PAYOUT_SELECT = {
   id: true,
   payoutMeetingAt: true,
   payoutBankLinkedAt: true,
+  payoutTermsAcceptedAt: true,
+  payoutTermsVersion: true,
   payoutReleaseAtSale: true,
   payoutHoldbackPercent: true,
   payoutHoldbackDays: true,
 } as const;
-
-type OrgPayoutRow = Prisma.OrganizationGetPayload<{
-  select: typeof ORG_PAYOUT_SELECT;
-}>;
 
 interface EarnedRow {
   eventId: string;
@@ -146,10 +147,22 @@ async function computeBalances(
   };
 }
 
-function toSetupState(org: OrgPayoutRow) {
+export function toSetupState(org: {
+  payoutMeetingAt: Date | null;
+  payoutBankLinkedAt: Date | null;
+  payoutTermsAcceptedAt: Date | null;
+  payoutTermsVersion: string | null;
+}): PayoutSetupState {
   const meetingDone = org.payoutMeetingAt !== null;
   const bankLinked = org.payoutBankLinkedAt !== null;
-  return { meetingDone, bankLinked, complete: meetingDone && bankLinked };
+  const terms = termsAccepted(org);
+  return {
+    meetingDone,
+    bankLinked,
+    termsAccepted: terms,
+    termsAcceptedAt: org.payoutTermsAcceptedAt?.toISOString() ?? null,
+    complete: meetingDone && bankLinked && terms,
+  };
 }
 
 export function toRequestDto(request: {
@@ -198,7 +211,13 @@ export async function getPayouts(
       availableCents: 0,
       pendingCents: 0,
       paidOutCents: 0,
-      setup: { meetingDone: false, bankLinked: false, complete: false },
+      setup: {
+        meetingDone: false,
+        bankLinked: false,
+        termsAccepted: false,
+        termsAcceptedAt: null,
+        complete: false,
+      },
       policy: resolvePayoutPolicy({
         payoutReleaseAtSale: false,
         payoutHoldbackPercent: null,
@@ -249,9 +268,12 @@ export async function requestPayout(
     where: { ownerUserId: actor.userId },
     select: ORG_PAYOUT_SELECT,
   });
-  if (!org || !toSetupState(org).complete) {
+  if (!org) throw new PayoutSetupIncompleteError();
+  const setup = toSetupState(org);
+  if (!setup.meetingDone || !setup.bankLinked) {
     throw new PayoutSetupIncompleteError();
   }
+  if (!setup.termsAccepted) throw new PayoutTermsNotAcceptedError();
 
   const open = await prisma.payoutRequest.count({
     where: { organizationId: org.id, status: 'REQUESTED' },

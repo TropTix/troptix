@@ -20,7 +20,7 @@ import {
 } from './_shared/errors';
 import { resolvePayoutPolicy } from './_shared/payouts';
 import { connectStateOf } from './organizer-connect';
-import { toRequestDto } from './organizer-payouts';
+import { toRequestDto, toSetupState } from './organizer-payouts';
 import { requirePlatformOwner } from './organizer-scope';
 
 export async function listPayoutRequests(
@@ -434,6 +434,8 @@ export async function listPayoutOrganizations(
       slug: true,
       payoutMeetingAt: true,
       payoutBankLinkedAt: true,
+      payoutTermsAcceptedAt: true,
+      payoutTermsVersion: true,
       stripeAccountId: true,
       stripeTransfersStatus: true,
       payoutReleaseAtSale: true,
@@ -444,8 +446,6 @@ export async function listPayoutOrganizations(
   });
 
   return rows.map((org) => {
-    const meetingDone = org.payoutMeetingAt !== null;
-    const bankLinked = org.payoutBankLinkedAt !== null;
     return {
       id: org.id,
       displayName: org.displayName,
@@ -453,9 +453,11 @@ export async function listPayoutOrganizations(
       ownerEmail: org.owner.email,
       payoutMeetingAt: org.payoutMeetingAt?.toISOString() ?? null,
       payoutBankLinkedAt: org.payoutBankLinkedAt?.toISOString() ?? null,
+      payoutTermsAcceptedAt: org.payoutTermsAcceptedAt?.toISOString() ?? null,
+      payoutTermsVersion: org.payoutTermsVersion,
       stripeAccountId: org.stripeAccountId,
       stripeTransfersStatus: org.stripeTransfersStatus,
-      setup: { meetingDone, bankLinked, complete: meetingDone && bankLinked },
+      setup: toSetupState(org),
       policy: resolvePayoutPolicy(org),
       holdbackPercentOverride: org.payoutHoldbackPercent,
       holdbackDaysOverride: org.payoutHoldbackDays,
