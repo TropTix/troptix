@@ -69,6 +69,7 @@ export {
   requestPayout,
   cancelPayoutRequest,
 } from './services/organizer-payouts';
+export { acceptPayoutTerms, currentPayoutTerms } from './services/payout-terms';
 export {
   getConnectSetup,
   getConnectStates,
@@ -98,6 +99,7 @@ export {
   PayoutSetupIncompleteError,
   InvalidPayoutAmountError,
   PayoutRequestPendingError,
+  PayoutTermsNotAcceptedError,
   InsufficientPlatformBalanceError,
   StripeAccountRestrictedError,
 } from './services/_shared/errors';

@@ -1,5 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
-import { getConnectSetup, getPayouts } from '@troptix/api/server';
+import {
+  currentPayoutTerms,
+  getConnectSetup,
+  getPayouts,
+} from '@troptix/api/server';
 import { connectReturnOutcomeSchema, FeatureFlag } from '@troptix/api';
 import { AlertTriangle, Banknote, Clock, Wallet } from 'lucide-react';
 import { isFlagEnabled } from '@/server/lib/featureFlags';
@@ -63,6 +67,7 @@ export default async function OrganizerPayoutsPage({
       : Promise.resolve(null),
   ]);
   const { policy, setup } = payouts;
+  const terms = currentPayoutTerms();
   const returnOutcome = connectReturnOutcomeSchema.safeParse(stripeParam);
 
   const holdbackLine = policy.releaseAtSale
@@ -96,6 +101,7 @@ export default async function OrganizerPayoutsPage({
             <SetupChecklistCard
               setup={setup}
               connect={connect}
+              terms={terms}
               readOnly={readOnly}
             />
           )}
@@ -186,6 +192,7 @@ export default async function OrganizerPayoutsPage({
         <PayoutSettings
           setup={setup}
           connect={connect}
+          terms={terms}
           readOnly={readOnly}
           holdbackLine={holdbackLine}
         />

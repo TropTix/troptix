@@ -302,6 +302,18 @@ each service with a fake Stripe, as the payout services do.
 
 ## Phases
 
+### Delivered ahead of PR A
+
+Step 3 shipped on its own (PR "Payout terms: accept in the app", 2026-09-27),
+because it is the contract half of the counsel-cleared collection position and
+needs nothing from steps 1 and 2. Two deviations from the text above: the
+terms live in `packages/api/src/legal/payoutTerms.ts` as a typed module rather
+than a markdown file, since the app cannot read `docs/` at runtime on Vercel;
+and the Owner reads and accepts in a dialog on the payouts page rather than a
+separate route, matching the approved design. The version string is a date.
+`requestPayout` gained the terms check and its own error. No new flag: the
+checklist is already behind `organizer-payouts`.
+
 ### PR A — the four steps
 
 - Migration + seed; `docs/legal/payout-terms.md` v1 (counsel's text).

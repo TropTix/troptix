@@ -9,12 +9,15 @@ import { stripe } from '@/server/lib/stripe';
 import { isFlagEnabled } from '@/server/lib/featureFlags';
 import { getRequestOrigin } from '@/server/lib/requestOrigin';
 import {
+  acceptPayoutTermsInputSchema,
   cancelPayoutRequestInputSchema,
   FeatureFlag,
   requestPayoutInputSchema,
+  type AcceptPayoutTermsInput,
   type RequestPayoutInput,
 } from '@troptix/api';
 import {
+  acceptPayoutTerms as acceptPayoutTermsService,
   cancelPayoutRequest as cancelPayoutRequestService,
   createStripeDashboardLink,
   requestPayout as requestPayoutService,
@@ -23,7 +26,9 @@ import {
   NotFoundError,
   PayoutRequestPendingError,
   PayoutSetupIncompleteError,
+  PayoutTermsNotAcceptedError,
   UnauthorizedError,
+  ConflictError,
 } from '@troptix/api/server';
 
 interface ActionResult {
@@ -50,6 +55,34 @@ export async function requestPayout(
     return { success: true };
   } catch (error) {
     return failure(error, 'Failed to request the payout. Please try again.');
+  }
+}
+
+export async function acceptPayoutTerms(
+  input: AcceptPayoutTermsInput
+): Promise<ActionResult> {
+  const parsed = acceptPayoutTermsInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: 'Invalid request.' };
+  }
+
+  const user = await getServerUser();
+  if (!user) {
+    return { success: false, error: 'Authentication required.' };
+  }
+
+  try {
+    await acceptPayoutTermsService(prisma, userToActor(user), parsed.data);
+    revalidatePath('/organizer/payouts');
+    return { success: true };
+  } catch (error) {
+    if (error instanceof ConflictError) {
+      return { success: false, error: error.message };
+    }
+    return failure(
+      error,
+      'Could not record your acceptance. Please try again.'
+    );
   }
 }
 
@@ -135,6 +168,12 @@ function failure(error: unknown, fallback: string): ActionResult {
     return {
       success: false,
       error: 'Payout setup is not complete yet — contact us to finish it.',
+    };
+  }
+  if (error instanceof PayoutTermsNotAcceptedError) {
+    return {
+      success: false,
+      error: 'Accept the payout terms before requesting a payout.',
     };
   }
   if (error instanceof PayoutRequestPendingError) {

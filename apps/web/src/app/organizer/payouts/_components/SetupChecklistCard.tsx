@@ -1,5 +1,5 @@
 import { CheckCircle2, Circle } from 'lucide-react';
-import type { ConnectSetup, PayoutSetupState } from '@troptix/api';
+import type { ConnectSetup, PayoutSetupState, PayoutTerms } from '@troptix/api';
 
 import {
   Card,
@@ -10,22 +10,64 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { LocalTime } from '@/components/LocalTime';
 import { cn } from '@/lib/utils';
 import { BankStep } from './BankStep';
+import { PayoutTermsDialog } from './PayoutTermsDialog';
 
-export const SETUP_STEP_COUNT = 2;
+export const SETUP_STEP_COUNT = 3;
 
 export function setupStepsDone(setup: PayoutSetupState) {
-  return Number(setup.meetingDone) + Number(setup.bankLinked);
+  return (
+    Number(setup.meetingDone) +
+    Number(setup.bankLinked) +
+    Number(setup.termsAccepted)
+  );
+}
+
+export function TermsStep({
+  setup,
+  terms,
+  readOnly,
+}: {
+  setup: PayoutSetupState;
+  terms: PayoutTerms;
+  readOnly: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <p>
+        {setup.termsAccepted ? (
+          <>
+            Accepted{' '}
+            {setup.termsAcceptedAt && <LocalTime at={setup.termsAcceptedAt} />}.
+            Holdback, timing, refunds, and how TropTix collects for you.
+          </>
+        ) : setup.termsAcceptedAt ? (
+          'The terms changed since you accepted them. Review and accept the new version.'
+        ) : (
+          'Holdback, payout timing, refunds, and how TropTix collects payments for you.'
+        )}
+      </p>
+      <PayoutTermsDialog
+        terms={terms}
+        accepted={setup.termsAccepted}
+        acceptedAt={setup.termsAcceptedAt}
+        canAccept={!readOnly}
+      />
+    </div>
+  );
 }
 
 export function SetupChecklistCard({
   setup,
   connect,
+  terms,
   readOnly,
 }: {
   setup: PayoutSetupState;
   connect: ConnectSetup | null;
+  terms: PayoutTerms;
   readOnly: boolean;
 }) {
   const done = setupStepsDone(setup);
@@ -47,7 +89,7 @@ export function SetupChecklistCard({
           />
         </CardAction>
       </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2">
+      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StepCard
           done={setup.meetingDone}
           active={!setup.meetingDone}
@@ -73,6 +115,13 @@ export function SetupChecklistCard({
           title="Connect your bank account"
         >
           <BankStep setup={setup} connect={connect} readOnly={readOnly} />
+        </StepCard>
+        <StepCard
+          done={setup.termsAccepted}
+          active={setup.meetingDone && setup.bankLinked && !setup.termsAccepted}
+          title="Accept payout terms"
+        >
+          <TermsStep setup={setup} terms={terms} readOnly={readOnly} />
         </StepCard>
       </CardContent>
     </Card>

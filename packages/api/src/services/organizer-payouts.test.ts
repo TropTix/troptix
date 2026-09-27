@@ -11,8 +11,10 @@ import {
   NotFoundError,
   PayoutRequestPendingError,
   PayoutSetupIncompleteError,
+  PayoutTermsNotAcceptedError,
   UnauthorizedError,
 } from './_shared/errors';
+import { PAYOUT_TERMS } from '../legal/payoutTerms';
 
 const NOW = new Date('2026-09-01T12:00:00Z');
 const OWNER: Actor = { kind: 'user', userId: 'owner-1', role: 'PATRON' };
@@ -23,12 +25,16 @@ const daysAgo = (days: number) =>
 const SETUP_DONE = {
   payoutMeetingAt: new Date('2026-08-01T00:00:00Z'),
   payoutBankLinkedAt: new Date('2026-08-02T00:00:00Z'),
+  payoutTermsAcceptedAt: new Date('2026-08-03T00:00:00Z'),
+  payoutTermsVersion: PAYOUT_TERMS.version,
 };
 
 const DEFAULT_ORG = {
   id: 'org-1',
   payoutMeetingAt: null,
   payoutBankLinkedAt: null,
+  payoutTermsAcceptedAt: null,
+  payoutTermsVersion: null,
   payoutReleaseAtSale: false,
   payoutHoldbackPercent: null,
   payoutHoldbackDays: null,
@@ -271,6 +277,27 @@ describe('requestPayout', () => {
     await expect(
       requestPayout(prisma, OWNER, { amountCents: 100 }, NOW)
     ).rejects.toThrow(PayoutSetupIncompleteError);
+  });
+
+  it('rejects until the current terms are accepted, once meeting and bank are done', async () => {
+    const stale = fakePrisma({
+      org: { ...DEFAULT_ORG, ...SETUP_DONE, payoutTermsVersion: '2020-01-01' },
+    });
+    await expect(
+      requestPayout(stale.prisma, OWNER, { amountCents: 100 }, NOW)
+    ).rejects.toThrow(PayoutTermsNotAcceptedError);
+
+    const never = fakePrisma({
+      org: {
+        ...DEFAULT_ORG,
+        ...SETUP_DONE,
+        payoutTermsAcceptedAt: null,
+        payoutTermsVersion: null,
+      },
+    });
+    await expect(
+      requestPayout(never.prisma, OWNER, { amountCents: 100 }, NOW)
+    ).rejects.toThrow(PayoutTermsNotAcceptedError);
   });
 
   it('rejects while another request is open', async () => {
