@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -46,6 +48,14 @@ describe('payout terms', () => {
       `${PayoutConfig.HOLDBACK_PERCENT}%`,
       `${PayoutConfig.HOLDBACK_DAYS} days`,
     ]);
+  });
+
+  it('is the version the preview seed marks as accepted', () => {
+    const seed = readFileSync(
+      join(__dirname, '../../../../supabase/seed.sql'),
+      'utf8'
+    );
+    expect(seed).toContain(`'${PAYOUT_TERMS.version}'`);
   });
 
   it('counts only the current version as accepted', () => {
