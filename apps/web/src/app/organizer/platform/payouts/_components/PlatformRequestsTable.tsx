@@ -4,8 +4,12 @@ import { useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Copy, ExternalLink } from 'lucide-react';
-import type { PayoutRailDto, PlatformPayoutRequest } from '@troptix/api';
+import { AlertTriangle, Copy, ExternalLink } from 'lucide-react';
+import type {
+  PayoutMismatch,
+  PayoutRailDto,
+  PlatformPayoutRequest,
+} from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,7 +48,10 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { formatCents } from '@/lib/dateUtils';
 import { LocalTime } from '@/components/LocalTime';
-import { resolvePayoutRequest } from '../_actions/platformPayoutActions';
+import {
+  resolvePayoutRequest,
+  sendPayoutViaStripe,
+} from '../_actions/platformPayoutActions';
 
 const STATUS_VARIANTS = {
   REQUESTED: 'default',
@@ -59,18 +66,32 @@ const RAIL_LABELS = {
   OTHER: 'Other',
 } satisfies Record<PayoutRailDto, string>;
 
+const MISMATCH_LABELS: Record<PayoutMismatch['kind'], string> = {
+  paid_without_transfer: 'Marked paid, no Stripe transfer found',
+  requested_with_transfer: 'A Stripe transfer exists but the request is open',
+  duplicate_transfer: 'More than one Stripe transfer for this request',
+  closed_with_transfer: 'Resolved off Stripe, but a Stripe transfer exists',
+  transfer_without_request: 'A Stripe transfer points at no request',
+};
+
+/** Stripe's Connect pricing for a transfer: 0.25% plus 25¢, absorbed by TropTix. */
+const connectFeeCents = (amountCents: number) =>
+  Math.round(amountCents * 0.0025) + 25;
+
 export function PlatformRequestsTable({
   requests,
+  mismatches = {},
 }: {
   requests: PlatformPayoutRequest[];
+  mismatches?: Record<string, PayoutMismatch>;
 }) {
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Payout requests</CardTitle>
         <CardDescription>
-          Open requests first. Mark paid after sending the transfer from the ops
-          bank.
+          Open requests first. Send via Stripe when the organization is on that
+          rail; otherwise mark paid after the transfer from the ops bank.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -92,7 +113,11 @@ export function PlatformRequestsTable({
             </TableHeader>
             <TableBody>
               {requests.map((request) => (
-                <RequestRow key={request.id} request={request} />
+                <RequestRow
+                  key={request.id}
+                  request={request}
+                  mismatch={mismatches[request.id]}
+                />
               ))}
             </TableBody>
           </Table>
@@ -102,8 +127,16 @@ export function PlatformRequestsTable({
   );
 }
 
-function RequestRow({ request }: { request: PlatformPayoutRequest }) {
+function RequestRow({
+  request,
+  mismatch,
+}: {
+  request: PlatformPayoutRequest;
+  mismatch?: PayoutMismatch;
+}) {
   const [panel, setPanel] = useState<'pay' | 'reject' | null>(null);
+  const onStripe =
+    request.stripeAccountId !== null && request.connectState === 'active';
 
   return (
     <>
@@ -122,9 +155,21 @@ function RequestRow({ request }: { request: PlatformPayoutRequest }) {
           <LocalTime at={request.createdAt} />
         </TableCell>
         <TableCell>
-          <Badge variant={STATUS_VARIANTS[request.status]}>
-            {request.status}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant={STATUS_VARIANTS[request.status]}>
+              {request.status}
+            </Badge>
+            {mismatch && (
+              <Badge
+                variant="outline"
+                className="border-warning/40 text-warning"
+                title={mismatch.transferIds.join(', ')}
+              >
+                <AlertTriangle />
+                {MISMATCH_LABELS[mismatch.kind]}
+              </Badge>
+            )}
+          </div>
         </TableCell>
         <TableCell className="text-right">
           {request.status === 'REQUESTED' ? (
@@ -134,7 +179,7 @@ function RequestRow({ request }: { request: PlatformPayoutRequest }) {
                 variant={panel === 'pay' ? 'secondary' : 'default'}
                 onClick={() => setPanel(panel === 'pay' ? null : 'pay')}
               >
-                Mark paid
+                {onStripe ? 'Pay' : 'Mark paid'}
               </Button>
               <Button
                 size="sm"
@@ -153,7 +198,14 @@ function RequestRow({ request }: { request: PlatformPayoutRequest }) {
       {panel === 'pay' && (
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={6}>
-            <MarkPaidPanel request={request} onDone={() => setPanel(null)} />
+            {onStripe ? (
+              <StripeSendPanel
+                request={request}
+                onDone={() => setPanel(null)}
+              />
+            ) : (
+              <MarkPaidPanel request={request} onDone={() => setPanel(null)} />
+            )}
           </TableCell>
         </TableRow>
       )}
@@ -183,6 +235,63 @@ function ResolutionSummary({ request }: { request: PlatformPayoutRequest }) {
     );
   }
   return null;
+}
+
+/** The Stripe rail: one click moves the money; "Pay another way" is the manual override. */
+function StripeSendPanel({
+  request,
+  onDone,
+}: {
+  request: PlatformPayoutRequest;
+  onDone: () => void;
+}) {
+  const [manual, setManual] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  if (manual) {
+    return <MarkPaidPanel request={request} onDone={onDone} />;
+  }
+
+  const send = () =>
+    startTransition(async () => {
+      setError(null);
+      const result = await sendPayoutViaStripe({ id: request.id });
+      if (result.success) {
+        onDone();
+      } else {
+        setError(result.error ?? 'Something went wrong.');
+      }
+    });
+
+  return (
+    <div className="space-y-3 rounded-lg bg-muted/40 p-4">
+      <div>
+        <p className="font-medium">
+          Send {formatCents(request.amountCents)} via Stripe to{' '}
+          <code className="text-sm">{request.stripeAccountId}</code> (
+          {request.organizationName})
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Stripe deposits to their bank within about two business days. Fee to
+          TropTix: about {formatCents(connectFeeCents(request.amountCents))}.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={isPending} onClick={send}>
+          {isPending ? 'Sending…' : 'Send via Stripe'}
+        </Button>
+        <Button
+          variant="outline"
+          disabled={isPending}
+          onClick={() => setManual(true)}
+        >
+          Pay another way
+        </Button>
+      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
 }
 
 /**

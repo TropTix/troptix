@@ -1,6 +1,6 @@
 # 30. Stripe is the payout rail: Connect for US organizers, separate charges and transfers, derived rail, live status
 
-- **Status:** Accepted (the live-status clause of decision 4 is superseded by ADR 0032)
+- **Status:** Accepted (the live-status clause of decision 4 is superseded by ADR 0032; the idempotency-key clause of decision 5 by ADR 0033)
 - **Date:** 2026-09-22
 
 ## Context

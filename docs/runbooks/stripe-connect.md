@@ -30,9 +30,14 @@ and [ADR 0030](../adr/0030-stripe-is-the-payout-rail.md).
    - URL: `https://<host>/api/stripe/connect-webhook`.
    - Copy the signing secret into `STRIPE_CONNECT_WEBHOOK_SECRET` for that
      environment.
-7. **Balance settings** (before the first live send, PR 2): a USD minimum
-   balance at least the size of open payout requests, so the daily sweep to
-   the ops bank leaves enough to fund transfers.
+7. **Balance settings** (before the first live send): Balance → Payout
+   settings → a USD minimum balance at least the size of open payout requests
+   with headroom, so the daily sweep to the ops bank leaves enough to fund
+   transfers. The platform queue header shows the available balance against
+   open requests and turns amber when it is short.
+8. **Dispute events**: add `charge.dispute.created` to the reservation
+   webhook's destination (the snapshot one, not the thin one). The handler
+   emails info@usetroptix.com the day a chargeback opens.
 
 ## Environment variables
 
@@ -62,6 +67,66 @@ right end state; anything Stripe decides after that never reaches the preview
    in the sandbox.
 6. Platform Payouts → the organization's row shows "Stripe · acct\_… ·
    active" with a link into the Stripe Dashboard.
+
+## Sending a payout
+
+1. Platform Payouts → an open request whose organization shows "Stripe ·
+   acct\_… · active" gets a **Pay** button. The panel names the account and
+   the Connect fee; **Send via Stripe** creates the transfer and marks the row
+   paid with the transfer id as its reference. **Pay another way** opens the
+   manual cockpit.
+2. The request id is the transfer's `transfer_group`, so a retry after any
+   failure is safe: the send looks the group up first and reuses a live
+   transfer it finds. A reversed transfer is never reused. The idempotency
+   key is fresh on every attempt (ADR 0033), so a retry after topping up the
+   balance is not answered with the cached failure.
+3. Failures leave the row open and say why: the platform balance is short
+   (wait for the sweep to leave the floor, or top up), or Stripe has paused
+   the account (the organizer sees **Update with Stripe**). "Transfer tr\_…
+   was sent but the request was already resolved" means the money moved and
+   the row did not: open the transfer in the Stripe Dashboard and either
+   reverse it or mark the row paid by hand with that id.
+4. The organizer's table reads "via Stripe, tr\_…"; their Express dashboard
+   shows the deposit and its arrival estimate.
+
+## Reconciliation
+
+`POST /api/cron/reconcile-payouts` lists Stripe transfers carrying a
+`payoutRequestId` over the last 35 days and compares them with the rows. It
+flags three cases: a paid row with no transfer, an open row with a transfer,
+and two transfers for one request. The platform queue runs the same check on
+every render and marks the rows; the cron logs mismatches so they show up in
+Vercel's logs even when nobody opens the queue. Schedule it like the
+reservation sweep ([runbook](expire-reservations-cron.md)), once a day:
+
+```sql
+select cron.schedule(
+  'reconcile-payouts',
+  '0 9 * * *',
+  $$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'app_base_url')
+           || '/api/cron/reconcile-payouts',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')
+    ),
+    timeout_milliseconds := 30000
+  );
+  $$
+);
+```
+
+A healthy run returns `200` with `{ "success": true, "mismatches": [] }`.
+
+## A chargeback after a payout
+
+Stripe's marketplace guidance is to reverse the transfer promptly. On the
+dispute email: find the charge in the Stripe Dashboard, note its event and
+organization, and if that organization has been paid for the event, reverse
+the matching transfer (Transfers → the transfer → Reverse) for the disputed
+amount. Refunds the organizer issues themselves need no action; they net out
+of the ledger (ADR 0030).
 
 ## Local events
 

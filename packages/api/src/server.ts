@@ -82,6 +82,9 @@ export {
   listPayoutRequests,
   listPayoutOrganizations,
   resolvePayoutRequest,
+  sendPayoutViaStripe,
+  reconcileStripePayouts,
+  readPlatformPayoutBalance,
   setPayoutSetupStep,
   setPayoutPolicy,
 } from './services/platform-payouts';
@@ -95,6 +98,8 @@ export {
   PayoutSetupIncompleteError,
   InvalidPayoutAmountError,
   PayoutRequestPendingError,
+  InsufficientPlatformBalanceError,
+  StripeAccountRestrictedError,
 } from './services/_shared/errors';
 
 export { appRouter, createCaller } from './trpc/routers';
