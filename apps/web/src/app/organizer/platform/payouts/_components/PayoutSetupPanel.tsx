@@ -51,7 +51,7 @@ export function PayoutSetupPanel({
       <CardContent>
         {organizations.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            No organizations selling paid tickets yet.
+            No organizations setting up payouts yet.
           </p>
         ) : (
           <ul className="divide-y">

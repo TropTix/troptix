@@ -409,7 +409,11 @@ export async function setPayoutPolicy(
   }
 }
 
-/** The setup panel's list: every Organization that sells (or has sold) paid tickets. */
+/**
+ * The setup panel's list: every Organization on the road to payouts — one
+ * that asked to sell paid tickets, started Stripe onboarding, is approved,
+ * or has sold.
+ */
 export async function listPayoutOrganizations(
   prisma: PrismaClient,
   actor: Actor
@@ -419,6 +423,8 @@ export async function listPayoutOrganizations(
   const rows = await prisma.organization.findMany({
     where: {
       OR: [
+        { paidTicketingRequestedAt: { not: null } },
+        { stripeAccountId: { not: null } },
         { paidTicketingEnabled: true },
         {
           events: {
