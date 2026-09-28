@@ -47,7 +47,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
-import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
+import { PaidTicketingBanner } from '@/components/PaidTicketingBanner';
 import { calculateFeesCents, FeeConfig } from '@troptix/api';
 
 // The STORED `price` is what checkout computes fees on: the organizer's
@@ -248,7 +248,7 @@ export function AddTicketTypeDrawer({
           <SheetDescription>
             Buyers see the name, price, and description at checkout.
           </SheetDescription>
-          {!paidEventsEnabled && <PaidWarningBannerForm />}
+          {!paidEventsEnabled && <PaidTicketingBanner />}
         </SheetHeader>
 
         <Form {...form}>

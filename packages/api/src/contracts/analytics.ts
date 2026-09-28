@@ -16,6 +16,8 @@ export const ANALYTICS_EVENTS = {
   checkoutExpired: 'checkout_expired',
   /** Only the paid-after-sell-out auto-refund (ADR 0018) — not support refunds. */
   checkoutRefunded: 'checkout_refunded',
+  /** Paid, but no order arrived within the finalizing wait; the webhook finishes it. */
+  checkoutFinalizeTimedOut: 'checkout_finalize_timed_out',
   checkoutAbandoned: 'checkout_abandoned',
   orderCompleted: 'order_completed',
 } as const;
@@ -35,7 +37,11 @@ export interface OrderCompletedProps {
   /** Null (analytics blocked) makes the implementation fall back to a server-only id. */
   distinctId: string | null;
   sessionId: string | null;
+  /** Which path materialized the order. A webhook share of zero means the endpoint is dead (ADR 0030). */
+  fulfilledVia: FulfilledVia;
 }
+
+export type FulfilledVia = 'webhook' | 'sync' | 'free';
 
 /**
  * A returned promise is awaited so serverless functions flush before freezing;

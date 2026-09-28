@@ -1,65 +1,160 @@
 import { CheckCircle2, Circle } from 'lucide-react';
-import type { PayoutSetupState } from '@troptix/api';
+import type { ConnectSetup, PayoutSetupState, PayoutTerms } from '@troptix/api';
 
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { LocalTime } from '@/components/LocalTime';
+import { cn } from '@/lib/utils';
+import { BankStep } from './BankStep';
+import { PayoutTermsDialog } from './PayoutTermsDialog';
 
-export function SetupChecklistCard({ setup }: { setup: PayoutSetupState }) {
+export const SETUP_STEP_COUNT = 3;
+
+export function setupStepsDone(setup: PayoutSetupState) {
+  return (
+    Number(setup.meetingDone) +
+    Number(setup.bankLinked) +
+    Number(setup.termsAccepted)
+  );
+}
+
+export function TermsStep({
+  setup,
+  terms,
+  readOnly,
+}: {
+  setup: PayoutSetupState;
+  terms: PayoutTerms;
+  readOnly: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <p>
+        {setup.termsAccepted ? (
+          <>
+            Accepted{' '}
+            {setup.termsAcceptedAt && <LocalTime at={setup.termsAcceptedAt} />}.
+            Holdback, timing, refunds, and how TropTix collects for you.
+          </>
+        ) : setup.termsAcceptedAt ? (
+          'The terms changed since you accepted them. Review and accept the new version.'
+        ) : (
+          'Holdback, payout timing, refunds, and how TropTix collects payments for you.'
+        )}
+      </p>
+      <PayoutTermsDialog
+        terms={terms}
+        accepted={setup.termsAccepted}
+        acceptedAt={setup.termsAcceptedAt}
+        canAccept={!readOnly}
+      />
+    </div>
+  );
+}
+
+export function SetupChecklistCard({
+  setup,
+  connect,
+  terms,
+  readOnly,
+}: {
+  setup: PayoutSetupState;
+  connect: ConnectSetup | null;
+  terms: PayoutTerms;
+  readOnly: boolean;
+}) {
+  const done = setupStepsDone(setup);
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Set up payouts</CardTitle>
         <CardDescription>
           Two steps with the TropTix team unlock payout requests. Your balances
-          are already tracked above.
+          are already tracked below.
         </CardDescription>
+        <CardAction className="flex flex-col items-end gap-1.5">
+          <span className="text-xs text-muted-foreground">
+            {done} of {SETUP_STEP_COUNT} done
+          </span>
+          <Progress
+            value={(done / SETUP_STEP_COUNT) * 100}
+            className="h-1.5 w-36"
+          />
+        </CardAction>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <ChecklistStep done={setup.meetingDone} title="Meet with TropTix">
-          A short call to cover terms, timing, and where the money goes.{' '}
-          <a
-            className="underline underline-offset-2 hover:text-foreground"
-            href="mailto:info@usetroptix.com?subject=Payout setup"
-          >
-            Contact us to schedule it.
-          </a>
-        </ChecklistStep>
-        <ChecklistStep
+      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StepCard
+          done={setup.meetingDone}
+          active={!setup.meetingDone}
+          title="Meet with TropTix"
+        >
+          {setup.meetingDone ? (
+            'Terms, timing, and where the money goes.'
+          ) : (
+            <>
+              A short call to cover terms, timing, and where the money goes.{' '}
+              <a
+                className="underline underline-offset-2 hover:text-foreground"
+                href="mailto:info@usetroptix.com?subject=Payout setup"
+              >
+                Contact us to schedule it.
+              </a>
+            </>
+          )}
+        </StepCard>
+        <StepCard
           done={setup.bankLinked}
+          active={setup.meetingDone && !setup.bankLinked}
           title="Connect your bank account"
         >
-          Your bank details are collected during setup and held at our bank —
-          TropTix never stores them.
-        </ChecklistStep>
+          <BankStep setup={setup} connect={connect} readOnly={readOnly} />
+        </StepCard>
+        <StepCard
+          done={setup.termsAccepted}
+          active={setup.meetingDone && setup.bankLinked && !setup.termsAccepted}
+          title="Accept payout terms"
+        >
+          <TermsStep setup={setup} terms={terms} readOnly={readOnly} />
+        </StepCard>
       </CardContent>
     </Card>
   );
 }
 
-function ChecklistStep({
+function StepCard({
   done,
+  active,
   title,
   children,
 }: {
   done: boolean;
+  active: boolean;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      {done ? (
-        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-      ) : (
-        <Circle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+    <div
+      className={cn(
+        'flex items-start gap-3 rounded-lg p-4',
+        done ? 'bg-muted/50' : 'border',
+        active && 'border-primary/30'
       )}
-      <div>
+    >
+      {done ? (
+        <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
+      ) : (
+        <Circle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+      )}
+      <div className="min-w-0 flex-1 space-y-1">
         <p className="font-medium">{title}</p>
-        <p className="text-sm text-muted-foreground">{children}</p>
+        <div className="text-sm text-muted-foreground">{children}</div>
       </div>
     </div>
   );

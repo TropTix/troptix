@@ -1,6 +1,5 @@
 'use client';
 import React, { useTransition, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
 import { FetchedTicketData } from '../page';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -24,11 +23,9 @@ interface AttendeeTableProps {
 const CheckInButton = ({
   ticketId,
   checkedIn,
-  eventId,
 }: {
   ticketId: string;
   checkedIn: boolean;
-  eventId: string;
 }) => {
   const [isPending, startTransition] = useTransition();
 
@@ -83,10 +80,8 @@ const CheckInButton = ({
 
 const MobileAttendeeView = ({
   attendees,
-  eventId,
 }: {
   attendees: FetchedTicketData[];
-  eventId: string;
 }) => {
   return (
     <div>
@@ -137,7 +132,6 @@ const MobileAttendeeView = ({
                     <CheckInButton
                       ticketId={attendee.id}
                       checkedIn={checkedIn}
-                      eventId={eventId}
                     />
                   </div>
                 </CardContent>
@@ -151,8 +145,6 @@ const MobileAttendeeView = ({
 };
 
 const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
-  const params = useParams();
-  const eventId = params?.eventId as string;
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -206,13 +198,7 @@ const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
         const ticketId = row.original.id;
         const checkedIn = row.original.checkinTimestamp !== null;
 
-        return (
-          <CheckInButton
-            ticketId={ticketId}
-            checkedIn={checkedIn}
-            eventId={eventId}
-          />
-        );
+        return <CheckInButton ticketId={ticketId} checkedIn={checkedIn} />;
       },
     },
   ];
@@ -260,7 +246,7 @@ const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
             className="w-full"
           />
         </div>
-        <MobileAttendeeView attendees={filteredAttendees} eventId={eventId} />
+        <MobileAttendeeView attendees={filteredAttendees} />
       </div>
     );
   }

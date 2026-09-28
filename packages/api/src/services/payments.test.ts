@@ -8,10 +8,12 @@ import { reserve, settle } from './reservations';
 import {
   beginPayment,
   confirmPaid,
+  finalizePayment,
   getCheckoutState,
   statementDescriptorSuffix,
   sweepExpiredHolds,
 } from './payments';
+import { AlreadyPaidError, HoldExpiredError } from './_shared/errors';
 import type {
   CheckoutAnalytics,
   OrderCompletedProps,
@@ -367,6 +369,7 @@ describe('confirmPaid — auto-refund on the expiry race', () => {
     const first = await confirmPaid(prisma, fake.stripe, {
       reservationId,
       paymentIntentId: pi,
+      fulfilledVia: 'webhook',
     });
     expect(first.kind).toBe('refunded');
     expect(fake.calls.refund).toHaveLength(1);
@@ -383,6 +386,7 @@ describe('confirmPaid — auto-refund on the expiry race', () => {
     const second = await confirmPaid(prisma, fake.stripe, {
       reservationId,
       paymentIntentId: pi,
+      fulfilledVia: 'webhook',
     });
     expect(second.kind).toBe('refunded');
     expect(fake.calls.refund).toHaveLength(1);
@@ -451,7 +455,31 @@ describe('beginPayment — session creation + reuse', () => {
     expect(res?.expiresAt.getTime()).toBe(returned);
   });
 
-  it('mints a fresh Session with a distinct key when the stored one is non-open', async () => {
+  it('refuses to mint a second Session when the stored one is complete', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+    const paidSessionId = `cs_paid_${generateId()}`;
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { stripeCheckoutSessionId: paidSessionId },
+    });
+    const fake = fakeStripe({
+      id: paidSessionId,
+      status: 'complete',
+      payment_status: 'paid',
+      payment_intent: `pi_test_${generateId()}`,
+    });
+
+    await expect(
+      beginPayment(prisma, fake.stripe, {
+        reservationId,
+        baseUrl: 'https://example.test',
+      })
+    ).rejects.toBeInstanceOf(AlreadyPaidError);
+    expect(fake.calls.create).toHaveLength(0);
+  });
+
+  it('mints a fresh Session with a distinct key when the stored one is expired', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
     const deadSessionId = `cs_dead_${generateId()}`;
@@ -476,8 +504,51 @@ describe('beginPayment — session creation + reuse', () => {
   });
 });
 
-describe('getCheckoutState', () => {
-  it('reports held while the Session is unpaid', async () => {
+describe('getCheckoutState — pure read', () => {
+  it('reports held for a live hold', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+
+    const state = await getCheckoutState(prisma, { reservationId });
+    expect(state.kind).toBe('held');
+  });
+
+  it('reports expired once the sweep has expired the hold', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await heldPaidReservation(tt.id, 1);
+    await forceExpire(reservationId);
+
+    const state = await getCheckoutState(prisma, { reservationId });
+    expect(state.kind).toBe('expired');
+  });
+
+  it('still reports held for a HELD row past its deadline (a paid webhook may be in flight)', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await expiredHold(tt.id, 1);
+
+    const state = await getCheckoutState(prisma, { reservationId });
+    expect(state.kind).toBe('held');
+  });
+});
+
+describe('beginPayment — lapsed hold', () => {
+  it('rejects with HoldExpiredError instead of minting a Session', async () => {
+    const tt = await makeTicketType(5);
+    const reservationId = await expiredHold(tt.id, 1);
+    const fake = fakeStripe();
+
+    await expect(
+      beginPayment(prisma, fake.stripe, {
+        reservationId,
+        baseUrl: 'https://example.test',
+      })
+    ).rejects.toBeInstanceOf(HoldExpiredError);
+    expect(fake.calls.create).toHaveLength(0);
+  });
+});
+
+describe('finalizePayment — one sync fulfil attempt', () => {
+  it('reports held after one retrieve when the Session is unpaid', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
     const fake = fakeStripe({ payment_status: 'unpaid' });
@@ -486,13 +557,14 @@ describe('getCheckoutState', () => {
       data: { stripeCheckoutSessionId: `cs_test_${generateId()}` },
     });
 
-    const state = await getCheckoutState(prisma, fake.stripe, {
+    const state = await finalizePayment(prisma, fake.stripe, {
       reservationId,
     });
     expect(state.kind).toBe('held');
+    expect(fake.calls.retrieve).toHaveLength(1);
   });
 
-  it('fulfills inline when the Session is paid but no order exists yet', async () => {
+  it('fulfills when the Session is paid but no order exists yet', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
     const pi = `pi_test_${generateId()}`;
@@ -502,7 +574,7 @@ describe('getCheckoutState', () => {
     });
     const fake = fakeStripe({ payment_status: 'paid', payment_intent: pi });
 
-    const state = await getCheckoutState(prisma, fake.stripe, {
+    const state = await finalizePayment(prisma, fake.stripe, {
       reservationId,
     });
     expect(state.kind).toBe('order');
@@ -515,16 +587,22 @@ describe('getCheckoutState', () => {
     expect(res?.status).toBe(ReservationStatus.CONVERTED);
   });
 
-  it('reports expired for an expired hold with no payment', async () => {
+  it('returns the existing order with no Stripe call once converted', async () => {
     const tt = await makeTicketType(5);
     const reservationId = await heldPaidReservation(tt.id, 1);
-    await forceExpire(reservationId);
-    const fake = fakeStripe();
+    const pi = `pi_test_${generateId()}`;
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { stripeCheckoutSessionId: `cs_test_${generateId()}` },
+    });
+    const fake = fakeStripe({ payment_status: 'paid', payment_intent: pi });
+    await finalizePayment(prisma, fake.stripe, { reservationId });
 
-    const state = await getCheckoutState(prisma, fake.stripe, {
+    const again = await finalizePayment(prisma, fake.stripe, {
       reservationId,
     });
-    expect(state.kind).toBe('expired');
+    expect(again.kind).toBe('order');
+    expect(fake.calls.retrieve).toHaveLength(1);
   });
 });
 
@@ -620,7 +698,11 @@ describe('confirmPaid — order_completed capture', () => {
     const first = await confirmPaid(
       prisma,
       fake.stripe,
-      { reservationId: r.reservationId, paymentIntentId: pi },
+      {
+        reservationId: r.reservationId,
+        paymentIntentId: pi,
+        fulfilledVia: 'webhook',
+      },
       analytics
     );
     expect(first.kind).toBe('order');
@@ -635,12 +717,17 @@ describe('confirmPaid — order_completed capture', () => {
       ticketCount: 2,
       distinctId: 'ph-distinct',
       sessionId: 'ph-session',
+      fulfilledVia: 'webhook',
     });
 
     const second = await confirmPaid(
       prisma,
       fake.stripe,
-      { reservationId: r.reservationId, paymentIntentId: pi },
+      {
+        reservationId: r.reservationId,
+        paymentIntentId: pi,
+        fulfilledVia: 'webhook',
+      },
       analytics
     );
     expect(second.kind).toBe('order');
@@ -659,7 +746,11 @@ describe('confirmPaid — order_completed capture', () => {
     const state = await confirmPaid(
       prisma,
       fakeStripe().stripe,
-      { reservationId, paymentIntentId: `pi_test_${generateId()}` },
+      {
+        reservationId,
+        paymentIntentId: `pi_test_${generateId()}`,
+        fulfilledVia: 'sync',
+      },
       analytics
     );
     expect(state.kind).toBe('order');

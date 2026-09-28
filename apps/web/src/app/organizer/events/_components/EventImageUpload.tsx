@@ -28,95 +28,55 @@ export function EventImageUploader({
 }: EventImageUploaderProps) {
   const inputId = useId();
   const resolvedCurrentUrl = eventFlyerUrl(currentImageUrl);
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    resolvedCurrentUrl
-  );
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setPreviewUrl(resolvedCurrentUrl);
-    if (!isUploading) {
-      setFile(null);
-    }
-  }, [resolvedCurrentUrl, isUploading]);
+    if (!pendingUrl) return;
+    return () => URL.revokeObjectURL(pendingUrl);
+  }, [pendingUrl]);
+  const previewUrl = pendingUrl ?? resolvedCurrentUrl;
 
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    if (file) {
-      objectUrl = URL.createObjectURL(file);
-      setPreviewUrl(objectUrl);
-    }
-
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-        setPreviewUrl((prev) =>
-          prev === objectUrl ? resolvedCurrentUrl : prev
-        );
-      }
-    };
-  }, [file, resolvedCurrentUrl]);
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
-    if (event.target.files && event.target.files[0]) {
-      const selectedFile = event.target.files[0];
-
-      if (!selectedFile.type.startsWith('image/')) {
-        setError('Please select an image file (e.g., JPG, PNG).');
-        setFile(null);
-        setPreviewUrl(resolvedCurrentUrl);
-        return;
-      }
-      if (selectedFile.size > 10 * 1024 * 1024) {
-        setError('File size exceeds 10MB limit.');
-        setFile(null);
-        setPreviewUrl(resolvedCurrentUrl);
-        return;
-      }
-
-      setFile(selectedFile);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file) {
-      setError('No file selected.');
-      return;
-    }
-
+  const upload = async (selectedFile: File) => {
     setIsUploading(true);
     setError(null);
-
     try {
-      const path = await uploadEventFlyer(file);
-      setPreviewUrl(eventFlyerUrl(path));
-      onUploadComplete(path, file);
-      setFile(null);
+      const path = await uploadEventFlyer(selectedFile);
+      onUploadComplete(path, selectedFile);
     } catch (uploadError: unknown) {
       const message =
         uploadError instanceof Error ? uploadError.message : 'Unknown error';
       console.error('Upload failed:', uploadError);
       setError(`Upload failed: ${message}`);
-      setPreviewUrl(resolvedCurrentUrl);
     } finally {
+      setPendingUrl(null);
       setIsUploading(false);
     }
   };
 
-  useEffect(() => {
-    if (file) {
-      handleUpload();
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) return;
+    if (!selectedFile.type.startsWith('image/')) {
+      setError('Please select an image file (e.g., JPG, PNG).');
+      setPendingUrl(null);
+      return;
     }
-  }, [file]);
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError('File size exceeds 10MB limit.');
+      setPendingUrl(null);
+      return;
+    }
+    setPendingUrl(URL.createObjectURL(selectedFile));
+    void upload(selectedFile);
+  };
 
   const handleRemoveImage = async () => {
     setError(null);
-    setFile(null);
-    setPreviewUrl(null);
+    setPendingUrl(null);
     setIsUploading(false);
     const previous = currentImageUrl;
     onUploadComplete(null, null);

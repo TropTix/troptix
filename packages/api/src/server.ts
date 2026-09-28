@@ -23,7 +23,9 @@ export {
 export {
   beginPayment,
   confirmPaid,
+  finalizePayment,
   getCheckoutState,
+  paymentIntentIdOf,
   sweepExpiredHolds,
   type SweepResult,
 } from './services/payments';
@@ -67,10 +69,23 @@ export {
   requestPayout,
   cancelPayoutRequest,
 } from './services/organizer-payouts';
+export { acceptPayoutTerms, currentPayoutTerms } from './services/payout-terms';
+export {
+  getConnectSetup,
+  getConnectStates,
+  startStripeOnboarding,
+  refreshStripeOnboarding,
+  finishStripeOnboardingReturn,
+  createStripeDashboardLink,
+} from './services/organizer-connect';
+export { handleConnectEvent } from './services/connect-webhook';
 export {
   listPayoutRequests,
   listPayoutOrganizations,
   resolvePayoutRequest,
+  sendPayoutViaStripe,
+  reconcileStripePayouts,
+  readPlatformPayoutBalance,
   setPayoutSetupStep,
   setPayoutPolicy,
 } from './services/platform-payouts';
@@ -84,6 +99,9 @@ export {
   PayoutSetupIncompleteError,
   InvalidPayoutAmountError,
   PayoutRequestPendingError,
+  PayoutTermsNotAcceptedError,
+  InsufficientPlatformBalanceError,
+  StripeAccountRestrictedError,
 } from './services/_shared/errors';
 
 export { appRouter, createCaller } from './trpc/routers';

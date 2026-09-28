@@ -16,13 +16,11 @@ import { useAuth } from '@/context/AuthContext';
 import { trpc } from '@/lib/trpc';
 
 function SettingsRow({
-  icon,
   label,
   value,
   onPress,
   destructive,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value?: string;
   onPress?: () => void;
@@ -80,7 +78,10 @@ export default function SettingsScreen() {
   }, []);
 
   useEffect(() => {
-    fetchProfile().finally(() => setLoading(false));
+    void (async () => {
+      await fetchProfile();
+      setLoading(false);
+    })();
   }, [fetchProfile]);
 
   const onRefresh = useCallback(async () => {
@@ -147,17 +148,9 @@ export default function SettingsScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Account</Text>
               <View style={styles.card}>
-                <SettingsRow
-                  icon="person-outline"
-                  label="Name"
-                  value={fullName}
-                />
+                <SettingsRow label="Name" value={fullName} />
                 <View style={styles.divider} />
-                <SettingsRow
-                  icon="mail-outline"
-                  label="Email"
-                  value={displayEmail}
-                />
+                <SettingsRow label="Email" value={displayEmail} />
               </View>
             </View>
           </>
@@ -166,22 +159,13 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App</Text>
           <View style={styles.card}>
-            <SettingsRow
-              icon="code-slash-outline"
-              label="Version"
-              value="1.0.0"
-            />
+            <SettingsRow label="Version" value="1.0.0" />
           </View>
         </View>
 
         <View style={[styles.section, { marginTop: 8 }]}>
           <View style={styles.card}>
-            <SettingsRow
-              icon="log-out-outline"
-              label="Sign Out"
-              onPress={handleSignOut}
-              destructive
-            />
+            <SettingsRow label="Sign Out" onPress={handleSignOut} destructive />
           </View>
         </View>
       </ScrollView>

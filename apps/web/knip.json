@@ -19,7 +19,7 @@
     "ts-node",
     "tsx"
   ],
-  "ignoreBinaries": ["next", "tsx", "tsc", "eslint", "jest"],
+  "ignoreBinaries": ["next", "tsx", "tsc", "jest"],
   "rules": {
     "exports": "warn",
     "types": "warn"

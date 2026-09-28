@@ -127,7 +127,10 @@ export default function EventsScreen() {
   }, [user?.name]);
 
   useEffect(() => {
-    fetchData().finally(() => setLoading(false));
+    void (async () => {
+      await fetchData();
+      setLoading(false);
+    })();
   }, [fetchData]);
 
   const onRefresh = useCallback(async () => {

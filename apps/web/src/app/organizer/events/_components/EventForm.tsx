@@ -67,7 +67,7 @@ import {
 import { PageThemePreview } from '../_components/PageThemePreview';
 import { PublishRequirements } from '@/components/PublishRequirements';
 import { createEvent, updateEvent } from '../_actions/eventActions';
-import { PaidWarningBannerForm } from '@/components/PaidWarningBanner';
+import { PaidTicketingBanner } from '@/components/PaidTicketingBanner';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
 import { cn } from '@/lib/utils';
 import { extractFlyerPaletteFromUrl, themeAvailable } from '@/lib/flyerTheme';
@@ -303,7 +303,7 @@ export default function EventForm({
 
   return (
     <div className="space-y-8">
-      {!paidEventsEnabled && <PaidWarningBannerForm />}
+      {!paidEventsEnabled && <PaidTicketingBanner />}
       <div className="flex flex-col md:flex-row gap-8">
         <div className="md:w-1/3 space-y-4">
           <Card>

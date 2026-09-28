@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import type { PayoutOrganization } from '@troptix/api';
+import { ExternalLink } from 'lucide-react';
+import type { ConnectState, PayoutOrganization } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,8 +34,10 @@ import {
 
 export function PayoutSetupPanel({
   organizations,
+  connectStates,
 }: {
   organizations: PayoutOrganization[];
+  connectStates: Record<string, ConnectState>;
 }) {
   return (
     <Card>
@@ -48,12 +51,16 @@ export function PayoutSetupPanel({
       <CardContent>
         {organizations.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            No organizations selling paid tickets yet.
+            No organizations setting up payouts yet.
           </p>
         ) : (
           <ul className="divide-y">
             {organizations.map((org) => (
-              <OrganizationRow key={org.id} org={org} />
+              <OrganizationRow
+                key={org.id}
+                org={org}
+                connectState={connectStates[org.id]}
+              />
             ))}
           </ul>
         )}
@@ -62,7 +69,13 @@ export function PayoutSetupPanel({
   );
 }
 
-function OrganizationRow({ org }: { org: PayoutOrganization }) {
+function OrganizationRow({
+  org,
+  connectState,
+}: {
+  org: PayoutOrganization;
+  connectState?: ConnectState;
+}) {
   const [editingPolicy, setEditingPolicy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -110,11 +123,24 @@ function OrganizationRow({ org }: { org: PayoutOrganization }) {
           disabled={isPending}
           onToggle={(done) => toggleStep('meeting', done)}
         />
-        <SetupToggle
-          label="Bank linked"
-          checkedAt={org.payoutBankLinkedAt}
-          disabled={isPending}
-          onToggle={(done) => toggleStep('bank', done)}
+        {org.stripeAccountId ? (
+          <StripeAccountStatus
+            accountId={org.stripeAccountId}
+            state={connectState}
+            linkedAt={org.payoutBankLinkedAt}
+          />
+        ) : (
+          <SetupToggle
+            label="Bank linked"
+            checkedAt={org.payoutBankLinkedAt}
+            disabled={isPending}
+            onToggle={(done) => toggleStep('bank', done)}
+          />
+        )}
+        <TermsStatus
+          accepted={org.setup.termsAccepted}
+          acceptedAt={org.payoutTermsAcceptedAt}
+          version={org.payoutTermsVersion}
         />
       </div>
 
@@ -129,6 +155,77 @@ function OrganizationRow({ org }: { org: PayoutOrganization }) {
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </li>
+  );
+}
+
+const CONNECT_LABELS: Record<ConnectState, string> = {
+  manual: 'no account',
+  in_progress: 'setting up',
+  pending: 'Stripe reviewing',
+  active: 'active',
+  needs_updates: 'needs updates',
+};
+
+/** Read-only: only the Owner can accept, in the app; there is no switch for it. */
+function TermsStatus({
+  accepted,
+  acceptedAt,
+  version,
+}: {
+  accepted: boolean;
+  acceptedAt: string | null;
+  version: string | null;
+}) {
+  return (
+    <div>
+      <p className="text-sm">
+        Payout terms ·{' '}
+        {accepted
+          ? `accepted v${version}`
+          : acceptedAt
+            ? `outdated (v${version})`
+            : 'not accepted'}
+      </p>
+      {acceptedAt && (
+        <p className="text-xs text-muted-foreground">
+          <LocalTime at={acceptedAt} />
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Read-only on the Stripe rail: Stripe's verification checks this step off, not a switch. */
+function StripeAccountStatus({
+  accountId,
+  state,
+  linkedAt,
+}: {
+  accountId: string;
+  state?: ConnectState;
+  linkedAt: string | null;
+}) {
+  return (
+    <div>
+      <p className="text-sm">
+        Stripe ·{' '}
+        <a
+          className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-foreground"
+          href={`https://dashboard.stripe.com/connect/accounts/${accountId}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {accountId}
+          <ExternalLink className="h-3 w-3" />
+        </a>{' '}
+        · {state ? CONNECT_LABELS[state] : 'checking…'}
+      </p>
+      {linkedAt && (
+        <p className="text-xs text-muted-foreground">
+          Bank linked <LocalTime at={linkedAt} />
+        </p>
+      )}
+    </div>
   );
 }
 

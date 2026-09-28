@@ -1,14 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  PlusCircle,
-  Eye,
-  Edit,
-  Settings,
-  Image as ImageIcon,
-} from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Image as ImageIcon } from 'lucide-react';
 
 const SkeletonEventCard = () => (
   <Card className="overflow-hidden flex flex-col">

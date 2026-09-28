@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Check, X, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Check, X, AlertCircle, ChevronRight } from 'lucide-react';
 import {
   Card,
   CardContent,

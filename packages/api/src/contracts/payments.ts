@@ -32,6 +32,11 @@ export const getCheckoutStateInputSchema = z.object({
 });
 export type GetCheckoutStateInput = z.infer<typeof getCheckoutStateInputSchema>;
 
+export const finalizePaymentInputSchema = z.object({
+  reservationId: z.string().min(1),
+});
+export type FinalizePaymentInput = z.infer<typeof finalizePaymentInputSchema>;
+
 const checkoutOrderTicketSchema = z.object({
   id: z.string(),
   ticketTypeName: z.string().nullable(),

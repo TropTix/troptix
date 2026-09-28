@@ -4,20 +4,27 @@ import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
+import { stripe } from '@/server/lib/stripe';
+import { formatCents } from '@/lib/dateUtils';
 import {
   resolvePayoutRequestInputSchema,
+  sendPayoutViaStripeInputSchema,
   setPayoutPolicyInputSchema,
   setPayoutSetupStepInputSchema,
   type ResolvePayoutRequestInput,
+  type SendPayoutViaStripeInput,
   type SetPayoutPolicyInput,
   type SetPayoutSetupStepInput,
 } from '@troptix/api';
 import {
   resolvePayoutRequest as resolvePayoutRequestService,
+  sendPayoutViaStripe as sendPayoutViaStripeService,
   setPayoutPolicy as setPayoutPolicyService,
   setPayoutSetupStep as setPayoutSetupStepService,
   ConflictError,
+  InsufficientPlatformBalanceError,
   NotFoundError,
+  StripeAccountRestrictedError,
   UnauthorizedError,
 } from '@troptix/api/server';
 
@@ -31,6 +38,14 @@ export async function resolvePayoutRequest(
 ): Promise<ActionResult> {
   return run(resolvePayoutRequestInputSchema.safeParse(input), (actor, data) =>
     resolvePayoutRequestService(prisma, actor, data)
+  );
+}
+
+export async function sendPayoutViaStripe(
+  input: SendPayoutViaStripeInput
+): Promise<ActionResult> {
+  return run(sendPayoutViaStripeInputSchema.safeParse(input), (actor, data) =>
+    sendPayoutViaStripeService(prisma, stripe, actor, data)
   );
 }
 
@@ -71,6 +86,23 @@ async function run<T>(
   } catch (error) {
     if (error instanceof ConflictError) {
       return { success: false, error: error.message };
+    }
+    if (error instanceof InsufficientPlatformBalanceError) {
+      const short =
+        error.shortfallCents === null
+          ? 'short'
+          : `${formatCents(error.shortfallCents)} short`;
+      return {
+        success: false,
+        error: `The platform balance is ${short}. Wait for the next sweep to leave the floor, or top up, then retry.`,
+      };
+    }
+    if (error instanceof StripeAccountRestrictedError) {
+      return {
+        success: false,
+        error:
+          'Stripe has paused this account until the organizer updates their details.',
+      };
     }
     if (error instanceof NotFoundError) {
       return { success: false, error: 'Not found.' };
