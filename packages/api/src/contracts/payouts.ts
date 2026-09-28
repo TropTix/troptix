@@ -12,6 +12,10 @@ export type PayoutRequestStatusDto = z.infer<typeof payoutRequestStatusSchema>;
 export const payoutRailSchema = z.enum(['MERCURY', 'STRIPE', 'OTHER']);
 export type PayoutRailDto = z.infer<typeof payoutRailSchema>;
 
+/** Which shape the Organization's Stripe account is (ADR 0034). */
+export const stripeAccountKindSchema = z.enum(['CONNECT', 'GLOBAL_PAYOUTS']);
+export type StripeAccountKind = z.infer<typeof stripeAccountKindSchema>;
+
 /**
  * The Organization's Stripe account as last mirrored from Stripe (ADR 0032).
  * `manual` = no account.
@@ -27,9 +31,18 @@ export type ConnectState = z.infer<typeof connectStateSchema>;
 
 export const connectSetupSchema = z.object({
   accountId: z.string().nullable(),
+  kind: stripeAccountKindSchema.nullable(),
   state: connectStateSchema,
 });
 export type ConnectSetup = z.infer<typeof connectSetupSchema>;
+
+export const startGlobalPayoutsOnboardingInputSchema = z.object({
+  country: z.string().length(2),
+  entityType: z.enum(['individual', 'company']),
+});
+export type StartGlobalPayoutsOnboardingInput = z.infer<
+  typeof startGlobalPayoutsOnboardingInputSchema
+>;
 
 export const connectReturnOutcomeSchema = z.enum([
   'active',
@@ -117,6 +130,7 @@ export const platformPayoutRequestSchema = organizerPayoutRequestSchema.extend({
   organizationSlug: z.string(),
   ownerEmail: z.string().nullable(),
   stripeAccountId: z.string().nullable(),
+  stripeAccountKind: stripeAccountKindSchema.nullable(),
   connectState: connectStateSchema,
 });
 export type PlatformPayoutRequest = z.infer<typeof platformPayoutRequestSchema>;
@@ -190,6 +204,7 @@ export const payoutOrganizationSchema = z.object({
   payoutTermsAcceptedAt: z.string().datetime().nullable(),
   payoutTermsVersion: z.string().nullable(),
   stripeAccountId: z.string().nullable(),
+  stripeAccountKind: stripeAccountKindSchema.nullable(),
   stripeTransfersStatus: z.string().nullable(),
   setup: payoutSetupStateSchema,
   policy: payoutPolicySchema,

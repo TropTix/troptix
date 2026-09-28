@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import type { OrganizerPayoutRequest } from '@troptix/api';
+import type { OrganizerPayoutRequest, StripeAccountKind } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,12 +41,13 @@ const STATUS_LABELS = {
 export function RequestsTable({
   requests,
   readOnly = false,
-  viaStripe = false,
+  stripeKind = null,
   action,
 }: {
   requests: OrganizerPayoutRequest[];
   readOnly?: boolean;
-  viaStripe?: boolean;
+  /** Set when the organization is active on a Stripe rail; which one decides the note. */
+  stripeKind?: StripeAccountKind | null;
   action?: React.ReactNode;
 }) {
   return (
@@ -82,10 +83,16 @@ export function RequestsTable({
             </TableBody>
           </Table>
         )}
-        {viaStripe && (
+        {stripeKind === 'CONNECT' && (
           <p className="mt-3 text-xs text-muted-foreground">
             Stripe deposits payouts to your bank within about two business days.
             Open your Stripe dashboard to track them.
+          </p>
+        )}
+        {stripeKind === 'GLOBAL_PAYOUTS' && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Stripe converts payouts to your currency and deposits them within
+            about a week.
           </p>
         )}
       </CardContent>

@@ -1,35 +1,52 @@
 /**
- * The Stripe rail's onboarding half (docs/plans/2026-09-stripe-connect-us-payout-rail.md).
- * Owner-only writes, never View-as. Stripe's transfers status is mirrored
- * into `stripeTransfersStatus` by the webhook and the onboarding return;
- * every read derives from the row (ADR 0032).
+ * The Stripe rail's onboarding half (docs/plans/2026-09-stripe-connect-us-payout-rail.md,
+ * docs/plans/2026-09-global-payouts-rail.md). Owner-only writes, never
+ * View-as. The payout capability's status is mirrored into
+ * `stripeTransfersStatus` by the webhook and the onboarding return; every
+ * read derives from the row (ADR 0032). A Connect account and a Global
+ * Payouts recipient are the same v2 account object; the kind says which
+ * client and which capability apply (ADR 0034).
  */
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
+import type StripePreview from 'stripe-preview';
 import type { Actor } from '../trpc/context';
 import type {
   ConnectReturnOutcome,
   ConnectSetup,
   ConnectState,
+  StripeAccountKind,
 } from '../contracts/payouts';
 import { NotFoundError, UnauthorizedError } from './_shared/errors';
 import { ensureOrganizationForUser } from './organizations';
 import { resolveOrganizerScope } from './organizer-scope';
+
+/**
+ * The GA client makes every Connect call; the preview client makes the
+ * recipient and money-management calls, which exist only on the preview API
+ * version and, live, only under a restricted key.
+ */
+export interface PayoutClients {
+  connect: Stripe;
+  global: StripePreview;
+}
 
 const ORG_SELECT = {
   id: true,
   displayName: true,
   slug: true,
   stripeAccountId: true,
+  stripeAccountKind: true,
   payoutBankLinkedAt: true,
   owner: { select: { email: true } },
 } as const;
 
-interface ConnectOrg {
+export interface ConnectOrg {
   id: string;
   displayName: string;
   slug: string;
   stripeAccountId: string | null;
+  stripeAccountKind: string | null;
   payoutBankLinkedAt: Date | null;
   owner: { email: string };
 }
@@ -40,16 +57,46 @@ interface ConnectRow {
   payoutBankLinkedAt: Date | string | null;
 }
 
-const ACCOUNT_INCLUDE: Stripe.V2.Core.AccountRetrieveParams['include'] = [
-  'configuration.recipient',
-  'requirements',
-];
+export interface StripeAccountRef {
+  stripeAccountId: string;
+  stripeAccountKind: string | null;
+}
+
+const ACCOUNT_INCLUDE = ['configuration.recipient', 'requirements'] as const;
+
+/**
+ * The shape both SDKs' account objects share where the payout capability
+ * lives. `bank_accounts` exists only on the preview version's type.
+ */
+export interface PayoutCapabilityAccount {
+  configuration?: {
+    recipient?: {
+      capabilities?: {
+        stripe_balance?: { stripe_transfers?: { status: string } } | null;
+        bank_accounts?: { local?: { status: string } } | null;
+      } | null;
+    } | null;
+  } | null;
+}
 
 export function transfersStatus(
-  account: Stripe.V2.Core.Account
+  account: PayoutCapabilityAccount
 ): string | undefined {
-  return account.configuration?.recipient?.capabilities?.stripe_balance
-    ?.stripe_transfers?.status;
+  const capabilities = account.configuration?.recipient?.capabilities;
+  return (
+    capabilities?.bank_accounts?.local?.status ??
+    capabilities?.stripe_balance?.stripe_transfers?.status
+  );
+}
+
+export function isGlobalPayouts(kind: string | null | undefined): boolean {
+  return kind === ('GLOBAL_PAYOUTS' satisfies StripeAccountKind);
+}
+
+export function toAccountKind(
+  kind: string | null | undefined
+): StripeAccountKind | null {
+  return kind === 'CONNECT' || kind === 'GLOBAL_PAYOUTS' ? kind : null;
 }
 
 /**
@@ -87,12 +134,17 @@ export async function getConnectSetup(
     where: { ownerUserId: organizerUserId },
     select: {
       stripeAccountId: true,
+      stripeAccountKind: true,
       stripeTransfersStatus: true,
       payoutBankLinkedAt: true,
     },
   });
-  if (!org) return { accountId: null, state: 'manual' };
-  return { accountId: org.stripeAccountId, state: connectStateOf(org) };
+  if (!org) return { accountId: null, kind: null, state: 'manual' };
+  return {
+    accountId: org.stripeAccountId,
+    kind: toAccountKind(org.stripeAccountKind),
+    state: connectStateOf(org),
+  };
 }
 
 /**
@@ -112,16 +164,27 @@ export async function recordTransfersStatus(
   if (status === 'active') await stampBankLinked(prisma, organizationId, now);
 }
 
+export async function retrieveAccount(
+  clients: PayoutClients,
+  account: StripeAccountRef
+): Promise<PayoutCapabilityAccount> {
+  if (isGlobalPayouts(account.stripeAccountKind)) {
+    return clients.global.v2.core.accounts.retrieve(account.stripeAccountId, {
+      include: [...ACCOUNT_INCLUDE],
+    });
+  }
+  return clients.connect.v2.core.accounts.retrieve(account.stripeAccountId, {
+    include: [...ACCOUNT_INCLUDE],
+  });
+}
+
 async function syncTransfersStatus(
   prisma: PrismaClient,
-  stripe: Stripe,
-  org: { id: string; stripeAccountId: string },
+  clients: PayoutClients,
+  org: { id: string } & StripeAccountRef,
   now: Date
 ): Promise<string | undefined> {
-  const account = await stripe.v2.core.accounts.retrieve(org.stripeAccountId, {
-    include: ACCOUNT_INCLUDE,
-  });
-  const status = transfersStatus(account);
+  const status = transfersStatus(await retrieveAccount(clients, org));
   await recordTransfersStatus(prisma, org.id, status, now);
   return status;
 }
@@ -131,7 +194,7 @@ async function syncTransfersStatus(
  * provisions the Organization (organizer-event-write). Connecting a bank is
  * as good a first act as creating an event, so `provision` does the same.
  */
-async function ownedOrg(
+export async function ownedOrg(
   prisma: PrismaClient,
   actor: Actor,
   opts: { provision?: boolean } = {}
@@ -158,15 +221,17 @@ async function ownedOrg(
 }
 
 function onboardingLink(
-  accountId: string,
+  account: StripeAccountRef,
   baseUrl: string
 ): Stripe.V2.Core.AccountLinkCreateParams {
   return {
-    account: accountId,
+    account: account.stripeAccountId,
     use_case: {
       type: 'account_onboarding',
       account_onboarding: {
-        configurations: ['recipient', 'merchant'],
+        configurations: isGlobalPayouts(account.stripeAccountKind)
+          ? ['recipient']
+          : ['recipient', 'merchant'],
         refresh_url: `${baseUrl}/organizer/payouts/stripe/refresh`,
         return_url: `${baseUrl}/organizer/payouts/stripe/return`,
         collection_options: { fields: 'eventually_due' },
@@ -175,23 +240,62 @@ function onboardingLink(
   };
 }
 
+/** A hosted-onboarding link for an existing account, from the client its kind needs. */
+export async function mintOnboardingLink(
+  clients: PayoutClients,
+  account: StripeAccountRef,
+  baseUrl: string
+): Promise<string> {
+  const params = onboardingLink(account, baseUrl);
+  const link = isGlobalPayouts(account.stripeAccountKind)
+    ? await clients.global.v2.core.accountLinks.create(params)
+    : await clients.connect.v2.core.accountLinks.create(params);
+  return link.url;
+}
+
 /**
- * Stripe's idempotency key makes a double click return the same account; the
- * guarded update makes the second writer adopt the first's id instead of
- * overwriting it.
- *
+ * The guarded update makes the second writer adopt the first's account
+ * instead of overwriting it; Stripe's idempotency key on the create has
+ * already made a double click return the same account.
+ */
+export async function claimStripeAccount(
+  prisma: PrismaClient,
+  organizationId: string,
+  account: { id: string; kind: StripeAccountKind }
+): Promise<StripeAccountRef> {
+  const claimed = await prisma.organization.updateMany({
+    where: { id: organizationId, stripeAccountId: null },
+    data: { stripeAccountId: account.id, stripeAccountKind: account.kind },
+  });
+  if (claimed.count === 1) {
+    return { stripeAccountId: account.id, stripeAccountKind: account.kind };
+  }
+
+  const current = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { stripeAccountId: true, stripeAccountKind: true },
+  });
+  return current?.stripeAccountId
+    ? {
+        stripeAccountId: current.stripeAccountId,
+        stripeAccountKind: current.stripeAccountKind,
+      }
+    : { stripeAccountId: account.id, stripeAccountKind: account.kind };
+}
+
+/**
  * `card_payments` is requested only because Stripe refuses
  * `stripe_transfers` without it unless the platform has been approved for
  * transfers-only accounts (error `capability_not_available_without_other_capability`).
  * Nothing charges through the account; the merchant configuration is
  * Stripe's precondition, not a product decision (ADR 0030).
  */
-async function createRecipientAccount(
+async function createConnectAccount(
   prisma: PrismaClient,
   stripe: Stripe,
   org: ConnectOrg,
   baseUrl: string
-): Promise<string> {
+): Promise<StripeAccountRef> {
   // Stripe rejects localhost as a business URL (url_invalid), so local dev
   // leaves the field for the form to collect.
   const profile = baseUrl.startsWith('https://')
@@ -224,49 +328,48 @@ async function createRecipientAccount(
     },
     { idempotencyKey: `connect-account-${org.id}` }
   );
-
-  const claimed = await prisma.organization.updateMany({
-    where: { id: org.id, stripeAccountId: null },
-    data: { stripeAccountId: account.id },
+  return claimStripeAccount(prisma, org.id, {
+    id: account.id,
+    kind: 'CONNECT',
   });
-  if (claimed.count === 1) return account.id;
-
-  const current = await prisma.organization.findUnique({
-    where: { id: org.id },
-    select: { stripeAccountId: true },
-  });
-  return current?.stripeAccountId ?? account.id;
 }
 
+/** The Connect path: a US organizer. An existing account of either kind is linked, not replaced. */
 export async function startStripeOnboarding(
   prisma: PrismaClient,
-  stripe: Stripe,
+  clients: PayoutClients,
   actor: Actor,
   input: { baseUrl: string }
 ): Promise<{ url: string }> {
   const org = await ownedOrg(prisma, actor, { provision: true });
-  const accountId =
-    org.stripeAccountId ??
-    (await createRecipientAccount(prisma, stripe, org, input.baseUrl));
-  const link = await stripe.v2.core.accountLinks.create(
-    onboardingLink(accountId, input.baseUrl)
-  );
-  return { url: link.url };
+  const account = org.stripeAccountId
+    ? {
+        stripeAccountId: org.stripeAccountId,
+        stripeAccountKind: org.stripeAccountKind,
+      }
+    : await createConnectAccount(prisma, clients.connect, org, input.baseUrl);
+  return { url: await mintOnboardingLink(clients, account, input.baseUrl) };
 }
 
 /** An expired or reused link lands here; without an account there is nothing to refresh. */
 export async function refreshStripeOnboarding(
   prisma: PrismaClient,
-  stripe: Stripe,
+  clients: PayoutClients,
   actor: Actor,
   input: { baseUrl: string }
 ): Promise<{ url: string | null }> {
   const org = await ownedOrg(prisma, actor);
   if (!org.stripeAccountId) return { url: null };
-  const link = await stripe.v2.core.accountLinks.create(
-    onboardingLink(org.stripeAccountId, input.baseUrl)
-  );
-  return { url: link.url };
+  return {
+    url: await mintOnboardingLink(
+      clients,
+      {
+        stripeAccountId: org.stripeAccountId,
+        stripeAccountKind: org.stripeAccountKind,
+      },
+      input.baseUrl
+    ),
+  };
 }
 
 async function stampBankLinked(
@@ -289,7 +392,7 @@ async function stampBankLinked(
  */
 export async function finishStripeOnboardingReturn(
   prisma: PrismaClient,
-  stripe: Stripe,
+  clients: PayoutClients,
   actor: Actor,
   now: Date = new Date()
 ): Promise<ConnectReturnOutcome> {
@@ -299,8 +402,12 @@ export async function finishStripeOnboardingReturn(
   try {
     status = await syncTransfersStatus(
       prisma,
-      stripe,
-      { id: org.id, stripeAccountId: org.stripeAccountId },
+      clients,
+      {
+        id: org.id,
+        stripeAccountId: org.stripeAccountId,
+        stripeAccountKind: org.stripeAccountKind,
+      },
       now
     );
   } catch {
@@ -310,14 +417,15 @@ export async function finishStripeOnboardingReturn(
   return status === 'pending' ? 'pending' : 'incomplete';
 }
 
+/** Connect only: a Global Payouts recipient has no dashboard. */
 export async function createStripeDashboardLink(
   prisma: PrismaClient,
   stripe: Stripe,
   actor: Actor
 ): Promise<{ url: string }> {
   const org = await ownedOrg(prisma, actor);
-  if (!org.stripeAccountId) {
-    throw new NotFoundError('This organization has no Stripe account');
+  if (!org.stripeAccountId || isGlobalPayouts(org.stripeAccountKind)) {
+    throw new NotFoundError('This organization has no Stripe dashboard');
   }
   const link = await stripe.accounts.createLoginLink(org.stripeAccountId);
   return { url: link.url };

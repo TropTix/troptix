@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { ConnectReturnOutcome } from '@troptix/api';
 import { finishStripeOnboardingReturn } from '@troptix/api/server';
 import prisma from '@/server/prisma';
-import { stripe } from '@/server/lib/stripe';
+import { payoutClients } from '@/server/lib/stripePayouts';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   try {
     outcome = await finishStripeOnboardingReturn(
       prisma,
-      stripe,
+      payoutClients,
       userToActor(user)
     );
   } catch (err) {

@@ -5,7 +5,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
-import type { ConnectState, PayoutOrganization } from '@troptix/api';
+import type {
+  ConnectState,
+  PayoutOrganization,
+  StripeAccountKind,
+} from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -126,6 +130,7 @@ function OrganizationRow({
         {org.stripeAccountId ? (
           <StripeAccountStatus
             accountId={org.stripeAccountId}
+            kind={org.stripeAccountKind}
             state={connectState}
             linkedAt={org.payoutBankLinkedAt}
           />
@@ -195,23 +200,34 @@ function TermsStatus({
   );
 }
 
-/** Read-only on the Stripe rail: Stripe's verification checks this step off, not a switch. */
+/**
+ * Read-only on the Stripe rail: Stripe's verification checks this step off,
+ * not a switch. A recipient lives under Global Payouts in the Dashboard, not
+ * under Connect.
+ */
 function StripeAccountStatus({
   accountId,
+  kind,
   state,
   linkedAt,
 }: {
   accountId: string;
+  kind: StripeAccountKind | null;
   state?: ConnectState;
   linkedAt: string | null;
 }) {
+  const recipient = kind === 'GLOBAL_PAYOUTS';
   return (
     <div>
       <p className="text-sm">
-        Stripe ·{' '}
+        {recipient ? 'Stripe recipient' : 'Stripe'} ·{' '}
         <a
           className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-foreground"
-          href={`https://dashboard.stripe.com/connect/accounts/${accountId}`}
+          href={
+            recipient
+              ? 'https://dashboard.stripe.com/global-payouts/recipients'
+              : `https://dashboard.stripe.com/connect/accounts/${accountId}`
+          }
           target="_blank"
           rel="noreferrer"
         >

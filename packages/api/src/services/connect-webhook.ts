@@ -1,16 +1,24 @@
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
-import { recordTransfersStatus, transfersStatus } from './organizer-connect';
+import {
+  recordTransfersStatus,
+  retrieveAccount,
+  transfersStatus,
+  type PayoutClients,
+} from './organizer-connect';
 
 export type ConnectEventOutcome = 'synced' | 'unknown_account' | 'ignored';
 
 /**
- * Thin events carry only ids, so the account is fetched fresh. Every
- * subscribed event mirrors the transfers status into the row, in both
- * directions; the gate stamps once when it reads active.
+ * Thin events carry only ids, so the account is fetched fresh, through the
+ * client its kind needs (a recipient's capability is invisible to the GA
+ * version). Every subscribed event mirrors the payout capability's status
+ * into the row, in both directions; the gate stamps once when it reads
+ * active.
  */
 export async function handleConnectEvent(
   prisma: PrismaClient,
+  clients: PayoutClients,
   notification: Stripe.V2.Core.EventNotification,
   now: Date = new Date()
 ): Promise<ConnectEventOutcome> {
@@ -22,13 +30,18 @@ export async function handleConnectEvent(
     return 'ignored';
   }
 
-  const account = await notification.fetchRelatedObject();
+  const accountId = notification.related_object?.id;
+  if (!accountId) return 'ignored';
   const org = await prisma.organization.findUnique({
-    where: { stripeAccountId: account.id },
-    select: { id: true },
+    where: { stripeAccountId: accountId },
+    select: { id: true, stripeAccountKind: true },
   });
   if (!org) return 'unknown_account';
 
+  const account = await retrieveAccount(clients, {
+    stripeAccountId: accountId,
+    stripeAccountKind: org.stripeAccountKind,
+  });
   await recordTransfersStatus(prisma, org.id, transfersStatus(account), now);
   return 'synced';
 }

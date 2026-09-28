@@ -19,7 +19,11 @@ import {
   StripeAccountRestrictedError,
 } from './_shared/errors';
 import { resolvePayoutPolicy } from './_shared/payouts';
-import { connectStateOf } from './organizer-connect';
+import {
+  connectStateOf,
+  isGlobalPayouts,
+  toAccountKind,
+} from './organizer-connect';
 import { toRequestDto, toSetupState } from './organizer-payouts';
 import { requirePlatformOwner } from './organizer-scope';
 
@@ -37,6 +41,7 @@ export async function listPayoutRequests(
           displayName: true,
           slug: true,
           stripeAccountId: true,
+          stripeAccountKind: true,
           stripeTransfersStatus: true,
           payoutBankLinkedAt: true,
           owner: { select: { email: true } },
@@ -52,6 +57,7 @@ export async function listPayoutRequests(
     organizationSlug: row.organization.slug,
     ownerEmail: row.organization.owner.email,
     stripeAccountId: row.organization.stripeAccountId,
+    stripeAccountKind: toAccountKind(row.organization.stripeAccountKind),
     connectState: connectStateOf(row.organization),
   }));
 }
@@ -95,6 +101,7 @@ export async function sendPayoutViaStripe(
               id: true,
               slug: true,
               stripeAccountId: true,
+              stripeAccountKind: true,
               stripeTransfersStatus: true,
               payoutBankLinkedAt: true,
             },
@@ -114,6 +121,11 @@ export async function sendPayoutViaStripe(
       ) {
         throw new ConflictError(
           'This organization is not active on Stripe; pay another way'
+        );
+      }
+      if (isGlobalPayouts(organization.stripeAccountKind)) {
+        throw new ConflictError(
+          'Global Payouts sends are not built yet; pay another way'
         );
       }
 
@@ -443,6 +455,7 @@ export async function listPayoutOrganizations(
       payoutTermsAcceptedAt: true,
       payoutTermsVersion: true,
       stripeAccountId: true,
+      stripeAccountKind: true,
       stripeTransfersStatus: true,
       payoutReleaseAtSale: true,
       payoutHoldbackPercent: true,
@@ -462,6 +475,7 @@ export async function listPayoutOrganizations(
       payoutTermsAcceptedAt: org.payoutTermsAcceptedAt?.toISOString() ?? null,
       payoutTermsVersion: org.payoutTermsVersion,
       stripeAccountId: org.stripeAccountId,
+      stripeAccountKind: toAccountKind(org.stripeAccountKind),
       stripeTransfersStatus: org.stripeTransfersStatus,
       setup: toSetupState(org),
       policy: resolvePayoutPolicy(org),

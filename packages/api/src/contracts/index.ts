@@ -7,5 +7,6 @@ export * from './featureFlags';
 export * from './organizations';
 export * from './organizer';
 export * from './payments';
+export * from './payoutCountries';
 export * from './payouts';
 export * from './reservations';

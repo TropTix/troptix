@@ -94,11 +94,13 @@ model Organization {
   payoutTermsAcceptedAt DateTime?
   payoutTermsVersion    String?   @db.VarChar(20)
 
-  // The organizer's Stripe account: a Connect account today, a Global Payouts
-  // recipient later. The transfers capability status is Stripe's, mirrored
-  // here by the webhook and the onboarding return (ADR 0032); null until the
-  // first sync.
+  // The organizer's Stripe account: a Connect account or a Global Payouts
+  // recipient (ADR 0034), told apart by the kind, set once at creation. The
+  // status is that of the account's payout capability (stripe_transfers or
+  // bank_accounts.local), mirrored here by the webhook and the onboarding
+  // return (ADR 0032); null until the first sync.
   stripeAccountId       String? @unique
+  stripeAccountKind     String?
   stripeTransfersStatus String?
 
   // Payout release policy overrides (graduated trust). Null = platform

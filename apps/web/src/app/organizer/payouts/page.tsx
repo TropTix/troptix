@@ -42,10 +42,12 @@ export default async function OrganizerPayoutsPage({
   // Email included so the staff release condition matches without PostHog
   // having seen this user before.
   const flagUser = { id: user.uid, email: user.email };
-  const [payoutsEnabled, connectEnabled] = await Promise.all([
-    isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, flagUser),
-    isFlagEnabled(FeatureFlag.STRIPE_CONNECT_ONBOARDING, flagUser),
-  ]);
+  const [payoutsEnabled, connectEnabled, globalPayoutsEnabled] =
+    await Promise.all([
+      isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, flagUser),
+      isFlagEnabled(FeatureFlag.STRIPE_CONNECT_ONBOARDING, flagUser),
+      isFlagEnabled(FeatureFlag.GLOBAL_PAYOUTS_ONBOARDING, flagUser),
+    ]);
   if (!payoutsEnabled) {
     notFound();
   }
@@ -101,6 +103,7 @@ export default async function OrganizerPayoutsPage({
             <SetupChecklistCard
               setup={setup}
               connect={connect}
+              globalPayouts={globalPayoutsEnabled}
               terms={terms}
               readOnly={readOnly}
             />
@@ -174,7 +177,7 @@ export default async function OrganizerPayoutsPage({
           <RequestsTable
             requests={payouts.requests}
             readOnly={readOnly}
-            viaStripe={connect?.state === 'active'}
+            stripeKind={connect?.state === 'active' ? connect.kind : null}
             action={
               !readOnly && (
                 <RequestPayoutDialog
@@ -192,6 +195,7 @@ export default async function OrganizerPayoutsPage({
         <PayoutSettings
           setup={setup}
           connect={connect}
+          globalPayouts={globalPayoutsEnabled}
           terms={terms}
           readOnly={readOnly}
           holdbackLine={holdbackLine}
