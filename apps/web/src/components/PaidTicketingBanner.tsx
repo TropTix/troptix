@@ -19,7 +19,6 @@ export function PaidTicketingBanner() {
       <Callout
         icon={<Wallet className="size-5" />}
         title="Start selling paid tickets"
-        body="Free tickets are on now. Two quick steps on the Payouts page and paid tickets are on too."
         steps={['Meet with TropTix', 'Connect your bank account']}
         actions={
           <Button asChild>
@@ -37,7 +36,6 @@ export function PaidTicketingBanner() {
     <Callout
       icon={<CalendarClock className="size-5" />}
       title="Start selling paid tickets"
-      body="Free tickets are on now. A short call with the TropTix team turns on paid tickets."
       actions={
         <>
           <Button variant="outline" asChild>
@@ -63,13 +61,11 @@ export function PaidTicketingBanner() {
 function Callout({
   icon,
   title,
-  body,
   steps,
   actions,
 }: {
   icon: React.ReactNode;
   title: string;
-  body: string;
   steps?: string[];
   actions: React.ReactNode;
 }) {
@@ -85,7 +81,6 @@ function Callout({
           </div>
           <div className="min-w-0 flex-1 space-y-1.5">
             <p className="font-semibold leading-tight">{title}</p>
-            <p className="text-sm text-muted-foreground">{body}</p>
             {steps && (
               <ol className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1 text-sm">
                 {steps.map((step, index) => (
