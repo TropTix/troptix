@@ -71,6 +71,7 @@ export async function ensureOrganizationForUser(
       data: {
         displayName: name,
         slug,
+        ownerUserId,
         memberships: ownerMembership(ownerUserId),
       },
     });
@@ -141,7 +142,11 @@ export async function updateOrganizationProfile(
       // Owner-only today. Phase 1 must scope this to the acting Organization
       // before Admins get the form, or an Admin's first save mints them an org.
       await prisma.organization.create({
-        data: { ...data, memberships: ownerMembership(input.ownerUserId) },
+        data: {
+          ...data,
+          ownerUserId: input.ownerUserId,
+          memberships: ownerMembership(input.ownerUserId),
+        },
       });
     }
   } catch (err) {

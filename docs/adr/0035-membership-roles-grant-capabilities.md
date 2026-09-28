@@ -17,7 +17,7 @@ The teams plan (PR #587, ADR 0031 there) already proposes the Owner as an `OWNER
 
 ## Decision
 
-1. **`MembershipRole` is `OWNER | ADMIN | SCANNER`.** The Owner is a Membership row. One `OWNER` row per Organization and one per user, each a partial unique index. `Organization.ownerUserId` is dropped; the migration writes an `OWNER` row for every Organization first.
+1. **`MembershipRole` is `OWNER | ADMIN | SCANNER`.** The Owner is a Membership row. One `OWNER` row per Organization and one per user, each a partial unique index. The migration writes an `OWNER` row for every Organization from `Organization.ownerUserId`, dual-written on create; access checks never read the scalar. It drops in a later migration once the Membership model is proven.
 2. **Code asks for a capability, never a role.** `packages/api/src/services/_shared/access.ts` holds one map from role to capabilities (`event.edit`, `event.checkIn`, `event.orders`, `organization.payouts`, …). A new feature adds a capability there and grants it to roles.
 3. **Access resolves through the event's Organization.** `eventsWhereCan(userId, capability)` is the Prisma filter for "events this person may do this on", and `requireEventCapability` guards one event. Both read the Membership on the event's Organization. `Events.organizerUserId` stays as a record of who created the event and is never an access key.
 4. **The map lives in code, not a table.** Changing what a role may do is a code change with review and tests. Per-Organization custom roles are not a need anyone has.

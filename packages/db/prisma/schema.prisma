@@ -34,6 +34,9 @@ model Users {
   socialMediaAccounts SocialMediaAccounts[]
   reservations        Reservation[]
   memberships         Membership[]
+  // Kept alongside Membership during the rollout (ADR 0035); not read by
+  // capability checks. Drops in a later migration once the model is proven.
+  organizations       Organization[]
   payoutRequests      PayoutRequest[]       @relation("PayoutRequestedBy")
   payoutsResolved     PayoutRequest[]       @relation("PayoutResolvedBy")
 
@@ -79,6 +82,11 @@ model Organization {
   linkedin    String?
   verified    Boolean  @default(false)
 
+  // Legacy owner scalar, kept alongside the OWNER Membership row during the
+  // rollout (ADR 0035). Dual-written on create; access checks read Membership,
+  // never this. Drops in a later migration once the model is proven.
+  ownerUserId String   @unique
+
   paidTicketingEnabled     Boolean   @default(false)
   paidTicketingRequestedAt DateTime?
 
@@ -106,6 +114,7 @@ model Organization {
   payoutHoldbackPercent Int?
   payoutHoldbackDays    Int?
 
+  owner          Users           @relation(fields: [ownerUserId], references: [id])
   events         Events[]
   memberships    Membership[]
   payoutRequests PayoutRequest[]
