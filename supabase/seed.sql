@@ -63,6 +63,19 @@ insert into public."Organization" (
   false, true, null, null, null, null
 );
 
+-- A third organization that asked to sell paid tickets but is not approved
+-- yet, so Platform View's setup panel shows a row before any sale.
+insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
+values ('seed_org_3', now(), now(), 'demo-organizer-3@troptix.test', 'Sunset Sessions', 'Sunset', 'Sessions', 'ORGANIZER');
+
+insert into public."Organization" (
+  id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
+  verified, "paidTicketingEnabled", "paidTicketingRequestedAt"
+) values (
+  'seed_organization_3', now(), now(), 'sunset-sessions', 'Sunset Sessions', 'seed_org_3',
+  false, false, now() - interval '2 days'
+);
+
 -- Demo Admin: holds a Membership in the demo Organization (teams Phase 1).
 -- Nothing reads Membership yet. To claim any seeded persona, set its email
 -- to yours BEFORE first sign-in — the provisioning trigger links by email
