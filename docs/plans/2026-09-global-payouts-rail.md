@@ -95,12 +95,20 @@ Counsel reviewed TropTix's position as the organizer's collection agent on
    the row the moment the event arrives belongs to the unattended-payouts
    plan, which also decides what happens to the request. Nothing subscribes
    to outbound payment events in this plan.
-10. **A deterministic idempotency key per request** for the outbound
-    payment: `global-payout-<request id>`. Under v2 semantics a retry within
-    30 days returns the payment or re-executes a failure, which is what ADR
-    0033's per-attempt key had to work around on v1. The list-and-match
-    lookup stays as the guard past 30 days and for a lost response. The row
-    lock and guarded resolve are unchanged.
+10. **A deterministic idempotency key per request, salted by the payments
+    that came back.** The key is `global-payout-<request id>-<n>`, where n
+    is the number of failed, canceled or returned payments the lookup found
+    for the request. Under v2 semantics a retry within 30 days returns the
+    payment or re-executes a failed request, which is what ADR 0033's
+    per-attempt key had to work around on v1. A request that _succeeded_ and
+    whose payment later came back is replayed too, though, so the key must
+    change once such a payment exists or the resend would hand back the dead
+    payment. The list-and-match lookup stays as the guard past 30 days and
+    for a lost response. The row lock and guarded resolve are unchanged.
+    Two sends on different requests share one financial account and are
+    not serialized against each other; the second may fail with
+    `insufficient_funds` and the admin retries. Serializing sends is the
+    unattended-payouts plan's job.
 11. **No quote in v1.** An OutboundPaymentQuote would lock the rate for five
     minutes and itemise fees before the send. Jamaica does not require one,
     the delivered amount comes back on the payment itself, and the fee is
