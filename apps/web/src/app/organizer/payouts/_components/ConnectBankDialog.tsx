@@ -151,7 +151,7 @@ export function ConnectBankDialog({
                 <SelectContent>
                   {PAYOUT_COUNTRIES.map((option) => (
                     <SelectItem key={option.code} value={option.code}>
-                      {option.name} ({option.currency})
+                      {option.name} — paid in {option.currency}
                     </SelectItem>
                   ))}
                 </SelectContent>

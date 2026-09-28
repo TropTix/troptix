@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Actor } from '../trpc/context';
 import { ConflictError, UnauthorizedError } from './_shared/errors';
-import { fakeClients, fakePrisma } from './organizer-connect.test';
+import { fakeClients, fakePrisma } from './organizer-connect.fakes';
 import { startGlobalPayoutsOnboarding } from './organizer-global-payouts';
 
 const OWNER: Actor = { kind: 'user', userId: 'owner-1', role: 'PATRON' };
@@ -102,35 +102,45 @@ describe('startGlobalPayoutsOnboarding', () => {
     });
   });
 
-  it('links an existing account of either kind instead of creating a second', async () => {
+  it('links an existing recipient instead of creating a second', async () => {
     const { prisma, updateMany } = fakePrisma({
       stripeAccountId: 'acct_have',
-      stripeAccountKind: 'CONNECT',
+      stripeAccountKind: 'GLOBAL_PAYOUTS',
     });
-    const { clients, connectCalls, globalCalls } = fakeClients();
+    const { clients, globalCalls } = fakeClients();
 
     await startGlobalPayoutsOnboarding(prisma, clients, OWNER, JAMAICA);
 
     expect(globalCalls.create).toEqual([]);
     expect(updateMany).not.toHaveBeenCalled();
-    expect(connectCalls.links[0]).toMatchObject({
+    expect(globalCalls.links[0]).toMatchObject({
       account: 'acct_have',
-      use_case: {
-        account_onboarding: { configurations: ['recipient', 'merchant'] },
-      },
+      use_case: { account_onboarding: { configurations: ['recipient'] } },
     });
+  });
+
+  it('refuses when a Connect account already exists, rather than sending the organizer into the US form', async () => {
+    const { prisma } = fakePrisma({
+      stripeAccountId: 'acct_us',
+      stripeAccountKind: 'CONNECT',
+    });
+    const { clients, connectCalls, globalCalls } = fakeClients();
+    await expect(
+      startGlobalPayoutsOnboarding(prisma, clients, OWNER, JAMAICA)
+    ).rejects.toThrow(ConflictError);
+    expect(connectCalls.links).toEqual([]);
+    expect(globalCalls.create).toEqual([]);
   });
 
   it("adopts the winner's account when the claim loses a race", async () => {
     const { prisma } = fakePrisma(
       {},
-      { claimCount: 0, raceId: 'acct_first', raceKind: 'CONNECT' }
+      { claimCount: 0, raceId: 'acct_first', raceKind: 'GLOBAL_PAYOUTS' }
     );
-    const { clients, connectCalls, globalCalls } = fakeClients();
+    const { clients, globalCalls } = fakeClients();
 
     await startGlobalPayoutsOnboarding(prisma, clients, OWNER, JAMAICA);
 
-    expect(globalCalls.links).toEqual([]);
-    expect(connectCalls.links[0]).toMatchObject({ account: 'acct_first' });
+    expect(globalCalls.links[0]).toMatchObject({ account: 'acct_first' });
   });
 });

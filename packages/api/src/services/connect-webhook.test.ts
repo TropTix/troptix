@@ -83,7 +83,7 @@ describe('handleConnectEvent', () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
-  it('ignores a subscribed event with no related object', async () => {
+  it('ignores a subscribed event with no related object, or one that is not an account', async () => {
     const { prisma, findUnique } = fakePrisma();
     const { clients } = fakeClients({ status: 'active' });
     await expect(
@@ -93,6 +93,18 @@ describe('handleConnectEvent', () => {
         notification(CAPABILITY_EVENT, null),
         NOW
       )
+    ).resolves.toBe('ignored');
+    const person = {
+      id: 'evt_2',
+      type: CAPABILITY_EVENT,
+      related_object: {
+        id: 'person_1',
+        type: 'v2.core.account_person',
+        url: '',
+      },
+    } as unknown as Stripe.V2.Core.EventNotification;
+    await expect(
+      handleConnectEvent(prisma, clients, person, NOW)
     ).resolves.toBe('ignored');
     expect(findUnique).not.toHaveBeenCalled();
   });

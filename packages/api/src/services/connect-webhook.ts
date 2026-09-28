@@ -30,8 +30,9 @@ export async function handleConnectEvent(
     return 'ignored';
   }
 
-  const accountId = notification.related_object?.id;
-  if (!accountId) return 'ignored';
+  const related = notification.related_object;
+  if (!related || related.type !== 'v2.core.account') return 'ignored';
+  const accountId = related.id;
   const org = await prisma.organization.findUnique({
     where: { stripeAccountId: accountId },
     select: { id: true, stripeAccountKind: true },

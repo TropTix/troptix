@@ -297,14 +297,15 @@ async function inspect(id: string): Promise<void> {
 async function link(id: string): Promise<void> {
   const account = await retrieve(id);
   const merchant = (account.applied_configurations ?? []).includes('merchant');
+  const configurations: Array<'recipient' | 'merchant'> = merchant
+    ? ['recipient', 'merchant']
+    : ['recipient'];
   const params = {
     account: id,
     use_case: {
       type: 'account_onboarding' as const,
       account_onboarding: {
-        configurations: merchant
-          ? (['recipient', 'merchant'] as const)
-          : (['recipient'] as const),
+        configurations,
         refresh_url: `${BASE_URL}/organizer/payouts/stripe/refresh`,
         return_url: `${BASE_URL}/organizer/payouts/stripe/return`,
         collection_options: { fields: 'eventually_due' as const },
@@ -312,26 +313,8 @@ async function link(id: string): Promise<void> {
     },
   };
   const accountLink = merchant
-    ? await stripe.v2.core.accountLinks.create({
-        ...params,
-        use_case: {
-          ...params.use_case,
-          account_onboarding: {
-            ...params.use_case.account_onboarding,
-            configurations: ['recipient', 'merchant'],
-          },
-        },
-      })
-    : await previewStripe.v2.core.accountLinks.create({
-        ...params,
-        use_case: {
-          ...params.use_case,
-          account_onboarding: {
-            ...params.use_case.account_onboarding,
-            configurations: ['recipient'],
-          },
-        },
-      });
+    ? await stripe.v2.core.accountLinks.create(params)
+    : await previewStripe.v2.core.accountLinks.create(params);
   console.log(`  client         ${merchant ? 'connect (GA)' : 'preview'}`);
   console.log(`  expires        ${accountLink.expires_at}`);
   console.log(`  url            ${accountLink.url}`);

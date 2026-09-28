@@ -11,6 +11,7 @@ import type { StartGlobalPayoutsOnboardingInput } from '../contracts/payouts';
 import { ConflictError } from './_shared/errors';
 import {
   claimStripeAccount,
+  isGlobalPayouts,
   mintOnboardingLink,
   ownedOrg,
   type ConnectOrg,
@@ -20,8 +21,9 @@ import {
 
 /**
  * Country and entity type go straight to Stripe and are never stored; the
- * hosted form collects what that country requires. An organization that
- * already has an account of either kind is linked, not given a second one.
+ * hosted form collects what that country requires. An existing recipient is
+ * linked, not replaced; an existing Connect account is refused, since the
+ * organizer has just said their bank is elsewhere.
  */
 export async function startGlobalPayoutsOnboarding(
   prisma: PrismaClient,
@@ -34,6 +36,11 @@ export async function startGlobalPayoutsOnboarding(
     throw new ConflictError('Stripe cannot pay a bank in that country yet');
   }
   const org = await ownedOrg(prisma, actor, { provision: true });
+  if (org.stripeAccountId && !isGlobalPayouts(org.stripeAccountKind)) {
+    throw new ConflictError(
+      'This organization is already connected through Stripe for a US bank; contact us to switch countries'
+    );
+  }
   const account = org.stripeAccountId
     ? {
         stripeAccountId: org.stripeAccountId,
