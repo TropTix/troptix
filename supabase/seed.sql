@@ -44,9 +44,10 @@ insert into public."Organization" (
   null, null
 );
 
--- A second organization with payout setup INCOMPLETE, so both payout screens
--- show the checklist state (organizer sees the checklist card; Platform View
--- shows unchecked boxes).
+-- A second organization with payout setup INCOMPLETE and paid ticketing off,
+-- so both payout screens show the checklist state (organizer sees the
+-- checklist card; Platform View shows unchecked boxes) and the organizer
+-- surfaces show the paid-ticketing banner.
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
 values ('seed_org_2', now(), now(), 'demo-organizer-2@troptix.test', 'Island Nights', 'Island', 'Nights', 'ORGANIZER');
 
@@ -55,7 +56,7 @@ insert into public."Organization" (
   verified, "paidTicketingEnabled", "stripeAccountId", "stripeTransfersStatus"
 ) values (
   'seed_organization_2', now(), now(), 'island-nights', 'Island Nights', 'seed_org_2',
-  false, true, null, null
+  false, false, null, null
 );
 
 -- Demo Admin: holds a Membership in the demo Organization (teams Phase 1).
