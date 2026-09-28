@@ -8,11 +8,12 @@
     "test": "pnpm --filter web test",
     "next": "pnpm --filter web dev",
     "dev": "npm-run-all --parallel next",
-    "typecheck": "pnpm --filter web typecheck && pnpm --filter @troptix/db typecheck && pnpm --filter @troptix/api typecheck && pnpm --filter @troptix/transactional typecheck && pnpm --filter troptix-mobile typecheck",
+    "typecheck": "pnpm --filter web typecheck && pnpm --filter @troptix/db typecheck && pnpm --filter @troptix/api typecheck && pnpm --filter @troptix/transactional typecheck && pnpm --filter troptix-mobile typecheck && pnpm --filter @troptix/e2e typecheck",
     "lint": "oxlint --report-unused-disable-directives-severity=error",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "e2e": "pnpm --filter @troptix/e2e build:web && pnpm --filter @troptix/e2e test"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs}": [
