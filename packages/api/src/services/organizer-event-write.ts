@@ -11,7 +11,7 @@ import {
 } from '../contracts/organizer';
 import { generateId } from './_shared/ids';
 import { NotFoundError } from './_shared/errors';
-import { eventsWhereCan } from './_shared/access';
+import { Capability, eventsWhereCan } from './_shared/access';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
 import { ticketTypeWriteFields } from './_shared/ticket-type-fields';
 import { resolveOrganizerScope } from './organizer-scope';
@@ -70,7 +70,7 @@ export async function updateEvent(
   const userId = await resolveOrganizerScope(prisma, actor);
 
   const event = await prisma.events.findFirst({
-    where: { id: eventId, ...eventsWhereCan(userId, 'event.edit') },
+    where: { id: eventId, ...eventsWhereCan(userId, Capability.EventEdit) },
     select: { organization: { select: { slug: true, displayName: true } } },
   });
   if (!event) {

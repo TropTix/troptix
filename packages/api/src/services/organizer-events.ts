@@ -5,7 +5,7 @@ import type {
   ViewAsInput,
 } from '../contracts/organizer';
 import { eventCardSelect, toEventSummary } from './_shared/organizerReads';
-import { eventsWhereCan } from './_shared/access';
+import { Capability, eventsWhereCan } from './_shared/access';
 import { resolveOrganizerScope } from './organizer-scope';
 
 export async function listOrganizerEvents(
@@ -21,7 +21,7 @@ export async function listOrganizerEvents(
   );
 
   const rows = await prisma.events.findMany({
-    where: eventsWhereCan(organizerUserId, 'event.orders'),
+    where: eventsWhereCan(organizerUserId, Capability.EventOrders),
     select: eventCardSelect,
     orderBy: { startsAt: 'desc' },
   });

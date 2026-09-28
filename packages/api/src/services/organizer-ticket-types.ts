@@ -17,7 +17,7 @@ import {
   type TicketTypeRollupRow,
 } from './_shared/organizerReads';
 import { getSaleState } from './_shared/saleState';
-import { eventsWhereCan } from './_shared/access';
+import { Capability, eventsWhereCan } from './_shared/access';
 import { resolveOrganizerScope } from './organizer-scope';
 
 export async function listTicketTypes(
@@ -37,7 +37,7 @@ export async function listTicketTypes(
     prisma.events.findFirst({
       where: {
         id: eventId,
-        ...eventsWhereCan(organizerUserId, 'event.orders'),
+        ...eventsWhereCan(organizerUserId, Capability.EventOrders),
       },
       select: {
         id: true,

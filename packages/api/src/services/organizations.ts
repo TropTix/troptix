@@ -1,6 +1,6 @@
 // Organizations are lazy-created on first explicit write (event save or
 // profile save) — never on a page view.
-import type { PrismaClient } from '@troptix/db';
+import { MembershipRole, type PrismaClient } from '@troptix/db';
 import type { EventSummary } from '../contracts/events';
 import type {
   OrganizationDetail,
@@ -27,14 +27,18 @@ export function findOrganizationForOwner(
   ownerUserId: string
 ) {
   return prisma.organization.findFirst({
-    where: { memberships: { some: { userId: ownerUserId, role: 'OWNER' } } },
+    where: {
+      memberships: {
+        some: { userId: ownerUserId, role: MembershipRole.OWNER },
+      },
+    },
   });
 }
 
 /** The Owner's user; every Organization has exactly one OWNER row. */
 export const organizationOwnerSelect = {
   memberships: {
-    where: { role: 'OWNER' },
+    where: { role: MembershipRole.OWNER },
     select: { user: { select: { id: true, email: true } } },
     take: 1,
   },
@@ -49,7 +53,7 @@ export function ownerOf(org: {
 }
 
 function ownerMembership(ownerUserId: string) {
-  return { create: { userId: ownerUserId, role: 'OWNER' as const } };
+  return { create: { userId: ownerUserId, role: MembershipRole.OWNER } };
 }
 
 export async function ensureOrganizationForUser(

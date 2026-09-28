@@ -2,7 +2,7 @@ import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type { AcceptPayoutTermsInput, PayoutTerms } from '../contracts/payouts';
 import { PAYOUT_TERMS } from '../legal/payoutTerms';
-import { organizationsWhereCan } from './_shared/access';
+import { Capability, organizationsWhereCan } from './_shared/access';
 import {
   ConflictError,
   NotFoundError,
@@ -39,7 +39,7 @@ export async function acceptPayoutTerms(
     );
   }
   const updated = await prisma.organization.updateMany({
-    where: organizationsWhereCan(actor.userId, 'organization.payouts'),
+    where: organizationsWhereCan(actor.userId, Capability.OrganizationPayouts),
     data: { payoutTermsAcceptedAt: now, payoutTermsVersion: input.version },
   });
   if (updated.count === 0) {

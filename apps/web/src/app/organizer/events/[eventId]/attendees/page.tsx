@@ -1,6 +1,6 @@
 import React from 'react';
 import prisma from '@/server/prisma';
-import { eventsWhereCan } from '@troptix/api/server';
+import { Capability, eventsWhereCan } from '@troptix/api/server';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { notFound, redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
@@ -41,7 +41,7 @@ async function fetchTickets(eventId: string, user: ServerUser) {
     const tickets = await prisma.tickets.findMany({
       where: {
         eventId: eventId,
-        event: eventsWhereCan(user.uid, 'event.orders'),
+        event: eventsWhereCan(user.uid, Capability.EventOrders),
         order: {
           status: 'COMPLETED',
         },
@@ -75,7 +75,7 @@ async function fetchTickets(eventId: string, user: ServerUser) {
 
 async function fetchEventName(eventId: string, user: ServerUser) {
   const event = await prisma.events.findFirst({
-    where: { id: eventId, ...eventsWhereCan(user.uid, 'event.orders') },
+    where: { id: eventId, ...eventsWhereCan(user.uid, Capability.EventOrders) },
     select: {
       name: true,
     },

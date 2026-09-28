@@ -6,33 +6,36 @@ import { NotFoundError } from './errors';
  * capability here and grants it to roles; call sites ask for the capability,
  * never for a role.
  */
-export type Capability =
-  | 'event.create'
-  | 'event.edit'
-  | 'event.checkIn'
-  | 'event.orders'
-  | 'organization.edit'
-  | 'organization.payouts'
-  | 'organization.members';
+export const Capability = {
+  EventCreate: 'event.create',
+  EventEdit: 'event.edit',
+  EventCheckIn: 'event.checkIn',
+  EventOrders: 'event.orders',
+  OrganizationEdit: 'organization.edit',
+  OrganizationPayouts: 'organization.payouts',
+  OrganizationMembers: 'organization.members',
+} as const;
+
+export type Capability = (typeof Capability)[keyof typeof Capability];
 
 const ROLE_CAPABILITIES: Record<MembershipRole, readonly Capability[]> = {
   OWNER: [
-    'event.create',
-    'event.edit',
-    'event.checkIn',
-    'event.orders',
-    'organization.edit',
-    'organization.payouts',
-    'organization.members',
+    Capability.EventCreate,
+    Capability.EventEdit,
+    Capability.EventCheckIn,
+    Capability.EventOrders,
+    Capability.OrganizationEdit,
+    Capability.OrganizationPayouts,
+    Capability.OrganizationMembers,
   ],
   ADMIN: [
-    'event.create',
-    'event.edit',
-    'event.checkIn',
-    'event.orders',
-    'organization.edit',
+    Capability.EventCreate,
+    Capability.EventEdit,
+    Capability.EventCheckIn,
+    Capability.EventOrders,
+    Capability.OrganizationEdit,
   ],
-  SCANNER: ['event.checkIn'],
+  SCANNER: [Capability.EventCheckIn],
 };
 
 export function roleCan(role: MembershipRole, capability: Capability): boolean {

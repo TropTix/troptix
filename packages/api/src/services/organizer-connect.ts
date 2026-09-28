@@ -13,7 +13,7 @@ import type {
   ConnectState,
 } from '../contracts/payouts';
 import { NotFoundError, UnauthorizedError } from './_shared/errors';
-import { organizationsWhereCan } from './_shared/access';
+import { Capability, organizationsWhereCan } from './_shared/access';
 import {
   ensureOrganizationForUser,
   organizationOwnerSelect,
@@ -89,7 +89,10 @@ export async function getConnectSetup(
     input.viewAsOrganizerUserId
   );
   const org = await prisma.organization.findFirst({
-    where: organizationsWhereCan(organizerUserId, 'organization.payouts'),
+    where: organizationsWhereCan(
+      organizerUserId,
+      Capability.OrganizationPayouts
+    ),
     select: {
       stripeAccountId: true,
       stripeTransfersStatus: true,
@@ -145,7 +148,7 @@ async function ownedOrg(
     throw new UnauthorizedError('Sign in to manage payouts');
   }
   const select = {
-    where: organizationsWhereCan(actor.userId, 'organization.payouts'),
+    where: organizationsWhereCan(actor.userId, Capability.OrganizationPayouts),
     select: ORG_SELECT,
   };
   const org = await prisma.organization.findFirst(select);

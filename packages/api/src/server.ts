@@ -59,11 +59,11 @@ export {
   type ScanTicketResult,
 } from './services/organizer-checkin';
 export {
+  Capability,
   eventsWhereCan,
   findEventRole,
   organizationsWhereCan,
   roleCan,
-  type Capability,
 } from './services/_shared/access';
 export {
   ensureOrganizationForUser,

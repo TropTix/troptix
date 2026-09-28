@@ -1,7 +1,7 @@
 import { BackButton } from '@/components/ui/back-button';
 import prisma from '@/server/prisma';
 import { parseStoredFlyerPalette } from '@troptix/api';
-import { eventsWhereCan } from '@troptix/api/server';
+import { Capability, eventsWhereCan } from '@troptix/api/server';
 import EventForm from '../../_components/EventForm';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
@@ -20,7 +20,7 @@ import type { ServerUser } from '@/server/authUser';
 async function getEvent(eventId: string, user: ServerUser) {
   {
     const event = await prisma.events.findFirst({
-      where: { id: eventId, ...eventsWhereCan(user.uid, 'event.edit') },
+      where: { id: eventId, ...eventsWhereCan(user.uid, Capability.EventEdit) },
       include: {
         organization: {
           select: { displayName: true, paidTicketingEnabled: true },

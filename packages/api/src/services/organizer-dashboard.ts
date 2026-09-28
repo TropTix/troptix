@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@troptix/db';
+import { MembershipRole, type PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import type {
   DashboardInput,
@@ -16,7 +16,7 @@ import {
   toRecentOrder,
 } from './_shared/organizerReads';
 import { isProfileComplete } from './_shared/organizerSetup';
-import { eventsWhereCan, rolesWith } from './_shared/access';
+import { Capability, eventsWhereCan, rolesWith } from './_shared/access';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const ACTIVE_EVENTS_LIMIT = 5;
@@ -91,7 +91,7 @@ export async function getDashboard(
   const range = input.range ?? DEFAULT_RANGE;
   const window = rangeWindow(range, now);
   const startOfToday = startOfUtcDay(now);
-  const ownedEvents = eventsWhereCan(organizerUserId, 'event.orders');
+  const ownedEvents = eventsWhereCan(organizerUserId, Capability.EventOrders);
 
   const [revenue, salesRows, activeEventRows, recentOrderRows, org] =
     await Promise.all([
@@ -118,7 +118,7 @@ export async function getDashboard(
             SELECT 1 FROM "Membership" m
             WHERE m."organizationId" = e."organizationId"
               AND m."userId" = ${organizerUserId}
-              AND m."role"::text = ANY(${rolesWith('event.orders')})
+              AND m."role"::text = ANY(${rolesWith(Capability.EventOrders)})
           )
           AND e."deletedAt" IS NULL
           AND t."createdAt" >= ${window.from}
@@ -144,7 +144,9 @@ export async function getDashboard(
 
       prisma.organization.findFirst({
         where: {
-          memberships: { some: { userId: organizerUserId, role: 'OWNER' } },
+          memberships: {
+            some: { userId: organizerUserId, role: MembershipRole.OWNER },
+          },
         },
         select: { logoUrl: true, bio: true, paidTicketingEnabled: true },
       }),

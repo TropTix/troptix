@@ -8,7 +8,7 @@ import type {
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
 import { customerDisplay, toCents } from './_shared/organizerMapping';
-import { eventsWhereCan } from './_shared/access';
+import { Capability, eventsWhereCan } from './_shared/access';
 import { resolveOrganizerScope } from './organizer-scope';
 
 /** Newest-N cap on the list read. The full set is the CSV export's job. */
@@ -28,7 +28,7 @@ export async function listEventOrders(
 
   // A non-owned or missing event yields a null gate → NotFound (not a
   // misleading empty list).
-  const ownedEvent = eventsWhereCan(organizerUserId, 'event.orders');
+  const ownedEvent = eventsWhereCan(organizerUserId, Capability.EventOrders);
   const [event, rows] = await Promise.all([
     prisma.events.findFirst({
       where: { id: eventId, ...ownedEvent },
@@ -85,7 +85,7 @@ export async function getOrderDetail(
     where: {
       id: orderId,
       eventId,
-      event: eventsWhereCan(organizerUserId, 'event.orders'),
+      event: eventsWhereCan(organizerUserId, Capability.EventOrders),
     },
     select: {
       id: true,

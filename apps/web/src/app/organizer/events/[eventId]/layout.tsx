@@ -1,7 +1,7 @@
 import React from 'react';
 import { EventManagementNav } from '@/components/ui/event-management-nav';
 import prisma from '@/server/prisma';
-import { eventsWhereCan } from '@troptix/api/server';
+import { Capability, eventsWhereCan } from '@troptix/api/server';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
@@ -14,7 +14,9 @@ async function getEvent(eventId: string, user: ServerUser) {
     where: {
       id: eventId,
       deletedAt: null,
-      ...(user.isPlatformOwner ? {} : eventsWhereCan(user.uid, 'event.orders')),
+      ...(user.isPlatformOwner
+        ? {}
+        : eventsWhereCan(user.uid, Capability.EventOrders)),
     },
     select: { name: true, isDraft: true },
   });

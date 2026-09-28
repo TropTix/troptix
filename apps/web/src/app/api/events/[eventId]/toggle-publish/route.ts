@@ -4,7 +4,7 @@ import {
 } from '@/lib/validations/publishValidation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
-import { eventsWhereCan } from '@troptix/api/server';
+import { Capability, eventsWhereCan } from '@troptix/api/server';
 import { revalidateEventPublicPages } from '@/server/revalidateEventPages';
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
@@ -28,7 +28,7 @@ export async function PATCH(
     }
 
     const event = await prisma.events.findFirst({
-      where: { id: eventId, ...eventsWhereCan(user.uid, 'event.edit') },
+      where: { id: eventId, ...eventsWhereCan(user.uid, Capability.EventEdit) },
       select: {
         id: true,
         isDraft: true,

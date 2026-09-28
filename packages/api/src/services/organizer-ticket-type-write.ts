@@ -7,7 +7,7 @@ import {
   type TicketTypeInput,
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
-import { eventsWhereCan } from './_shared/access';
+import { Capability, eventsWhereCan } from './_shared/access';
 import { generateId } from './_shared/ids';
 import { toCents } from './_shared/organizerMapping';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
@@ -28,7 +28,7 @@ export async function createTicketType(
   const userId = await resolveOrganizerScope(prisma, actor);
 
   const event = await prisma.events.findFirst({
-    where: { id: eventId, ...eventsWhereCan(userId, 'event.edit') },
+    where: { id: eventId, ...eventsWhereCan(userId, Capability.EventEdit) },
     select: eventOrganizationSelect,
   });
   if (!event) {
@@ -58,7 +58,7 @@ export async function updateTicketType(
     where: {
       id: ticketTypeId,
       eventId,
-      event: eventsWhereCan(userId, 'event.edit'),
+      event: eventsWhereCan(userId, Capability.EventEdit),
     },
     select: {
       id: true,
