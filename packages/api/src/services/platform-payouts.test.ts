@@ -662,7 +662,10 @@ describe('listPayoutOrganizations', () => {
     slug: 'demo-organizer',
     payoutMeetingAt: new Date('2026-08-01T00:00:00Z'),
     payoutBankLinkedAt: null,
+    payoutTermsAcceptedAt: null,
+    payoutTermsVersion: null,
     stripeAccountId: null,
+    stripeTransfersStatus: null,
     payoutReleaseAtSale: true,
     payoutHoldbackPercent: null,
     payoutHoldbackDays: null,
@@ -680,8 +683,17 @@ describe('listPayoutOrganizations', () => {
         ownerEmail: 'owner@example.test',
         payoutMeetingAt: '2026-08-01T00:00:00.000Z',
         payoutBankLinkedAt: null,
+        payoutTermsAcceptedAt: null,
+        payoutTermsVersion: null,
         stripeAccountId: null,
-        setup: { meetingDone: true, bankLinked: false, complete: false },
+        stripeTransfersStatus: null,
+        setup: {
+          meetingDone: true,
+          bankLinked: false,
+          termsAccepted: false,
+          termsAcceptedAt: null,
+          complete: false,
+        },
         policy: { holdbackPercent: 20, holdbackDays: 20, releaseAtSale: true },
         holdbackPercentOverride: null,
         holdbackDaysOverride: null,
@@ -690,11 +702,13 @@ describe('listPayoutOrganizations', () => {
     ]);
   });
 
-  it('includes orgs that sell paid tickets or already have earnings', async () => {
+  it('includes orgs that requested paid tickets, started Stripe, sell, or have earnings', async () => {
     const { prisma, orgFindMany } = fakePrisma();
     await listPayoutOrganizations(prisma, STAFF);
     expect(orgFindMany.mock.calls[0][0].where).toEqual({
       OR: [
+        { paidTicketingRequestedAt: { not: null } },
+        { stripeAccountId: { not: null } },
         { paidTicketingEnabled: true },
         {
           events: {

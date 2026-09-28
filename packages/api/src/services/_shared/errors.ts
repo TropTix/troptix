@@ -56,6 +56,14 @@ export class PayoutRequestPendingError extends Error {
   }
 }
 
+/** The Owner has not accepted the current payout terms. */
+export class PayoutTermsNotAcceptedError extends Error {
+  constructor(message = 'The current payout terms have not been accepted') {
+    super(message);
+    this.name = 'PayoutTermsNotAcceptedError';
+  }
+}
+
 export class PaidTicketingNotEnabledError extends Error {
   constructor(message = 'Paid ticketing is not enabled for this organization') {
     super(message);

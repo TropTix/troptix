@@ -33,30 +33,47 @@ values ('seed_staff_1', now(), now(), 'demo-staff@troptix.test', 'Demo Staff', '
 
 -- Demo organizer's Organization (brand). Approved for paid ticketing to match
 -- the paid festival below (seed_event_1); not verified.
--- Payout setup complete (both timestamps set) so the request flow is exercisable.
+-- Payout setup complete (meeting, bank, and the current terms version) so the
+-- request flow is exercisable. Keep the version in step with
+-- packages/api/src/legal/payoutTerms.ts.
 insert into public."Organization" (
   id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
   verified, "paidTicketingEnabled", "payoutMeetingAt", "payoutBankLinkedAt",
+  "payoutTermsAcceptedAt", "payoutTermsVersion",
   "stripeAccountId", "stripeTransfersStatus"
 ) values (
   'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer', 'seed_org_1',
   false, true, now() - interval '40 days', now() - interval '40 days',
+  now() - interval '40 days', '2026-09-27',
   null, null
 );
 
--- A second organization with payout setup INCOMPLETE and paid ticketing off,
--- so both payout screens show the checklist state (organizer sees the
--- checklist card; Platform View shows unchecked boxes) and the organizer
--- surfaces show the paid-ticketing banner.
+-- A second organization with payout setup INCOMPLETE, so both payout screens
+-- show the checklist state (organizer sees the checklist card; Platform View
+-- shows unchecked boxes).
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
 values ('seed_org_2', now(), now(), 'demo-organizer-2@troptix.test', 'Island Nights', 'Island', 'Nights', 'ORGANIZER');
 
 insert into public."Organization" (
   id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
-  verified, "paidTicketingEnabled", "stripeAccountId", "stripeTransfersStatus"
+  verified, "paidTicketingEnabled", "payoutTermsAcceptedAt", "payoutTermsVersion",
+  "stripeAccountId", "stripeTransfersStatus"
 ) values (
   'seed_organization_2', now(), now(), 'island-nights', 'Island Nights', 'seed_org_2',
-  false, false, null, null
+  false, true, null, null, null, null
+);
+
+-- A third organization that asked to sell paid tickets but is not approved
+-- yet, so Platform View's setup panel shows a row before any sale.
+insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
+values ('seed_org_3', now(), now(), 'demo-organizer-3@troptix.test', 'Sunset Sessions', 'Sunset', 'Sessions', 'ORGANIZER');
+
+insert into public."Organization" (
+  id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
+  verified, "paidTicketingEnabled", "paidTicketingRequestedAt"
+) values (
+  'seed_organization_3', now(), now(), 'sunset-sessions', 'Sunset Sessions', 'seed_org_3',
+  false, false, now() - interval '2 days'
 );
 
 -- Demo Admin: holds a Membership in the demo Organization (teams Phase 1).

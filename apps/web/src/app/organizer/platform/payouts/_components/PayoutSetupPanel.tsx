@@ -51,7 +51,7 @@ export function PayoutSetupPanel({
       <CardContent>
         {organizations.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            No organizations selling paid tickets yet.
+            No organizations setting up payouts yet.
           </p>
         ) : (
           <ul className="divide-y">
@@ -137,6 +137,11 @@ function OrganizationRow({
             onToggle={(done) => toggleStep('bank', done)}
           />
         )}
+        <TermsStatus
+          accepted={org.setup.termsAccepted}
+          acceptedAt={org.payoutTermsAcceptedAt}
+          version={org.payoutTermsVersion}
+        />
       </div>
 
       <p className="text-xs text-muted-foreground">
@@ -160,6 +165,35 @@ const CONNECT_LABELS: Record<ConnectState, string> = {
   active: 'active',
   needs_updates: 'needs updates',
 };
+
+/** Read-only: only the Owner can accept, in the app; there is no switch for it. */
+function TermsStatus({
+  accepted,
+  acceptedAt,
+  version,
+}: {
+  accepted: boolean;
+  acceptedAt: string | null;
+  version: string | null;
+}) {
+  return (
+    <div>
+      <p className="text-sm">
+        Payout terms ·{' '}
+        {accepted
+          ? `accepted v${version}`
+          : acceptedAt
+            ? `outdated (v${version})`
+            : 'not accepted'}
+      </p>
+      {acceptedAt && (
+        <p className="text-xs text-muted-foreground">
+          <LocalTime at={acceptedAt} />
+        </p>
+      )}
+    </div>
+  );
+}
 
 /** Read-only on the Stripe rail: Stripe's verification checks this step off, not a switch. */
 function StripeAccountStatus({
