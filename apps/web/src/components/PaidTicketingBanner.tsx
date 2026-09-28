@@ -1,5 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import { HelpCircle, Mail } from 'lucide-react';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { FeatureFlag } from '@troptix/api';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -22,13 +26,17 @@ const BODY = [
 
 export const PAID_CHECKOUT_MAILTO = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(SUBJECT)}&body=${encodeURIComponent(BODY)}`;
 
-const STEPS = [
+const PAYOUT_STEPS = [
   'Meet with TropTix',
   'Connect your bank account',
   'Accept payout terms',
 ];
+const CALL_STEPS = ['Schedule a call', 'Get approved by TropTix'];
 
 export function PaidTicketingBanner() {
+  // Only `=== true` is on — undefined means the flags haven't loaded yet.
+  const payoutsEnabled = useFeatureFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS);
+  const steps = payoutsEnabled === true ? PAYOUT_STEPS : CALL_STEPS;
   return (
     <div className="@container">
       <section
@@ -64,7 +72,7 @@ export function PaidTicketingBanner() {
           </div>
 
           <ol className="flex flex-col gap-3 @xl:flex-1 @xl:flex-row @xl:items-start @xl:gap-0">
-            {STEPS.map((step, index) => (
+            {steps.map((step, index) => (
               <li
                 key={step}
                 className="flex items-center gap-3 @xl:flex-1 @xl:flex-col @xl:items-start @xl:gap-2"
@@ -73,7 +81,7 @@ export function PaidTicketingBanner() {
                   <span className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-primary/40 bg-background text-xs font-semibold text-primary">
                     {index + 1}
                   </span>
-                  {index < STEPS.length - 1 && (
+                  {index < steps.length - 1 && (
                     <span className="hidden h-0.5 flex-1 bg-primary/20 @xl:block" />
                   )}
                 </div>
