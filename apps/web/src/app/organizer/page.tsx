@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { PaidWarningBannerOrganizer } from '@/components/PaidWarningBanner';
+import { PaidTicketingBanner } from '@/components/PaidTicketingBanner';
 import { formatCents, getDateFormatter } from '@/lib/dateUtils';
 import { DEFAULT_EVENT_IMAGE, eventFlyerUrl } from '@/lib/supabase/storage';
 import { requireOrganizerActor } from '@/server/actor';
@@ -47,7 +47,7 @@ export default async function OrganizerDashboardPage({
 
   return (
     <div className="space-y-8">
-      {!setup.paidTicketingEnabled && <PaidWarningBannerOrganizer />}
+      {!setup.paidTicketingEnabled && <PaidTicketingBanner />}
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
