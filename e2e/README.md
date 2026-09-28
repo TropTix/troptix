@@ -40,6 +40,7 @@ pnpm --filter @troptix/e2e test:ui     # Playwright UI mode
   `e2e-` ids and deletes them afterwards, so assertions are absolute and tests
   run in parallel. The discover test uses the seeded demo events.
 - Paid checkout hits Stripe test mode with the standard test cards. No webhook
-  forwarding: the checkout page's own poll fulfils the order.
+  forwarding: the checkout page's one sync finalize attempt fulfils the order
+  (ADR 0030).
 - Analytics and the venue map are blocked at the network layer. Order emails
   go to Resend's sink address.

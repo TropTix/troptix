@@ -28,10 +28,10 @@ test.skip(
   'Paid checkout needs both Stripe test keys (apps/web/.env locally, repo secrets on CI).'
 );
 
-// 2 × GA at $25.00 + $2.50 fees = $55.00. Stripe's confirm() ends in a
-// full-page redirect back to /e/[id]?reservation=…, where the page remounts
-// and polls until the order exists; assertions after the redirect cover that
-// whole resume path. No webhook is involved: the poll fulfils the order.
+// 2 × GA at $25.00 + $2.50 fees = $55.00. confirm() resolves in place and the
+// client makes one checkout.finalizePayment call (ADR 0030); no webhook is
+// involved. The URL carries ?reservation= from the payment step on, so a
+// refresh here would resume the same hold.
 test('paid checkout charges the card and records the order', async ({
   page,
   factory,

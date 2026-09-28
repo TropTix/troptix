@@ -134,10 +134,11 @@ jobs:
 
   # Browser tests for the buyer flow (e2e/). Hermetic: the same local Postgres
   # the api-tests use, a production build of apps/web, real Stripe test mode.
-  # No webhook forwarding is needed — the checkout page's own poll fulfils the
-  # order (ADR 0034). Every test is recorded; the HTML report and the stitched
-  # proof video are uploaded as the run's artifact. Paid specs skip themselves
-  # when the Stripe test keys are not configured as repo secrets.
+  # No webhook forwarding is needed — the checkout page's one sync finalize
+  # attempt fulfils the order (ADR 0030, ADR 0034). Every test is recorded; the
+  # HTML report and the stitched proof video are uploaded as the run's
+  # artifact. Paid specs skip themselves when the Stripe test keys are not
+  # configured as repo secrets.
   e2e:
     needs: changes
     if: needs.changes.outputs.web == 'true'

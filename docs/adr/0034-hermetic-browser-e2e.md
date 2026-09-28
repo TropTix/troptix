@@ -15,10 +15,10 @@ Three facts about the app decide the shape:
 
 - Nothing in the buyer flow signs in. Every checkout procedure is public; the
   reservation id is the credential.
-- The success screen does not depend on the Stripe webhook. After Stripe
-  redirects back, the page polls `checkout.getCheckoutState`, which retrieves
-  the Session and fulfils the order itself. The webhook and the poll converge
-  on one idempotent settle.
+- The success screen does not depend on the Stripe webhook. After `confirm()`
+  resolves, the client calls `checkout.finalizePayment` once, which retrieves
+  the Session and fulfils the order (ADR 0030). The webhook and that sync
+  attempt converge on one idempotent settle.
 - The `packages/api` integration tests already run in CI against a local
   Postgres started with `supabase db start`.
 
@@ -28,8 +28,8 @@ Three facts about the app decide the shape:
   the same `supabase db start` Postgres, a production build of `apps/web`
   served with `next start`, and Stripe **test mode** reached over the network.
   Supabase auth is a placeholder URL; no auth container runs.
-- **No webhook forwarding.** The suite relies on the poll path to fulfil paid
-  orders. The webhook handler stays covered at the service layer.
+- **No webhook forwarding.** The suite relies on the sync finalize attempt to
+  fulfil paid orders. The webhook handler stays covered at the service layer.
 - **Per-test fixtures.** Each test inserts and deletes its own organizer,
   organization, event and ticket types with `e2e-` ids. Assertions are
   absolute and specs run in parallel. The seeded demo events serve only the
@@ -46,7 +46,8 @@ Three facts about the app decide the shape:
 - **Good:** Deterministic and free. A fresh runner is a fresh database, no
   branch-hours, no shared state between PRs, no dependence on the Vercel or
   Supabase integrations being healthy. The Stripe iframe is filled like any
-  other input; the poll removes the hardest part of paid-checkout testing.
+  other input; the sync finalize removes the hardest part of paid-checkout
+  testing.
 - **Trade-off:** The suite does not exercise the deployed runtime (serverless
   boundaries, Vercel env wiring) or the webhook path in a browser. Both stay
   covered elsewhere or are accepted gaps.

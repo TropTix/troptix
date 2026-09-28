@@ -76,13 +76,13 @@ Checked against current docs (September 2026):
 
 ## Coverage
 
-| Question                                | Spec                                                                                                                                                                                    |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Do the events load?                     | `discover.spec.ts`: seeded events listed, private one hidden, card opens the event page                                                                                                 |
-| Do the tickets load, correctly?         | `event-page.spec.ts`: names, prices, fee lines; sold out / on sale soon / gated hidden; per-user clamp and running total                                                                |
-| Can you check out free?                 | `free-checkout.spec.ts`: RSVP completes; DB shows COMPLETED FREE order, VALID ticket, hold converted, counters absolute                                                                 |
-| Can you check out paid?                 | `paid-checkout.spec.ts`: 2 × GA at $55.00 with `4242…`; survives the Stripe redirect; DB order, tickets, reservation, inventory; PaymentIntent `succeeded` on Stripe; ticket page opens |
-| What happens when the card is declined? | `paid-checkout.spec.ts`: `…0002` shows the decline, buyer stays on the payment step, no order, hold still `HELD`, then a retry with a good card succeeds                                |
+| Question                                | Spec                                                                                                                                                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Do the events load?                     | `discover.spec.ts`: seeded events listed, private one hidden, card opens the event page                                                                                                           |
+| Do the tickets load, correctly?         | `event-page.spec.ts`: names, prices, fee lines; sold out / on sale soon / gated hidden; per-user clamp and running total                                                                          |
+| Can you check out free?                 | `free-checkout.spec.ts`: RSVP completes; DB shows COMPLETED FREE order, VALID ticket, hold converted, counters absolute                                                                           |
+| Can you check out paid?                 | `paid-checkout.spec.ts`: 2 × GA at $55.00 with `4242…`; in-place confirm and one sync finalize; DB order, tickets, reservation, inventory; PaymentIntent `succeeded` on Stripe; ticket page opens |
+| What happens when the card is declined? | `paid-checkout.spec.ts`: `…0002` shows the decline, buyer stays on the payment step, no order, hold still `HELD`, then a retry with a good card succeeds                                          |
 
 Seven tests, about 30 seconds wall clock locally with parallel workers.
 
