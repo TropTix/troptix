@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { HelpCircle, Mail } from 'lucide-react';
+import { ArrowRight, HelpCircle, Mail } from 'lucide-react';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { FeatureFlag } from '@troptix/api';
 
@@ -94,12 +94,21 @@ export function PaidTicketingBanner() {
           </ol>
 
           <div className="@xl:shrink-0">
-            <Button asChild>
-              <Link href={PAID_CHECKOUT_MAILTO}>
-                <Mail />
-                Contact support
-              </Link>
-            </Button>
+            {payoutsEnabled === true ? (
+              <Button asChild>
+                <Link href="/organizer/payouts">
+                  Set up payouts
+                  <ArrowRight />
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild>
+                <Link href={PAID_CHECKOUT_MAILTO}>
+                  <Mail />
+                  Contact support
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </section>
