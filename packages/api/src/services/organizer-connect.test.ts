@@ -25,7 +25,7 @@ const ORG = {
   stripeAccountId: null as string | null,
   stripeTransfersStatus: null as string | null,
   payoutBankLinkedAt: null as Date | null,
-  owner: { email: 'owner@example.test' },
+  memberships: [{ user: { id: 'owner-1', email: 'owner@example.test' } }],
 };
 
 type Status = 'active' | 'pending' | 'restricted' | 'unsupported' | 'missing';
@@ -218,7 +218,7 @@ describe('startStripeOnboarding', () => {
 
     expect(create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        ownerUserId: 'owner-1',
+        memberships: { create: { userId: 'owner-1', role: 'OWNER' } },
         displayName: 'owner@example.test',
       }),
     });

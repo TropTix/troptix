@@ -10,6 +10,12 @@ type MockPrismaOptions = {
 
 function fakePrisma(opts: MockPrismaOptions): PrismaClient {
   return {
+    membership: {
+      findFirst: async ({ where }: any) => {
+        const role = opts.ticket?.members?.[where.userId];
+        return role ? { role } : null;
+      },
+    },
     tickets: {
       findUnique: async () => opts.ticket ?? null,
       updateMany: async ({ where }: any) => {
@@ -48,7 +54,8 @@ describe('appRouter.organizer (via createCaller)', () => {
         ticket: {
           id: 't-1',
           status: 'AVAILABLE',
-          event: { organizerUserId: 'org-1' },
+          eventId: 'e-1',
+          members: { 'org-1': 'OWNER' },
         },
       })
     ).organizer.checkInTicket({ ticketId: 't-1' });
@@ -71,7 +78,8 @@ describe('appRouter.organizer (via createCaller)', () => {
           ticket: {
             id: 't-1',
             status: 'NOT_AVAILABLE',
-            event: { organizerUserId: 'org-1' },
+            eventId: 'e-1',
+            members: { 'org-1': 'OWNER' },
           },
         })
       ).organizer.checkInTicket({ ticketId: 't-1' })
@@ -85,7 +93,8 @@ describe('appRouter.organizer (via createCaller)', () => {
           ticket: {
             id: 't-1',
             status: 'AVAILABLE',
-            event: { organizerUserId: 'org-2' },
+            eventId: 'e-1',
+            members: { 'org-2': 'OWNER' },
           },
         })
       ).organizer.checkInTicket({ ticketId: 't-1' })
@@ -99,7 +108,8 @@ describe('appRouter.organizer (via createCaller)', () => {
           id: 't-1',
           status: 'AVAILABLE',
           checkinTimestamp: new Date(),
-          event: { organizerUserId: 'org-1' },
+          eventId: 'e-1',
+          members: { 'org-1': 'OWNER' },
         },
       })
     ).organizer.undoCheckInTicket({ ticketId: 't-1' });
@@ -115,7 +125,8 @@ describe('appRouter.organizer (via createCaller)', () => {
             id: 't-1',
             status: 'AVAILABLE',
             checkinTimestamp: null,
-            event: { organizerUserId: 'org-1' },
+            eventId: 'e-1',
+            members: { 'org-1': 'OWNER' },
           },
         })
       ).organizer.undoCheckInTicket({ ticketId: 't-1' })

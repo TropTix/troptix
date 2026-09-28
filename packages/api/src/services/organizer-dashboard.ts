@@ -16,6 +16,7 @@ import {
   toRecentOrder,
 } from './_shared/organizerReads';
 import { isProfileComplete } from './_shared/organizerSetup';
+import { eventsWhereCan, rolesWith } from './_shared/access';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const ACTIVE_EVENTS_LIMIT = 5;
@@ -90,7 +91,7 @@ export async function getDashboard(
   const range = input.range ?? DEFAULT_RANGE;
   const window = rangeWindow(range, now);
   const startOfToday = startOfUtcDay(now);
-  const ownedEvents = { organizerUserId, deletedAt: null };
+  const ownedEvents = eventsWhereCan(organizerUserId, 'event.orders');
 
   const [revenue, salesRows, activeEventRows, recentOrderRows, org] =
     await Promise.all([
@@ -113,7 +114,12 @@ export async function getDashboard(
         JOIN "Orders" o ON o."id" = t."orderId"
         JOIN "Events" e ON e."id" = t."eventId"
         WHERE o."status" = 'COMPLETED'
-          AND e."organizerUserId" = ${organizerUserId}
+          AND EXISTS (
+            SELECT 1 FROM "Membership" m
+            WHERE m."organizationId" = e."organizationId"
+              AND m."userId" = ${organizerUserId}
+              AND m."role"::text = ANY(${rolesWith('event.orders')})
+          )
           AND e."deletedAt" IS NULL
           AND t."createdAt" >= ${window.from}
           AND t."createdAt" < ${window.to}
@@ -137,7 +143,9 @@ export async function getDashboard(
       ),
 
       prisma.organization.findFirst({
-        where: { ownerUserId: organizerUserId },
+        where: {
+          memberships: { some: { userId: organizerUserId, role: 'OWNER' } },
+        },
         select: { logoUrl: true, bio: true, paidTicketingEnabled: true },
       }),
     ]);

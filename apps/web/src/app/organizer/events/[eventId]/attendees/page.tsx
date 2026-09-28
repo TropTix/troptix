@@ -1,5 +1,6 @@
 import React from 'react';
 import prisma from '@/server/prisma';
+import { eventsWhereCan } from '@troptix/api/server';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { notFound, redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
@@ -33,14 +34,14 @@ export interface FetchedTicketData {
 
 import type { ServerUser } from '@/server/authUser';
 
-// The layout's 404 is not protection: this read carries its own ownership scope.
+// The layout's 404 is not protection: this read carries its own access scope.
 // A DB failure must not render as an empty attendee list — let errors propagate.
 async function fetchTickets(eventId: string, user: ServerUser) {
   {
     const tickets = await prisma.tickets.findMany({
       where: {
         eventId: eventId,
-        event: { organizerUserId: user.uid, deletedAt: null },
+        event: eventsWhereCan(user.uid, 'event.orders'),
         order: {
           status: 'COMPLETED',
         },
@@ -73,8 +74,8 @@ async function fetchTickets(eventId: string, user: ServerUser) {
 }
 
 async function fetchEventName(eventId: string, user: ServerUser) {
-  const event = await prisma.events.findUnique({
-    where: { id: eventId, organizerUserId: user.uid, deletedAt: null },
+  const event = await prisma.events.findFirst({
+    where: { id: eventId, ...eventsWhereCan(user.uid, 'event.orders') },
     select: {
       name: true,
     },

@@ -33,7 +33,6 @@ model Users {
   orders              Orders[]
   socialMediaAccounts SocialMediaAccounts[]
   reservations        Reservation[]
-  organizations       Organization[]
   memberships         Membership[]
   payoutRequests      PayoutRequest[]       @relation("PayoutRequestedBy")
   payoutsResolved     PayoutRequest[]       @relation("PayoutResolvedBy")
@@ -78,7 +77,6 @@ model Organization {
   instagram   String?
   twitter     String?
   linkedin    String?
-  ownerUserId String   @unique
   verified    Boolean  @default(false)
 
   paidTicketingEnabled     Boolean   @default(false)
@@ -108,7 +106,6 @@ model Organization {
   payoutHoldbackPercent Int?
   payoutHoldbackDays    Int?
 
-  owner          Users           @relation(fields: [ownerUserId], references: [id])
   events         Events[]
   memberships    Membership[]
   payoutRequests PayoutRequest[]
@@ -161,14 +158,17 @@ model PayoutRequest {
   @@index([organizationId])
 }
 
-// Membership roles (ADR 0024). The Owner is never a row here — the
-// `ownerUserId` scalar is the one answer to "who owns this".
+// What each role may do lives in packages/api/src/services/_shared/access.ts,
+// never in role checks at call sites (ADR 0035).
 enum MembershipRole {
+  OWNER
   ADMIN
+  SCANNER
 }
 
-// The role covers every event the Organization owns — there are no per-event
-// grants (ADR 0024).
+// The role covers every event the Organization owns. The migration also
+// creates two partial unique indexes Prisma cannot express: one OWNER row per
+// Organization, and one OWNER row per user.
 model Membership {
   id        String         @id @default(uuid())
   createdAt DateTime       @default(now())
@@ -347,8 +347,8 @@ model Events {
   summary         String?
   organizer       String
   organizerUserId String
-  // Auth still keys on organizerUserId — a legacy key dual-written ==
-  // organization.ownerUserId — until the query-key flip to organizationId (ADR 0022).
+  // Who created the event. Never an access key: access resolves through the
+  // owning Organization's Memberships (ADR 0035).
   organizationId  String
 
   // Full timestamps — the event form folds the time input into these before

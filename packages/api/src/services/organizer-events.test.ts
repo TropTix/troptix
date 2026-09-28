@@ -50,7 +50,7 @@ describe('listOrganizerEvents — authorization', () => {
     await listOrganizerEvents(prisma, OWNER, {}, NOW);
 
     expect(eventsFindMany.mock.calls[0][0].where).toMatchObject({
-      organizerUserId: 'owner-1',
+      organization: { memberships: { some: { userId: 'owner-1' } } },
       deletedAt: null,
     });
   });
@@ -63,9 +63,9 @@ describe('listOrganizerEvents — authorization', () => {
       { viewAsOrganizerUserId: 'someone-else' },
       NOW
     );
-    expect(eventsFindMany.mock.calls[0][0].where.organizerUserId).toBe(
-      'owner-1'
-    );
+    expect(
+      eventsFindMany.mock.calls[0][0].where.organization.memberships.some.userId
+    ).toBe('owner-1');
   });
 
   it('honors View-as for a platform owner', async () => {
@@ -78,9 +78,9 @@ describe('listOrganizerEvents — authorization', () => {
       { viewAsOrganizerUserId: 'target' },
       NOW
     );
-    expect(eventsFindMany.mock.calls[0][0].where.organizerUserId).toBe(
-      'target'
-    );
+    expect(
+      eventsFindMany.mock.calls[0][0].where.organization.memberships.some.userId
+    ).toBe('target');
   });
 });
 

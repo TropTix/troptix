@@ -59,8 +59,17 @@ export {
   type ScanTicketResult,
 } from './services/organizer-checkin';
 export {
+  eventsWhereCan,
+  findEventRole,
+  organizationsWhereCan,
+  roleCan,
+  type Capability,
+} from './services/_shared/access';
+export {
   ensureOrganizationForUser,
   findOrganizationForOwner,
+  organizationOwnerSelect,
+  ownerOf,
   getOrganizationBySlug,
   updateOrganizationProfile,
 } from './services/organizations';

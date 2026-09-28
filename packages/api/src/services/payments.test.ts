@@ -54,7 +54,7 @@ beforeAll(async () => {
       id: TEST_ORG_ID,
       slug: TEST_ORG_ID,
       displayName: 'Test Org',
-      ownerUserId: TEST_OWNER_ID,
+      memberships: { create: { userId: TEST_OWNER_ID, role: 'OWNER' } },
     },
   });
   await prisma.events.create({

@@ -27,9 +27,29 @@ export function findOrganizationForOwner(
   ownerUserId: string
 ) {
   return prisma.organization.findFirst({
-    where: { ownerUserId },
-    orderBy: { createdAt: 'asc' },
+    where: { memberships: { some: { userId: ownerUserId, role: 'OWNER' } } },
   });
+}
+
+/** The Owner's user; every Organization has exactly one OWNER row. */
+export const organizationOwnerSelect = {
+  memberships: {
+    where: { role: 'OWNER' },
+    select: { user: { select: { id: true, email: true } } },
+    take: 1,
+  },
+} as const;
+
+export function ownerOf(org: {
+  memberships: { user: { id: string; email: string } }[];
+}): { id: string; email: string } {
+  const [owner] = org.memberships;
+  if (!owner) throw new NotFoundError('Organization has no owner');
+  return owner.user;
+}
+
+function ownerMembership(ownerUserId: string) {
+  return { create: { userId: ownerUserId, role: 'OWNER' as const } };
 }
 
 export async function ensureOrganizationForUser(
@@ -44,11 +64,15 @@ export async function ensureOrganizationForUser(
   const slug = generateUniqueSlug(name, (s) => taken.has(s));
   try {
     return await prisma.organization.create({
-      data: { ownerUserId, displayName: name, slug },
+      data: {
+        displayName: name,
+        slug,
+        memberships: ownerMembership(ownerUserId),
+      },
     });
   } catch (err) {
-    // ownerUserId is unique (one org per owner): a concurrent ensure lost the
-    // race — the winner's row is the org. Slug collisions rethrow.
+    // One OWNER row per user (a partial unique index): a concurrent ensure
+    // lost the race — the winner's row is the org. Slug collisions rethrow.
     if ((err as { code?: string }).code === 'P2002') {
       const winner = await findOrganizationForOwner(prisma, ownerUserId);
       if (winner) return winner;
@@ -113,7 +137,7 @@ export async function updateOrganizationProfile(
       // Owner-only today. Phase 1 must scope this to the acting Organization
       // before Admins get the form, or an Admin's first save mints them an org.
       await prisma.organization.create({
-        data: { ownerUserId: input.ownerUserId, ...data },
+        data: { ...data, memberships: ownerMembership(input.ownerUserId) },
       });
     }
   } catch (err) {

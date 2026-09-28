@@ -23,6 +23,7 @@ import {
   resolvePayoutPolicy,
   type PayoutPolicy,
 } from './_shared/payouts';
+import { organizationsWhereCan } from './_shared/access';
 import { resolveOrganizerScope } from './organizer-scope';
 import { termsAccepted } from './payout-terms';
 
@@ -202,7 +203,7 @@ export async function getPayouts(
   );
 
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: organizerUserId },
+    where: organizationsWhereCan(organizerUserId, 'organization.payouts'),
     select: ORG_PAYOUT_SELECT,
   });
 
@@ -265,7 +266,7 @@ export async function requestPayout(
   }
 
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: actor.userId },
+    where: organizationsWhereCan(actor.userId, 'organization.payouts'),
     select: ORG_PAYOUT_SELECT,
   });
   if (!org) throw new PayoutSetupIncompleteError();
@@ -325,7 +326,7 @@ export async function cancelPayoutRequest(
     where: {
       id: input.id,
       status: 'REQUESTED',
-      organization: { ownerUserId: actor.userId },
+      organization: organizationsWhereCan(actor.userId, 'organization.payouts'),
     },
     data: { status: 'CANCELLED' },
   });

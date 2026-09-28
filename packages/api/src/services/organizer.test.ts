@@ -1,7 +1,8 @@
 import type { PrismaClient } from '@troptix/db';
 import { describe, expect, it } from 'vitest';
 import type { Actor } from '../trpc/context';
-import { checkInTicket, undoCheckInTicket } from './organizer';
+import type { MembershipRole } from '@troptix/db';
+import { checkInTicket, getEvent, undoCheckInTicket } from './organizer';
 
 type MockPrismaOptions = {
   ticket?: any;
@@ -9,6 +10,12 @@ type MockPrismaOptions = {
 
 function fakePrisma(opts: MockPrismaOptions): PrismaClient {
   return {
+    membership: {
+      findFirst: async ({ where }: any) => {
+        const role = opts.ticket?.members?.[where.userId];
+        return role ? { role } : null;
+      },
+    },
     tickets: {
       findUnique: async () => opts.ticket ?? null,
       updateMany: async ({ where }: any) => {
@@ -45,7 +52,8 @@ describe('checkInTicket', () => {
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
-        event: { organizerUserId: 'org-2' },
+        eventId: 'e-1',
+        members: { 'org-2': 'OWNER' },
       },
     });
     await expect(checkInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
@@ -58,7 +66,8 @@ describe('checkInTicket', () => {
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
-        event: { organizerUserId: 'org-1' },
+        eventId: 'e-1',
+        members: { 'org-1': 'OWNER' },
       },
     });
     await expect(
@@ -71,7 +80,8 @@ describe('checkInTicket', () => {
       ticket: {
         id: 't-1',
         status: 'NOT_AVAILABLE',
-        event: { organizerUserId: 'org-1' },
+        eventId: 'e-1',
+        members: { 'org-1': 'OWNER' },
       },
     });
     await expect(checkInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
@@ -85,7 +95,8 @@ describe('checkInTicket', () => {
         id: 't-1',
         status: 'AVAILABLE',
         checkinTimestamp: new Date(),
-        event: { organizerUserId: 'org-1' },
+        eventId: 'e-1',
+        members: { 'org-1': 'OWNER' },
       },
     });
     await expect(checkInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
@@ -98,7 +109,8 @@ describe('checkInTicket', () => {
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
-        event: { organizerUserId: 'org-1' },
+        eventId: 'e-1',
+        members: { 'org-1': 'OWNER' },
       },
     });
     const res = await checkInTicket(prisma, mockActor, 't-1');
@@ -111,7 +123,8 @@ describe('checkInTicket', () => {
         ticket: {
           id: 't-1',
           status: voidStatus,
-          event: { organizerUserId: 'org-1' },
+          eventId: 'e-1',
+          members: { 'org-1': 'OWNER' },
         },
       });
       await expect(checkInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
@@ -125,7 +138,8 @@ describe('checkInTicket', () => {
       ticket: {
         id: 't-1',
         status: 'VALID',
-        event: { organizerUserId: 'org-1' },
+        eventId: 'e-1',
+        members: { 'org-1': 'OWNER' },
       },
     });
     const res = await checkInTicket(prisma, mockActor, 't-1');
@@ -146,7 +160,8 @@ describe('undoCheckInTicket', () => {
       ticket: {
         id: 't-1',
         status: 'AVAILABLE',
-        event: { organizerUserId: 'org-2' },
+        eventId: 'e-1',
+        members: { 'org-2': 'OWNER' },
       },
     });
     await expect(undoCheckInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
@@ -160,7 +175,8 @@ describe('undoCheckInTicket', () => {
         id: 't-1',
         status: 'AVAILABLE',
         checkinTimestamp: null,
-        event: { organizerUserId: 'org-1' },
+        eventId: 'e-1',
+        members: { 'org-1': 'OWNER' },
       },
     });
     await expect(undoCheckInTicket(prisma, mockActor, 't-1')).rejects.toThrow(
@@ -174,10 +190,61 @@ describe('undoCheckInTicket', () => {
         id: 't-1',
         status: 'AVAILABLE',
         checkinTimestamp: new Date(),
-        event: { organizerUserId: 'org-1' },
+        eventId: 'e-1',
+        members: { 'org-1': 'OWNER' },
       },
     });
     const res = await undoCheckInTicket(prisma, mockActor, 't-1');
     expect(res).toEqual({ success: true });
+  });
+});
+
+describe('getEvent', () => {
+  function eventPrisma(role: MembershipRole | null): PrismaClient {
+    return {
+      membership: {
+        findFirst: async () => (role ? { role } : null),
+      },
+      events: {
+        findUnique: async () => ({
+          id: 'e-1',
+          name: 'Show',
+          startsAt: new Date('2026-10-01T22:00:00Z'),
+          venue: 'Hall',
+          address: '1 Main St, Kingston',
+          tickets: [
+            {
+              id: 't-1',
+              firstName: 'Ana',
+              lastName: 'Diaz',
+              email: 'ana@example.com',
+              checkinTimestamp: null,
+              ticketType: { name: 'GA' },
+              ticketsType: 'PAID',
+            },
+          ],
+        }),
+      },
+    } as unknown as PrismaClient;
+  }
+
+  it('shows guest emails to the Owner', async () => {
+    const event = await getEvent(eventPrisma('OWNER'), mockActor, 'e-1');
+    expect(event.guests[0]?.email).toBe('ana@example.com');
+  });
+
+  it('gives a Scanner the door slice without emails', async () => {
+    const event = await getEvent(eventPrisma('SCANNER'), mockActor, 'e-1');
+    expect(event.guests[0]).toMatchObject({
+      name: 'Ana Diaz',
+      ticketType: 'GA',
+    });
+    expect(event.guests[0]?.email).toBeUndefined();
+  });
+
+  it('throws UNAUTHORIZED without a Membership', async () => {
+    await expect(getEvent(eventPrisma(null), mockActor, 'e-1')).rejects.toThrow(
+      'UNAUTHORIZED'
+    );
   });
 });

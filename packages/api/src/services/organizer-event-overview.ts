@@ -20,6 +20,7 @@ import {
   toRecentOrder,
   toTicketTypeBreakdown,
 } from './_shared/organizerReads';
+import { eventsWhereCan } from './_shared/access';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const MAX_SERIES_DAYS = 30;
@@ -44,7 +45,7 @@ export async function getEventOverview(
   );
 
   const event = await prisma.events.findFirst({
-    where: { id: eventId, organizerUserId, deletedAt: null },
+    where: { id: eventId, ...eventsWhereCan(organizerUserId, 'event.orders') },
     select: {
       id: true,
       name: true,

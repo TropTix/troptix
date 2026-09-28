@@ -50,7 +50,9 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.ticketTypes.deleteMany({ where: { eventId } });
   await prisma.events.deleteMany({ where: { id: eventId } });
-  await prisma.organization.deleteMany({ where: { ownerUserId: OWNER_ID } });
+  await prisma.organization.deleteMany({
+    where: { memberships: { some: { userId: OWNER_ID, role: 'OWNER' } } },
+  });
   await prisma.users.deleteMany({ where: { id: OWNER_ID } });
   await prisma.$disconnect();
 });
@@ -87,7 +89,7 @@ describe('createTicketType (real DB)', () => {
 
   it('allows a paid create once the org is approved', async () => {
     await prisma.organization.updateMany({
-      where: { ownerUserId: OWNER_ID },
+      where: { memberships: { some: { userId: OWNER_ID, role: 'OWNER' } } },
       data: { paidTicketingEnabled: true },
     });
     const { ticketTypeId } = await createTicketType(

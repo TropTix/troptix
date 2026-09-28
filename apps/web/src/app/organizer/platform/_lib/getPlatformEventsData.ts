@@ -1,4 +1,5 @@
 import prisma from '@/server/prisma';
+import { organizationOwnerSelect, ownerOf } from '@troptix/api/server';
 import type { ServerUser } from '@/server/authUser';
 import { notFound } from 'next/navigation';
 
@@ -49,7 +50,7 @@ export async function getAllPlatformEvents(
       organization: {
         select: {
           displayName: true,
-          owner: { select: { id: true, email: true } },
+          ...organizationOwnerSelect,
         },
       },
 
@@ -100,9 +101,9 @@ export async function getAllPlatformEvents(
       status,
       createdAt: event.createdAt,
       organizer: {
-        id: event.organization.owner.id,
+        id: ownerOf(event.organization).id,
         name: event.organization.displayName,
-        email: event.organization.owner.email,
+        email: ownerOf(event.organization).email,
       },
       stats: {
         totalOrders: event.orders.length,

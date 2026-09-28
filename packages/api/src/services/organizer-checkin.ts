@@ -3,7 +3,7 @@
 import { TicketStatus, type PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { ConflictError, NotFoundError } from './_shared/errors';
-import { requireOwnedEvent } from './_shared/owned-event';
+import { eventsWhereCan, requireEventCapability } from './_shared/access';
 import { resolveOrganizerScope } from './organizer-scope';
 
 // Un-checked-in is two statuses mid-cutover: legacy AVAILABLE and the
@@ -27,8 +27,8 @@ export async function scanTicket(
   actor: Actor,
   input: { ticketId: string; eventId: string }
 ): Promise<ScanTicketResult> {
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
-  await requireOwnedEvent(prisma, organizerUserId, input.eventId);
+  const userId = await resolveOrganizerScope(prisma, actor);
+  await requireEventCapability(prisma, userId, input.eventId, 'event.checkIn');
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: input.ticketId, eventId: input.eventId },
@@ -59,19 +59,19 @@ export async function scanTicket(
   };
 }
 
-// Ownership is resolved through the event join, so a foreign ticket id reads
+// Access is resolved through the event join, so a foreign ticket id reads
 // as not found rather than forbidden.
 export async function toggleTicketCheckIn(
   prisma: PrismaClient,
   actor: Actor,
   input: { ticketId: string }
 ) {
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const userId = await resolveOrganizerScope(prisma, actor);
 
   const ticket = await prisma.tickets.findFirst({
     where: {
       id: input.ticketId,
-      event: { organizerUserId, deletedAt: null },
+      event: eventsWhereCan(userId, 'event.checkIn'),
     },
     select: { id: true, status: true },
   });

@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import { connection } from 'next/server';
 import prisma from '@/server/prisma';
 import {
+  findEventRole,
   getEventDetailRaw,
   shapeEventDetail,
   NotFoundError,
@@ -67,7 +68,7 @@ export default async function EventDetailPage({
 
   if (event.isDraft) {
     const user = await getUserFromIdTokenCookie();
-    if (user?.uid !== event.organizerUserId) {
+    if (!user || !(await findEventRole(prisma, user.uid, event.id))) {
       notFound();
     }
   }

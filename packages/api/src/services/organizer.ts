@@ -4,6 +4,7 @@
  */
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
+import { eventsWhereCan, findEventRole, roleCan } from './_shared/access';
 
 export async function getEvents(prisma: PrismaClient, actor: Actor) {
   if (actor.kind !== 'user') {
@@ -11,7 +12,7 @@ export async function getEvents(prisma: PrismaClient, actor: Actor) {
   }
 
   const events = await prisma.events.findMany({
-    where: { organizerUserId: actor.userId },
+    where: eventsWhereCan(actor.userId, 'event.checkIn'),
     select: {
       id: true,
       name: true,
@@ -54,6 +55,13 @@ export async function getEvent(
     throw new Error('UNAUTHORIZED');
   }
 
+  const role = await findEventRole(prisma, actor.userId, eventId);
+  if (!role || !roleCan(role, 'event.checkIn')) {
+    throw new Error('UNAUTHORIZED');
+  }
+  // The door slice: contact details only for roles that see orders.
+  const seesContacts = roleCan(role, 'event.orders');
+
   const event = await prisma.events.findUnique({
     where: { id: eventId },
     include: {
@@ -66,10 +74,6 @@ export async function getEvent(
 
   if (!event) {
     throw new Error('NOT_FOUND');
-  }
-
-  if (event.organizerUserId !== actor.userId) {
-    throw new Error('UNAUTHORIZED');
   }
 
   return {
@@ -86,7 +90,7 @@ export async function getEvent(
       ticketId: t.id,
       checkedIn: !!t.checkinTimestamp,
       checkedInAt: t.checkinTimestamp?.toISOString(),
-      email: t.email ?? undefined,
+      email: seesContacts ? (t.email ?? undefined) : undefined,
     })),
   };
 }
@@ -102,14 +106,15 @@ export async function checkInTicket(
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: ticketId },
-    select: { status: true, event: { select: { organizerUserId: true } } },
+    select: { status: true, eventId: true },
   });
 
   if (!ticket) {
     throw new Error('NOT_FOUND');
   }
 
-  if (ticket.event.organizerUserId !== actor.userId) {
+  const role = await findEventRole(prisma, actor.userId, ticket.eventId);
+  if (!role || !roleCan(role, 'event.checkIn')) {
     throw new Error('UNAUTHORIZED');
   }
 
@@ -149,14 +154,15 @@ export async function undoCheckInTicket(
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: ticketId },
-    select: { status: true, event: { select: { organizerUserId: true } } },
+    select: { status: true, eventId: true },
   });
 
   if (!ticket) {
     throw new Error('NOT_FOUND');
   }
 
-  if (ticket.event.organizerUserId !== actor.userId) {
+  const role = await findEventRole(prisma, actor.userId, ticket.eventId);
+  if (!role || !roleCan(role, 'event.checkIn')) {
     throw new Error('UNAUTHORIZED');
   }
 

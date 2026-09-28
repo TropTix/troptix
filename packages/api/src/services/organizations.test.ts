@@ -23,16 +23,18 @@ function makeFakePrisma() {
     organization: {
       findFirst: async ({ where }: any) =>
         orgs
-          .filter((o) => o.ownerUserId === where.ownerUserId)
+          .filter((o) => o.ownerUserId === where.memberships.some.userId)
           .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
       findMany: async () => orgs.map((o) => ({ slug: o.slug })),
-      create: async ({ data }: any) => {
-        if (orgs.some((o) => o.ownerUserId === data.ownerUserId)) {
+      create: async ({ data: { memberships, ...data } }: any) => {
+        const ownerUserId = memberships.create.userId;
+        if (orgs.some((o) => o.ownerUserId === ownerUserId)) {
           throw { code: 'P2002' };
         }
         const row: OrgRow = {
           id: `org-${orgs.length}`,
           createdAt: clock++,
+          ownerUserId,
           ...data,
         };
         orgs.push(row);
@@ -51,7 +53,8 @@ describe('ensureOrganizationForUser', () => {
       ownerUserId: 'u1',
       displayName: 'Island Vibes',
     });
-    expect(org.ownerUserId).toBe('u1');
+    expect(orgs[0]?.ownerUserId).toBe('u1');
+    expect(org.id).toBe(orgs[0]?.id);
     expect(org.slug).toBe('island-vibes');
     expect(orgs).toHaveLength(1);
   });
@@ -248,7 +251,7 @@ describe('updateOrganizationProfile', () => {
       organization: {
         findFirst: async ({ where }: any) =>
           orgs
-            .filter((o) => o.ownerUserId === where.ownerUserId)
+            .filter((o) => o.ownerUserId === where.memberships.some.userId)
             .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
         findUnique: async ({ where }: any) =>
           orgs.find((o) => o.slug === where.slug) ?? null,
@@ -257,10 +260,11 @@ describe('updateOrganizationProfile', () => {
           Object.assign(o, data);
           return o;
         },
-        create: async ({ data }: any) => {
+        create: async ({ data: { memberships, ...data } }: any) => {
+          const ownerUserId = memberships.create.userId;
           if (
             orgs.some(
-              (o) => o.ownerUserId === data.ownerUserId || o.slug === data.slug
+              (o) => o.ownerUserId === ownerUserId || o.slug === data.slug
             )
           ) {
             throw { code: 'P2002' };
@@ -268,6 +272,7 @@ describe('updateOrganizationProfile', () => {
           const row = {
             id: `org-${orgs.length}`,
             createdAt: orgs.length,
+            ownerUserId,
             ...data,
           };
           orgs.push(row);

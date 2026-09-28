@@ -80,7 +80,7 @@ describe('getEventOverview — authorization', () => {
     await getEventOverview(prisma, OWNER, 'e1', {}, NOW);
     expect(eventsFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 'e1',
-      organizerUserId: 'owner-1',
+      organization: { memberships: { some: { userId: 'owner-1' } } },
       deletedAt: null,
     });
   });
@@ -103,9 +103,10 @@ describe('getEventOverview — authorization', () => {
       { viewAsOrganizerUserId: 'target' },
       NOW
     );
-    expect(eventsFindFirst.mock.calls[0][0].where.organizerUserId).toBe(
-      'target'
-    );
+    expect(
+      eventsFindFirst.mock.calls[0][0].where.organization.memberships.some
+        .userId
+    ).toBe('target');
   });
 });
 

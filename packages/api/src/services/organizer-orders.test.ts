@@ -48,7 +48,10 @@ describe('listEventOrders', () => {
     const args = ordersFindMany.mock.calls[0][0];
     expect(args.where).toMatchObject({
       eventId: 'e1',
-      event: { organizerUserId: 'owner-1', deletedAt: null },
+      event: {
+        organization: { memberships: { some: { userId: 'owner-1' } } },
+        deletedAt: null,
+      },
       status: { not: 'PENDING' },
     });
     expect(args.take).toBe(200);
@@ -68,9 +71,10 @@ describe('listEventOrders', () => {
     await listEventOrders(prisma, ADMIN, 'e1', {
       viewAsOrganizerUserId: 'target',
     });
-    expect(ordersFindMany.mock.calls[0][0].where.event.organizerUserId).toBe(
-      'target'
-    );
+    expect(
+      ordersFindMany.mock.calls[0][0].where.event.organization.memberships.some
+        .userId
+    ).toBe('target');
   });
 
   it('shapes rows as amount charged + ticket count', async () => {
@@ -135,7 +139,10 @@ describe('getOrderDetail', () => {
     expect(ordersFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 'o1',
       eventId: 'e1',
-      event: { organizerUserId: 'owner-1', deletedAt: null },
+      event: {
+        organization: { memberships: { some: { userId: 'owner-1' } } },
+        deletedAt: null,
+      },
     });
   });
 

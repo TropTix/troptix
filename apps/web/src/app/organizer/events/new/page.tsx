@@ -2,6 +2,7 @@ import EventForm from '../_components/EventForm';
 import { BackButton } from '@/components/ui/back-button';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
+import { findOrganizationForOwner } from '@troptix/api/server';
 import { redirect } from 'next/navigation';
 
 export default async function CreateEventPage() {
@@ -9,10 +10,7 @@ export default async function CreateEventPage() {
   if (!user) {
     redirect('/auth/signin');
   }
-  const org = await prisma.organization.findFirst({
-    where: { ownerUserId: user.uid },
-    select: { displayName: true, paidTicketingEnabled: true },
-  });
+  const org = await findOrganizationForOwner(prisma, user.uid);
   const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
 
   return (

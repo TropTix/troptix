@@ -39,7 +39,6 @@ const ticket = (priceCents: number) => ({
 function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
   const org = {
     id: 'org-1',
-    ownerUserId: 'owner-1',
     slug: 'eman-events',
     displayName: 'Eman Events',
     paidTicketingEnabled: opts.paidEnabled ?? false,
@@ -49,7 +48,9 @@ function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
   const ticketTypesCreateMany = vi.fn().mockResolvedValue({ count: 0 });
   const eventsFindFirst = vi
     .fn()
-    .mockResolvedValue(opts.event === undefined ? { id: 'e1' } : opts.event);
+    .mockResolvedValue(
+      opts.event === undefined ? { organization: org } : opts.event
+    );
   const eventsUpdate = vi.fn().mockResolvedValue({});
 
   const prisma = {
@@ -183,7 +184,7 @@ describe('updateEvent', () => {
     await updateEvent(prisma, OWNER, 'e1', updateInput);
     expect(eventsFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 'e1',
-      organizerUserId: 'owner-1',
+      organization: { memberships: { some: { userId: 'owner-1' } } },
       deletedAt: null,
     });
   });
@@ -196,7 +197,7 @@ describe('updateEvent', () => {
     expect(eventsUpdate).not.toHaveBeenCalled();
   });
 
-  it('updates event fields only, refreshing the org linkage, dates verbatim', async () => {
+  it('updates event fields only, keeping the owning Organization, dates verbatim', async () => {
     const { prisma, eventsUpdate } = fakePrisma();
     await updateEvent(prisma, OWNER, 'e1', {
       ...updateInput,
@@ -208,13 +209,13 @@ describe('updateEvent', () => {
     expect(call.where).toEqual({ id: 'e1' });
     expect(call.data).toMatchObject({
       name: 'Renamed Cruise',
-      organizationId: 'org-1',
       organizer: 'Eman Events',
       isPrivate: true,
     });
     expect(call.data.startsAt).toStrictEqual(STARTS);
     expect(call.data.endsAt).toStrictEqual(ENDS);
     expect(call.data.ticketTypes).toBeUndefined();
+    expect(call.data.organizationId).toBeUndefined();
   });
 
   it('leaves isPrivate untouched when omitted', async () => {
