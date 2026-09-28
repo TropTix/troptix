@@ -31,7 +31,8 @@
     "zod": "^3.24.3"
   },
   "peerDependencies": {
-    "stripe": "^22.3.0"
+    "stripe": "^22.3.0",
+    "stripe-preview": "npm:stripe@22.7.0-beta.1"
   },
   "devDependencies": {
     "dotenv": "^17.2.0",

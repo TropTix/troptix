@@ -14,23 +14,33 @@ const ACTIONS = {
   dashboard: openStripeDashboard,
 };
 
-/** Runs a Stripe redirect action; the button stays put on failure and shows why. */
+type ActionResult = { success: boolean; error?: string } | void;
+
+/**
+ * Runs a Stripe redirect action; the button stays put on failure and shows
+ * why. `action` names a shared action; `run` is for one that needs input.
+ */
 export function StripeActionButton({
   action,
+  run,
   children,
   className,
   ...props
 }: {
-  action: keyof typeof ACTIONS;
+  action?: keyof typeof ACTIONS;
+  run?: () => Promise<ActionResult>;
   children: React.ReactNode;
-} & Pick<ComponentProps<typeof Button>, 'variant' | 'size' | 'className'>) {
+} & Pick<
+  ComponentProps<typeof Button>,
+  'variant' | 'size' | 'className' | 'disabled'
+>) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const run = () =>
+  const start = () =>
     startTransition(async () => {
       setError(null);
-      const result = await ACTIONS[action]();
+      const result = await (run ?? ACTIONS[action ?? 'onboarding'])();
       if (result && !result.success) {
         setError(result.error ?? 'Something went wrong.');
       }
@@ -38,7 +48,7 @@ export function StripeActionButton({
 
   return (
     <div className={className}>
-      <Button onClick={run} disabled={isPending} {...props}>
+      <Button {...props} onClick={start} disabled={isPending || props.disabled}>
         {isPending ? 'Opening Stripe…' : children}
         <ExternalLink />
       </Button>

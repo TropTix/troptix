@@ -3,6 +3,7 @@ import type Stripe from 'stripe';
 import { handleConnectEvent } from '@troptix/api/server';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
+import { payoutClients } from '@/server/lib/stripePayouts';
 
 /**
  * Thin-event destination for the organizer Stripe accounts (ADR 0030) — its
@@ -39,7 +40,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const outcome = await handleConnectEvent(prisma, notification);
+    const outcome = await handleConnectEvent(
+      prisma,
+      payoutClients,
+      notification
+    );
     console.log(
       `[ConnectWebhook] ${notification.type} (${notification.id}): ${outcome}`
     );

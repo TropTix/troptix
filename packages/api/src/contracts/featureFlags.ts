@@ -3,6 +3,7 @@
 export const FeatureFlag = {
   ORGANIZER_PAYOUTS: 'organizer-payouts',
   STRIPE_CONNECT_ONBOARDING: 'stripe-connect-onboarding',
+  GLOBAL_PAYOUTS_ONBOARDING: 'global-payouts-onboarding',
 } as const;
 
 export type FeatureFlagKey = (typeof FeatureFlag)[keyof typeof FeatureFlag];

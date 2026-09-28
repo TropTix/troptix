@@ -1,6 +1,7 @@
 /**
- * Stripe Connect lab. Tries account shapes against the sandbox and prints what
- * Stripe accepts, so the plan can be checked against Stripe rather than docs.
+ * Stripe payouts lab. Tries account shapes against the sandbox and prints
+ * what Stripe accepts, and walks the Global Payouts money movement end to
+ * end, so the plans can be checked against Stripe rather than docs.
  *
  *   pnpm --filter web exec tsx --env-file=.env scripts/stripe-lab.ts <command>
  *
@@ -10,11 +11,16 @@
  *   link <acct_…>                    mint a hosted-onboarding link
  *   list                             accounts this lab created
  *   cleanup                          close or delete every lab account
+ *   fa                               the platform's financial accounts and balances
+ *   fund <cents>                     move cents from the payments balance into the financial account
+ *   payout-methods <acct_…>          a recipient's payout methods
+ *   pay <acct_…> <cents>             an outbound payment in USD to a recipient
  *
  * Refuses to run against anything but a sandbox key. Every account it creates
  * carries `metadata.lab = connect-lab` so `list` and `cleanup` find them.
  */
 import Stripe from 'stripe';
+import StripePreview from 'stripe-preview';
 
 const LAB = 'connect-lab';
 const BASE_URL = process.env.LAB_BASE_URL ?? 'https://example.test';
@@ -31,20 +37,21 @@ if (!key.startsWith('sk_test_'))
   fail('Refusing to run: STRIPE_SECRET_KEY is not a sandbox key.');
 
 const stripe = new Stripe(key, { apiVersion: '2026-06-24.dahlia' });
-// Global Payouts recipient capabilities (bank_accounts.*) exist only on the
-// preview API version, so the Jamaican shape needs its own client.
-const previewStripe = new Stripe(key, {
+// Global Payouts recipient capabilities (bank_accounts.*) and money movement
+// exist only on the preview API version, which the preview SDK is pinned to.
+const previewStripe = new StripePreview(key, {
   apiVersion: '2026-08-26.preview',
-} as unknown as ConstructorParameters<typeof Stripe>[1]);
+});
 
 type V2Params = Stripe.V2.Core.AccountCreateParams;
+type PreviewParams = StripePreview.V2.Core.AccountCreateParams;
 type V1Params = Stripe.AccountCreateParams;
 
 interface Variant {
   expect: string;
   v2?: (name: string) => V2Params;
+  preview?: (name: string) => PreviewParams;
   v1?: (name: string) => V1Params;
-  preview?: boolean;
 }
 
 const responsibilities = {
@@ -139,20 +146,18 @@ const VARIANTS: Record<string, Variant> = {
   },
   'jamaica-global-payouts': {
     expect:
-      'Accepted on the preview API version: a Global Payouts recipient in Jamaica with a local bank payout method. Not a Connect account; paid by outbound payment from the platform financial account.',
-    preview: true,
-    v2: (name) =>
-      ({
-        display_name: name,
-        contact_email: 'lab@example.test',
-        identity: { country: 'jm', entity_type: 'individual' },
-        configuration: {
-          recipient: {
-            capabilities: { bank_accounts: { local: { requested: true } } },
-          },
+      'Accepted on the preview API version: a Global Payouts recipient in Jamaica with a local bank payout method. What the Global Payouts rail creates (ADR 0034). Not a Connect account; paid by outbound payment from the platform financial account.',
+    preview: (name) => ({
+      display_name: name,
+      contact_email: 'lab@example.test',
+      identity: { country: 'jm', entity_type: 'individual' },
+      configuration: {
+        recipient: {
+          capabilities: { bank_accounts: { local: { requested: true } } },
         },
-        metadata: { lab: LAB, variant: 'jamaica-global-payouts' },
-      }) as unknown as V2Params,
+      },
+      metadata: { lab: LAB, variant: 'jamaica-global-payouts' },
+    }),
   },
   'v1-express-transfers-only': {
     expect:
@@ -188,14 +193,14 @@ const VARIANTS: Record<string, Variant> = {
   },
 };
 
-const INCLUDE: Stripe.V2.Core.AccountRetrieveParams['include'] = [
+const INCLUDE = [
   'configuration.recipient',
   'configuration.merchant',
   'requirements',
   'identity',
-];
+] as const;
 
-function describeV2(account: Stripe.V2.Core.Account): void {
+function describeV2(account: StripePreview.V2.Core.Account): void {
   const recipient = account.configuration?.recipient?.capabilities;
   const merchant = account.configuration?.merchant?.capabilities;
   const entries = account.requirements?.entries ?? [];
@@ -203,9 +208,13 @@ function describeV2(account: Stripe.V2.Core.Account): void {
   console.log(
     `  applied            ${JSON.stringify(account.applied_configurations)}`
   );
+  console.log(`  country            ${account.identity?.country ?? '-'}`);
   console.log(`  dashboard          ${account.dashboard}`);
   console.log(
     `  stripe_transfers   ${recipient?.stripe_balance?.stripe_transfers?.status ?? '-'}`
+  );
+  console.log(
+    `  bank_accounts.local ${recipient?.bank_accounts?.local?.status ?? '-'}`
   );
   console.log(`  card_payments      ${merchant?.card_payments?.status ?? '-'}`);
   console.log(
@@ -245,14 +254,20 @@ async function create(
     `LAB ${variantName} ${new Date().toISOString().slice(0, 16)}`;
   console.log(`\n${variantName}\n  expect: ${variant.expect}\n`);
   try {
-    if (variant.v2) {
-      const client = variant.preview ? previewStripe : stripe;
-      const account = await client.v2.core.accounts.create({
-        ...variant.v2(name),
-        include: INCLUDE,
+    if (variant.preview) {
+      const account = await previewStripe.v2.core.accounts.create({
+        ...variant.preview(name),
+        include: [...INCLUDE],
       });
       console.log('  ACCEPTED');
       describeV2(account);
+    } else if (variant.v2) {
+      const account = await stripe.v2.core.accounts.create({
+        ...variant.v2(name),
+        include: [...INCLUDE],
+      });
+      console.log('  ACCEPTED');
+      describeV2(account as unknown as StripePreview.V2.Core.Account);
     } else if (variant.v1) {
       const account = await stripe.accounts.create(variant.v1(name));
       console.log('  ACCEPTED');
@@ -263,11 +278,16 @@ async function create(
   }
 }
 
+/** The preview version shows both capabilities, so every v2 read goes through it. */
+async function retrieve(id: string): Promise<StripePreview.V2.Core.Account> {
+  return previewStripe.v2.core.accounts.retrieve(id, {
+    include: [...INCLUDE],
+  });
+}
+
 async function inspect(id: string): Promise<void> {
   try {
-    describeV2(
-      await stripe.v2.core.accounts.retrieve(id, { include: INCLUDE })
-    );
+    describeV2(await retrieve(id));
   } catch (err) {
     console.log(`  v2 retrieve failed (${stripeErrorLine(err)}); trying v1`);
     describeV1(await stripe.accounts.retrieve(id));
@@ -275,25 +295,27 @@ async function inspect(id: string): Promise<void> {
 }
 
 async function link(id: string): Promise<void> {
-  const account = await stripe.v2.core.accounts.retrieve(id, {
-    include: INCLUDE,
-  });
-  const configurations = (account.applied_configurations ?? []).filter(
-    (c): c is 'recipient' | 'merchant' => c === 'recipient' || c === 'merchant'
-  );
-  const accountLink = await stripe.v2.core.accountLinks.create({
+  const account = await retrieve(id);
+  const merchant = (account.applied_configurations ?? []).includes('merchant');
+  const configurations: Array<'recipient' | 'merchant'> = merchant
+    ? ['recipient', 'merchant']
+    : ['recipient'];
+  const params = {
     account: id,
     use_case: {
-      type: 'account_onboarding',
+      type: 'account_onboarding' as const,
       account_onboarding: {
         configurations,
         refresh_url: `${BASE_URL}/organizer/payouts/stripe/refresh`,
         return_url: `${BASE_URL}/organizer/payouts/stripe/return`,
-        collection_options: { fields: 'eventually_due' },
+        collection_options: { fields: 'eventually_due' as const },
       },
     },
-  });
-  console.log(`  configurations ${JSON.stringify(configurations)}`);
+  };
+  const accountLink = merchant
+    ? await stripe.v2.core.accountLinks.create(params)
+    : await previewStripe.v2.core.accountLinks.create(params);
+  console.log(`  client         ${merchant ? 'connect (GA)' : 'preview'}`);
   console.log(`  expires        ${accountLink.expires_at}`);
   console.log(`  url            ${accountLink.url}`);
 }
@@ -305,7 +327,9 @@ async function labAccounts(): Promise<
     string,
     { id: string; kind: 'v1' | 'v2'; name: string; variant: string }
   >();
-  for await (const account of stripe.v2.core.accounts.list({ limit: 20 })) {
+  for await (const account of previewStripe.v2.core.accounts.list({
+    limit: 20,
+  })) {
     if (account.metadata?.lab === LAB) {
       found.set(account.id, {
         id: account.id,
@@ -349,7 +373,7 @@ async function cleanup(): Promise<void> {
         await stripe.accounts.del(account.id);
         console.log(`deleted ${account.id}`);
       } else {
-        await stripe.v2.core.accounts.close(account.id);
+        await previewStripe.v2.core.accounts.close(account.id);
         console.log(`closed  ${account.id}`);
       }
     } catch (err) {
@@ -357,6 +381,123 @@ async function cleanup(): Promise<void> {
     }
   }
   if (accounts.length === 0) console.log('Nothing to clean up.');
+}
+
+async function financialAccount(): Promise<StripePreview.V2.MoneyManagement.FinancialAccount> {
+  const wanted = process.env.STRIPE_FINANCIAL_ACCOUNT_ID;
+  for await (const account of previewStripe.v2.moneyManagement.financialAccounts.list(
+    { limit: 10 }
+  )) {
+    if (!wanted || account.id === wanted) return account;
+  }
+  fail(
+    wanted
+      ? `Financial account ${wanted} not found in this sandbox.`
+      : 'This sandbox has no financial account. Activate Treasury first.'
+  );
+}
+
+function amountLine(
+  amounts: Record<string, { value: number; currency: string }>
+) {
+  return (
+    Object.values(amounts)
+      .map((amount) => `${amount.value} ${amount.currency}`)
+      .join(', ') || '-'
+  );
+}
+
+async function fa(): Promise<void> {
+  for await (const account of previewStripe.v2.moneyManagement.financialAccounts.list(
+    { limit: 10 }
+  )) {
+    console.log(`${account.id}  ${account.status}  ${account.type}`);
+    console.log(`  available         ${amountLine(account.balance.available)}`);
+    console.log(
+      `  inbound_pending   ${amountLine(account.balance.inbound_pending)}`
+    );
+    console.log(
+      `  outbound_pending  ${amountLine(account.balance.outbound_pending)}`
+    );
+  }
+}
+
+async function fund(cents: number): Promise<void> {
+  const account = await financialAccount();
+  const payout = await stripe.payouts.create({
+    amount: cents,
+    currency: 'usd',
+    payout_method: account.id,
+    description: 'lab: fund the financial account',
+  });
+  console.log(`  payout   ${payout.id}  ${payout.status}`);
+  console.log(`  to       ${account.id}`);
+}
+
+async function payoutMethods(accountId: string): Promise<void> {
+  let count = 0;
+  for await (const method of previewStripe.v2.moneyManagement.payoutMethods.list(
+    { limit: 10 },
+    { stripeContext: accountId }
+  )) {
+    count += 1;
+    console.log(`${method.id}  ${method.type}`);
+    console.log(
+      `  payments ${method.usage_status.payments}  restricted ${method.restricted}`
+    );
+    if (method.bank_account) {
+      console.log(
+        `  bank     ${method.bank_account.bank_name ?? '-'} ····${method.bank_account.last4}  ${method.bank_account.country}  archived ${method.bank_account.archived}`
+      );
+    }
+  }
+  if (count === 0) console.log('No payout methods on this recipient.');
+}
+
+async function pay(accountId: string, cents: number): Promise<void> {
+  const account = await financialAccount();
+  let method: StripePreview.V2.MoneyManagement.PayoutMethod | undefined;
+  for await (const candidate of previewStripe.v2.moneyManagement.payoutMethods.list(
+    { limit: 10 },
+    { stripeContext: accountId }
+  )) {
+    if (
+      candidate.type === 'bank_account' &&
+      !candidate.restricted &&
+      !candidate.bank_account?.archived &&
+      candidate.usage_status.payments === 'eligible'
+    ) {
+      method = candidate;
+      break;
+    }
+  }
+  if (!method) fail('No eligible bank account on this recipient.');
+  const payment =
+    await previewStripe.v2.moneyManagement.outboundPayments.create(
+      {
+        from: { financial_account: account.id, currency: 'usd' },
+        to: { recipient: accountId, payout_method: method.id },
+        amount: { value: cents, currency: 'usd' },
+        description: 'lab: outbound payment',
+        metadata: { lab: LAB },
+      },
+      { idempotencyKey: `lab-pay-${accountId}-${Date.now()}` }
+    );
+  console.log(`  payment   ${payment.id}  ${payment.status}`);
+  console.log(
+    `  debited   ${payment.from.debited.value} ${payment.from.debited.currency}`
+  );
+  console.log(
+    `  credited  ${payment.to.credited.value} ${payment.to.credited.currency}`
+  );
+  console.log(`  arrives   ${payment.expected_arrival_date ?? '-'}`);
+  console.log(`  receipt   ${payment.receipt_url ?? '-'}`);
+}
+
+function cents(raw: string | undefined, usage: string): number {
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) fail(usage);
+  return value;
 }
 
 async function main(): Promise<void> {
@@ -380,9 +521,19 @@ async function main(): Promise<void> {
       return list();
     case 'cleanup':
       return cleanup();
+    case 'fa':
+      return fa();
+    case 'fund':
+      return fund(cents(arg1, 'Usage: fund <cents>'));
+    case 'payout-methods':
+      if (!arg1) fail('Usage: payout-methods <acct_…>');
+      return payoutMethods(arg1);
+    case 'pay':
+      if (!arg1) fail('Usage: pay <acct_…> <cents>');
+      return pay(arg1, cents(arg2, 'Usage: pay <acct_…> <cents>'));
     default:
       fail(
-        'Commands: variants | create <variant> | inspect <id> | link <id> | list | cleanup'
+        'Commands: variants | create <variant> | inspect <id> | link <id> | list | cleanup | fa | fund <cents> | payout-methods <id> | pay <id> <cents>'
       );
   }
 }
