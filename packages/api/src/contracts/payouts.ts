@@ -154,8 +154,9 @@ export type SendPayoutViaStripeInput = z.infer<
 >;
 
 /**
- * A row and Stripe's transfers disagree (plan decision 17). Computed from
- * Stripe at read time, never stored.
+ * A row and Stripe's money movement disagree (Connect plan decision 17,
+ * Global Payouts plan decision 9). Computed from Stripe at read time, never
+ * stored. `stripeIds` are transfers (`tr_…`) or outbound payments (`obp_…`).
  */
 export const payoutMismatchSchema = z.object({
   requestId: z.string(),
@@ -165,8 +166,9 @@ export const payoutMismatchSchema = z.object({
     'duplicate_transfer',
     'closed_with_transfer',
     'transfer_without_request',
+    'payment_returned',
   ]),
-  transferIds: z.array(z.string()),
+  stripeIds: z.array(z.string()),
 });
 export type PayoutMismatch = z.infer<typeof payoutMismatchSchema>;
 

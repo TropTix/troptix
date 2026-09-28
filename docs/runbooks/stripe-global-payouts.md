@@ -32,10 +32,10 @@ organizers stay on Connect ([runbook](stripe-connect.md)).
 
 ## Environment variables
 
-| Variable                      | Where                            | Purpose                                                                                    |
-| ----------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------ |
-| `STRIPE_PAYOUTS_KEY`          | production                       | Restricted key for recipient and money-management calls; falls back to `STRIPE_SECRET_KEY` |
-| `STRIPE_FINANCIAL_ACCOUNT_ID` | production, preview, development | The financial account outbound payments draw on (PR 2)                                     |
+| Variable                      | Where                            | Purpose                                                                                                     |
+| ----------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `STRIPE_PAYOUTS_KEY`          | production                       | Restricted key for recipient and money-management calls; falls back to `STRIPE_SECRET_KEY`                  |
+| `STRIPE_FINANCIAL_ACCOUNT_ID` | production, preview, development | The financial account outbound payments draw on; unset turns the send rail and its reconciliation sweep off |
 
 The preview SDK (`stripe-preview`, the `public-preview` tag of `stripe`) is
 pinned to the exact beta in `apps/web/package.json` and
@@ -72,6 +72,42 @@ pnpm exec tsx --env-file=.env scripts/stripe-lab.ts pay <acct_…> 5000
 
 `pay` prints the debited USD, the credited JMD, and the receipt. Run this
 before reviewing PR 1 and again after any bump of the preview SDK.
+
+## Sending a payout
+
+1. Platform Payouts → an open request whose organization shows "Stripe
+   recipient · acct\_… · active" gets a **Pay** button. The panel names the
+   account and the worst-case fee; **Send via Stripe** funds the financial
+   account from the payments balance if it is short, creates the outbound
+   payment, and marks the row paid with the payment id (`obp_…`) as its
+   reference. **Pay another way** opens the manual cockpit.
+2. The idempotency key is the request's (`global-payout-<id>`): v2 keys live
+   30 days and a retry re-executes a failure, so a retry after any error is
+   safe. Past that, the send lists the recipient's payments since the request
+   and reuses a live one it finds. A failed, canceled or returned payment is
+   never reused.
+3. Failures leave the row open and say why: the payments balance is short
+   (wait for the sweep to leave the floor, or top up), the top-up has not
+   settled (retry in a minute), Stripe declined the payout in review, or the
+   recipient has no bank account Stripe can pay (the organizer sees **Finish
+   setting up with Stripe**). "obp\_… was sent but the request was already
+   resolved" means the money moved and the row did not: open the payment in
+   the Dashboard under Global Payouts and mark the row paid by hand with that
+   id. Cross-border payouts cannot be reversed once posted.
+4. The organizer's table reads "via Stripe, obp\_…"; the receipt and the JMD
+   figure are on the payment in the Dashboard.
+
+## Reconciliation
+
+The daily job and the platform page sweep outbound payments alongside
+transfers (see the [Connect runbook](stripe-connect.md#reconciliation) for
+the schedule). Two more flags apply here: a paid row whose payment `failed`
+or `returned` ("Marked paid, but the Stripe payment failed or came back"),
+and the usual open-row-with-a-payment. For a returned payment: read the
+return reason on the payment's timeline in the Dashboard, have the organizer
+fix their bank details through **Update with Stripe**, then pay the request
+again by hand from the cockpit. Resending through Stripe needs the request
+reopened, which the unattended-payouts plan adds.
 
 ## Local events
 

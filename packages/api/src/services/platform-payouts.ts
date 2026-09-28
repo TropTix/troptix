@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
+import type StripePreview from 'stripe-preview';
 import type { Actor } from '../trpc/context';
 import type {
   PayoutMismatch,
@@ -18,11 +19,15 @@ import {
   NotFoundError,
   StripeAccountRestrictedError,
 } from './_shared/errors';
-import { resolvePayoutPolicy } from './_shared/payouts';
+import {
+  globalPayoutFeeHeadroomCents,
+  resolvePayoutPolicy,
+} from './_shared/payouts';
 import {
   connectStateOf,
   isGlobalPayouts,
   toAccountKind,
+  type PayoutClients,
 } from './organizer-connect';
 import { toRequestDto, toSetupState } from './organizer-payouts';
 import { requirePlatformOwner } from './organizer-scope';
@@ -63,6 +68,7 @@ export async function listPayoutRequests(
 }
 
 const transferGroupFor = (requestId: string) => `payout-request-${requestId}`;
+const globalPayoutKeyFor = (requestId: string) => `global-payout-${requestId}`;
 
 const RESTRICTED_CODES = new Set([
   'account_invalid',
@@ -71,20 +77,31 @@ const RESTRICTED_CODES = new Set([
   'transfers_not_allowed',
 ]);
 
+/** OutboundPayment create errors that mean the recipient, not the money, is the problem. */
+const RECIPIENT_NOT_READY_CODES = new Set([
+  'account_not_configured_as_recipient',
+  'outbound_payment_not_allowed',
+  'to_recipient_not_found',
+]);
+
+/** A payment in one of these states paid nobody; it is neither reused nor counted live. */
+const DEAD_PAYMENT_STATUSES = new Set(['failed', 'canceled', 'returned']);
+
 /**
- * Transfer first, resolve second (ADR 0030 decision 5, keys per ADR 0033).
- * The row lock serializes two admins on one request; the transfer-group
- * lookup catches a transfer whose response never arrived. Every failure
- * leaves the row REQUESTED; only a resolve that wrote nothing after the money
- * moved is reported for a human to reconcile.
+ * Money first, resolve second (ADR 0030 decision 5, keys per ADR 0033 for
+ * transfers and ADR 0034 for outbound payments). The row lock serializes two
+ * admins on one request; the lookup before the create catches money whose
+ * response never arrived. Every failure leaves the row REQUESTED; only a
+ * resolve that wrote nothing after the money moved is reported for a human
+ * to reconcile.
  */
 export async function sendPayoutViaStripe(
   prisma: PrismaClient,
-  stripe: Stripe,
+  clients: PayoutClients,
   actor: Actor,
   input: SendPayoutViaStripeInput,
   now: Date = new Date()
-): Promise<{ transferId: string }> {
+): Promise<{ reference: string }> {
   const resolvedByUserId = await requirePlatformOwner(prisma, actor);
 
   return prisma.$transaction(
@@ -96,6 +113,7 @@ export async function sendPayoutViaStripe(
           id: true,
           status: true,
           amountCents: true,
+          createdAt: true,
           organization: {
             select: {
               id: true,
@@ -123,40 +141,51 @@ export async function sendPayoutViaStripe(
           'This organization is not active on Stripe; pay another way'
         );
       }
-      if (isGlobalPayouts(organization.stripeAccountKind)) {
-        throw new ConflictError(
-          'Global Payouts sends are not built yet; pay another way'
-        );
-      }
 
-      const transfer = await findOrCreateTransfer(stripe, {
+      const send = {
         id: request.id,
         amountCents: request.amountCents,
+        createdAt: request.createdAt,
         destination: organization.stripeAccountId,
         organizationId: organization.id,
         slug: organization.slug,
-      });
+      };
+      const reference = isGlobalPayouts(organization.stripeAccountKind)
+        ? (await findOrCreateOutboundPayment(clients, send)).id
+        : (await findOrCreateTransfer(clients.connect, send)).id;
 
       const updated = await tx.payoutRequest.updateMany({
         where: { id: request.id, status: 'REQUESTED' },
         data: {
           status: 'PAID',
           rail: 'STRIPE',
-          reference: transfer.id,
+          reference,
           resolvedAt: now,
           resolvedByUserId,
         },
       });
       if (updated.count === 0) {
         throw new ConflictError(
-          `Transfer ${transfer.id} was sent but the request was already resolved or cancelled — reconcile by hand`
+          `${reference} was sent but the request was already resolved or cancelled — reconcile by hand`
         );
       }
-      return { transferId: transfer.id };
+      return { reference };
     },
     { timeout: 30_000 }
   );
 }
+
+interface SendRequest {
+  id: string;
+  amountCents: number;
+  createdAt: Date;
+  destination: string;
+  organizationId: string;
+  slug: string;
+}
+
+const descriptionFor = (send: SendRequest) =>
+  `TropTix payout — ${send.slug} — ${send.id.slice(0, 8)}`;
 
 /**
  * Stripe replays a cached failure under a reused idempotency key for 24
@@ -165,15 +194,9 @@ export async function sendPayoutViaStripe(
  */
 async function findOrCreateTransfer(
   stripe: Stripe,
-  request: {
-    id: string;
-    amountCents: number;
-    destination: string;
-    organizationId: string;
-    slug: string;
-  }
+  send: SendRequest
 ): Promise<Stripe.Transfer> {
-  const group = transferGroupFor(request.id);
+  const group = transferGroupFor(send.id);
   const existing = await stripe.transfers.list({
     transfer_group: group,
     limit: 10,
@@ -184,20 +207,20 @@ async function findOrCreateTransfer(
   try {
     return await stripe.transfers.create(
       {
-        amount: request.amountCents,
+        amount: send.amountCents,
         currency: 'usd',
-        destination: request.destination,
-        description: `TropTix payout — ${request.slug} — ${request.id.slice(0, 8)}`,
+        destination: send.destination,
+        description: descriptionFor(send),
         transfer_group: group,
         metadata: {
-          payoutRequestId: request.id,
-          organizationId: request.organizationId,
+          payoutRequestId: send.id,
+          organizationId: send.organizationId,
         },
       },
       { idempotencyKey: `${group}-${randomUUID()}` }
     );
   } catch (error) {
-    throw await mapTransferError(stripe, error, request.amountCents);
+    throw await mapTransferError(stripe, error, send.amountCents);
   }
 }
 
@@ -225,6 +248,141 @@ async function mapTransferError(
   return error;
 }
 
+/**
+ * The Global Payouts branch (ADR 0034). v2 keys live 30 days and re-execute
+ * a failure, so the key is the request's; the list by recipient and window
+ * is the guard past that and for a lost response. The payout method is
+ * named, never left to a Stripe-side default; the financial account is
+ * topped up from the payments balance before the send.
+ */
+async function findOrCreateOutboundPayment(
+  clients: PayoutClients,
+  send: SendRequest
+): Promise<{ id: string }> {
+  const financialAccountId = clients.financialAccountId;
+  if (!financialAccountId) {
+    throw new ConflictError(
+      'Global Payouts is not configured: no financial account'
+    );
+  }
+
+  for await (const payment of clients.global.v2.moneyManagement.outboundPayments.list(
+    {
+      recipient: send.destination,
+      created_gte: send.createdAt.toISOString(),
+      limit: 100,
+    }
+  )) {
+    if (
+      payment.metadata?.payoutRequestId === send.id &&
+      !DEAD_PAYMENT_STATUSES.has(payment.status)
+    ) {
+      return payment;
+    }
+  }
+
+  const payoutMethod = await pickPayoutMethod(clients.global, send.destination);
+  await fundFinancialAccount(clients, financialAccountId, send);
+
+  try {
+    return await clients.global.v2.moneyManagement.outboundPayments.create(
+      {
+        from: { financial_account: financialAccountId, currency: 'usd' },
+        to: { recipient: send.destination, payout_method: payoutMethod },
+        amount: { value: send.amountCents, currency: 'usd' },
+        description: descriptionFor(send),
+        metadata: {
+          payoutRequestId: send.id,
+          organizationId: send.organizationId,
+        },
+      },
+      { idempotencyKey: globalPayoutKeyFor(send.id) }
+    );
+  } catch (error) {
+    throw mapOutboundPaymentError(error);
+  }
+}
+
+async function pickPayoutMethod(
+  stripe: StripePreview,
+  recipient: string
+): Promise<string> {
+  for await (const method of stripe.v2.moneyManagement.payoutMethods.list(
+    { limit: 10 },
+    { stripeContext: recipient }
+  )) {
+    if (
+      method.type === 'bank_account' &&
+      !method.restricted &&
+      !method.bank_account?.archived &&
+      method.usage_status.payments === 'eligible'
+    ) {
+      return method.id;
+    }
+  }
+  throw new StripeAccountRestrictedError(
+    'This recipient has no bank account Stripe can pay'
+  );
+}
+
+/**
+ * Fees are billed to the financial account separately, so the top-up covers
+ * the amount plus headroom (plan decision 8). A v1 payout from the payments
+ * balance into the financial account settles at once.
+ */
+async function fundFinancialAccount(
+  clients: PayoutClients,
+  financialAccountId: string,
+  send: SendRequest
+): Promise<void> {
+  const account =
+    await clients.global.v2.moneyManagement.financialAccounts.retrieve(
+      financialAccountId
+    );
+  const available = account.balance.available.usd?.value ?? 0;
+  const needed =
+    send.amountCents + globalPayoutFeeHeadroomCents(send.amountCents);
+  if (available >= needed) return;
+
+  const topUp = needed - available;
+  try {
+    await clients.connect.payouts.create(
+      {
+        amount: topUp,
+        currency: 'usd',
+        payout_method: financialAccountId,
+        description: descriptionFor(send),
+        metadata: { payoutRequestId: send.id },
+      },
+      { idempotencyKey: `${globalPayoutKeyFor(send.id)}-fund-${randomUUID()}` }
+    );
+  } catch (error) {
+    throw await mapTransferError(clients.connect, error, topUp);
+  }
+}
+
+function mapOutboundPaymentError(error: unknown): unknown {
+  const { code, rawType } = error as { code?: string; rawType?: string };
+  const reason = code ?? rawType;
+  if (!reason) return error;
+  if (reason === 'insufficient_funds') {
+    return new ConflictError(
+      'The financial account top-up has not settled yet; retry in a minute'
+    );
+  }
+  if (reason === 'outbound_payment_cannot_be_processed') {
+    return new ConflictError('Stripe declined this payout in review');
+  }
+  if (
+    RECIPIENT_NOT_READY_CODES.has(reason) ||
+    reason.startsWith('recipient_') ||
+    reason.startsWith('payout_method_')
+  ) {
+    return new StripeAccountRestrictedError();
+  }
+  return error;
+}
+
 async function availableUsdCents(stripe: Stripe): Promise<number> {
   const balance = await stripe.balance.retrieve();
   return balance.available
@@ -232,18 +390,31 @@ async function availableUsdCents(stripe: Stripe): Promise<number> {
     .reduce((sum, entry) => sum + entry.amount, 0);
 }
 
+async function financialAccountUsdCents(
+  clients: PayoutClients
+): Promise<number> {
+  if (!clients.financialAccountId) return 0;
+  const account =
+    await clients.global.v2.moneyManagement.financialAccounts.retrieve(
+      clients.financialAccountId
+    );
+  return account.balance.available.usd?.value ?? 0;
+}
+
 /**
- * The queue header (plan decision 18): what Stripe can send against what the
- * Stripe rail owes. Manual-rail requests never draw on this balance.
+ * The queue header (Connect plan decision 18, Global Payouts plan decision
+ * 12): what Stripe can send, on either rail, against what the Stripe rails
+ * owe. Manual-rail requests never draw on this balance.
  */
 export async function readPlatformPayoutBalance(
   prisma: PrismaClient,
-  stripe: Stripe,
+  clients: PayoutClients,
   actor: Actor
 ): Promise<PlatformPayoutBalance> {
   await requirePlatformOwner(prisma, actor);
-  const [availableCents, open] = await Promise.all([
-    availableUsdCents(stripe),
+  const [platformCents, financialAccountCents, open] = await Promise.all([
+    availableUsdCents(clients.connect),
+    financialAccountUsdCents(clients),
     prisma.payoutRequest.aggregate({
       where: {
         status: 'REQUESTED',
@@ -255,34 +426,57 @@ export async function readPlatformPayoutBalance(
       _sum: { amountCents: true },
     }),
   ]);
-  return { availableCents, openRequestsCents: open._sum.amountCents ?? 0 };
+  return {
+    availableCents: platformCents + financialAccountCents,
+    openRequestsCents: open._sum.amountCents ?? 0,
+  };
 }
 
 /**
- * The safety net under the idempotency rules (plan decision 17): Stripe's
- * live transfers carrying a request id, against the rows. Not actor-gated
- * because the cron calls it; the platform page checks its viewer first.
+ * The safety net under the idempotency rules (Connect plan decision 17,
+ * Global Payouts plan decision 9): Stripe's live transfers and outbound
+ * payments carrying a request id, against the rows. A payment that failed
+ * or came back is reported on its own, since the row says paid. Not
+ * actor-gated because the cron calls it; the platform page checks its
+ * viewer first.
  */
 export async function reconcileStripePayouts(
   prisma: PrismaClient,
-  stripe: Stripe,
+  clients: PayoutClients,
   {
     now = new Date(),
     windowDays = 35,
   }: { now?: Date; windowDays?: number } = {}
 ): Promise<PayoutMismatch[]> {
   const since = new Date(now.getTime() - windowDays * 86_400_000);
-  const transfersByRequest = new Map<string, string[]>();
-  for await (const transfer of stripe.transfers.list({
+  const liveByRequest = new Map<string, string[]>();
+  const deadByRequest = new Map<string, string[]>();
+  const add = (map: Map<string, string[]>, requestId: string, id: string) =>
+    map.set(requestId, [...(map.get(requestId) ?? []), id]);
+
+  for await (const transfer of clients.connect.transfers.list({
     created: { gte: Math.floor(since.getTime() / 1000) },
     limit: 100,
   })) {
     const requestId = transfer.metadata?.payoutRequestId;
     if (!requestId || transfer.reversed) continue;
-    transfersByRequest.set(requestId, [
-      ...(transfersByRequest.get(requestId) ?? []),
-      transfer.id,
-    ]);
+    add(liveByRequest, requestId, transfer.id);
+  }
+
+  if (clients.financialAccountId) {
+    for await (const payment of clients.global.v2.moneyManagement.outboundPayments.list(
+      { created_gte: since.toISOString(), limit: 100 }
+    )) {
+      const requestId = payment.metadata?.payoutRequestId;
+      if (!requestId) continue;
+      add(
+        DEAD_PAYMENT_STATUSES.has(payment.status)
+          ? deadByRequest
+          : liveByRequest,
+        requestId,
+        payment.id
+      );
+    }
   }
 
   const rows = await prisma.payoutRequest.findMany({
@@ -290,7 +484,14 @@ export async function reconcileStripePayouts(
       OR: [
         { status: 'REQUESTED' },
         { status: 'PAID', rail: 'STRIPE', resolvedAt: { gte: since } },
-        { id: { in: Array.from(transfersByRequest.keys()) } },
+        {
+          id: {
+            in: [
+              ...Array.from(liveByRequest.keys()),
+              ...Array.from(deadByRequest.keys()),
+            ],
+          },
+        },
       ],
     },
     select: { id: true, status: true, rail: true },
@@ -300,44 +501,51 @@ export async function reconcileStripePayouts(
   const seen = new Set<string>();
   for (const row of rows) {
     seen.add(row.id);
-    const transferIds = transfersByRequest.get(row.id) ?? [];
+    const liveIds = liveByRequest.get(row.id) ?? [];
+    const deadIds = deadByRequest.get(row.id) ?? [];
     const paidOnStripe = row.status === 'PAID' && row.rail === 'STRIPE';
-    if (row.status === 'REQUESTED' && transferIds.length > 0) {
+    if (row.status === 'REQUESTED' && liveIds.length > 0) {
       mismatches.push({
         requestId: row.id,
         kind: 'requested_with_transfer',
-        transferIds,
+        stripeIds: liveIds,
       });
-    } else if (paidOnStripe && transferIds.length === 0) {
+    } else if (paidOnStripe && liveIds.length === 0 && deadIds.length > 0) {
+      mismatches.push({
+        requestId: row.id,
+        kind: 'payment_returned',
+        stripeIds: deadIds,
+      });
+    } else if (paidOnStripe && liveIds.length === 0) {
       mismatches.push({
         requestId: row.id,
         kind: 'paid_without_transfer',
-        transferIds,
+        stripeIds: [],
       });
-    } else if (paidOnStripe && transferIds.length > 1) {
+    } else if (paidOnStripe && liveIds.length > 1) {
       mismatches.push({
         requestId: row.id,
         kind: 'duplicate_transfer',
-        transferIds,
+        stripeIds: liveIds,
       });
     } else if (
       !paidOnStripe &&
       row.status !== 'REQUESTED' &&
-      transferIds.length > 0
+      liveIds.length > 0
     ) {
       mismatches.push({
         requestId: row.id,
         kind: 'closed_with_transfer',
-        transferIds,
+        stripeIds: liveIds,
       });
     }
   }
-  for (const [requestId, transferIds] of Array.from(transfersByRequest)) {
+  for (const [requestId, liveIds] of Array.from(liveByRequest)) {
     if (!seen.has(requestId)) {
       mismatches.push({
         requestId,
         kind: 'transfer_without_request',
-        transferIds,
+        stripeIds: liveIds,
       });
     }
   }
