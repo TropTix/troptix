@@ -7,10 +7,10 @@ tracking-issue: PR #568 (single-PR initiative)
 
 # Browser end-to-end tests for the buyer flow
 
-We want to lean on end-to-end tests for confidence when changing the product,
-and we want each run to leave proof a person can watch. This plan adds a
-Playwright suite for the buyer flow, runs it on every web PR, and ships a
-video of the run as the artifact.
+We want to lean on end-to-end tests for confidence when changing the product.
+This plan adds a Playwright suite for the buyer flow, runs it on every web PR
+with Stripe faked at the network edge, and keeps a video and trace of every
+failure.
 
 Decision record: [ADR 0034](../adr/0034-hermetic-browser-e2e.md).
 
@@ -37,10 +37,12 @@ Checked against current docs (September 2026):
   `webServer`. Video and trace can be kept per test; the HTML report embeds
   both. 1.59+ can stamp actions, test titles and chapter cards into the
   recording, which makes a self-narrating video.
-- **Stripe** says its hosted Checkout resists automation, but the embedded
-  Payment Element on our own page fills like any iframe. Test cards: `4242…`
-  succeeds, `4000 0000 0000 0002` declines, `…9995` insufficient funds,
-  `4000 0025 0000 3155` needs 3DS. Declines should be asserted on server
+- **Stripe** says to mock its UI and API in automated tests: the Payment
+  Element carries measures against automation, and test-mode rate limits are
+  stricter than live. A first cut drove the real Payment Element in test mode
+  and worked, but needed secrets and network; the fake replaced it. The fake
+  keeps Stripe's test-card semantics: `4242…` succeeds, `4000 0000 0000 0002`
+  declines, `…9995` insufficient funds. Declines are asserted on server
   state, not just the message.
 - **Supabase's** documented CI pattern is the local stack with migrations and
   `seed.sql`. Preview branches are for humans to click; they cannot be reset
@@ -55,11 +57,17 @@ Checked against current docs (September 2026):
 ## Design
 
 - **Workspace** `e2e/` (`@troptix/e2e`): Playwright + `pg` for direct
-  database assertions + `ffmpeg` (from PATH; CI installs it) to stitch the proof video.
+  database assertions, plus the fake Stripe.
 - **Runtime**: `supabase db start` Postgres, production build of `apps/web`
-  on port 3210, real Stripe test mode. Build and start share one environment
-  (`e2e/lib/env.ts`) because `NEXT_PUBLIC_*` values bake in at build time.
-  Supabase auth is a placeholder; the buyer flow never signs in.
+  on port 3210, fake Stripe on port 3211. Build and start share one
+  environment (`e2e/lib/env.ts`) because `NEXT_PUBLIC_*` values bake in at
+  build time. Supabase auth is a placeholder; the buyer flow never signs in.
+- **Fake Stripe**: `scripts/fake-stripe.ts` stands in for `api.stripe.com`
+  (Checkout Sessions create/retrieve/expire, refunds, PaymentIntents) and the
+  app's SDK is pointed at it with `STRIPE_API_BASE`, the one app change.
+  `lib/fake-stripe-js.js` is served in place of Stripe.js and implements only
+  what `@stripe/react-stripe-js` and the payment step call; its `confirm()`
+  asks the fake server, and the card number decides the outcome.
 - **Fixtures**: each test creates and deletes its own organizer →
   organization → event → ticket types chain with `e2e-` ids. The discover
   test uses the seeded demo events, whose dates are now `now()`-relative.
@@ -67,46 +75,45 @@ Checked against current docs (September 2026):
   ticket-type card (`ticket-type-<id>`) so a test can address a tier by id.
   The checkout sheet's screen-reader title names the dialog after the
   current step, which is the step oracle.
-- **Isolation**: analytics (`/ingest`, PostHog) and Google Maps are blocked
-  at the network layer. Order emails go to `delivered@resend.dev`.
-- **Proof**: `video: 'on'` with action and title overlays, chapter cards per
-  step, `trace: 'retain-on-failure'`. After the run, `scripts/stitch-proof.ts`
-  concatenates every video into `playwright-report/proof.mp4`. CI uploads the
-  report directory (videos, traces, proof) as the `e2e-report` artifact.
+- **Isolation**: every other Stripe domain, analytics (`/ingest`, PostHog)
+  and Google Maps are blocked at the network layer. The order email is
+  attempted with a placeholder Resend key and rejected; nothing depends on it.
+- **Evidence**: video with action and title overlays and a trace, both
+  `retain-on-failure`. CI uploads the HTML report as the `e2e-report`
+  artifact either way.
 
 ## Coverage
 
-| Question                                | Spec                                                                                                                                                                                              |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Do the events load?                     | `discover.spec.ts`: seeded events listed, private one hidden, card opens the event page                                                                                                           |
-| Do the tickets load, correctly?         | `event-page.spec.ts`: names, prices, fee lines; sold out / on sale soon / gated hidden; per-user clamp and running total                                                                          |
-| Can you check out free?                 | `free-checkout.spec.ts`: RSVP completes; DB shows COMPLETED FREE order, VALID ticket, hold converted, counters absolute                                                                           |
-| Can you check out paid?                 | `paid-checkout.spec.ts`: 2 × GA at $55.00 with `4242…`; in-place confirm and one sync finalize; DB order, tickets, reservation, inventory; PaymentIntent `succeeded` on Stripe; ticket page opens |
-| What happens when the card is declined? | `paid-checkout.spec.ts`: `…0002` shows the decline, buyer stays on the payment step, no order, hold still `HELD`, then a retry with a good card succeeds                                          |
+| Question                                | Spec                                                                                                                                                                                                           |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Do the events load?                     | `discover.spec.ts`: seeded events listed, private one hidden, card opens the event page                                                                                                                        |
+| Do the tickets load, correctly?         | `event-page.spec.ts`: names, prices, fee lines; sold out / on sale soon / gated hidden; per-user clamp and running total                                                                                       |
+| Can you check out free?                 | `free-checkout.spec.ts`: RSVP completes; DB shows COMPLETED FREE order, VALID ticket, hold converted, counters absolute                                                                                        |
+| Can you check out paid?                 | `paid-checkout.spec.ts`: 2 × GA at $55.00 with `4242…`; in-place confirm and one sync finalize; DB order, tickets, reservation, inventory; PaymentIntent `succeeded` for $55.00 in the fake; ticket page opens |
+| What happens when the card is declined? | `paid-checkout.spec.ts`: `…0002` shows the decline, buyer stays on the payment step, no order, hold still `HELD`, then a retry with a good card succeeds                                                       |
 
 Seven tests, about 30 seconds wall clock locally with parallel workers.
 
 ## Rollout
 
-1. Land the suite and the `e2e` CI job **not required**. Paid specs skip
-   until the two repo secrets exist: `E2E_STRIPE_SECRET_KEY` and
-   `E2E_STRIPE_PUBLISHABLE_KEY` (test mode). Stripe recommends a separate
-   sandbox for CI; one shared test key is acceptable for now.
+1. Land the suite and the `e2e` CI job **not required**. It needs no
+   secrets.
 2. Make `e2e` a required check after a few clean runs on real PRs.
-3. Post the proof video in the PR conversation from the workflow, so
-   reviewers see it without opening artifacts.
-4. Next specs, in order of value: 3DS challenge card; hold expiry
+3. Next specs, in order of value: 3DS challenge card; hold expiry
    (drive `/api/cron/expire-reservations` with `CRON_SECRET`); organizer
    sign-in via the local auth container and Mailpit, then create an event
    from the dashboard and buy it.
-5. Later, not scheduled: a production smoke reusing the free RSVP spec
+4. Later, not scheduled: a production smoke reusing the free RSVP spec
    against a live event, and a signed synthetic webhook test in
    `packages/api`.
 
 ## Known limits
 
 - The deployed runtime and the webhook path are not exercised in a browser.
-- Stripe test mode is a network dependency; paid specs are the flake budget.
+- The real Payment Element, Stripe.js and Stripe's API are not exercised; the
+  fake mirrors the fields the app reads and can drift if the integration
+  reads more. Stripe test mode by hand and the `packages/api` tests remain the
+  check on the real contract.
 - The checkout copy says tickets are held for 10 minutes; the server hold is
   12 with a 2-minute client buffer. Not a test concern, noted for a follow-up.
 - Event cards on `/discover` have no accessible link name (the link wraps an

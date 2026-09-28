@@ -1,3 +1,5 @@
+import { FAKE_STRIPE_URL } from './env';
+
 export type PaymentIntent = {
   id: string;
   status: string;
@@ -6,10 +8,10 @@ export type PaymentIntent = {
   livemode: boolean;
 };
 
+// What the app's Stripe SDK sent, as the fake server recorded it.
 export async function getPaymentIntent(id: string): Promise<PaymentIntent> {
-  const res = await fetch(`https://api.stripe.com/v1/payment_intents/${id}`, {
-    headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
-  });
-  if (!res.ok) throw new Error(`Stripe ${res.status}: ${await res.text()}`);
+  const res = await fetch(`${FAKE_STRIPE_URL}/v1/payment_intents/${id}`);
+  if (!res.ok)
+    throw new Error(`fake stripe ${res.status}: ${await res.text()}`);
   return (await res.json()) as PaymentIntent;
 }

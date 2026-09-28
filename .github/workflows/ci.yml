@@ -133,20 +133,15 @@ jobs:
         run: pnpm --filter @troptix/api test
 
   # Browser tests for the buyer flow (e2e/). Hermetic: the same local Postgres
-  # the api-tests use, a production build of apps/web, real Stripe test mode.
-  # No webhook forwarding is needed — the checkout page's one sync finalize
-  # attempt fulfils the order (ADR 0030, ADR 0034). Every test is recorded; the
-  # HTML report and the stitched proof video are uploaded as the run's
-  # artifact. Paid specs skip themselves when the Stripe test keys are not
-  # configured as repo secrets.
+  # the api-tests use, a production build of apps/web, and a fake Stripe run
+  # from the e2e package (ADR 0034), so no secrets and no network. Failed
+  # tests keep a video and a trace; the HTML report is uploaded either way.
   e2e:
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     env:
       CI: 1
-      STRIPE_SECRET_KEY: ${{ secrets.E2E_STRIPE_SECRET_KEY }}
-      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.E2E_STRIPE_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
@@ -161,25 +156,13 @@ jobs:
         run: supabase db start
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Chromium
         run: pnpm --filter @troptix/e2e exec playwright install --with-deps chromium
       - name: Build web
         run: pnpm --filter @troptix/e2e build:web
       - name: Run browser tests
         run: pnpm --filter @troptix/e2e test
-      - name: Install ffmpeg
-        if: always()
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
-      - name: Stitch proof video
-        if: always()
-        run: pnpm --filter @troptix/e2e proof
-      - name: Upload report and videos
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:

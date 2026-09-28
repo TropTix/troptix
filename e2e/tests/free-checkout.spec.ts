@@ -16,18 +16,17 @@ import {
 test('free RSVP completes and records a FREE order with a valid ticket', async ({
   page,
   factory,
-  chapter,
 }) => {
   const event = await factory.createFreeEvent();
   const rsvp = event.ticketTypes.rsvp;
 
-  await chapter('Pick one free ticket', async () => {
+  await test.step('Pick one free ticket', async () => {
     await openCheckout(page, event.id, /RSVP/);
     await addTickets(page, rsvp.id, 1);
     await page.getByRole('button', { name: 'Continue' }).click();
   });
 
-  await chapter('Enter buyer details and complete the RSVP', async () => {
+  await test.step('Enter buyer details and complete the RSVP', async () => {
     await fillContact(page, BUYER);
     await page.getByRole('button', { name: 'Complete RSVP' }).click();
     await expect(page.getByText(/Order confirmed · 1 ticket/)).toBeVisible({
@@ -37,7 +36,7 @@ test('free RSVP completes and records a FREE order with a valid ticket', async (
 
   const orderId = await successOrderId(page);
 
-  await chapter('The order and ticket are recorded', async () => {
+  await test.step('The order and ticket are recorded', async () => {
     const order = await getOrder(orderId);
     expect(order).not.toBeNull();
     expect(order!.status).toBe('COMPLETED');
@@ -59,7 +58,7 @@ test('free RSVP completes and records a FREE order with a valid ticket', async (
     expect(inventory.reserved).toBe(0);
   });
 
-  await chapter('The ticket page opens from the confirmation', async () => {
+  await test.step('The ticket page opens from the confirmation', async () => {
     await page.getByRole('link', { name: /View tickets/ }).click();
     await page.waitForURL(`/orders/${orderId}/tickets`);
     await expect(page.getByText(event.name).first()).toBeVisible();

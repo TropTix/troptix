@@ -1,15 +1,30 @@
-import { test as base, type Page } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { test as base } from '@playwright/test';
 import { EventFactory } from './events';
+import { FAKE_STRIPE_URL } from './env';
 
-export const test = base.extend<{ factory: EventFactory; chapter: Chapter }>({
+const stripeJsShim = fs
+  .readFileSync(path.join(__dirname, 'fake-stripe-js.js'), 'utf8')
+  .replace('__FAKE_STRIPE_URL__', FAKE_STRIPE_URL);
+
+export const test = base.extend<{ factory: EventFactory }>({
   factory: async ({}, use) => {
     const factory = new EventFactory();
     await use(factory);
     await factory.cleanup();
   },
-  // Third parties the flow does not need: analytics (keeps test runs out of
-  // the funnel) and the venue map. Stripe stays live — it is what we test.
+  // No request leaves for a third party. Stripe.js is replaced by the shim,
+  // the rest of Stripe's domains, analytics and the venue map are cut off.
+  // Routes match in reverse registration order, so the shim goes last.
   page: async ({ page }, use) => {
+    await page.route('https://*.stripe.com/**', (route) => route.abort());
+    await page.route('https://js.stripe.com/**', (route) =>
+      route.fulfill({
+        contentType: 'application/javascript',
+        body: stripeJsShim,
+      })
+    );
     await page.route('**/ingest/**', (route) => route.abort());
     await page.route('https://*.posthog.com/**', (route) => route.abort());
     await page.route('https://maps.googleapis.com/**', (route) =>
@@ -17,22 +32,6 @@ export const test = base.extend<{ factory: EventFactory; chapter: Chapter }>({
     );
     await use(page);
   },
-  chapter: async ({ page }, use) => {
-    await use(makeChapter(page));
-  },
 });
-
-type Chapter = <T>(title: string, body: () => Promise<T>) => Promise<T>;
-
-// A named step that also stamps a title card into the recording, so the
-// proof video narrates itself.
-function makeChapter(page: Page): Chapter {
-  return (title, body) =>
-    test.step(title, async () => {
-      await page.screencast.showChapter(title, { duration: 1200 });
-      await page.waitForTimeout(1200);
-      return body();
-    });
-}
 
 export { expect } from '@playwright/test';

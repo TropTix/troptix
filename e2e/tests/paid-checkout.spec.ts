@@ -20,52 +20,42 @@ import {
 } from '../lib/db';
 import { getPaymentIntent } from '../lib/stripe';
 
-// The browser needs the publishable key and the server the secret; one
-// without the other fails at beginPayment rather than skipping.
-test.skip(
-  !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
-    !process.env.STRIPE_SECRET_KEY,
-  'Paid checkout needs both Stripe test keys (apps/web/.env locally, repo secrets on CI).'
-);
-
 // 2 × GA at $25.00 + $2.50 fees = $55.00. confirm() resolves in place and the
 // client makes one checkout.finalizePayment call (ADR 0030); no webhook is
-// involved. The URL carries ?reservation= from the payment step on, so a
-// refresh here would resume the same hold.
+// involved. Stripe is the fake server, so "Stripe agrees" checks what the app
+// asked Stripe to charge.
 test('paid checkout charges the card and records the order', async ({
   page,
   factory,
-  chapter,
 }) => {
   const QTY = 2;
   const TOTAL_CENTS = QTY * (GA.priceCents + GA.feesCents);
   const event = await factory.createPaidEvent();
   const ga = event.ticketTypes.ga;
 
-  await chapter('Pick 2 General Admission tickets', async () => {
+  await test.step('Pick 2 General Admission tickets', async () => {
     await openCheckout(page, event.id, /Get Tickets/);
     await addTickets(page, ga.id, QTY);
     await page.getByRole('button', { name: 'Continue' }).click();
   });
 
-  await chapter('Enter buyer details', async () => {
+  await test.step('Enter buyer details', async () => {
     await fillContact(page, BUYER);
     await page.getByRole('button', { name: 'Continue to payment' }).click();
     await expect(page.getByText(/Held for \d+:\d\d/)).toBeVisible();
   });
 
-  await chapter('Pay $55.00 with a test card', async () => {
+  await test.step('Pay $55.00 with a test card', async () => {
     await fillCard(page, CARDS.success);
     await page.getByRole('button', { name: /^Pay \$55\.00/ }).click();
-    await page.waitForURL(/reservation=/, { timeout: 60_000 });
     await expect(page.getByText(/Order confirmed · 2 tickets/)).toBeVisible({
-      timeout: 60_000,
+      timeout: 30_000,
     });
   });
 
   const orderId = await successOrderId(page);
 
-  await chapter('The order, tickets and inventory are recorded', async () => {
+  await test.step('The order, tickets and inventory are recorded', async () => {
     const order = await getOrder(orderId);
     expect(order).not.toBeNull();
     expect(order!.status).toBe('COMPLETED');
@@ -92,7 +82,7 @@ test('paid checkout charges the card and records the order', async ({
     expect(inventory.reserved).toBe(0);
   });
 
-  await chapter('Stripe agrees: the PaymentIntent succeeded', async () => {
+  await test.step('Stripe was asked to charge $55.00 and the PaymentIntent succeeded', async () => {
     const order = await getOrder(orderId);
     const intent = await getPaymentIntent(order!.stripePaymentId!);
     expect(intent.status).toBe('succeeded');
@@ -101,7 +91,7 @@ test('paid checkout charges the card and records the order', async ({
     expect(intent.livemode).toBe(false);
   });
 
-  await chapter('The ticket page opens from the confirmation', async () => {
+  await test.step('The ticket page opens from the confirmation', async () => {
     await page.getByRole('link', { name: /View tickets/ }).click();
     await page.waitForURL(`/orders/${orderId}/tickets`);
     await expect(page.getByText(event.name).first()).toBeVisible();
@@ -111,12 +101,11 @@ test('paid checkout charges the card and records the order', async ({
 test('a declined card shows the error, keeps the hold, and a retry succeeds', async ({
   page,
   factory,
-  chapter,
 }) => {
   const event = await factory.createPaidEvent();
   const ga = event.ticketTypes.ga;
 
-  await chapter('Pick 1 ticket and reach payment', async () => {
+  await test.step('Pick 1 ticket and reach payment', async () => {
     await openCheckout(page, event.id, /Get Tickets/);
     await addTickets(page, ga.id, 1);
     await page.getByRole('button', { name: 'Continue' }).click();
@@ -127,17 +116,15 @@ test('a declined card shows the error, keeps the hold, and a retry succeeds', as
 
   const reservationId = reservationIdFromUrl(page);
 
-  await chapter('Pay with a card that is declined', async () => {
+  await test.step('Pay with a card that is declined', async () => {
     await fillCard(page, CARDS.declined);
     await page.getByRole('button', { name: /^Pay \$27\.50/ }).click();
-    await expect(page.getByText(/declined/i).first()).toBeVisible({
-      timeout: 60_000,
-    });
+    await expect(page.getByText(/declined/i).first()).toBeVisible();
     await expect(checkoutStep(page, 'Payment')).toBeVisible();
     expect(page.url()).toContain(`/e/${event.id}`);
   });
 
-  await chapter('Nothing was sold: no order, hold still in place', async () => {
+  await test.step('Nothing was sold: no order, hold still in place', async () => {
     expect(await countOrdersForEvent(event.id)).toBe(0);
     const reservation = await getReservation(reservationId);
     expect(reservation?.status).toBe('HELD');
@@ -146,14 +133,13 @@ test('a declined card shows the error, keeps the hold, and a retry succeeds', as
     expect(inventory.reserved).toBe(1);
   });
 
-  await chapter('Retry with a good card succeeds', async () => {
+  await test.step('Retry with a good card succeeds', async () => {
     await fillCard(page, CARDS.success);
     const pay = page.getByRole('button', { name: /^Pay \$27\.50/ });
     await expect(pay).toBeEnabled();
     await pay.click();
-    await page.waitForURL(/reservation=/, { timeout: 60_000 });
     await expect(page.getByText(/Order confirmed · 1 ticket/)).toBeVisible({
-      timeout: 60_000,
+      timeout: 30_000,
     });
     const orderId = await successOrderId(page);
     const order = await getOrder(orderId);

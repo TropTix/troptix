@@ -13,20 +13,19 @@ function eventCard(page: Page, name: string) {
 // are always upcoming and always listed.
 test('events load on the discover page and open their event page', async ({
   page,
-  chapter,
 }) => {
-  await chapter('Open the discover page', async () => {
+  await test.step('Open the discover page', async () => {
     await page.goto('/discover');
     await expect(page.getByRole('heading', { name: 'Discover' })).toBeVisible();
   });
 
-  await chapter('Seeded events are listed', async () => {
+  await test.step('Seeded events are listed', async () => {
     await expect(eventCard(page, 'TropTix Demo Festival')).toBeVisible();
     await expect(eventCard(page, 'TropTix Free Community Day')).toBeVisible();
     await expect(eventCard(page, 'TropTix Private Preview')).toHaveCount(0);
   });
 
-  await chapter('An event card opens its page', async () => {
+  await test.step('An event card opens its page', async () => {
     await eventCard(page, 'TropTix Demo Festival').click();
     await page.waitForURL(/\/e\/seed_event_1/);
     await expect(

@@ -41,23 +41,12 @@ export const CARDS = {
   insufficientFunds: '4000 0000 0000 9995',
 };
 
-// The Payment Element lives in a cross-origin Stripe iframe whose inputs
-// appear a moment after the frame itself, so wait on the field, not the frame.
+// The Payment Element is the e2e shim (lib/fake-stripe-js.js): plain inputs,
+// and the card number picks the outcome the way Stripe's test cards do.
 export async function fillCard(page: Page, number: string) {
-  const frame = page.frameLocator('iframe[title="Secure payment input frame"]');
-  const cardNumber = frame.getByRole('textbox', { name: /card number/i });
-  await expect(cardNumber).toBeVisible({ timeout: 45_000 });
-  await cardNumber.fill(number);
-  await frame.getByRole('textbox', { name: /expir/i }).fill('12 / 34');
-  await frame.getByRole('textbox', { name: /security code|cvc/i }).fill('123');
-  // Postal code is optional in the Element and can paint a beat after the
-  // card fields, so wait briefly rather than checking once.
-  const zip = frame.getByRole('textbox', { name: /zip|postal/i });
-  const hasZip = await zip.waitFor({ state: 'visible', timeout: 3_000 }).then(
-    () => true,
-    () => false
-  );
-  if (hasZip) await zip.fill('12345');
+  await page.getByLabel('Card number').fill(number);
+  await page.getByLabel('Expiration').fill('12 / 34');
+  await page.getByLabel('CVC').fill('123');
 }
 
 export function reservationIdFromUrl(page: Page): string {

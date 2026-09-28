@@ -1,13 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 import {
   BASE_URL,
+  FAKE_STRIPE_URL,
   LOCAL_DB_URL,
   PORT,
-  loadWebEnvFile,
   webEnv,
 } from './lib/env';
 
-loadWebEnvFile();
 process.env.E2E_DATABASE_URL ??= LOCAL_DB_URL;
 
 export default defineConfig({
@@ -27,10 +26,8 @@ export default defineConfig({
     baseURL: BASE_URL,
     viewport: { width: 1280, height: 720 },
     trace: 'retain-on-failure',
-    // Every test is recorded: the videos are the proof artifact, stitched
-    // into playwright-report/proof.mp4 by scripts/stitch-proof.ts.
     video: {
-      mode: 'on',
+      mode: 'retain-on-failure',
       size: { width: 1280, height: 720 },
       show: {
         actions: { position: 'bottom-left', fontSize: 18 },
@@ -39,11 +36,18 @@ export default defineConfig({
     },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    command: `pnpm --filter web start -p ${PORT}`,
-    url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-    env: webEnv(),
-  },
+  webServer: [
+    {
+      command: 'tsx scripts/fake-stripe.ts',
+      url: `${FAKE_STRIPE_URL}/health`,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: `pnpm --filter web start -p ${PORT}`,
+      url: BASE_URL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      env: webEnv(),
+    },
+  ],
 });
