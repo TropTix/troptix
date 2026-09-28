@@ -18,8 +18,8 @@ export function PaidTicketingBanner() {
     return (
       <Callout
         icon={<Wallet className="size-5" />}
-        title="Finish payout setup to sell paid tickets"
-        body="Free tickets are on now. Paid tickets turn on once payout setup is done."
+        title="Start selling paid tickets"
+        body="Free tickets are on now. Two quick steps on the Payouts page and paid tickets are on too."
         steps={['Meet with TropTix', 'Connect your bank account']}
         actions={
           <Button asChild>
@@ -36,8 +36,8 @@ export function PaidTicketingBanner() {
   return (
     <Callout
       icon={<CalendarClock className="size-5" />}
-      title="Want to sell paid tickets?"
-      body="Free events are open to you now. To sell paid tickets, schedule a short call with the TropTix team."
+      title="Start selling paid tickets"
+      body="Free tickets are on now. A short call with the TropTix team turns on paid tickets."
       actions={
         <>
           <Button variant="outline" asChild>
