@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
+import type StripePreview from 'stripe-preview';
 import type { Actor } from '../trpc/context';
 import {
   listPayoutOrganizations,
@@ -19,6 +20,7 @@ import {
   StripeAccountRestrictedError,
   UnauthorizedError,
 } from './_shared/errors';
+import type { PayoutClients } from './organizer-connect';
 
 const STAFF: Actor = { kind: 'user', userId: 'staff-1', role: 'PATRON' };
 const OWNER: Actor = { kind: 'user', userId: 'owner-1', role: 'PATRON' };
@@ -52,7 +54,6 @@ interface FakeOpts {
   organizations?: unknown[];
   updatedCount?: number;
   request?: unknown;
-  openSumCents?: number;
 }
 
 function fakePrisma(opts: FakeOpts = {}) {
@@ -64,9 +65,6 @@ function fakePrisma(opts: FakeOpts = {}) {
     .mockResolvedValue({ count: opts.updatedCount ?? 1 });
   const requestFindMany = vi.fn().mockResolvedValue(opts.requests ?? []);
   const requestFindUnique = vi.fn().mockResolvedValue(opts.request ?? null);
-  const requestAggregate = vi
-    .fn()
-    .mockResolvedValue({ _sum: { amountCents: opts.openSumCents ?? null } });
   const orgFindMany = vi.fn().mockResolvedValue(opts.organizations ?? []);
 
   const lock = vi.fn().mockResolvedValue([]);
@@ -79,7 +77,6 @@ function fakePrisma(opts: FakeOpts = {}) {
     payoutRequest: {
       findMany: requestFindMany,
       findUnique: requestFindUnique,
-      aggregate: requestAggregate,
       updateMany: requestUpdateMany,
     },
     organization: { findMany: orgFindMany, updateMany: orgUpdateMany },
@@ -90,7 +87,6 @@ function fakePrisma(opts: FakeOpts = {}) {
   return {
     prisma,
     requestUpdateMany,
-    requestAggregate,
     orgUpdateMany,
     orgFindMany,
     lock,
@@ -116,11 +112,26 @@ function stripeError(code: string) {
   return Object.assign(new Error(code), { code });
 }
 
+interface FakePayment {
+  id: string;
+  status: string;
+  metadata?: Record<string, string>;
+}
+
+interface FakeMethod {
+  id: string;
+  type?: string;
+  restricted?: boolean;
+  archived?: boolean;
+  payments?: string;
+}
+
 function fakeStripe(
   opts: {
     existing?: FakeTransfer[];
     all?: FakeTransfer[];
     createError?: unknown;
+    fundError?: unknown;
     availableUsd?: number;
   } = {}
 ) {
@@ -137,11 +148,77 @@ function fakeStripe(
       { amount: 999, currency: 'jmd' },
     ],
   }));
+  const fund = vi.fn(async (params: unknown, options: unknown) => {
+    if (opts.fundError) throw opts.fundError;
+    return { id: 'po_fund', params, options };
+  });
   const stripe = {
     transfers: { create, list },
     balance: { retrieve },
+    payouts: { create: fund },
   } as unknown as Stripe;
-  return { stripe, create, list, retrieve };
+  return { stripe, create, list, retrieve, fund };
+}
+
+function fakeGlobal(
+  opts: {
+    payments?: FakePayment[];
+    methods?: FakeMethod[];
+    faAvailableUsd?: number;
+    createError?: unknown;
+  } = {}
+) {
+  const paymentsList = vi.fn(() => listResult(opts.payments ?? []));
+  const paymentsCreate = vi.fn(async (params: unknown, options: unknown) => {
+    if (opts.createError) throw opts.createError;
+    return { id: 'obp_new', status: 'processing', params, options };
+  });
+  const methodsList = vi.fn((_params: unknown, _options: unknown) =>
+    listResult(
+      (opts.methods ?? [{ id: 'jmba_1' }]).map((method) => ({
+        id: method.id,
+        type: method.type ?? 'bank_account',
+        restricted: method.restricted ?? false,
+        bank_account: { archived: method.archived ?? false },
+        usage_status: { payments: method.payments ?? 'eligible' },
+      }))
+    )
+  );
+  const faRetrieve = vi.fn(async () => ({
+    id: 'fa_1',
+    balance: {
+      available:
+        opts.faAvailableUsd === undefined
+          ? {}
+          : { usd: { value: opts.faAvailableUsd, currency: 'usd' } },
+    },
+  }));
+  const global = {
+    v2: {
+      moneyManagement: {
+        outboundPayments: { list: paymentsList, create: paymentsCreate },
+        payoutMethods: { list: methodsList },
+        financialAccounts: { retrieve: faRetrieve },
+      },
+    },
+  } as unknown as StripePreview;
+  return { global, paymentsList, paymentsCreate, methodsList, faRetrieve };
+}
+
+/** `financialAccountId: null` means the send rail is not configured. */
+function clientsOf(
+  stripe: Stripe,
+  global: StripePreview = fakeGlobal().global,
+  opts: { financialAccountId?: string | null } = {}
+): PayoutClients {
+  return {
+    connect: stripe,
+    global,
+    financialAccountId:
+      opts.financialAccountId === null
+        ? undefined
+        : (opts.financialAccountId ?? 'fa_1'),
+  };
 }
 
 const OPEN_REQUEST = {
@@ -251,13 +328,13 @@ describe('sendPayoutViaStripe', () => {
 
     const result = await sendPayoutViaStripe(
       prisma,
-      stripe,
+      clientsOf(stripe),
       STAFF,
       { id: 'req-1' },
       NOW
     );
 
-    expect(result).toEqual({ transferId: 'tr_new' });
+    expect(result).toEqual({ reference: 'tr_new' });
     expect(lock).toHaveBeenCalledTimes(1);
     expect(list).toHaveBeenCalledWith({
       transfer_group: 'payout-request-req-1',
@@ -291,11 +368,11 @@ describe('sendPayoutViaStripe', () => {
     const { prisma, requestUpdateMany } = fakePrisma({ request: OPEN_REQUEST });
     const { stripe, create } = fakeStripe({ existing: [{ id: 'tr_old' }] });
 
-    const result = await sendPayoutViaStripe(prisma, stripe, STAFF, {
+    const result = await sendPayoutViaStripe(prisma, clientsOf(stripe), STAFF, {
       id: 'req-1',
     });
 
-    expect(result.transferId).toBe('tr_old');
+    expect(result.reference).toBe('tr_old');
     expect(create).not.toHaveBeenCalled();
     expect(requestUpdateMany.mock.calls[0][0].data.reference).toBe('tr_old');
   });
@@ -306,19 +383,23 @@ describe('sendPayoutViaStripe', () => {
       existing: [{ id: 'tr_reversed', reversed: true }],
     });
 
-    const result = await sendPayoutViaStripe(prisma, stripe, STAFF, {
+    const result = await sendPayoutViaStripe(prisma, clientsOf(stripe), STAFF, {
       id: 'req-1',
     });
 
-    expect(result.transferId).toBe('tr_new');
+    expect(result.reference).toBe('tr_new');
     expect(create).toHaveBeenCalledTimes(1);
   });
 
   it('uses a different idempotency key on each attempt so a cached failure is not replayed', async () => {
     const { prisma } = fakePrisma({ request: OPEN_REQUEST });
     const { stripe, create } = fakeStripe();
-    await sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' });
-    await sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' });
+    await sendPayoutViaStripe(prisma, clientsOf(stripe), STAFF, {
+      id: 'req-1',
+    });
+    await sendPayoutViaStripe(prisma, clientsOf(stripe), STAFF, {
+      id: 'req-1',
+    });
     const keys = create.mock.calls.map(
       (call) => (call[1] as { idempotencyKey: string }).idempotencyKey
     );
@@ -332,7 +413,7 @@ describe('sendPayoutViaStripe', () => {
       availableUsd: 10000,
     });
 
-    const error = await sendPayoutViaStripe(prisma, stripe, STAFF, {
+    const error = await sendPayoutViaStripe(prisma, clientsOf(stripe), STAFF, {
       id: 'req-1',
     }).catch((e: unknown) => e);
 
@@ -351,7 +432,7 @@ describe('sendPayoutViaStripe', () => {
     const { prisma } = fakePrisma({ request: OPEN_REQUEST });
     const { stripe } = fakeStripe({ createError: stripeError(code) });
     await expect(
-      sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' })
+      sendPayoutViaStripe(prisma, clientsOf(stripe), STAFF, { id: 'req-1' })
     ).rejects.toThrow(StripeAccountRestrictedError);
   });
 
@@ -368,30 +449,11 @@ describe('sendPayoutViaStripe', () => {
         },
       });
       await expect(
-        sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' })
+        sendPayoutViaStripe(prisma, clientsOf(stripe), STAFF, { id: 'req-1' })
       ).rejects.toThrow(ConflictError);
     }
     expect(list).not.toHaveBeenCalled();
     expect(create).not.toHaveBeenCalled();
-  });
-
-  it('refuses a Global Payouts recipient until its send rail exists', async () => {
-    const { stripe, create, list } = fakeStripe();
-    const { prisma, requestUpdateMany } = fakePrisma({
-      request: {
-        ...OPEN_REQUEST,
-        organization: {
-          ...OPEN_REQUEST.organization,
-          stripeAccountKind: 'GLOBAL_PAYOUTS',
-        },
-      },
-    });
-    await expect(
-      sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' })
-    ).rejects.toThrow(ConflictError);
-    expect(list).not.toHaveBeenCalled();
-    expect(create).not.toHaveBeenCalled();
-    expect(requestUpdateMany).not.toHaveBeenCalled();
   });
 
   it('rethrows any other Stripe failure untouched', async () => {
@@ -399,7 +461,7 @@ describe('sendPayoutViaStripe', () => {
     const boom = stripeError('api_connection_error');
     const { stripe } = fakeStripe({ createError: boom });
     await expect(
-      sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' })
+      sendPayoutViaStripe(prisma, clientsOf(stripe), STAFF, { id: 'req-1' })
     ).rejects.toBe(boom);
   });
 
@@ -407,7 +469,7 @@ describe('sendPayoutViaStripe', () => {
     const { prisma } = fakePrisma({ request: OPEN_REQUEST, updatedCount: 0 });
     const { stripe } = fakeStripe();
     await expect(
-      sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' })
+      sendPayoutViaStripe(prisma, clientsOf(stripe), STAFF, { id: 'req-1' })
     ).rejects.toThrow(/tr_new/);
   });
 
@@ -418,7 +480,9 @@ describe('sendPayoutViaStripe', () => {
       request: { ...OPEN_REQUEST, status: 'PAID' },
     });
     await expect(
-      sendPayoutViaStripe(resolved.prisma, stripe, STAFF, { id: 'req-1' })
+      sendPayoutViaStripe(resolved.prisma, clientsOf(stripe), STAFF, {
+        id: 'req-1',
+      })
     ).rejects.toThrow(ConflictError);
 
     const manual = fakePrisma({
@@ -428,31 +492,330 @@ describe('sendPayoutViaStripe', () => {
       },
     });
     await expect(
-      sendPayoutViaStripe(manual.prisma, stripe, STAFF, { id: 'req-1' })
+      sendPayoutViaStripe(manual.prisma, clientsOf(stripe), STAFF, {
+        id: 'req-1',
+      })
     ).rejects.toThrow(ConflictError);
 
     const missing = fakePrisma();
     await expect(
-      sendPayoutViaStripe(missing.prisma, stripe, STAFF, { id: 'req-1' })
+      sendPayoutViaStripe(missing.prisma, clientsOf(stripe), STAFF, {
+        id: 'req-1',
+      })
     ).rejects.toThrow(NotFoundError);
 
     const owner = fakePrisma({ platformOwner: false, request: OPEN_REQUEST });
     await expect(
-      sendPayoutViaStripe(owner.prisma, stripe, OWNER, { id: 'req-1' })
+      sendPayoutViaStripe(owner.prisma, clientsOf(stripe), OWNER, {
+        id: 'req-1',
+      })
     ).rejects.toThrow(UnauthorizedError);
 
     expect(create).not.toHaveBeenCalled();
   });
 });
 
+describe('sendPayoutViaStripe — Global Payouts', () => {
+  const NOW = new Date('2026-09-27T12:00:00Z');
+  const GP_REQUEST = {
+    ...OPEN_REQUEST,
+    createdAt: new Date('2026-09-20T00:00:00Z'),
+    organization: {
+      ...OPEN_REQUEST.organization,
+      stripeAccountId: 'acct_jm',
+      stripeAccountKind: 'GLOBAL_PAYOUTS',
+    },
+  };
+
+  it('names the payout method, tops the financial account up with headroom, creates the payment with the request key, then resolves', async () => {
+    const { prisma, requestUpdateMany } = fakePrisma({ request: GP_REQUEST });
+    const {
+      stripe,
+      fund,
+      create: transfer,
+    } = fakeStripe({ availableUsd: 100000 });
+    const { global, paymentsCreate, methodsList, paymentsList } = fakeGlobal({
+      faAvailableUsd: 1000,
+    });
+
+    const result = await sendPayoutViaStripe(
+      prisma,
+      clientsOf(stripe, global),
+      STAFF,
+      { id: 'req-1' },
+      NOW
+    );
+
+    expect(result).toEqual({ reference: 'obp_new' });
+    expect(transfer).not.toHaveBeenCalled();
+    expect(paymentsList).toHaveBeenCalledWith({
+      recipient: 'acct_jm',
+      created_gte: '2026-09-20T00:00:00.000Z',
+      limit: 100,
+    });
+    expect(methodsList.mock.calls[0][1]).toEqual({ stripeContext: 'acct_jm' });
+    // 25000 + ceil(25000 * 2.25%) + 150 = 25713 needed, 1000 there.
+    expect(fund).toHaveBeenCalledTimes(1);
+    expect(fund.mock.calls[0][0]).toEqual({
+      amount: 24713,
+      currency: 'usd',
+      payout_method: 'fa_1',
+      description: 'TropTix payout — island-nights — req-1',
+      metadata: { payoutRequestId: 'req-1' },
+    });
+    expect(paymentsCreate.mock.calls[0][0]).toEqual({
+      from: { financial_account: 'fa_1', currency: 'usd' },
+      to: { recipient: 'acct_jm', payout_method: 'jmba_1' },
+      amount: { value: 25000, currency: 'usd' },
+      description: 'TropTix payout — island-nights — req-1',
+      metadata: { payoutRequestId: 'req-1', organizationId: 'org-1' },
+    });
+    expect(paymentsCreate.mock.calls[0][1]).toEqual({
+      idempotencyKey: 'global-payout-req-1-0',
+    });
+    expect(requestUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'req-1', status: 'REQUESTED' },
+      data: {
+        status: 'PAID',
+        rail: 'STRIPE',
+        reference: 'obp_new',
+        resolvedAt: NOW,
+        resolvedByUserId: 'staff-1',
+      },
+    });
+  });
+
+  it('skips the top-up when the financial account already covers amount plus headroom', async () => {
+    const { prisma } = fakePrisma({ request: GP_REQUEST });
+    const { stripe, fund } = fakeStripe();
+    const { global, paymentsCreate } = fakeGlobal({ faAvailableUsd: 25713 });
+    await sendPayoutViaStripe(prisma, clientsOf(stripe, global), STAFF, {
+      id: 'req-1',
+    });
+    expect(fund).not.toHaveBeenCalled();
+    expect(paymentsCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses a live payment for the request and ignores one that failed or came back', async () => {
+    const { prisma, requestUpdateMany } = fakePrisma({ request: GP_REQUEST });
+    const { stripe, fund } = fakeStripe();
+    const { global, paymentsCreate } = fakeGlobal({
+      payments: [
+        {
+          id: 'obp_other',
+          status: 'posted',
+          metadata: { payoutRequestId: 'x' },
+        },
+        {
+          id: 'obp_returned',
+          status: 'returned',
+          metadata: { payoutRequestId: 'req-1' },
+        },
+        {
+          id: 'obp_live',
+          status: 'processing',
+          metadata: { payoutRequestId: 'req-1' },
+        },
+      ],
+    });
+
+    const result = await sendPayoutViaStripe(
+      prisma,
+      clientsOf(stripe, global),
+      STAFF,
+      { id: 'req-1' }
+    );
+
+    expect(result.reference).toBe('obp_live');
+    expect(fund).not.toHaveBeenCalled();
+    expect(paymentsCreate).not.toHaveBeenCalled();
+    expect(requestUpdateMany.mock.calls[0][0].data.reference).toBe('obp_live');
+  });
+
+  it('salts the key by the payments that came back, so a resend is not handed the dead one', async () => {
+    const { prisma } = fakePrisma({ request: GP_REQUEST });
+    const { stripe } = fakeStripe();
+    const { global, paymentsCreate } = fakeGlobal({
+      faAvailableUsd: 100000,
+      payments: [
+        {
+          id: 'obp_returned',
+          status: 'returned',
+          metadata: { payoutRequestId: 'req-1' },
+        },
+        {
+          id: 'obp_failed',
+          status: 'failed',
+          metadata: { payoutRequestId: 'req-1' },
+        },
+      ],
+    });
+    const result = await sendPayoutViaStripe(
+      prisma,
+      clientsOf(stripe, global),
+      STAFF,
+      { id: 'req-1' }
+    );
+    expect(result.reference).toBe('obp_new');
+    expect(paymentsCreate.mock.calls[0][1]).toEqual({
+      idempotencyKey: 'global-payout-req-1-2',
+    });
+  });
+
+  it('refuses to resolve against a payment Stripe hands back in a dead state', async () => {
+    const { prisma, requestUpdateMany } = fakePrisma({ request: GP_REQUEST });
+    const { stripe } = fakeStripe();
+    const { global, paymentsCreate } = fakeGlobal({ faAvailableUsd: 100000 });
+    paymentsCreate.mockResolvedValueOnce({
+      id: 'obp_dead',
+      status: 'returned',
+    } as never);
+    await expect(
+      sendPayoutViaStripe(prisma, clientsOf(stripe, global), STAFF, {
+        id: 'req-1',
+      })
+    ).rejects.toThrow(ConflictError);
+    expect(requestUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('skips a restricted, archived, or ineligible payout method and refuses when none is usable', async () => {
+    const { prisma } = fakePrisma({ request: GP_REQUEST });
+    const { stripe } = fakeStripe();
+    const picked = fakeGlobal({
+      faAvailableUsd: 100000,
+      methods: [
+        { id: 'jmba_restricted', restricted: true },
+        { id: 'jmba_archived', archived: true },
+        { id: 'jmba_disabled', payments: 'disabled' },
+        { id: 'card_1', type: 'card' },
+        { id: 'jmba_ok' },
+      ],
+    });
+    await sendPayoutViaStripe(prisma, clientsOf(stripe, picked.global), STAFF, {
+      id: 'req-1',
+    });
+    expect(picked.paymentsCreate.mock.calls[0][0]).toMatchObject({
+      to: { payout_method: 'jmba_ok' },
+    });
+
+    const none = fakeGlobal({
+      methods: [{ id: 'jmba_restricted', restricted: true }],
+    });
+    const { prisma: prisma2, requestUpdateMany } = fakePrisma({
+      request: GP_REQUEST,
+    });
+    await expect(
+      sendPayoutViaStripe(prisma2, clientsOf(stripe, none.global), STAFF, {
+        id: 'req-1',
+      })
+    ).rejects.toThrow(StripeAccountRestrictedError);
+    expect(none.paymentsCreate).not.toHaveBeenCalled();
+    expect(requestUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('maps a short payments balance on the top-up to the insufficient-balance error', async () => {
+    const { prisma, requestUpdateMany } = fakePrisma({ request: GP_REQUEST });
+    const { stripe } = fakeStripe({
+      fundError: stripeError('balance_insufficient'),
+      availableUsd: 10000,
+    });
+    const { global, paymentsCreate } = fakeGlobal({ faAvailableUsd: 0 });
+
+    const error = await sendPayoutViaStripe(
+      prisma,
+      clientsOf(stripe, global),
+      STAFF,
+      { id: 'req-1' }
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(InsufficientPlatformBalanceError);
+    expect((error as InsufficientPlatformBalanceError).shortfallCents).toBe(
+      15713
+    );
+    expect(paymentsCreate).not.toHaveBeenCalled();
+    expect(requestUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['insufficient_funds', ConflictError],
+    ['outbound_payment_cannot_be_processed', ConflictError],
+    ['recipient_amount_limit_exceeded', ConflictError],
+    ['recipient_feature_not_active', StripeAccountRestrictedError],
+    ['payout_method_disabled', StripeAccountRestrictedError],
+    ['account_not_configured_as_recipient', StripeAccountRestrictedError],
+  ])('maps %s on the payment create', async (code, errorClass) => {
+    const { prisma, requestUpdateMany } = fakePrisma({ request: GP_REQUEST });
+    const { stripe } = fakeStripe();
+    const { global } = fakeGlobal({
+      faAvailableUsd: 100000,
+      createError: stripeError(code),
+    });
+    await expect(
+      sendPayoutViaStripe(prisma, clientsOf(stripe, global), STAFF, {
+        id: 'req-1',
+      })
+    ).rejects.toThrow(errorClass);
+    expect(requestUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('reads the v2 error type when no code is set', async () => {
+    const { prisma } = fakePrisma({ request: GP_REQUEST });
+    const { stripe } = fakeStripe();
+    const { global } = fakeGlobal({
+      faAvailableUsd: 100000,
+      createError: Object.assign(new Error('short'), {
+        rawType: 'insufficient_funds',
+      }),
+    });
+    await expect(
+      sendPayoutViaStripe(prisma, clientsOf(stripe, global), STAFF, {
+        id: 'req-1',
+      })
+    ).rejects.toThrow(ConflictError);
+  });
+
+  it('refuses without a financial account before touching Stripe', async () => {
+    const { prisma } = fakePrisma({ request: GP_REQUEST });
+    const { stripe } = fakeStripe();
+    const { global, paymentsList } = fakeGlobal();
+    await expect(
+      sendPayoutViaStripe(
+        prisma,
+        clientsOf(stripe, global, { financialAccountId: null }),
+        STAFF,
+        {
+          id: 'req-1',
+        }
+      )
+    ).rejects.toThrow(ConflictError);
+    expect(paymentsList).not.toHaveBeenCalled();
+  });
+});
+
 describe('readPlatformPayoutBalance', () => {
+  const openRows = (
+    rows: Array<{ amountCents: number; kind?: string | null }>
+  ) =>
+    rows.map((row) => ({
+      amountCents: row.amountCents,
+      organization: { stripeAccountKind: row.kind ?? 'CONNECT' },
+    }));
+
   it('sums the USD available balance against open Stripe-rail requests only', async () => {
-    const { prisma, requestAggregate } = fakePrisma({ openSumCents: 30000 });
+    const { prisma } = fakePrisma({
+      requests: openRows([{ amountCents: 30000 }]),
+    });
     const { stripe } = fakeStripe({ availableUsd: 12345 });
     await expect(
-      readPlatformPayoutBalance(prisma, stripe, STAFF)
+      readPlatformPayoutBalance(
+        prisma,
+        clientsOf(stripe, fakeGlobal().global, { financialAccountId: null }),
+        STAFF
+      )
     ).resolves.toEqual({ availableCents: 12345, openRequestsCents: 30000 });
-    expect(requestAggregate.mock.calls[0][0].where).toEqual({
+    const where = (prisma.payoutRequest.findMany as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0].where;
+    expect(where).toEqual({
       status: 'REQUESTED',
       organization: {
         stripeAccountId: { not: null },
@@ -464,8 +827,35 @@ describe('readPlatformPayoutBalance', () => {
   it('reads zero open requests as zero', async () => {
     const { prisma } = fakePrisma();
     const { stripe } = fakeStripe();
-    const result = await readPlatformPayoutBalance(prisma, stripe, STAFF);
+    const result = await readPlatformPayoutBalance(
+      prisma,
+      clientsOf(stripe),
+      STAFF
+    );
     expect(result.openRequestsCents).toBe(0);
+  });
+
+  it('adds the financial account when one is configured, and fee headroom for recipient-rail requests', async () => {
+    const { prisma } = fakePrisma({
+      requests: openRows([
+        { amountCents: 10000 },
+        { amountCents: 10000, kind: 'GLOBAL_PAYOUTS' },
+      ]),
+    });
+    const { stripe } = fakeStripe({ availableUsd: 1000 });
+    const { global, faRetrieve } = fakeGlobal({ faAvailableUsd: 250 });
+    // 10000 + 10000 + ceil(10000 * 2.25%) + 150
+    await expect(
+      readPlatformPayoutBalance(prisma, clientsOf(stripe, global), STAFF)
+    ).resolves.toEqual({ availableCents: 1250, openRequestsCents: 20375 });
+    await expect(
+      readPlatformPayoutBalance(
+        prisma,
+        clientsOf(stripe, global, { financialAccountId: null }),
+        STAFF
+      )
+    ).resolves.toMatchObject({ availableCents: 1000 });
+    expect(faRetrieve).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -501,46 +891,50 @@ describe('reconcileStripePayouts', () => {
     const { prisma } = fakePrisma({ requests: rows });
     const { stripe, list } = fakeStripe({ all: transfers });
 
-    const result = await reconcileStripePayouts(prisma, stripe, {
-      now: NOW,
-      windowDays: 35,
-    });
+    const result = await reconcileStripePayouts(
+      prisma,
+      clientsOf(stripe, fakeGlobal().global, { financialAccountId: null }),
+      {
+        now: NOW,
+        windowDays: 35,
+      }
+    );
 
     expect(result).toEqual([
       {
         requestId: 'open-sent',
         kind: 'requested_with_transfer',
-        transferIds: ['tr_a'],
+        stripeIds: ['tr_a'],
       },
       {
         requestId: 'paid-missing',
         kind: 'paid_without_transfer',
-        transferIds: [],
+        stripeIds: [],
       },
       {
         requestId: 'paid-twice',
         kind: 'duplicate_transfer',
-        transferIds: ['tr_c', 'tr_d'],
+        stripeIds: ['tr_c', 'tr_d'],
       },
       {
         requestId: 'paid-reversed-only',
         kind: 'paid_without_transfer',
-        transferIds: [],
+        stripeIds: [],
       },
       {
         requestId: 'cancelled-sent',
         kind: 'closed_with_transfer',
-        transferIds: ['tr_g'],
+        stripeIds: ['tr_g'],
       },
       {
         requestId: 'paid-mercury-sent',
         kind: 'closed_with_transfer',
-        transferIds: ['tr_h'],
+        stripeIds: ['tr_h'],
       },
       {
         requestId: 'deleted-row',
         kind: 'transfer_without_request',
-        transferIds: ['tr_i'],
+        stripeIds: ['tr_i'],
       },
     ]);
     expect(list).toHaveBeenCalledWith({
@@ -557,8 +951,91 @@ describe('reconcileStripePayouts', () => {
       all: [{ id: 'tr_b', metadata: { payoutRequestId: 'paid-clean' } }],
     });
     await expect(
-      reconcileStripePayouts(prisma, stripe, { now: NOW })
+      reconcileStripePayouts(
+        prisma,
+        clientsOf(stripe, fakeGlobal().global, { financialAccountId: null }),
+        { now: NOW }
+      )
     ).resolves.toEqual([]);
+  });
+
+  it('sweeps outbound payments too, flagging a paid row whose payment failed or came back', async () => {
+    const { prisma } = fakePrisma({
+      requests: [
+        { id: 'paid-obp', status: 'PAID', rail: 'STRIPE' },
+        { id: 'paid-returned', status: 'PAID', rail: 'STRIPE' },
+        { id: 'paid-resent', status: 'PAID', rail: 'STRIPE' },
+        { id: 'open-obp', status: 'REQUESTED', rail: null },
+      ],
+    });
+    const { stripe } = fakeStripe({ all: [] });
+    const { global, paymentsList } = fakeGlobal({
+      payments: [
+        {
+          id: 'obp_a',
+          status: 'posted',
+          metadata: { payoutRequestId: 'paid-obp' },
+        },
+        {
+          id: 'obp_b',
+          status: 'returned',
+          metadata: { payoutRequestId: 'paid-returned' },
+        },
+        {
+          id: 'obp_c',
+          status: 'failed',
+          metadata: { payoutRequestId: 'paid-resent' },
+        },
+        {
+          id: 'obp_d',
+          status: 'processing',
+          metadata: { payoutRequestId: 'paid-resent' },
+        },
+        {
+          id: 'obp_e',
+          status: 'processing',
+          metadata: { payoutRequestId: 'open-obp' },
+        },
+        { id: 'obp_f', status: 'posted', metadata: {} },
+      ],
+    });
+
+    const result = await reconcileStripePayouts(
+      prisma,
+      clientsOf(stripe, global),
+      { now: NOW, windowDays: 35 }
+    );
+
+    expect(result).toEqual([
+      {
+        requestId: 'paid-returned',
+        kind: 'payment_returned',
+        stripeIds: ['obp_b'],
+      },
+      {
+        requestId: 'open-obp',
+        kind: 'requested_with_transfer',
+        stripeIds: ['obp_e'],
+      },
+    ]);
+    expect(paymentsList).toHaveBeenCalledWith({
+      created_gte: new Date(NOW.getTime() - 35 * 86_400_000).toISOString(),
+      limit: 100,
+    });
+  });
+
+  it('leaves outbound payments alone when no financial account is configured', async () => {
+    const { prisma } = fakePrisma();
+    const { stripe } = fakeStripe();
+    const { global, paymentsList } = fakeGlobal();
+    await reconcileStripePayouts(
+      prisma,
+      clientsOf(stripe, global, { financialAccountId: null }),
+      {
+        now: NOW,
+      }
+    );
+    expect(paymentsList).not.toHaveBeenCalled();
   });
 
   it('asks the database for the rows the transfers point at', async () => {
@@ -566,7 +1043,11 @@ describe('reconcileStripePayouts', () => {
     const { stripe } = fakeStripe({
       all: [{ id: 'tr_z', metadata: { payoutRequestId: 'some-row' } }],
     });
-    await reconcileStripePayouts(prisma, stripe, { now: NOW });
+    await reconcileStripePayouts(
+      prisma,
+      clientsOf(stripe, fakeGlobal().global, { financialAccountId: null }),
+      { now: NOW }
+    );
     const where = (prisma.payoutRequest.findMany as ReturnType<typeof vi.fn>)
       .mock.calls[0][0].where;
     expect(where.OR[2]).toEqual({ id: { in: ['some-row'] } });

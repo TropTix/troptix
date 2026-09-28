@@ -16,14 +16,14 @@ import { cn } from '@/lib/utils';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import prisma from '@/server/prisma';
-import { stripe } from '@/server/lib/stripe';
+import { payoutClients } from '@/server/lib/stripePayouts';
 import { PayoutSetupPanel } from './_components/PayoutSetupPanel';
 import { PlatformRequestsTable } from './_components/PlatformRequestsTable';
 
-// Walks every transfer in the window, so a few minutes stale beats a Stripe
-// round-trip per page view. The cron runs the same check daily.
+// Walks every transfer and outbound payment in the window, so a few minutes
+// stale beats two Stripe round-trips per page view. The cron runs the same check daily.
 const reconcileCached = unstable_cache(
-  () => reconcileStripePayouts(prisma, stripe),
+  () => reconcileStripePayouts(prisma, payoutClients),
   ['payout-reconciliation'],
   { revalidate: 300 }
 );
@@ -46,7 +46,7 @@ export default async function PlatformPayoutsPage() {
   const [requests, organizations, balance, mismatchList] = await Promise.all([
     listPayoutRequests(prisma, actor),
     listPayoutOrganizations(prisma, actor),
-    readPlatformPayoutBalance(prisma, stripe, actor).catch(unavailable),
+    readPlatformPayoutBalance(prisma, payoutClients, actor).catch(unavailable),
     reconcileCached().catch(unavailable),
   ]);
   const connectStates = getConnectStates(organizations);

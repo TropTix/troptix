@@ -6,3 +6,4 @@ export type { AppRouter } from './trpc/routers';
 // Fee math is a pure module (no imports, no DB) — the one service export that
 // is safe on this entry.
 export { calculateFeesCents, FeeConfig } from './services/_shared/fees';
+export { globalPayoutFeeHeadroomCents } from './services/_shared/payouts';

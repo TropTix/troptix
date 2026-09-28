@@ -33,6 +33,8 @@ import { resolveOrganizerScope } from './organizer-scope';
 export interface PayoutClients {
   connect: Stripe;
   global: StripePreview;
+  /** The financial account outbound payments draw on; unset until Treasury is active. */
+  financialAccountId?: string;
 }
 
 const ORG_SELECT = {
