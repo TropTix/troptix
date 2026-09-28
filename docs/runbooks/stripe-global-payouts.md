@@ -81,9 +81,10 @@ before reviewing PR 1 and again after any bump of the preview SDK.
    account from the payments balance if it is short, creates the outbound
    payment, and marks the row paid with the payment id (`obp_…`) as its
    reference. **Pay another way** opens the manual cockpit.
-2. The idempotency key is the request's (`global-payout-<id>`): v2 keys live
-   30 days and a retry re-executes a failure, so a retry after any error is
-   safe. Past that, the send lists the recipient's payments since the request
+2. The idempotency key is the request's, salted by the number of its
+   payments that failed or came back (`global-payout-<id>-<n>`): v2 keys
+   live 30 days and a retry re-executes a failure, so a retry after any
+   error is safe, and a resend after a returned payment gets a new one. Past that, the send lists the recipient's payments since the request
    and reuses a live one it finds. A failed, canceled or returned payment is
    never reused.
 3. Failures leave the row open and say why: the payments balance is short

@@ -68,7 +68,12 @@ export async function listPayoutRequests(
 }
 
 const transferGroupFor = (requestId: string) => `payout-request-${requestId}`;
-const globalPayoutKeyFor = (requestId: string) => `global-payout-${requestId}`;
+/**
+ * v2 replays a request that succeeded, so once a payment has come back the
+ * key must change or the resend would be handed the dead payment (ADR 0034).
+ */
+const globalPayoutKeyFor = (requestId: string, deadCount: number) =>
+  `global-payout-${requestId}-${deadCount}`;
 
 const RESTRICTED_CODES = new Set([
   'account_invalid',
@@ -77,11 +82,29 @@ const RESTRICTED_CODES = new Set([
   'transfers_not_allowed',
 ]);
 
-/** OutboundPayment create errors that mean the recipient, not the money, is the problem. */
+/**
+ * OutboundPayment create codes that mean the recipient's bank details, not
+ * the money, are the problem; the organizer fixes them through Stripe.
+ * From the create endpoint's error table (2026-09-27).
+ */
 const RECIPIENT_NOT_READY_CODES = new Set([
   'account_not_configured_as_recipient',
   'outbound_payment_not_allowed',
+  'payout_method_archived',
+  'payout_method_disabled',
+  'payout_method_expired',
+  'payout_method_invalid',
+  'payout_method_unsupported_currency',
+  'payout_method_unusable',
+  'recipient_feature_not_active',
+  'recipient_feature_not_active_for_suitable_delivery_option',
   'to_recipient_not_found',
+]);
+
+/** Stripe-side velocity limits on the recipient: nothing for the organizer to fix. */
+const RECIPIENT_LIMIT_CODES = new Set([
+  'recipient_amount_limit_exceeded',
+  'recipient_count_limit_exceeded',
 ]);
 
 /** A payment in one of these states paid nobody; it is neither reused nor counted live. */
@@ -266,6 +289,7 @@ async function findOrCreateOutboundPayment(
     );
   }
 
+  let deadCount = 0;
   for await (const payment of clients.global.v2.moneyManagement.outboundPayments.list(
     {
       recipient: send.destination,
@@ -273,19 +297,17 @@ async function findOrCreateOutboundPayment(
       limit: 100,
     }
   )) {
-    if (
-      payment.metadata?.payoutRequestId === send.id &&
-      !DEAD_PAYMENT_STATUSES.has(payment.status)
-    ) {
-      return payment;
-    }
+    if (payment.metadata?.payoutRequestId !== send.id) continue;
+    if (DEAD_PAYMENT_STATUSES.has(payment.status)) deadCount += 1;
+    else return payment;
   }
 
   const payoutMethod = await pickPayoutMethod(clients.global, send.destination);
   await fundFinancialAccount(clients, financialAccountId, send);
 
+  let payment;
   try {
-    return await clients.global.v2.moneyManagement.outboundPayments.create(
+    payment = await clients.global.v2.moneyManagement.outboundPayments.create(
       {
         from: { financial_account: financialAccountId, currency: 'usd' },
         to: { recipient: send.destination, payout_method: payoutMethod },
@@ -296,11 +318,17 @@ async function findOrCreateOutboundPayment(
           organizationId: send.organizationId,
         },
       },
-      { idempotencyKey: globalPayoutKeyFor(send.id) }
+      { idempotencyKey: globalPayoutKeyFor(send.id, deadCount) }
     );
   } catch (error) {
     throw mapOutboundPaymentError(error);
   }
+  if (DEAD_PAYMENT_STATUSES.has(payment.status)) {
+    throw new ConflictError(
+      `Stripe returned ${payment.id}, which is ${payment.status}; retry to create a new payment`
+    );
+  }
+  return payment;
 }
 
 async function pickPayoutMethod(
@@ -354,7 +382,7 @@ async function fundFinancialAccount(
         description: descriptionFor(send),
         metadata: { payoutRequestId: send.id },
       },
-      { idempotencyKey: `${globalPayoutKeyFor(send.id)}-fund-${randomUUID()}` }
+      { idempotencyKey: `global-payout-${send.id}-fund-${randomUUID()}` }
     );
   } catch (error) {
     throw await mapTransferError(clients.connect, error, topUp);
@@ -373,11 +401,12 @@ function mapOutboundPaymentError(error: unknown): unknown {
   if (reason === 'outbound_payment_cannot_be_processed') {
     return new ConflictError('Stripe declined this payout in review');
   }
-  if (
-    RECIPIENT_NOT_READY_CODES.has(reason) ||
-    reason.startsWith('recipient_') ||
-    reason.startsWith('payout_method_')
-  ) {
+  if (RECIPIENT_LIMIT_CODES.has(reason)) {
+    return new ConflictError(
+      "This recipient has hit Stripe's payout limit for now; try again later"
+    );
+  }
+  if (RECIPIENT_NOT_READY_CODES.has(reason)) {
     return new StripeAccountRestrictedError();
   }
   return error;
@@ -415,7 +444,7 @@ export async function readPlatformPayoutBalance(
   const [platformCents, financialAccountCents, open] = await Promise.all([
     availableUsdCents(clients.connect),
     financialAccountUsdCents(clients),
-    prisma.payoutRequest.aggregate({
+    prisma.payoutRequest.findMany({
       where: {
         status: 'REQUESTED',
         organization: {
@@ -423,12 +452,25 @@ export async function readPlatformPayoutBalance(
           stripeTransfersStatus: 'active',
         },
       },
-      _sum: { amountCents: true },
+      select: {
+        amountCents: true,
+        organization: { select: { stripeAccountKind: true } },
+      },
     }),
   ]);
+  // A recipient-rail request needs its fee headroom funded too.
+  const openRequestsCents = open.reduce(
+    (sum, request) =>
+      sum +
+      request.amountCents +
+      (isGlobalPayouts(request.organization.stripeAccountKind)
+        ? globalPayoutFeeHeadroomCents(request.amountCents)
+        : 0),
+    0
+  );
   return {
     availableCents: platformCents + financialAccountCents,
-    openRequestsCents: open._sum.amountCents ?? 0,
+    openRequestsCents,
   };
 }
 

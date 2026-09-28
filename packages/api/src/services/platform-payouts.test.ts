@@ -54,7 +54,6 @@ interface FakeOpts {
   organizations?: unknown[];
   updatedCount?: number;
   request?: unknown;
-  openSumCents?: number;
 }
 
 function fakePrisma(opts: FakeOpts = {}) {
@@ -66,9 +65,6 @@ function fakePrisma(opts: FakeOpts = {}) {
     .mockResolvedValue({ count: opts.updatedCount ?? 1 });
   const requestFindMany = vi.fn().mockResolvedValue(opts.requests ?? []);
   const requestFindUnique = vi.fn().mockResolvedValue(opts.request ?? null);
-  const requestAggregate = vi
-    .fn()
-    .mockResolvedValue({ _sum: { amountCents: opts.openSumCents ?? null } });
   const orgFindMany = vi.fn().mockResolvedValue(opts.organizations ?? []);
 
   const lock = vi.fn().mockResolvedValue([]);
@@ -81,7 +77,6 @@ function fakePrisma(opts: FakeOpts = {}) {
     payoutRequest: {
       findMany: requestFindMany,
       findUnique: requestFindUnique,
-      aggregate: requestAggregate,
       updateMany: requestUpdateMany,
     },
     organization: { findMany: orgFindMany, updateMany: orgUpdateMany },
@@ -92,7 +87,6 @@ function fakePrisma(opts: FakeOpts = {}) {
   return {
     prisma,
     requestUpdateMany,
-    requestAggregate,
     orgUpdateMany,
     orgFindMany,
     lock,
@@ -577,7 +571,7 @@ describe('sendPayoutViaStripe — Global Payouts', () => {
       metadata: { payoutRequestId: 'req-1', organizationId: 'org-1' },
     });
     expect(paymentsCreate.mock.calls[0][1]).toEqual({
-      idempotencyKey: 'global-payout-req-1',
+      idempotencyKey: 'global-payout-req-1-0',
     });
     expect(requestUpdateMany).toHaveBeenCalledWith({
       where: { id: 'req-1', status: 'REQUESTED' },
@@ -636,6 +630,52 @@ describe('sendPayoutViaStripe — Global Payouts', () => {
     expect(fund).not.toHaveBeenCalled();
     expect(paymentsCreate).not.toHaveBeenCalled();
     expect(requestUpdateMany.mock.calls[0][0].data.reference).toBe('obp_live');
+  });
+
+  it('salts the key by the payments that came back, so a resend is not handed the dead one', async () => {
+    const { prisma } = fakePrisma({ request: GP_REQUEST });
+    const { stripe } = fakeStripe();
+    const { global, paymentsCreate } = fakeGlobal({
+      faAvailableUsd: 100000,
+      payments: [
+        {
+          id: 'obp_returned',
+          status: 'returned',
+          metadata: { payoutRequestId: 'req-1' },
+        },
+        {
+          id: 'obp_failed',
+          status: 'failed',
+          metadata: { payoutRequestId: 'req-1' },
+        },
+      ],
+    });
+    const result = await sendPayoutViaStripe(
+      prisma,
+      clientsOf(stripe, global),
+      STAFF,
+      { id: 'req-1' }
+    );
+    expect(result.reference).toBe('obp_new');
+    expect(paymentsCreate.mock.calls[0][1]).toEqual({
+      idempotencyKey: 'global-payout-req-1-2',
+    });
+  });
+
+  it('refuses to resolve against a payment Stripe hands back in a dead state', async () => {
+    const { prisma, requestUpdateMany } = fakePrisma({ request: GP_REQUEST });
+    const { stripe } = fakeStripe();
+    const { global, paymentsCreate } = fakeGlobal({ faAvailableUsd: 100000 });
+    paymentsCreate.mockResolvedValueOnce({
+      id: 'obp_dead',
+      status: 'returned',
+    } as never);
+    await expect(
+      sendPayoutViaStripe(prisma, clientsOf(stripe, global), STAFF, {
+        id: 'req-1',
+      })
+    ).rejects.toThrow(ConflictError);
+    expect(requestUpdateMany).not.toHaveBeenCalled();
   });
 
   it('skips a restricted, archived, or ineligible payout method and refuses when none is usable', async () => {
@@ -699,6 +739,7 @@ describe('sendPayoutViaStripe — Global Payouts', () => {
   it.each([
     ['insufficient_funds', ConflictError],
     ['outbound_payment_cannot_be_processed', ConflictError],
+    ['recipient_amount_limit_exceeded', ConflictError],
     ['recipient_feature_not_active', StripeAccountRestrictedError],
     ['payout_method_disabled', StripeAccountRestrictedError],
     ['account_not_configured_as_recipient', StripeAccountRestrictedError],
@@ -752,13 +793,29 @@ describe('sendPayoutViaStripe — Global Payouts', () => {
 });
 
 describe('readPlatformPayoutBalance', () => {
+  const openRows = (
+    rows: Array<{ amountCents: number; kind?: string | null }>
+  ) =>
+    rows.map((row) => ({
+      amountCents: row.amountCents,
+      organization: { stripeAccountKind: row.kind ?? 'CONNECT' },
+    }));
+
   it('sums the USD available balance against open Stripe-rail requests only', async () => {
-    const { prisma, requestAggregate } = fakePrisma({ openSumCents: 30000 });
+    const { prisma } = fakePrisma({
+      requests: openRows([{ amountCents: 30000 }]),
+    });
     const { stripe } = fakeStripe({ availableUsd: 12345 });
     await expect(
-      readPlatformPayoutBalance(prisma, clientsOf(stripe), STAFF)
+      readPlatformPayoutBalance(
+        prisma,
+        clientsOf(stripe, fakeGlobal().global, { financialAccountId: null }),
+        STAFF
+      )
     ).resolves.toEqual({ availableCents: 12345, openRequestsCents: 30000 });
-    expect(requestAggregate.mock.calls[0][0].where).toEqual({
+    const where = (prisma.payoutRequest.findMany as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0].where;
+    expect(where).toEqual({
       status: 'REQUESTED',
       organization: {
         stripeAccountId: { not: null },
@@ -778,13 +835,19 @@ describe('readPlatformPayoutBalance', () => {
     expect(result.openRequestsCents).toBe(0);
   });
 
-  it('adds the financial account when one is configured', async () => {
-    const { prisma } = fakePrisma();
+  it('adds the financial account when one is configured, and fee headroom for recipient-rail requests', async () => {
+    const { prisma } = fakePrisma({
+      requests: openRows([
+        { amountCents: 10000 },
+        { amountCents: 10000, kind: 'GLOBAL_PAYOUTS' },
+      ]),
+    });
     const { stripe } = fakeStripe({ availableUsd: 1000 });
     const { global, faRetrieve } = fakeGlobal({ faAvailableUsd: 250 });
+    // 10000 + 10000 + ceil(10000 * 2.25%) + 150
     await expect(
       readPlatformPayoutBalance(prisma, clientsOf(stripe, global), STAFF)
-    ).resolves.toMatchObject({ availableCents: 1250 });
+    ).resolves.toEqual({ availableCents: 1250, openRequestsCents: 20375 });
     await expect(
       readPlatformPayoutBalance(
         prisma,
