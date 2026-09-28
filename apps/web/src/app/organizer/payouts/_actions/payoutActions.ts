@@ -201,6 +201,9 @@ export async function openStripeDashboard(): Promise<ActionResult> {
     if (error instanceof NotFoundError) {
       return { success: false, error: 'No Stripe account is connected yet.' };
     }
+    if (error instanceof ConflictError) {
+      return { success: false, error: error.message };
+    }
     return failure(
       error,
       'Could not open your Stripe dashboard. Please try again.'

@@ -17,7 +17,11 @@ import type {
   ConnectState,
   StripeAccountKind,
 } from '../contracts/payouts';
-import { NotFoundError, UnauthorizedError } from './_shared/errors';
+import {
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
+} from './_shared/errors';
 import { ensureOrganizationForUser } from './organizations';
 import { resolveOrganizerScope } from './organizer-scope';
 
@@ -424,8 +428,13 @@ export async function createStripeDashboardLink(
   actor: Actor
 ): Promise<{ url: string }> {
   const org = await ownedOrg(prisma, actor);
-  if (!org.stripeAccountId || isGlobalPayouts(org.stripeAccountKind)) {
-    throw new NotFoundError('This organization has no Stripe dashboard');
+  if (!org.stripeAccountId) {
+    throw new NotFoundError('This organization has no Stripe account');
+  }
+  if (isGlobalPayouts(org.stripeAccountKind)) {
+    throw new ConflictError(
+      'Payouts to a bank outside the US have no Stripe dashboard; your bank statement shows each deposit'
+    );
   }
   const link = await stripe.accounts.createLoginLink(org.stripeAccountId);
   return { url: link.url };
