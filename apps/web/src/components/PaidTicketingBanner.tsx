@@ -24,7 +24,7 @@ const BODY = [
   'First paid event: ',
 ].join('\n');
 
-export const PAID_CHECKOUT_MAILTO = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(SUBJECT)}&body=${encodeURIComponent(BODY)}`;
+const PAID_CHECKOUT_MAILTO = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(SUBJECT)}&body=${encodeURIComponent(BODY)}`;
 
 const PAYOUT_STEPS = [
   'Meet with TropTix',
@@ -48,7 +48,7 @@ export function PaidTicketingBanner() {
             <TooltipTrigger asChild>
               <button
                 type="button"
-                aria-label="Why contact support?"
+                aria-label="Why we meet first"
                 className="absolute top-3 right-3 rounded-full p-1 text-muted-foreground hover:bg-primary/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <HelpCircle className="size-4" />
