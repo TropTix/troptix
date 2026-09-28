@@ -41,7 +41,7 @@ const REQUEST_ROW = {
     stripeAccountId: null,
     stripeTransfersStatus: null,
     payoutBankLinkedAt: null,
-    owner: { email: 'owner@example.test' },
+    memberships: [{ user: { id: 'owner-1', email: 'owner@example.test' } }],
   },
 };
 
@@ -669,7 +669,7 @@ describe('listPayoutOrganizations', () => {
     payoutReleaseAtSale: true,
     payoutHoldbackPercent: null,
     payoutHoldbackDays: null,
-    owner: { email: 'owner@example.test' },
+    memberships: [{ user: { id: 'owner-1', email: 'owner@example.test' } }],
   };
 
   it('maps setup state and the effective policy', async () => {

@@ -49,8 +49,8 @@ export async function getEventDetailRaw(
   prisma: PrismaClient,
   input: EventDetailInput
 ) {
-  // Drafts ARE returned: the page does its own draft guard via
-  // isDraft/organizerUserId (organizer preview) — don't filter them here.
+  // Drafts ARE returned: the page does its own draft guard (organizer
+  // preview) — don't filter them here.
   const event = await prisma.events.findUnique({
     where: { id: input.eventId },
     select: {
@@ -62,7 +62,6 @@ export async function getEventDetailRaw(
       isDraft: true,
       isPrivate: true,
       organizer: true,
-      organizerUserId: true,
       organization: {
         select: {
           slug: true,
@@ -179,7 +178,6 @@ export function shapeEventDetail(
     isDraft: event.isDraft,
     isPrivate: event.isPrivate,
     organizer: event.organizer,
-    organizerUserId: event.organizerUserId,
     hostedBy: event.organization
       ? {
           slug: event.organization.slug,

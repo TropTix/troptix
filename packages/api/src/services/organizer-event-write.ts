@@ -10,7 +10,8 @@ import {
   type UpdateEventInput,
 } from '../contracts/organizer';
 import { generateId } from './_shared/ids';
-import { requireOwnedEvent } from './_shared/owned-event';
+import { NotFoundError } from './_shared/errors';
+import { Capability, eventsWhereCan } from './_shared/access';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
 import { ticketTypeWriteFields } from './_shared/ticket-type-fields';
 import { resolveOrganizerScope } from './organizer-scope';
@@ -66,27 +67,22 @@ export async function updateEvent(
   input: UpdateEventInput
 ): Promise<{ organizationSlug: string }> {
   const data = updateEventInputSchema.parse(input);
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const userId = await resolveOrganizerScope(prisma, actor);
 
-  // Provisioning (a write) must wait until ownership has passed, so probing a
-  // foreign event id can't leave side effects.
-  const [, existingOrg] = await Promise.all([
-    requireOwnedEvent(prisma, organizerUserId, eventId),
-    findOrganizationForOwner(prisma, organizerUserId),
-  ]);
-  const org =
-    existingOrg ?? (await provisionOrganization(prisma, organizerUserId));
+  const event = await prisma.events.findFirst({
+    where: { id: eventId, ...eventsWhereCan(userId, Capability.EventEdit) },
+    select: { organization: { select: { slug: true, displayName: true } } },
+  });
+  if (!event) {
+    throw new NotFoundError('Event not found');
+  }
 
   await prisma.events.update({
     where: { id: eventId },
-    data: {
-      organizationId: org.id,
-      organizer: org.displayName,
-      ...eventFields(data),
-    },
+    data: { organizer: event.organization.displayName, ...eventFields(data) },
   });
 
-  return { organizationSlug: org.slug };
+  return { organizationSlug: event.organization.slug };
 }
 
 async function resolveOrganization(
@@ -94,13 +90,7 @@ async function resolveOrganization(
   organizerUserId: string
 ) {
   const existing = await findOrganizationForOwner(prisma, organizerUserId);
-  return existing ?? provisionOrganization(prisma, organizerUserId);
-}
-
-async function provisionOrganization(
-  prisma: PrismaClient,
-  organizerUserId: string
-) {
+  if (existing) return existing;
   const user = await prisma.users.findUnique({
     where: { id: organizerUserId },
     select: { email: true },

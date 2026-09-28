@@ -109,7 +109,7 @@ describe('getPayouts — authorization and scoping', () => {
     const { prisma, orgFindFirst } = fakePrisma();
     await getPayouts(prisma, OWNER, {}, NOW);
     expect(orgFindFirst.mock.calls[0][0].where).toEqual({
-      ownerUserId: 'owner-1',
+      memberships: { some: { userId: 'owner-1', role: { in: ['OWNER'] } } },
     });
   });
 
@@ -122,7 +122,9 @@ describe('getPayouts — authorization and scoping', () => {
       NOW
     );
     expect(orgFindFirst.mock.calls[0][0].where).toEqual({
-      ownerUserId: 'target-organizer',
+      memberships: {
+        some: { userId: 'target-organizer', role: { in: ['OWNER'] } },
+      },
     });
   });
 
@@ -359,7 +361,9 @@ describe('cancelPayoutRequest', () => {
       where: {
         id: 'req-1',
         status: 'REQUESTED',
-        organization: { ownerUserId: 'owner-1' },
+        organization: {
+          memberships: { some: { userId: 'owner-1', role: { in: ['OWNER'] } } },
+        },
       },
       data: { status: 'CANCELLED' },
     });

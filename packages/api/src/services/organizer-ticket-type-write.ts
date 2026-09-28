@@ -7,13 +7,16 @@ import {
   type TicketTypeInput,
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
-import { requireOwnedEvent } from './_shared/owned-event';
+import { Capability, eventsWhereCan } from './_shared/access';
 import { generateId } from './_shared/ids';
 import { toCents } from './_shared/organizerMapping';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
 import { ticketTypeWriteFields } from './_shared/ticket-type-fields';
 import { resolveOrganizerScope } from './organizer-scope';
-import { findOrganizationForOwner } from './organizations';
+
+const eventOrganizationSelect = {
+  organization: { select: { paidTicketingEnabled: true } },
+} as const;
 
 export async function createTicketType(
   prisma: PrismaClient,
@@ -22,16 +25,16 @@ export async function createTicketType(
   input: TicketTypeInput
 ): Promise<{ ticketTypeId: string }> {
   const data = ticketTypeInputSchema.parse(input);
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const userId = await resolveOrganizerScope(prisma, actor);
 
-  const [, org] = await Promise.all([
-    requireOwnedEvent(prisma, organizerUserId, eventId),
-    findOrganizationForOwner(prisma, organizerUserId),
-  ]);
-  assertPaidTicketingAllowed(
-    { paidTicketingEnabled: org?.paidTicketingEnabled ?? false },
-    [data]
-  );
+  const event = await prisma.events.findFirst({
+    where: { id: eventId, ...eventsWhereCan(userId, Capability.EventEdit) },
+    select: eventOrganizationSelect,
+  });
+  if (!event) {
+    throw new NotFoundError('Event not found');
+  }
+  assertPaidTicketingAllowed(event.organization, [data]);
 
   const ticketTypeId = generateId();
   await prisma.ticketTypes.create({
@@ -49,19 +52,21 @@ export async function updateTicketType(
   input: TicketTypeInput
 ): Promise<void> {
   const data = ticketTypeInputSchema.parse(input);
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const userId = await resolveOrganizerScope(prisma, actor);
 
-  const [owned, org] = await Promise.all([
-    prisma.ticketTypes.findFirst({
-      where: {
-        id: ticketTypeId,
-        eventId,
-        event: { organizerUserId, deletedAt: null },
-      },
-      select: { id: true, price: true, priceCents: true },
-    }),
-    findOrganizationForOwner(prisma, organizerUserId),
-  ]);
+  const owned = await prisma.ticketTypes.findFirst({
+    where: {
+      id: ticketTypeId,
+      eventId,
+      event: eventsWhereCan(userId, Capability.EventEdit),
+    },
+    select: {
+      id: true,
+      price: true,
+      priceCents: true,
+      event: { select: eventOrganizationSelect },
+    },
+  });
   if (!owned) {
     throw new NotFoundError('Ticket type not found');
   }
@@ -69,10 +74,7 @@ export async function updateTicketType(
   // editable even if the org lost — or never had — approval.
   const storedPriceCents = owned.priceCents ?? toCents(owned.price);
   if (storedPriceCents === 0) {
-    assertPaidTicketingAllowed(
-      { paidTicketingEnabled: org?.paidTicketingEnabled ?? false },
-      [data]
-    );
+    assertPaidTicketingAllowed(owned.event.organization, [data]);
   }
 
   await prisma.ticketTypes.update({

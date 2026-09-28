@@ -75,7 +75,9 @@ describe('payout terms', () => {
       NOW
     );
     expect(updateMany).toHaveBeenCalledWith({
-      where: { ownerUserId: 'owner-1' },
+      where: {
+        memberships: { some: { userId: 'owner-1', role: { in: ['OWNER'] } } },
+      },
       data: {
         payoutTermsAcceptedAt: NOW,
         payoutTermsVersion: PAYOUT_TERMS.version,

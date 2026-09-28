@@ -28,34 +28,27 @@ const input = (over: Partial<TicketTypeInput> = {}): TicketTypeInput => ({
 function fakePrisma(
   opts: {
     paidEnabled?: boolean;
-    org?: unknown;
     event?: unknown;
     ticketType?: unknown;
   } = {}
 ) {
+  const organization = { paidTicketingEnabled: opts.paidEnabled ?? false };
   const eventsFindFirst = vi
     .fn()
-    .mockResolvedValue(opts.event === undefined ? { id: 'e1' } : opts.event);
+    .mockResolvedValue(
+      opts.event === undefined ? { organization } : opts.event
+    );
   const ticketTypesFindFirst = vi
     .fn()
     .mockResolvedValue(
       opts.ticketType === undefined
-        ? { id: 't1', price: 0, priceCents: 0 }
+        ? { id: 't1', price: 0, priceCents: 0, event: { organization } }
         : opts.ticketType
     );
   const ticketTypesCreate = vi.fn().mockResolvedValue({});
   const ticketTypesUpdate = vi.fn().mockResolvedValue({});
 
   const prisma = {
-    organization: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue(
-          opts.org === undefined
-            ? { id: 'org-1', paidTicketingEnabled: opts.paidEnabled ?? false }
-            : opts.org
-        ),
-    },
     events: { findFirst: eventsFindFirst },
     ticketTypes: {
       findFirst: ticketTypesFindFirst,
@@ -86,7 +79,7 @@ describe('createTicketType', () => {
     await createTicketType(prisma, OWNER, 'e1', input());
     expect(eventsFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 'e1',
-      organizerUserId: 'owner-1',
+      organization: { memberships: { some: { userId: 'owner-1' } } },
       deletedAt: null,
     });
   });
@@ -99,14 +92,12 @@ describe('createTicketType', () => {
     expect(ticketTypesCreate).not.toHaveBeenCalled();
   });
 
-  it('gates a paid ticket on the org flag — including when no org exists yet', async () => {
-    for (const org of [{ id: 'org-1', paidTicketingEnabled: false }, null]) {
-      const { prisma, ticketTypesCreate } = fakePrisma({ org });
-      await expect(
-        createTicketType(prisma, OWNER, 'e1', input({ priceCents: 2500 }))
-      ).rejects.toThrow(PaidTicketingNotEnabledError);
-      expect(ticketTypesCreate).not.toHaveBeenCalled();
-    }
+  it('gates a paid ticket on the owning Organization’s flag', async () => {
+    const { prisma, ticketTypesCreate } = fakePrisma({ paidEnabled: false });
+    await expect(
+      createTicketType(prisma, OWNER, 'e1', input({ priceCents: 2500 }))
+    ).rejects.toThrow(PaidTicketingNotEnabledError);
+    expect(ticketTypesCreate).not.toHaveBeenCalled();
   });
 
   it('writes the row with cents, the legacy float, the enum, and a null discountCode', async () => {
@@ -137,7 +128,10 @@ describe('updateTicketType', () => {
     expect(ticketTypesFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 't1',
       eventId: 'e1',
-      event: { organizerUserId: 'owner-1', deletedAt: null },
+      event: {
+        organization: { memberships: { some: { userId: 'owner-1' } } },
+        deletedAt: null,
+      },
     });
   });
 

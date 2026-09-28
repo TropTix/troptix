@@ -13,7 +13,12 @@ import type {
   ConnectState,
 } from '../contracts/payouts';
 import { NotFoundError, UnauthorizedError } from './_shared/errors';
-import { ensureOrganizationForUser } from './organizations';
+import { Capability, organizationsWhereCan } from './_shared/access';
+import {
+  ensureOrganizationForUser,
+  organizationOwnerSelect,
+  ownerOf,
+} from './organizations';
 import { resolveOrganizerScope } from './organizer-scope';
 
 const ORG_SELECT = {
@@ -22,7 +27,7 @@ const ORG_SELECT = {
   slug: true,
   stripeAccountId: true,
   payoutBankLinkedAt: true,
-  owner: { select: { email: true } },
+  ...organizationOwnerSelect,
 } as const;
 
 interface ConnectOrg {
@@ -31,7 +36,7 @@ interface ConnectOrg {
   slug: string;
   stripeAccountId: string | null;
   payoutBankLinkedAt: Date | null;
-  owner: { email: string };
+  memberships: { user: { id: string; email: string } }[];
 }
 
 interface ConnectRow {
@@ -84,7 +89,10 @@ export async function getConnectSetup(
     input.viewAsOrganizerUserId
   );
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: organizerUserId },
+    where: organizationsWhereCan(
+      organizerUserId,
+      Capability.OrganizationPayouts
+    ),
     select: {
       stripeAccountId: true,
       stripeTransfersStatus: true,
@@ -139,7 +147,10 @@ async function ownedOrg(
   if (actor.kind !== 'user') {
     throw new UnauthorizedError('Sign in to manage payouts');
   }
-  const select = { where: { ownerUserId: actor.userId }, select: ORG_SELECT };
+  const select = {
+    where: organizationsWhereCan(actor.userId, Capability.OrganizationPayouts),
+    select: ORG_SELECT,
+  };
   const org = await prisma.organization.findFirst(select);
   if (org) return org;
   if (!opts.provision) throw new NotFoundError('Organization not found');
@@ -200,7 +211,7 @@ async function createRecipientAccount(
   const account = await stripe.v2.core.accounts.create(
     {
       display_name: org.displayName,
-      contact_email: org.owner.email,
+      contact_email: ownerOf(org).email,
       dashboard: 'express',
       identity: { country: 'us' },
       defaults: {

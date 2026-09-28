@@ -37,12 +37,12 @@ values ('seed_staff_1', now(), now(), 'demo-staff@troptix.test', 'Demo Staff', '
 -- request flow is exercisable. Keep the version in step with
 -- packages/api/src/legal/payoutTerms.ts.
 insert into public."Organization" (
-  id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
+  id, "createdAt", "updatedAt", slug, "displayName",
   verified, "paidTicketingEnabled", "payoutMeetingAt", "payoutBankLinkedAt",
   "payoutTermsAcceptedAt", "payoutTermsVersion",
   "stripeAccountId", "stripeTransfersStatus"
 ) values (
-  'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer', 'seed_org_1',
+  'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer',
   false, true, now() - interval '40 days', now() - interval '40 days',
   now() - interval '40 days', '2026-09-27',
   null, null
@@ -55,11 +55,11 @@ insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstNam
 values ('seed_org_2', now(), now(), 'demo-organizer-2@troptix.test', 'Island Nights', 'Island', 'Nights', 'ORGANIZER');
 
 insert into public."Organization" (
-  id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
+  id, "createdAt", "updatedAt", slug, "displayName",
   verified, "paidTicketingEnabled", "payoutTermsAcceptedAt", "payoutTermsVersion",
   "stripeAccountId", "stripeTransfersStatus"
 ) values (
-  'seed_organization_2', now(), now(), 'island-nights', 'Island Nights', 'seed_org_2',
+  'seed_organization_2', now(), now(), 'island-nights', 'Island Nights',
   false, true, null, null, null, null
 );
 
@@ -69,22 +69,30 @@ insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstNam
 values ('seed_org_3', now(), now(), 'demo-organizer-3@troptix.test', 'Sunset Sessions', 'Sunset', 'Sessions', 'ORGANIZER');
 
 insert into public."Organization" (
-  id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
+  id, "createdAt", "updatedAt", slug, "displayName",
   verified, "paidTicketingEnabled", "paidTicketingRequestedAt"
 ) values (
-  'seed_organization_3', now(), now(), 'sunset-sessions', 'Sunset Sessions', 'seed_org_3',
+  'seed_organization_3', now(), now(), 'sunset-sessions', 'Sunset Sessions',
   false, false, now() - interval '2 days'
 );
 
--- Demo Admin: holds a Membership in the demo Organization (teams Phase 1).
--- Nothing reads Membership yet. To claim any seeded persona, set its email
--- to yours BEFORE first sign-in — the provisioning trigger links by email
--- and the row's grants come along. (.test addresses get no magic links.)
+-- Every Organization's Owner is an OWNER Membership (ADR 0035). The demo
+-- Organization also has an Admin and a Scanner, one persona per role. To claim
+-- any seeded persona, set its email to yours BEFORE first sign-in — the
+-- provisioning trigger links by email and the row's grants come along. (.test
+-- addresses get no magic links.)
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName")
-values ('seed_admin_1', now(), now(), 'demo-admin@troptix.test', 'Demo Admin', 'Demo', 'Admin');
+values
+  ('seed_admin_1', now(), now(), 'demo-admin@troptix.test', 'Demo Admin', 'Demo', 'Admin'),
+  ('seed_scanner_1', now(), now(), 'demo-scanner@troptix.test', 'Demo Scanner', 'Demo', 'Scanner');
 
 insert into public."Membership" (id, "createdAt", "updatedAt", role, "organizationId", "userId")
-values ('seed_membership_1', now(), now(), 'ADMIN', 'seed_organization_1', 'seed_admin_1');
+values
+  ('seed_membership_owner_1', now(), now(), 'OWNER', 'seed_organization_1', 'seed_org_1'),
+  ('seed_membership_owner_2', now(), now(), 'OWNER', 'seed_organization_2', 'seed_org_2'),
+  ('seed_membership_owner_3', now(), now(), 'OWNER', 'seed_organization_3', 'seed_org_3'),
+  ('seed_membership_1', now(), now(), 'ADMIN', 'seed_organization_1', 'seed_admin_1'),
+  ('seed_membership_scanner_1', now(), now(), 'SCANNER', 'seed_organization_1', 'seed_scanner_1');
 
 -- Published events, owned by the demo organizer. `startsAt`/`endsAt` are full
 -- timestamps — the only date columns Events has (ADR 0020). Dates are

@@ -83,8 +83,13 @@ export class EventFactory {
     );
     await query(
       `insert into public."Organization"
-         (id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId", "paidTicketingEnabled")
-       values ($1, now(), now(), $1, 'E2E Test Org', $2, true)`,
+         (id, "createdAt", "updatedAt", slug, "displayName", "paidTicketingEnabled")
+       values ($1, now(), now(), $1, 'E2E Test Org', true)`,
+      [orgId]
+    );
+    await query(
+      `insert into public."Membership" (id, "createdAt", "updatedAt", role, "organizationId", "userId")
+       values ($1, now(), now(), 'OWNER', $1, $2)`,
       [orgId, userId]
     );
     await query(

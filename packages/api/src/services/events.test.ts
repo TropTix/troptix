@@ -67,7 +67,6 @@ function fakeEvent(
     isDraft: false,
     isPrivate: false,
     organizer: 'Island Brunch Co.',
-    organizerUserId: 'user-1',
     organization: overrides.organization ?? null,
     startsAt: new Date('2026-07-01T18:00:00.000Z'),
     endsAt: new Date('2026-07-01T22:00:00.000Z'),

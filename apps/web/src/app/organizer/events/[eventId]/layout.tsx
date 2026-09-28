@@ -1,6 +1,7 @@
 import React from 'react';
 import { EventManagementNav } from '@/components/ui/event-management-nav';
 import prisma from '@/server/prisma';
+import { Capability, eventsWhereCan } from '@troptix/api/server';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { redirect } from 'next/navigation';
@@ -9,11 +10,13 @@ import type { ServerUser } from '@/server/authUser';
 // Platform Owners pass this nav shell: layouts can't read ?viewAs, and blocking
 // here would kill View-as on every page below — the pages themselves authorize.
 async function getEvent(eventId: string, user: ServerUser) {
-  const event = await prisma.events.findUnique({
+  const event = await prisma.events.findFirst({
     where: {
       id: eventId,
       deletedAt: null,
-      ...(user.isPlatformOwner ? {} : { organizerUserId: user.uid }),
+      ...(user.isPlatformOwner
+        ? {}
+        : eventsWhereCan(user.uid, Capability.EventOrders)),
     },
     select: { name: true, isDraft: true },
   });

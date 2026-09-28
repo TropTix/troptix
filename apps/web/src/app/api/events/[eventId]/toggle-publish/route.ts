@@ -4,6 +4,7 @@ import {
 } from '@/lib/validations/publishValidation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
+import { Capability, eventsWhereCan } from '@troptix/api/server';
 import { revalidateEventPublicPages } from '@/server/revalidateEventPages';
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
@@ -26,16 +27,8 @@ export async function PATCH(
       );
     }
 
-    // Paid ticketing is the Organization's approval, not a user role — the
-    // same flag the @troptix/api write services enforce.
-    const org = await prisma.organization.findFirst({
-      where: { ownerUserId: user.uid },
-      select: { paidTicketingEnabled: true },
-    });
-    const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
-
-    const event = await prisma.events.findUnique({
-      where: { id: eventId, organizerUserId: user.uid },
+    const event = await prisma.events.findFirst({
+      where: { id: eventId, ...eventsWhereCan(user.uid, Capability.EventEdit) },
       select: {
         id: true,
         isDraft: true,
@@ -47,7 +40,7 @@ export async function PATCH(
         venue: true,
         address: true,
         imageUrl: true,
-        organization: { select: { slug: true } },
+        organization: { select: { slug: true, paidTicketingEnabled: true } },
         ticketTypes: {
           select: {
             id: true,
@@ -70,9 +63,11 @@ export async function PATCH(
     }
 
     if (event.isDraft) {
+      // Paid ticketing is the owning Organization's approval, not a user
+      // role — the same flag the @troptix/api write services enforce.
       const validationResult = validateEventForPublish(
         event,
-        paidEventsEnabled
+        event.organization.paidTicketingEnabled
       );
 
       if (!validationResult.isValid) {

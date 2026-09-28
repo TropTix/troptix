@@ -65,7 +65,6 @@ export const eventDetailSchema = z.object({
   isDraft: z.boolean(),
   isPrivate: z.boolean(),
   organizer: z.string(),
-  organizerUserId: z.string(),
   hostedBy: z
     .object({
       slug: z.string(),

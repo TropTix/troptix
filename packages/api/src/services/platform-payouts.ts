@@ -22,6 +22,7 @@ import { resolvePayoutPolicy } from './_shared/payouts';
 import { connectStateOf } from './organizer-connect';
 import { toRequestDto, toSetupState } from './organizer-payouts';
 import { requirePlatformOwner } from './organizer-scope';
+import { organizationOwnerSelect, ownerOf } from './organizations';
 
 export async function listPayoutRequests(
   prisma: PrismaClient,
@@ -39,7 +40,7 @@ export async function listPayoutRequests(
           stripeAccountId: true,
           stripeTransfersStatus: true,
           payoutBankLinkedAt: true,
-          owner: { select: { email: true } },
+          ...organizationOwnerSelect,
         },
       },
     },
@@ -50,7 +51,7 @@ export async function listPayoutRequests(
     organizationId: row.organizationId,
     organizationName: row.organization.displayName,
     organizationSlug: row.organization.slug,
-    ownerEmail: row.organization.owner.email,
+    ownerEmail: ownerOf(row.organization).email,
     stripeAccountId: row.organization.stripeAccountId,
     connectState: connectStateOf(row.organization),
   }));
@@ -447,7 +448,7 @@ export async function listPayoutOrganizations(
       payoutReleaseAtSale: true,
       payoutHoldbackPercent: true,
       payoutHoldbackDays: true,
-      owner: { select: { email: true } },
+      ...organizationOwnerSelect,
     },
   });
 
@@ -456,7 +457,7 @@ export async function listPayoutOrganizations(
       id: org.id,
       displayName: org.displayName,
       slug: org.slug,
-      ownerEmail: org.owner.email,
+      ownerEmail: ownerOf(org).email,
       payoutMeetingAt: org.payoutMeetingAt?.toISOString() ?? null,
       payoutBankLinkedAt: org.payoutBankLinkedAt?.toISOString() ?? null,
       payoutTermsAcceptedAt: org.payoutTermsAcceptedAt?.toISOString() ?? null,

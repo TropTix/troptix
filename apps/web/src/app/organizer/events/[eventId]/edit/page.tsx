@@ -1,6 +1,7 @@
 import { BackButton } from '@/components/ui/back-button';
 import prisma from '@/server/prisma';
 import { parseStoredFlyerPalette } from '@troptix/api';
+import { Capability, eventsWhereCan } from '@troptix/api/server';
 import EventForm from '../../_components/EventForm';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
@@ -14,13 +15,16 @@ interface EditEventPageProps {
 
 import type { ServerUser } from '@/server/authUser';
 
-// Ownership scoping in the query is the access check — null means 404.
+// Access scoping in the query is the access check — null means 404.
 // Errors propagate to the error boundary; a DB failure is not a 404.
 async function getEvent(eventId: string, user: ServerUser) {
   {
-    const event = await prisma.events.findUnique({
-      where: { id: eventId, organizerUserId: user.uid, deletedAt: null },
+    const event = await prisma.events.findFirst({
+      where: { id: eventId, ...eventsWhereCan(user.uid, Capability.EventEdit) },
       include: {
+        organization: {
+          select: { displayName: true, paidTicketingEnabled: true },
+        },
         ticketTypes: {
           select: {
             name: true,
@@ -71,11 +75,8 @@ export default async function EditEventPage(props: EditEventPageProps) {
     flyerPalette: parseStoredFlyerPalette(event.flyerPalette),
   };
 
-  const org = await prisma.organization.findFirst({
-    where: { ownerUserId: user.uid },
-    select: { displayName: true, paidTicketingEnabled: true },
-  });
-  const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
+  const org = event.organization;
+  const paidEventsEnabled = org.paidTicketingEnabled;
 
   return (
     <div className=" mx-auto py-8">
@@ -97,7 +98,7 @@ export default async function EditEventPage(props: EditEventPageProps) {
         }
         isDraft={event.isDraft}
         paidEventsEnabled={paidEventsEnabled}
-        organizationName={org?.displayName}
+        organizationName={org.displayName}
       />
     </div>
   );

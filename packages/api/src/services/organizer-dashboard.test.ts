@@ -56,7 +56,7 @@ describe('getDashboard — authorization', () => {
 
     const where = eventsFindMany.mock.calls[0][0].where;
     expect(where).toMatchObject({
-      organizerUserId: 'owner-1',
+      organization: { memberships: { some: { userId: 'owner-1' } } },
       deletedAt: null,
     });
   });
@@ -73,9 +73,9 @@ describe('getDashboard — authorization', () => {
       NOW
     );
 
-    expect(eventsFindMany.mock.calls[0][0].where.organizerUserId).toBe(
-      'owner-1'
-    );
+    expect(
+      eventsFindMany.mock.calls[0][0].where.organization.memberships.some.userId
+    ).toBe('owner-1');
   });
 
   it('honors View-as for a platform owner', async () => {
@@ -90,9 +90,9 @@ describe('getDashboard — authorization', () => {
       NOW
     );
 
-    expect(eventsFindMany.mock.calls[0][0].where.organizerUserId).toBe(
-      'target-organizer'
-    );
+    expect(
+      eventsFindMany.mock.calls[0][0].where.organization.memberships.some.userId
+    ).toBe('target-organizer');
   });
 
   it('excludes soft-deleted events', async () => {
@@ -301,7 +301,7 @@ describe('getDashboard — range', () => {
     expect(where.createdAt.lt).toEqual(NOW);
     expect(where.status).toBe('COMPLETED');
     expect(where.event).toMatchObject({
-      organizerUserId: 'owner-1',
+      organization: { memberships: { some: { userId: 'owner-1' } } },
       deletedAt: null,
     });
   });

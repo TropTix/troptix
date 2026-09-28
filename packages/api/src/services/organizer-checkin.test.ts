@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import type { PrismaClient } from '@troptix/db';
+import type { MembershipRole, PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import {
   ConflictError,
   NotFoundError,
   UnauthorizedError,
 } from './_shared/errors';
+import { eventWhereAdmits, whereUserId } from './_shared/access.fixtures';
 import { scanTicket, toggleTicketCheckIn } from './organizer-checkin';
 
 const owner: Actor = { kind: 'user', userId: 'org-1', role: 'PATRON' };
+const scanner: Actor = { kind: 'user', userId: 'door-1', role: 'PATRON' };
 
 type TicketRow = {
   id: string;
@@ -19,20 +21,21 @@ type TicketRow = {
 };
 type EventRow = {
   id: string;
-  organizerUserId: string;
+  members: Record<string, MembershipRole>;
   deletedAt: Date | null;
 };
 
 function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
   const prisma = {
-    events: {
-      findFirst: async ({ where }: any) =>
-        events.find(
+    membership: {
+      findFirst: async ({ where }: any) => {
+        const event = events.find(
           (e) =>
-            e.id === where.id &&
-            e.organizerUserId === where.organizerUserId &&
-            e.deletedAt === null
-        ) ?? null,
+            e.id === where.organization.events.some.id && e.deletedAt === null
+        );
+        const role = event?.members[where.userId];
+        return role ? { role } : null;
+      },
     },
     tickets: {
       findUnique: async ({ where }: any) =>
@@ -42,11 +45,9 @@ function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
         tickets.find((t) => {
           if (t.id !== where.id) return false;
           const event = events.find((e) => e.id === t.eventId);
-          return (
-            !!event &&
-            event.organizerUserId === where.event.organizerUserId &&
-            event.deletedAt === null
-          );
+          const userId = whereUserId(where.event);
+          const role = event && userId ? event.members[userId] : undefined;
+          return !!role && eventWhereAdmits(where.event, event!, userId!, role);
         }) ?? null,
       updateMany: async ({ where, data }: any) => {
         let count = 0;
@@ -80,8 +81,12 @@ function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
 
 const seed = (): { events: EventRow[]; tickets: TicketRow[] } => ({
   events: [
-    { id: 'e1', organizerUserId: 'org-1', deletedAt: null },
-    { id: 'e2', organizerUserId: 'org-2', deletedAt: null },
+    {
+      id: 'e1',
+      members: { 'org-1': 'OWNER', 'door-1': 'SCANNER' },
+      deletedAt: null,
+    },
+    { id: 'e2', members: { 'org-2': 'OWNER' }, deletedAt: null },
   ],
   tickets: [
     {
@@ -158,7 +163,9 @@ describe('scanTicket', () => {
   });
 
   it('checks in a VALID ticket (the status the checkout mints)', async () => {
-    const events = [{ id: 'e1', organizerUserId: 'org-1', deletedAt: null }];
+    const events: EventRow[] = [
+      { id: 'e1', members: { 'org-1': 'OWNER' }, deletedAt: null },
+    ];
     const tickets: TicketRow[] = [
       {
         id: 't1',
@@ -178,7 +185,9 @@ describe('scanTicket', () => {
   });
 
   it("names a typeless ticket 'Complementary'", async () => {
-    const events = [{ id: 'e1', organizerUserId: 'org-1', deletedAt: null }];
+    const events: EventRow[] = [
+      { id: 'e1', members: { 'org-1': 'OWNER' }, deletedAt: null },
+    ];
     const tickets: TicketRow[] = [
       {
         id: 't1',
@@ -195,6 +204,35 @@ describe('scanTicket', () => {
     });
     expect(result.ticketName).toBe('Complementary');
     expect(result.scanSucceeded).toBe(true);
+  });
+});
+
+describe('Scanner access', () => {
+  it('lets a Scanner scan a ticket on their Organization’s event', async () => {
+    const { events, tickets } = seed();
+    const prisma = makeFakePrisma(events, tickets);
+    const result = await scanTicket(prisma, scanner, {
+      ticketId: 't1',
+      eventId: 'e1',
+    });
+    expect(result.scanSucceeded).toBe(true);
+  });
+
+  it('lets a Scanner check a guest in and out', async () => {
+    const { events, tickets } = seed();
+    const prisma = makeFakePrisma(events, tickets);
+    await toggleTicketCheckIn(prisma, scanner, { ticketId: 't1' });
+    expect(tickets[0].status).toBe('NOT_AVAILABLE');
+    await toggleTicketCheckIn(prisma, scanner, { ticketId: 't1' });
+    expect(tickets[0].status).toBe('AVAILABLE');
+  });
+
+  it('refuses a Scanner on another Organization’s event', async () => {
+    const { events, tickets } = seed();
+    const prisma = makeFakePrisma(events, tickets);
+    await expect(
+      scanTicket(prisma, scanner, { ticketId: 't2', eventId: 'e2' })
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
