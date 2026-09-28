@@ -19,7 +19,11 @@ export function PaidTicketingBanner() {
       <Callout
         icon={<Wallet className="size-5" />}
         title="Start selling paid tickets"
-        steps={['Meet with TropTix', 'Connect your bank account']}
+        steps={[
+          'Meet with TropTix',
+          'Connect your bank account',
+          'Accept payout terms',
+        ]}
         actions={
           <Button asChild>
             <Link href="/organizer/payouts">
