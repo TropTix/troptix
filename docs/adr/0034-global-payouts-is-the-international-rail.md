@@ -49,10 +49,14 @@ error. ADR 0033's per-attempt key exists because of v1's 24-hour replay.
 5. **The send names the payout method** it found by listing the recipient's
    payout methods, and fails as "restricted" when there is no usable bank
    account. Readiness never depends on a Stripe-side default.
-6. **A deterministic idempotency key per request** for the outbound payment,
-   `global-payout-<request id>`, because v2 re-executes failures. The
-   list-and-match lookup by recipient, window and metadata stays as the guard
-   past 30 days. The row lock and guarded resolve from ADR 0033 stand.
+6. **A deterministic idempotency key per request, salted by dead payments**
+   for the outbound payment: `global-payout-<request id>-<n>`, n being the
+   count of failed, canceled or returned payments already found for the
+   request. v2 re-executes a failed request under the same key, but replays
+   a request that succeeded, so a payment that came back after creation
+   would be handed back on a resend unless the key changes. The
+   list-and-match lookup by recipient, window and metadata stays as the
+   guard past 30 days. The row lock and guarded resolve from ADR 0033 stand.
 7. **Returned and failed payments surface through reconciliation**, as a new
    mismatch kind, not through outbound payment events. Acting on them on
    arrival belongs to the unattended-payouts plan.
