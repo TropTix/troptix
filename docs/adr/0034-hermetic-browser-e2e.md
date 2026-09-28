@@ -1,4 +1,4 @@
-# 29. Browser end-to-end tests run hermetically, with real Stripe test mode and no webhook
+# 34. Browser end-to-end tests run hermetically, with real Stripe test mode and no webhook
 
 - **Status:** Accepted
 - **Date:** 2026-09-21

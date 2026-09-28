@@ -4,8 +4,8 @@ import path from 'node:path';
 
 // Concatenates every recorded test video from the last run into one mp4 a
 // reviewer can watch end to end. Playwright's own ffmpeg is a minimal build
-// without the concat demuxer, so this needs a full `ffmpeg` on PATH (the
-// GitHub runner ships one; locally, install it).
+// without the concat demuxer, so this needs a full `ffmpeg` on PATH (CI
+// installs it with apt; locally, install it or set FFMPEG).
 const ffmpeg = process.env.FFMPEG ?? 'ffmpeg';
 const root = path.resolve(__dirname, '..');
 const resultsDir = path.join(root, 'test-results');

@@ -12,7 +12,7 @@ and we want each run to leave proof a person can watch. This plan adds a
 Playwright suite for the buyer flow, runs it on every web PR, and ships a
 video of the run as the artifact.
 
-Decision record: [ADR 0029](../adr/0029-hermetic-browser-e2e.md).
+Decision record: [ADR 0034](../adr/0034-hermetic-browser-e2e.md).
 
 ## What we had
 
@@ -55,7 +55,7 @@ Checked against current docs (September 2026):
 ## Design
 
 - **Workspace** `e2e/` (`@troptix/e2e`): Playwright + `pg` for direct
-  database assertions + `ffmpeg-static` to stitch the proof video.
+  database assertions + `ffmpeg` (from PATH; CI installs it) to stitch the proof video.
 - **Runtime**: `supabase db start` Postgres, production build of `apps/web`
   on port 3210, real Stripe test mode. Build and start share one environment
   (`e2e/lib/env.ts`) because `NEXT_PUBLIC_*` values bake in at build time.

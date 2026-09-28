@@ -6,12 +6,13 @@ handled. Every test is recorded, and a run ends with one stitched video a
 reviewer can watch.
 
 Design and rationale: [docs/plans/2026-09-e2e-browser-tests.md](../docs/plans/2026-09-e2e-browser-tests.md)
-and [ADR 0029](../docs/adr/0029-hermetic-browser-e2e.md).
+and [ADR 0034](../docs/adr/0034-hermetic-browser-e2e.md).
 
 ## Run locally
 
 Needs Docker, the Supabase CLI, and `ffmpeg` on your PATH (for the stitched
-video; the GitHub runner ships it). Stripe test keys come from `apps/web/.env`.
+video; set `FFMPEG` to point at a binary elsewhere). Stripe test keys come from
+`apps/web/.env`.
 
 ```sh
 supabase db start          # local Postgres with migrations + seed (once)

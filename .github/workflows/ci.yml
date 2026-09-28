@@ -135,7 +135,7 @@ jobs:
   # Browser tests for the buyer flow (e2e/). Hermetic: the same local Postgres
   # the api-tests use, a production build of apps/web, real Stripe test mode.
   # No webhook forwarding is needed — the checkout page's own poll fulfils the
-  # order (ADR 0029). Every test is recorded; the HTML report and the stitched
+  # order (ADR 0034). Every test is recorded; the HTML report and the stitched
   # proof video are uploaded as the run's artifact. Paid specs skip themselves
   # when the Stripe test keys are not configured as repo secrets.
   e2e:
@@ -172,6 +172,9 @@ jobs:
         run: pnpm --filter @troptix/e2e build:web
       - name: Run browser tests
         run: pnpm --filter @troptix/e2e test
+      - name: Install ffmpeg
+        if: always()
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: Stitch proof video
         if: always()
         run: pnpm --filter @troptix/e2e proof
