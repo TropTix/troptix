@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import prisma from '@/server/prisma';
 import { getServerUser } from '@/server/authUser';
+import type { Actor } from '@troptix/api/server';
 import { userToActor } from '@/server/actor';
 import { stripe } from '@/server/lib/stripe';
 import { formatCents } from '@/lib/dateUtils';
@@ -67,7 +68,7 @@ export async function setPayoutPolicy(
 
 async function run<T>(
   parsed: { success: true; data: T } | { success: false },
-  service: (actor: ReturnType<typeof userToActor>, data: T) => Promise<unknown>
+  service: (actor: Actor, data: T) => Promise<unknown>
 ): Promise<ActionResult> {
   if (!parsed.success) {
     return { success: false, error: 'Invalid input.' };

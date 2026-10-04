@@ -2,6 +2,8 @@
 // deletion (docs/plans/2026-07-organizer-dashboard-migration.md). Don't build on this.
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
+import { resolveActingScope } from '@/server/actor';
+import { eventsInScope } from '@troptix/api/server';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -39,8 +41,11 @@ export async function GET(
     );
   }
 
-  const ownedEvent = await prisma.events.findUnique({
-    where: { id: eventId, organizerUserId: organizerId.uid, deletedAt: null },
+  const ownedEvent = await prisma.events.findFirst({
+    where: {
+      id: eventId,
+      ...eventsInScope(await resolveActingScope(organizerId)),
+    },
     select: { id: true },
   });
   if (!ownedEvent) {

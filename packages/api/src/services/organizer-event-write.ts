@@ -10,14 +10,15 @@ import {
   type UpdateEventInput,
 } from '../contracts/organizer';
 import { generateId } from './_shared/ids';
-import { requireOwnedEvent } from './_shared/owned-event';
+import { NotFoundError } from './_shared/errors';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
 import { ticketTypeWriteFields } from './_shared/ticket-type-fields';
-import { resolveOrganizerScope } from './organizer-scope';
 import {
-  ensureOrganizationForUser,
-  findOrganizationForOwner,
-} from './organizations';
+  eventsInScope,
+  resolveOrganizerScope,
+  type OrganizerScope,
+} from './organizer-scope';
+import { ensureOrganizationForUser } from './organizations';
 
 export async function createEvent(
   prisma: PrismaClient,
@@ -25,9 +26,9 @@ export async function createEvent(
   input: CreateEventInput
 ): Promise<{ eventId: string }> {
   const data = createEventInputSchema.parse(input);
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const scope = await resolveOrganizerScope(prisma, actor);
 
-  const org = await resolveOrganization(prisma, organizerUserId);
+  const org = await resolveOrganization(prisma, scope);
   const ticketTypes = data.ticketTypes ?? [];
   assertPaidTicketingAllowed(org, ticketTypes);
 
@@ -37,7 +38,7 @@ export async function createEvent(
     await tx.events.create({
       data: {
         id: eventId,
-        organizerUserId,
+        organizerUserId: scope.userId,
         organizationId: org.id,
         isDraft: true,
         organizer: org.displayName,
@@ -66,47 +67,40 @@ export async function updateEvent(
   input: UpdateEventInput
 ): Promise<{ organizationSlug: string }> {
   const data = updateEventInputSchema.parse(input);
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const scope = await resolveOrganizerScope(prisma, actor);
 
-  // Provisioning (a write) must wait until ownership has passed, so probing a
-  // foreign event id can't leave side effects.
-  const [, existingOrg] = await Promise.all([
-    requireOwnedEvent(prisma, organizerUserId, eventId),
-    findOrganizationForOwner(prisma, organizerUserId),
-  ]);
-  const org =
-    existingOrg ?? (await provisionOrganization(prisma, organizerUserId));
+  const event = await prisma.events.findFirst({
+    where: { id: eventId, ...eventsInScope(scope) },
+    select: { organization: { select: { slug: true, displayName: true } } },
+  });
+  if (!event) {
+    throw new NotFoundError('Event not found');
+  }
 
   await prisma.events.update({
     where: { id: eventId },
-    data: {
-      organizationId: org.id,
-      organizer: org.displayName,
-      ...eventFields(data),
-    },
+    data: { organizer: event.organization.displayName, ...eventFields(data) },
   });
 
-  return { organizationSlug: org.slug };
+  return { organizationSlug: event.organization.slug };
 }
 
 async function resolveOrganization(
   prisma: PrismaClient,
-  organizerUserId: string
+  scope: OrganizerScope
 ) {
-  const existing = await findOrganizationForOwner(prisma, organizerUserId);
-  return existing ?? provisionOrganization(prisma, organizerUserId);
-}
-
-async function provisionOrganization(
-  prisma: PrismaClient,
-  organizerUserId: string
-) {
+  if (scope.organizationId) {
+    const org = await prisma.organization.findUnique({
+      where: { id: scope.organizationId },
+    });
+    if (org) return org;
+  }
   const user = await prisma.users.findUnique({
-    where: { id: organizerUserId },
+    where: { id: scope.userId },
     select: { email: true },
   });
   return ensureOrganizationForUser(prisma, {
-    ownerUserId: organizerUserId,
+    ownerUserId: scope.userId,
     displayName: user?.email ?? '',
   });
 }

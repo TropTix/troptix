@@ -9,7 +9,9 @@ import type {
 import { generateUniqueSlug, isValidSlug } from './_shared/slug';
 import { publicEventsWhere } from './_shared/publicEvents';
 import { toEventSummary } from './_shared/eventSummary';
-import { NotFoundError } from './_shared/errors';
+import { NotFoundError, UnauthorizedError } from './_shared/errors';
+import { resolveOrganizerScope } from './organizer-scope';
+import type { Actor } from '../trpc/context';
 
 type OrganizationRow = Awaited<
   ReturnType<PrismaClient['organization']['create']>
@@ -58,7 +60,6 @@ export async function ensureOrganizationForUser(
 }
 
 export type UpdateOrganizationProfileInput = {
-  ownerUserId: string;
   displayName: string;
   slug: string;
   logoUrl: string | null;
@@ -80,9 +81,15 @@ const blankToNull = (value: string | null): string | null => {
 
 export async function updateOrganizationProfile(
   prisma: PrismaClient,
+  actor: Actor,
   input: UpdateOrganizationProfileInput
 ): Promise<UpdateOrganizationProfileResult> {
-  const org = await findOrganizationForOwner(prisma, input.ownerUserId);
+  const scope = await resolveOrganizerScope(prisma, actor);
+  const org = scope.organizationId
+    ? await prisma.organization.findUnique({
+        where: { id: scope.organizationId },
+      })
+    : null;
 
   const nextSlug = input.slug.trim().toLowerCase();
   if (nextSlug !== org?.slug) {
@@ -109,24 +116,13 @@ export async function updateOrganizationProfile(
   try {
     if (org) {
       await prisma.organization.update({ where: { id: org.id }, data });
-    } else {
-      // Owner-only today. Phase 1 must scope this to the acting Organization
-      // before Admins get the form, or an Admin's first save mints them an org.
+    } else if (!scope.organizationId) {
       await prisma.organization.create({
-        data: { ownerUserId: input.ownerUserId, ...data },
+        data: { ownerUserId: scope.userId, ...data },
       });
     }
   } catch (err) {
     if ((err as { code?: string }).code === 'P2002') {
-      // Two uniques can fire: losing the one-org-per-owner race means a
-      // concurrent first save won — retry as an update. Else it's the slug race.
-      if (!org) {
-        const winner = await findOrganizationForOwner(
-          prisma,
-          input.ownerUserId
-        );
-        if (winner) return updateOrganizationProfile(prisma, input);
-      }
       return { ok: false, reason: 'slug_taken' };
     }
     throw err;
@@ -192,4 +188,55 @@ export async function getOrganizationBySlug(
     upcomingEvents,
     pastEvents,
   };
+}
+
+export async function findActingOrganization(
+  prisma: PrismaClient,
+  actor: Actor
+) {
+  const scope = await resolveOrganizerScope(prisma, actor);
+  return scope.organizationId
+    ? prisma.organization.findUnique({ where: { id: scope.organizationId } })
+    : null;
+}
+
+export function listOwnedOrganizations(prisma: PrismaClient, actor: Actor) {
+  if (actor.kind !== 'user') {
+    throw new UnauthorizedError('Sign in to switch organizations');
+  }
+  return prisma.organization.findMany({
+    where: { ownerUserId: actor.userId },
+    select: { id: true, displayName: true },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+export async function createOrganization(
+  prisma: PrismaClient,
+  actor: Actor,
+  displayName: string
+): Promise<OrganizationRow> {
+  if (actor.kind !== 'user') {
+    throw new UnauthorizedError('Sign in to create an organization');
+  }
+  const name = displayName.trim() || FALLBACK_NAME;
+  const taken = await loadTakenSlugs(prisma);
+  const slug = generateUniqueSlug(name, (s) => taken.has(s));
+  return prisma.organization.create({
+    data: { displayName: name, slug, ownerUserId: actor.userId },
+  });
+}
+
+/** Makes an owned Organization the default the next time the dashboard opens. */
+export async function switchToOrganization(
+  prisma: PrismaClient,
+  actor: Actor,
+  organizationId: string
+): Promise<boolean> {
+  if (actor.kind !== 'user') return false;
+  const owned = await prisma.organization.updateMany({
+    where: { id: organizationId, ownerUserId: actor.userId },
+    data: { updatedAt: new Date() },
+  });
+  return owned.count === 1;
 }

@@ -2,6 +2,8 @@
 // deletion (docs/plans/2026-07-organizer-dashboard-migration.md). Don't build on this.
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
+import { resolveActingScope } from '@/server/actor';
+import { eventsInScope } from '@troptix/api/server';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -38,7 +40,7 @@ export async function GET() {
         address: true,
         isDraft: false,
       },
-      where: { organizerUserId: organizerId.uid },
+      where: eventsInScope(await resolveActingScope(organizerId)),
       orderBy: {
         startsAt: 'desc',
       },

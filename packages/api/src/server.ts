@@ -65,9 +65,18 @@ export {
   type ScanTicketResult,
 } from './services/organizer-checkin';
 export {
+  eventsInScope,
+  organizationInScope,
+  resolveOrganizerScope,
+  type OrganizerScope,
+} from './services/organizer-scope';
+export {
+  createOrganization,
   ensureOrganizationForUser,
-  findOrganizationForOwner,
+  findActingOrganization,
   getOrganizationBySlug,
+  listOwnedOrganizations,
+  switchToOrganization,
   updateOrganizationProfile,
 } from './services/organizations';
 export {

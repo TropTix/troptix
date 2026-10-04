@@ -78,7 +78,7 @@ model Organization {
   instagram   String?
   twitter     String?
   linkedin    String?
-  ownerUserId String   @unique
+  ownerUserId String
   verified    Boolean  @default(false)
 
   paidTicketingEnabled     Boolean   @default(false)
@@ -112,6 +112,8 @@ model Organization {
   events         Events[]
   memberships    Membership[]
   payoutRequests PayoutRequest[]
+
+  @@index([ownerUserId])
 }
 
 enum PayoutRequestStatus {

@@ -1,3 +1,4 @@
+import type { Actor } from '../trpc/context';
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import {
@@ -246,12 +247,18 @@ describe('updateOrganizationProfile', () => {
     const orgs = seed.map((o) => ({ ...o }));
     const prisma = {
       organization: {
+        findMany: async ({ where }: any) =>
+          orgs
+            .filter((o) => o.ownerUserId === where.ownerUserId)
+            .map((o) => ({ id: o.id, updatedAt: new Date(0), events: [] })),
         findFirst: async ({ where }: any) =>
           orgs
             .filter((o) => o.ownerUserId === where.ownerUserId)
             .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
         findUnique: async ({ where }: any) =>
-          orgs.find((o) => o.slug === where.slug) ?? null,
+          where.id
+            ? (orgs.find((o) => o.id === where.id) ?? null)
+            : (orgs.find((o) => o.slug === where.slug) ?? null),
         update: async ({ where, data }: any) => {
           const o = orgs.find((x) => x.id === where.id)!;
           Object.assign(o, data);
@@ -278,8 +285,13 @@ describe('updateOrganizationProfile', () => {
     return { prisma, orgs };
   }
 
+  const actorOf = (userId: string): Actor => ({
+    kind: 'user',
+    userId,
+    role: 'PATRON',
+  });
+
   const base = {
-    ownerUserId: 'u1',
     displayName: 'Island Vibes',
     slug: 'island-vibes',
     logoUrl: null,
@@ -309,7 +321,7 @@ describe('updateOrganizationProfile', () => {
 
   it('updates fields and blanks to null', async () => {
     const { prisma, orgs } = makeFake(seed());
-    const result = await updateOrganizationProfile(prisma, {
+    const result = await updateOrganizationProfile(prisma, actorOf('u1'), {
       ...base,
       displayName: 'Island Vibes Collective',
       bio: '  Soca everywhere  ',
@@ -324,13 +336,13 @@ describe('updateOrganizationProfile', () => {
 
   it('allows keeping the current slug (no false "taken")', async () => {
     const { prisma } = makeFake(seed());
-    const result = await updateOrganizationProfile(prisma, base);
+    const result = await updateOrganizationProfile(prisma, actorOf('u1'), base);
     expect(result).toEqual({ ok: true, slug: 'island-vibes' });
   });
 
   it('rejects a slug taken by another org', async () => {
     const { prisma } = makeFake(seed());
-    const result = await updateOrganizationProfile(prisma, {
+    const result = await updateOrganizationProfile(prisma, actorOf('u1'), {
       ...base,
       slug: 'sunset',
     });
@@ -339,7 +351,7 @@ describe('updateOrganizationProfile', () => {
 
   it('rejects an invalid slug', async () => {
     const { prisma } = makeFake(seed());
-    const result = await updateOrganizationProfile(prisma, {
+    const result = await updateOrganizationProfile(prisma, actorOf('u1'), {
       ...base,
       slug: 'ab',
     });
@@ -348,9 +360,8 @@ describe('updateOrganizationProfile', () => {
 
   it('creates the Organization on a first save, with the validated slug', async () => {
     const { prisma, orgs } = makeFake(seed());
-    const result = await updateOrganizationProfile(prisma, {
+    const result = await updateOrganizationProfile(prisma, actorOf('newbie'), {
       ...base,
-      ownerUserId: 'newbie',
       slug: 'fresh-crew',
       displayName: 'Fresh Crew',
     });
@@ -363,14 +374,12 @@ describe('updateOrganizationProfile', () => {
   it('writes nothing when a first save fails slug validation (no phantom org)', async () => {
     const { prisma, orgs } = makeFake(seed());
     const before = orgs.length;
-    const invalid = await updateOrganizationProfile(prisma, {
+    const invalid = await updateOrganizationProfile(prisma, actorOf('newbie'), {
       ...base,
-      ownerUserId: 'newbie',
       slug: 'ab',
     });
-    const taken = await updateOrganizationProfile(prisma, {
+    const taken = await updateOrganizationProfile(prisma, actorOf('newbie'), {
       ...base,
-      ownerUserId: 'newbie',
       slug: 'sunset',
     });
     expect(invalid).toEqual({ ok: false, reason: 'slug_invalid' });
@@ -381,19 +390,28 @@ describe('updateOrganizationProfile', () => {
   it('maps a slug unique-constraint violation (race) to slug_taken', async () => {
     const prisma = {
       organization: {
+        findMany: async () => [{ id: 'a', updatedAt: new Date(0), events: [] }],
         findFirst: async () => ({
           id: 'a',
           ownerUserId: 'u1',
           slug: 'island-vibes',
           displayName: 'Island Vibes',
         }),
-        findUnique: async () => null,
+        findUnique: async ({ where }: any) =>
+          where.id
+            ? {
+                id: 'a',
+                ownerUserId: 'u1',
+                slug: 'island-vibes',
+                displayName: 'Island Vibes',
+              }
+            : null,
         update: async () => {
           throw { code: 'P2002' };
         },
       },
     } as unknown as PrismaClient;
-    const result = await updateOrganizationProfile(prisma, {
+    const result = await updateOrganizationProfile(prisma, actorOf('u1'), {
       ...base,
       slug: 'new-slug',
     });
