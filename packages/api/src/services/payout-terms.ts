@@ -7,6 +7,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from './_shared/errors';
+import { organizationInScope, resolveOrganizerScope } from './organizer-scope';
 
 export function currentPayoutTerms(): PayoutTerms {
   return PAYOUT_TERMS;
@@ -37,8 +38,9 @@ export async function acceptPayoutTerms(
       'The payout terms changed while you were reading. Reload and review the new version.'
     );
   }
+  const scope = await resolveOrganizerScope(prisma, actor);
   const updated = await prisma.organization.updateMany({
-    where: { ownerUserId: actor.userId },
+    where: organizationInScope(scope),
     data: { payoutTermsAcceptedAt: now, payoutTermsVersion: input.version },
   });
   if (updated.count === 0) {

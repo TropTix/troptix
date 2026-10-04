@@ -1,5 +1,10 @@
 import { redirect } from 'next/navigation';
-import type { Actor } from '@troptix/api/server';
+import {
+  resolveOrganizerScope,
+  type Actor,
+  type OrganizerScope,
+} from '@troptix/api/server';
+import prisma from '@/server/prisma';
 import { getServerUser, type ServerUser } from '@/server/authUser';
 
 export function userToActor(user: ServerUser): Actor {
@@ -16,4 +21,10 @@ export async function requireOrganizerActor(): Promise<Actor> {
     redirect('/auth/signin');
   }
   return userToActor(user);
+}
+
+export async function resolveActingScope(
+  user: ServerUser
+): Promise<OrganizerScope> {
+  return resolveOrganizerScope(prisma, userToActor(user));
 }

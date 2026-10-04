@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import prisma from '@/server/prisma';
-import { findOrganizationForOwner } from '@troptix/api/server';
+import { findActingOrganization } from '@troptix/api/server';
+import { userToActor } from '@/server/actor';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import OrganizationProfileForm from './_components/OrganizationProfileForm';
 
@@ -11,7 +12,7 @@ export default async function OrganizerProfilePage() {
   const user = await getUserFromIdTokenCookie();
   if (!user) redirect('/auth/signin');
 
-  const org = await findOrganizationForOwner(prisma, user.uid);
+  const org = await findActingOrganization(prisma, userToActor(user));
 
   return (
     <OrganizationProfileForm

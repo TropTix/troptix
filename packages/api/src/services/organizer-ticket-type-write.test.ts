@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -48,6 +49,7 @@ function fakePrisma(
 
   const prisma = {
     organization: {
+      ...ownedOrganizations(),
       findFirst: vi
         .fn()
         .mockResolvedValue(
@@ -86,7 +88,7 @@ describe('createTicketType', () => {
     await createTicketType(prisma, OWNER, 'e1', input());
     expect(eventsFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 'e1',
-      organizerUserId: 'owner-1',
+      organizationId: 'org-1',
       deletedAt: null,
     });
   });
@@ -137,7 +139,7 @@ describe('updateTicketType', () => {
     expect(ticketTypesFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 't1',
       eventId: 'e1',
-      event: { organizerUserId: 'owner-1', deletedAt: null },
+      event: { organizationId: 'org-1', deletedAt: null },
     });
   });
 

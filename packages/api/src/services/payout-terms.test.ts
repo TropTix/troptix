@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -19,9 +20,11 @@ import {
 const OWNER: Actor = { kind: 'user', userId: 'owner-1', role: 'PATRON' };
 const NOW = new Date('2026-09-27T12:00:00Z');
 
-function fakePrisma(count = 1) {
+function fakePrisma(count = 1, organizationIds = ['org-1']) {
   const updateMany = vi.fn().mockResolvedValue({ count });
-  const prisma = { organization: { updateMany } } as unknown as PrismaClient;
+  const prisma = {
+    organization: { ...ownedOrganizations(organizationIds), updateMany },
+  } as unknown as PrismaClient;
   return { prisma, updateMany };
 }
 
@@ -75,7 +78,7 @@ describe('payout terms', () => {
       NOW
     );
     expect(updateMany).toHaveBeenCalledWith({
-      where: { ownerUserId: 'owner-1' },
+      where: { id: 'org-1' },
       data: {
         payoutTermsAcceptedAt: NOW,
         payoutTermsVersion: PAYOUT_TERMS.version,
@@ -92,7 +95,7 @@ describe('payout terms', () => {
   });
 
   it('refuses an anonymous actor and a user with no organization', async () => {
-    const { prisma } = fakePrisma(0);
+    const { prisma } = fakePrisma(0, []);
     await expect(
       acceptPayoutTerms(
         prisma,

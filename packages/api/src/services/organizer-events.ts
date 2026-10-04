@@ -5,7 +5,12 @@ import type {
   ViewAsInput,
 } from '../contracts/organizer';
 import { eventCardSelect, toEventSummary } from './_shared/organizerReads';
-import { isPlatformOwner, resolveOrganizerScope } from './organizer-scope';
+import {
+  eventsInScope,
+  isPlatformOwner,
+  organizationInScope,
+  resolveOrganizerScope,
+} from './organizer-scope';
 
 export async function listOrganizerEvents(
   prisma: PrismaClient,
@@ -13,14 +18,14 @@ export async function listOrganizerEvents(
   input: ViewAsInput = {},
   now: Date = new Date()
 ): Promise<OrganizerEventSummary[]> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
   );
 
   const rows = await prisma.events.findMany({
-    where: { organizerUserId, deletedAt: null },
+    where: eventsInScope(scope),
     select: eventCardSelect,
     orderBy: { startsAt: 'desc' },
   });
@@ -33,12 +38,12 @@ export async function getEventNavSummary(
   actor: Actor,
   eventId: string
 ) {
-  const userId = await resolveOrganizerScope(prisma, actor);
-  const ownership = (await isPlatformOwner(prisma, userId))
-    ? {}
-    : { organizerUserId: userId };
-  return prisma.events.findUnique({
-    where: { id: eventId, deletedAt: null, ...ownership },
+  const scope = await resolveOrganizerScope(prisma, actor);
+  const ownership = (await isPlatformOwner(prisma, scope.userId))
+    ? { deletedAt: null }
+    : eventsInScope(scope);
+  return prisma.events.findFirst({
+    where: { id: eventId, ...ownership },
     select: { name: true, isDraft: true },
   });
 }
@@ -48,9 +53,9 @@ export async function getEventName(
   actor: Actor,
   eventId: string
 ) {
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
-  return prisma.events.findUnique({
-    where: { id: eventId, organizerUserId, deletedAt: null },
+  const scope = await resolveOrganizerScope(prisma, actor);
+  return prisma.events.findFirst({
+    where: { id: eventId, ...eventsInScope(scope) },
     select: { name: true },
   });
 }
@@ -60,10 +65,10 @@ export async function getEventForEdit(
   actor: Actor,
   eventId: string
 ) {
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const scope = await resolveOrganizerScope(prisma, actor);
   const [event, organization] = await Promise.all([
-    prisma.events.findUnique({
-      where: { id: eventId, organizerUserId, deletedAt: null },
+    prisma.events.findFirst({
+      where: { id: eventId, ...eventsInScope(scope) },
       include: {
         ticketTypes: {
           select: {
@@ -81,7 +86,7 @@ export async function getEventForEdit(
       },
     }),
     prisma.organization.findFirst({
-      where: { ownerUserId: organizerUserId },
+      where: organizationInScope(scope),
       select: { displayName: true, paidTicketingEnabled: true },
     }),
   ]);
@@ -93,11 +98,11 @@ export async function listEventAttendees(
   actor: Actor,
   eventId: string
 ) {
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const scope = await resolveOrganizerScope(prisma, actor);
   return prisma.tickets.findMany({
     where: {
       eventId,
-      event: { organizerUserId, deletedAt: null },
+      event: eventsInScope(scope),
       order: { status: 'COMPLETED' },
     },
     select: {

@@ -8,7 +8,7 @@ import type {
 } from '../contracts/organizer';
 import { NotFoundError } from './_shared/errors';
 import { customerDisplay, toCents } from './_shared/organizerMapping';
-import { resolveOrganizerScope } from './organizer-scope';
+import { eventsInScope, resolveOrganizerScope } from './organizer-scope';
 
 /** Newest-N cap on the list read. The full set is the CSV export's job. */
 export const ORDERS_LIST_LIMIT = 200;
@@ -19,7 +19,7 @@ export async function listEventOrders(
   eventId: string,
   input: ViewAsInput = {}
 ): Promise<EventOrderRow[]> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
@@ -27,7 +27,7 @@ export async function listEventOrders(
 
   // A non-owned or missing event yields a null gate → NotFound (not a
   // misleading empty list).
-  const ownedEvent = { organizerUserId, deletedAt: null };
+  const ownedEvent = eventsInScope(scope);
   const [event, rows] = await Promise.all([
     prisma.events.findFirst({
       where: { id: eventId, ...ownedEvent },
@@ -72,7 +72,7 @@ export async function getOrderDetail(
   orderId: string,
   input: ViewAsInput = {}
 ): Promise<OrderDetail> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
@@ -84,7 +84,7 @@ export async function getOrderDetail(
     where: {
       id: orderId,
       eventId,
-      event: { organizerUserId, deletedAt: null },
+      event: eventsInScope(scope),
     },
     select: {
       id: true,

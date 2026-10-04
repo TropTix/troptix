@@ -12,8 +12,11 @@ import { generateId } from './_shared/ids';
 import { toCents } from './_shared/organizerMapping';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
 import { ticketTypeWriteFields } from './_shared/ticket-type-fields';
-import { resolveOrganizerScope } from './organizer-scope';
-import { findOrganizationForOwner } from './organizations';
+import {
+  eventsInScope,
+  organizationInScope,
+  resolveOrganizerScope,
+} from './organizer-scope';
 
 export async function createTicketType(
   prisma: PrismaClient,
@@ -22,11 +25,11 @@ export async function createTicketType(
   input: TicketTypeInput
 ): Promise<{ ticketTypeId: string }> {
   const data = ticketTypeInputSchema.parse(input);
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const scope = await resolveOrganizerScope(prisma, actor);
 
   const [, org] = await Promise.all([
-    requireOwnedEvent(prisma, organizerUserId, eventId),
-    findOrganizationForOwner(prisma, organizerUserId),
+    requireOwnedEvent(prisma, scope, eventId),
+    prisma.organization.findFirst({ where: organizationInScope(scope) }),
   ]);
   assertPaidTicketingAllowed(
     { paidTicketingEnabled: org?.paidTicketingEnabled ?? false },
@@ -49,18 +52,18 @@ export async function updateTicketType(
   input: TicketTypeInput
 ): Promise<void> {
   const data = ticketTypeInputSchema.parse(input);
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const scope = await resolveOrganizerScope(prisma, actor);
 
   const [owned, org] = await Promise.all([
     prisma.ticketTypes.findFirst({
       where: {
         id: ticketTypeId,
         eventId,
-        event: { organizerUserId, deletedAt: null },
+        event: eventsInScope(scope),
       },
       select: { id: true, price: true, priceCents: true },
     }),
-    findOrganizationForOwner(prisma, organizerUserId),
+    prisma.organization.findFirst({ where: organizationInScope(scope) }),
   ]);
   if (!owned) {
     throw new NotFoundError('Ticket type not found');

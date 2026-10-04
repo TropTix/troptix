@@ -91,6 +91,8 @@ export const organizerDashboardSchema = z.object({
   activeEvents: z.array(organizerEventSummarySchema),
   /** The latest orders, deliberately NOT range-scoped. */
   recentOrders: z.array(dashboardRecentOrderSchema),
+  /** Null until the person's first event creates their Organization. */
+  organization: z.object({ displayName: z.string() }).nullable(),
   setup: organizerSetupStateSchema,
 });
 export type OrganizerDashboard = z.infer<typeof organizerDashboardSchema>;

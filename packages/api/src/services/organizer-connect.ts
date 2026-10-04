@@ -14,7 +14,7 @@ import type {
 } from '../contracts/payouts';
 import { NotFoundError, UnauthorizedError } from './_shared/errors';
 import { ensureOrganizationForUser } from './organizations';
-import { resolveOrganizerScope } from './organizer-scope';
+import { organizationInScope, resolveOrganizerScope } from './organizer-scope';
 
 const ORG_SELECT = {
   id: true,
@@ -78,13 +78,13 @@ export async function getConnectSetup(
   actor: Actor,
   input: { viewAsOrganizerUserId?: string } = {}
 ): Promise<ConnectSetup> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
   );
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: organizerUserId },
+    where: organizationInScope(scope),
     select: {
       stripeAccountId: true,
       stripeTransfersStatus: true,
@@ -139,20 +139,28 @@ async function ownedOrg(
   if (actor.kind !== 'user') {
     throw new UnauthorizedError('Sign in to manage payouts');
   }
-  const select = { where: { ownerUserId: actor.userId }, select: ORG_SELECT };
-  const org = await prisma.organization.findFirst(select);
+  const scope = await resolveOrganizerScope(prisma, actor);
+  const org = await prisma.organization.findFirst({
+    where: organizationInScope(scope),
+    select: ORG_SELECT,
+  });
   if (org) return org;
-  if (!opts.provision) throw new NotFoundError('Organization not found');
+  if (!opts.provision || scope.organizationId) {
+    throw new NotFoundError('Organization not found');
+  }
 
   const user = await prisma.users.findUnique({
     where: { id: actor.userId },
     select: { email: true },
   });
-  await ensureOrganizationForUser(prisma, {
+  const provisioned = await ensureOrganizationForUser(prisma, {
     ownerUserId: actor.userId,
     displayName: user?.email ?? '',
   });
-  const created = await prisma.organization.findFirst(select);
+  const created = await prisma.organization.findUnique({
+    where: { id: provisioned.id },
+    select: ORG_SELECT,
+  });
   if (!created) throw new NotFoundError('Organization not found');
   return created;
 }
