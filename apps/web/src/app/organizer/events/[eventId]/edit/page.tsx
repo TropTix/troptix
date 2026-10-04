@@ -1,5 +1,7 @@
 import { BackButton } from '@/components/ui/back-button';
 import prisma from '@/server/prisma';
+import { getEventForEdit } from '@troptix/api/server';
+import { userToActor } from '@/server/actor';
 import { parseStoredFlyerPalette } from '@troptix/api';
 import EventForm from '../../_components/EventForm';
 import { notFound } from 'next/navigation';
@@ -17,27 +19,7 @@ import type { ServerUser } from '@/server/authUser';
 // Ownership scoping in the query is the access check — null means 404.
 // Errors propagate to the error boundary; a DB failure is not a 404.
 async function getEvent(eventId: string, user: ServerUser) {
-  {
-    const event = await prisma.events.findUnique({
-      where: { id: eventId, organizerUserId: user.uid, deletedAt: null },
-      include: {
-        ticketTypes: {
-          select: {
-            name: true,
-            price: true,
-            capacity: true,
-            description: true,
-            maxPurchasePerUser: true,
-            saleStartsAt: true,
-            saleEndsAt: true,
-            ticketingFees: true,
-            discountCode: true,
-          },
-        },
-      },
-    });
-    return event;
-  }
+  return getEventForEdit(prisma, userToActor(user), eventId);
 }
 
 export default async function EditEventPage(props: EditEventPageProps) {
@@ -48,7 +30,7 @@ export default async function EditEventPage(props: EditEventPageProps) {
   if (!user) {
     redirect('/auth/signin');
   }
-  const event = await getEvent(eventId, user);
+  const { event, organization: org } = await getEvent(eventId, user);
 
   if (!event) {
     notFound();
@@ -71,10 +53,6 @@ export default async function EditEventPage(props: EditEventPageProps) {
     flyerPalette: parseStoredFlyerPalette(event.flyerPalette),
   };
 
-  const org = await prisma.organization.findFirst({
-    where: { ownerUserId: user.uid },
-    select: { displayName: true, paidTicketingEnabled: true },
-  });
   const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
 
   return (

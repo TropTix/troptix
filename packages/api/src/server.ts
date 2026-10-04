@@ -40,7 +40,13 @@ export {
   listPublicEvents,
 } from './services/events';
 export { getDashboard } from './services/organizer-dashboard';
-export { listOrganizerEvents } from './services/organizer-events';
+export {
+  getEventForEdit,
+  getEventName,
+  getEventNavSummary,
+  listEventAttendees,
+  listOrganizerEvents,
+} from './services/organizer-events';
 export { getEventOverview } from './services/organizer-event-overview';
 export {
   listEventOrders,

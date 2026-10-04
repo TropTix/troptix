@@ -27,7 +27,7 @@ export async function resolveOrganizerScope(
 }
 
 /** The explicit grant (`Users.isPlatformOwner`, ADR 0022) — never an email. */
-async function isPlatformOwner(
+export async function isPlatformOwner(
   prisma: PrismaClient,
   userId: string
 ): Promise<boolean> {
