@@ -4,7 +4,7 @@ import { TicketStatus, type PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import { ConflictError, NotFoundError } from './_shared/errors';
 import { requireOwnedEvent } from './_shared/owned-event';
-import { resolveOrganizerScope } from './organizer-scope';
+import { eventsInScope, resolveOrganizerScope } from './organizer-scope';
 
 // Un-checked-in is two statuses mid-cutover: legacy AVAILABLE and the
 // canonical VALID the reservation checkout mints.
@@ -27,8 +27,8 @@ export async function scanTicket(
   actor: Actor,
   input: { ticketId: string; eventId: string }
 ): Promise<ScanTicketResult> {
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
-  await requireOwnedEvent(prisma, organizerUserId, input.eventId);
+  const scope = await resolveOrganizerScope(prisma, actor);
+  await requireOwnedEvent(prisma, scope, input.eventId);
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: input.ticketId, eventId: input.eventId },
@@ -66,12 +66,12 @@ export async function toggleTicketCheckIn(
   actor: Actor,
   input: { ticketId: string }
 ) {
-  const organizerUserId = await resolveOrganizerScope(prisma, actor);
+  const scope = await resolveOrganizerScope(prisma, actor);
 
   const ticket = await prisma.tickets.findFirst({
     where: {
       id: input.ticketId,
-      event: { organizerUserId, deletedAt: null },
+      event: eventsInScope(scope),
     },
     select: { id: true, status: true },
   });

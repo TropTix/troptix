@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -47,9 +48,14 @@ function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
 
   const eventsCreate = vi.fn().mockResolvedValue({});
   const ticketTypesCreateMany = vi.fn().mockResolvedValue({ count: 0 });
-  const eventsFindFirst = vi
-    .fn()
-    .mockResolvedValue(opts.event === undefined ? { id: 'e1' } : opts.event);
+  const eventsFindFirst = vi.fn().mockResolvedValue(
+    opts.event === undefined
+      ? {
+          id: 'e1',
+          organization: { slug: 'eman-events', displayName: 'Eman Events' },
+        }
+      : opts.event
+  );
   const eventsUpdate = vi.fn().mockResolvedValue({});
 
   const prisma = {
@@ -57,7 +63,9 @@ function fakePrisma(opts: { paidEnabled?: boolean; event?: unknown } = {}) {
       findUnique: vi.fn().mockResolvedValue({ email: 'o@b.com' }),
     },
     organization: {
+      ...ownedOrganizations(),
       findFirst: vi.fn().mockResolvedValue(org),
+      findUnique: vi.fn().mockResolvedValue(org),
     },
     events: { findFirst: eventsFindFirst, update: eventsUpdate },
     $transaction: vi.fn(
@@ -183,7 +191,7 @@ describe('updateEvent', () => {
     await updateEvent(prisma, OWNER, 'e1', updateInput);
     expect(eventsFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 'e1',
-      organizerUserId: 'owner-1',
+      organizationId: 'org-1',
       deletedAt: null,
     });
   });
@@ -196,7 +204,7 @@ describe('updateEvent', () => {
     expect(eventsUpdate).not.toHaveBeenCalled();
   });
 
-  it('updates event fields only, refreshing the org linkage, dates verbatim', async () => {
+  it('updates event fields only, keeping the event in its organization, dates verbatim', async () => {
     const { prisma, eventsUpdate } = fakePrisma();
     await updateEvent(prisma, OWNER, 'e1', {
       ...updateInput,
@@ -208,7 +216,6 @@ describe('updateEvent', () => {
     expect(call.where).toEqual({ id: 'e1' });
     expect(call.data).toMatchObject({
       name: 'Renamed Cruise',
-      organizationId: 'org-1',
       organizer: 'Eman Events',
       isPrivate: true,
     });

@@ -17,7 +17,7 @@ import {
   type TicketTypeRollupRow,
 } from './_shared/organizerReads';
 import { getSaleState } from './_shared/saleState';
-import { resolveOrganizerScope } from './organizer-scope';
+import { eventsInScope, resolveOrganizerScope } from './organizer-scope';
 
 export async function listTicketTypes(
   prisma: PrismaClient,
@@ -26,7 +26,7 @@ export async function listTicketTypes(
   input: ViewAsInput = {},
   now: Date = new Date()
 ): Promise<TicketTypesView> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
@@ -34,7 +34,7 @@ export async function listTicketTypes(
 
   const [event, rollups] = await Promise.all([
     prisma.events.findFirst({
-      where: { id: eventId, organizerUserId, deletedAt: null },
+      where: { id: eventId, ...eventsInScope(scope) },
       select: {
         id: true,
         endsAt: true,

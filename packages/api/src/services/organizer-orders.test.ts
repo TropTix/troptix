@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -22,6 +23,7 @@ function fakePrisma(
   const ordersFindFirst = vi.fn().mockResolvedValue(opts.order ?? null);
 
   const prisma = {
+    organization: ownedOrganizations(),
     users: {
       findUnique: vi
         .fn()
@@ -48,7 +50,7 @@ describe('listEventOrders', () => {
     const args = ordersFindMany.mock.calls[0][0];
     expect(args.where).toMatchObject({
       eventId: 'e1',
-      event: { organizerUserId: 'owner-1', deletedAt: null },
+      event: { organizationId: 'org-1', deletedAt: null },
       status: { not: 'PENDING' },
     });
     expect(args.take).toBe(200);
@@ -62,14 +64,14 @@ describe('listEventOrders', () => {
   });
 
   it('honors View-as for a platform owner', async () => {
-    const { prisma, ordersFindMany } = fakePrisma({
+    const { prisma } = fakePrisma({
       platformOwner: true,
     });
     await listEventOrders(prisma, ADMIN, 'e1', {
       viewAsOrganizerUserId: 'target',
     });
-    expect(ordersFindMany.mock.calls[0][0].where.event.organizerUserId).toBe(
-      'target'
+    expect(prisma.organization.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ownerUserId: 'target' } })
     );
   });
 
@@ -135,7 +137,7 @@ describe('getOrderDetail', () => {
     expect(ordersFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 'o1',
       eventId: 'e1',
-      event: { organizerUserId: 'owner-1', deletedAt: null },
+      event: { organizationId: 'org-1', deletedAt: null },
     });
   });
 

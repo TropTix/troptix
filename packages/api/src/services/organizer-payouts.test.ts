@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -86,7 +87,7 @@ function fakePrisma(opts: FakeOpts = {}) {
         .fn()
         .mockResolvedValue({ isPlatformOwner: opts.platformOwner ?? false }),
     },
-    organization: { findFirst: orgFindFirst },
+    organization: { ...ownedOrganizations(), findFirst: orgFindFirst },
     payoutRequest: { groupBy, findMany, count, create, updateMany },
     $queryRaw: queryRaw,
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
@@ -108,22 +109,20 @@ describe('getPayouts — authorization and scoping', () => {
   it('resolves the org by the acting owner', async () => {
     const { prisma, orgFindFirst } = fakePrisma();
     await getPayouts(prisma, OWNER, {}, NOW);
-    expect(orgFindFirst.mock.calls[0][0].where).toEqual({
-      ownerUserId: 'owner-1',
-    });
+    expect(orgFindFirst.mock.calls[0][0].where).toEqual({ id: 'org-1' });
   });
 
   it('honors View-as for a platform owner', async () => {
-    const { prisma, orgFindFirst } = fakePrisma({ platformOwner: true });
+    const { prisma } = fakePrisma({ platformOwner: true });
     await getPayouts(
       prisma,
       OWNER,
       { viewAsOrganizerUserId: 'target-organizer' },
       NOW
     );
-    expect(orgFindFirst.mock.calls[0][0].where).toEqual({
-      ownerUserId: 'target-organizer',
-    });
+    expect(prisma.organization.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ownerUserId: 'target-organizer' } })
+    );
   });
 
   it('returns zeroed balances when the user has no organization', async () => {
@@ -359,7 +358,7 @@ describe('cancelPayoutRequest', () => {
       where: {
         id: 'req-1',
         status: 'REQUESTED',
-        organization: { ownerUserId: 'owner-1' },
+        organization: { id: 'org-1' },
       },
       data: { status: 'CANCELLED' },
     });

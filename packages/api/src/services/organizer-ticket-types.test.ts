@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -45,6 +46,7 @@ function fakePrisma(
   const ticketsGroupBy = vi.fn().mockResolvedValue(opts.revenue ?? []);
 
   const prisma = {
+    organization: ownedOrganizations(),
     users: {
       findUnique: vi
         .fn()
@@ -100,7 +102,7 @@ describe('listTicketTypes — authorization', () => {
     await listTicketTypes(prisma, OWNER, 'e1', {}, NOW);
     expect(eventsFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 'e1',
-      organizerUserId: 'owner-1',
+      organizationId: 'org-1',
       deletedAt: null,
     });
   });
@@ -113,7 +115,7 @@ describe('listTicketTypes — authorization', () => {
   });
 
   it('honors View-as for a platform owner', async () => {
-    const { prisma, eventsFindFirst } = fakePrisma({
+    const { prisma } = fakePrisma({
       platformOwner: true,
     });
     await listTicketTypes(
@@ -123,8 +125,8 @@ describe('listTicketTypes — authorization', () => {
       { viewAsOrganizerUserId: 'target' },
       NOW
     );
-    expect(eventsFindFirst.mock.calls[0][0].where.organizerUserId).toBe(
-      'target'
+    expect(prisma.organization.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ownerUserId: 'target' } })
     );
   });
 });
