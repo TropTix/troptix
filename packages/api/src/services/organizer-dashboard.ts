@@ -16,7 +16,11 @@ import {
   toRecentOrder,
 } from './_shared/organizerReads';
 import { isProfileComplete } from './_shared/organizerSetup';
-import { resolveOrganizerScope } from './organizer-scope';
+import {
+  eventsInScope,
+  organizationInScope,
+  resolveOrganizerScope,
+} from './organizer-scope';
 
 const ACTIVE_EVENTS_LIMIT = 5;
 const DEFAULT_RANGE: DashboardRange = 'month';
@@ -81,7 +85,7 @@ export async function getDashboard(
   input: DashboardInput = {},
   now: Date = new Date()
 ): Promise<OrganizerDashboard> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
@@ -90,7 +94,7 @@ export async function getDashboard(
   const range = input.range ?? DEFAULT_RANGE;
   const window = rangeWindow(range, now);
   const startOfToday = startOfUtcDay(now);
-  const ownedEvents = { organizerUserId, deletedAt: null };
+  const ownedEvents = eventsInScope(scope);
 
   const [revenue, salesRows, activeEventRows, recentOrderRows, org] =
     await Promise.all([
@@ -113,7 +117,7 @@ export async function getDashboard(
         JOIN "Orders" o ON o."id" = t."orderId"
         JOIN "Events" e ON e."id" = t."eventId"
         WHERE o."status" = 'COMPLETED'
-          AND e."organizerUserId" = ${organizerUserId}
+          AND e."organizationId" = ${scope.organizationId}
           AND e."deletedAt" IS NULL
           AND t."createdAt" >= ${window.from}
           AND t."createdAt" < ${window.to}
@@ -137,8 +141,13 @@ export async function getDashboard(
       ),
 
       prisma.organization.findFirst({
-        where: { ownerUserId: organizerUserId },
-        select: { logoUrl: true, bio: true, paidTicketingEnabled: true },
+        where: organizationInScope(scope),
+        select: {
+          displayName: true,
+          logoUrl: true,
+          bio: true,
+          paidTicketingEnabled: true,
+        },
       }),
     ]);
 
@@ -158,6 +167,7 @@ export async function getDashboard(
     salesSeries: buildSalesSeries(salesRows, window),
     activeEvents,
     recentOrders,
+    organization: org ? { displayName: org.displayName } : null,
     setup: {
       profileComplete: isProfileComplete(org),
       paidTicketingEnabled: org?.paidTicketingEnabled ?? false,

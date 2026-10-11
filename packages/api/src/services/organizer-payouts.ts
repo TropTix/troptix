@@ -23,7 +23,7 @@ import {
   resolvePayoutPolicy,
   type PayoutPolicy,
 } from './_shared/payouts';
-import { resolveOrganizerScope } from './organizer-scope';
+import { organizationInScope, resolveOrganizerScope } from './organizer-scope';
 import { termsAccepted } from './payout-terms';
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -195,14 +195,14 @@ export async function getPayouts(
   input: GetPayoutsInput = {},
   now: Date = new Date()
 ): Promise<OrganizerPayouts> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
   );
 
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: organizerUserId },
+    where: organizationInScope(scope),
     select: ORG_PAYOUT_SELECT,
   });
 
@@ -264,8 +264,9 @@ export async function requestPayout(
     throw new UnauthorizedError('Sign in to request a payout');
   }
 
+  const scope = await resolveOrganizerScope(prisma, actor);
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: actor.userId },
+    where: organizationInScope(scope),
     select: ORG_PAYOUT_SELECT,
   });
   if (!org) throw new PayoutSetupIncompleteError();
@@ -321,11 +322,12 @@ export async function cancelPayoutRequest(
     throw new UnauthorizedError('Sign in to cancel a payout request');
   }
 
+  const scope = await resolveOrganizerScope(prisma, actor);
   const updated = await prisma.payoutRequest.updateMany({
     where: {
       id: input.id,
       status: 'REQUESTED',
-      organization: { ownerUserId: actor.userId },
+      organization: organizationInScope(scope),
     },
     data: { status: 'CANCELLED' },
   });

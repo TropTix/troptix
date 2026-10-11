@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import prisma from '@/server/prisma';
 import { updateOrganizationProfile } from '@troptix/api/server';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
+import { userToActor } from '@/server/actor';
 import {
   organizationProfileSchema,
   OrganizationProfileValues,
@@ -34,8 +35,7 @@ export async function saveOrganizationProfile(
   }
 
   const d = parsed.data;
-  const result = await updateOrganizationProfile(prisma, {
-    ownerUserId: user.uid,
+  const result = await updateOrganizationProfile(prisma, userToActor(user), {
     displayName: d.displayName,
     slug: d.slug,
     logoUrl: d.logoUrl ?? null,

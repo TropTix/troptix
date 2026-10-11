@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -35,7 +36,7 @@ function fakePrisma(opts: FakeOpts = {}) {
     },
     orders: { aggregate: ordersAggregate, findMany: ordersFindMany },
     events: { findMany: eventsFindMany },
-    organization: { findFirst: orgFindFirst },
+    organization: { ...ownedOrganizations(), findFirst: orgFindFirst },
     $queryRaw: queryRaw,
   } as unknown as PrismaClient;
 
@@ -56,13 +57,13 @@ describe('getDashboard — authorization', () => {
 
     const where = eventsFindMany.mock.calls[0][0].where;
     expect(where).toMatchObject({
-      organizerUserId: 'owner-1',
+      organizationId: 'org-1',
       deletedAt: null,
     });
   });
 
   it('ignores View-as for a non-platform-owner (pins them to themselves)', async () => {
-    const { prisma, eventsFindMany } = fakePrisma({
+    const { prisma } = fakePrisma({
       platformOwner: false,
     });
 
@@ -73,13 +74,13 @@ describe('getDashboard — authorization', () => {
       NOW
     );
 
-    expect(eventsFindMany.mock.calls[0][0].where.organizerUserId).toBe(
-      'owner-1'
+    expect(prisma.organization.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ownerUserId: 'owner-1' } })
     );
   });
 
   it('honors View-as for a platform owner', async () => {
-    const { prisma, eventsFindMany } = fakePrisma({
+    const { prisma } = fakePrisma({
       platformOwner: true,
     });
 
@@ -90,8 +91,8 @@ describe('getDashboard — authorization', () => {
       NOW
     );
 
-    expect(eventsFindMany.mock.calls[0][0].where.organizerUserId).toBe(
-      'target-organizer'
+    expect(prisma.organization.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ownerUserId: 'target-organizer' } })
     );
   });
 
@@ -301,7 +302,7 @@ describe('getDashboard — range', () => {
     expect(where.createdAt.lt).toEqual(NOW);
     expect(where.status).toBe('COMPLETED');
     expect(where.event).toMatchObject({
-      organizerUserId: 'owner-1',
+      organizationId: 'org-1',
       deletedAt: null,
     });
   });

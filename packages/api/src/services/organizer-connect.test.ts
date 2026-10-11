@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type Stripe from 'stripe';
@@ -36,7 +37,6 @@ function fakePrisma(
 ) {
   const row = org === null ? null : { ...ORG, ...org };
   const findFirst = vi.fn().mockResolvedValue(row);
-  const findMany = vi.fn().mockResolvedValue([]);
   const create = vi.fn().mockResolvedValue({ ...ORG, id: 'org-new' });
   const orgFindUnique = vi
     .fn()
@@ -45,8 +45,8 @@ function fakePrisma(
   const update = vi.fn().mockResolvedValue(row);
   const prisma = {
     organization: {
+      ...ownedOrganizations(org === null ? [] : ['org-1']),
       findFirst,
-      findMany,
       create,
       findUnique: orgFindUnique,
       update,
@@ -206,10 +206,11 @@ describe('startStripeOnboarding', () => {
 
   it('provisions an Organization for a first-time organizer, then connects', async () => {
     const { prisma, findFirst, create } = fakePrisma(null);
-    findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValue({ ...ORG, id: 'org-new' });
+    findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    vi.mocked(prisma.organization.findUnique).mockResolvedValue({
+      ...ORG,
+      id: 'org-new',
+    } as never);
     const { stripe, calls } = fakeStripe();
 
     const result = await startStripeOnboarding(prisma, stripe, OWNER, {
