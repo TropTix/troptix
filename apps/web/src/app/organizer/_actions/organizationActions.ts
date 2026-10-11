@@ -7,6 +7,13 @@ import { createOrganization, switchToOrganization } from '@troptix/api/server';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 
+function returnPath(formData: FormData): string {
+  const returnTo = String(formData.get('returnTo') ?? '');
+  return returnTo.startsWith('/organizer') && !returnTo.startsWith('//')
+    ? returnTo
+    : '/organizer';
+}
+
 export async function setActingOrganization(formData: FormData) {
   const user = await getUserFromIdTokenCookie();
   if (!user) redirect('/auth/signin');
@@ -17,7 +24,7 @@ export async function setActingOrganization(formData: FormData) {
     organizationId
   );
   if (switched) revalidatePath('/organizer', 'layout');
-  redirect('/organizer');
+  redirect(returnPath(formData));
 }
 
 export async function createOrganizationAction(formData: FormData) {
@@ -26,5 +33,5 @@ export async function createOrganizationAction(formData: FormData) {
   const displayName = String(formData.get('displayName') ?? '');
   await createOrganization(prisma, userToActor(user), displayName);
   revalidatePath('/organizer', 'layout');
-  redirect('/organizer');
+  redirect(returnPath(formData));
 }

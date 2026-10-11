@@ -66,6 +66,7 @@ export {
 } from './services/organizer-checkin';
 export {
   eventsInScope,
+  isPlatformOwner,
   organizationInScope,
   resolveOrganizerScope,
   type OrganizerScope,
