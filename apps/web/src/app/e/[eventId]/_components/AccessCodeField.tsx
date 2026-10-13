@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 export type ApplyCodeOutcome = 'unlocked' | 'invalid' | 'failed';
 
@@ -10,6 +10,10 @@ const ERROR_COPY: Record<Exclude<ApplyCodeOutcome, 'unlocked'>, string> = {
   invalid: "That code didn't work. Check it and try again.",
   failed: "We couldn't check that code. Try again in a moment.",
 };
+
+// Press snaps on a strong ease-out; colour changes ease. Disabled never scales.
+const PRESS =
+  'transition-[transform_150ms_cubic-bezier(0.23,1,0.32,1),background-color_150ms_ease,color_150ms_ease] active:scale-[0.96] disabled:active:scale-100';
 
 export default function AccessCodeField({
   activeCode,
@@ -20,27 +24,32 @@ export default function AccessCodeField({
   onApply: (code: string) => Promise<ApplyCodeOutcome>;
   onClear: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const hasText = code.trim().length > 0;
 
   if (activeCode) {
     return (
       <div
         data-testid="access-code-chip"
-        className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-2.5 text-sm"
+        className="flex h-12 items-center justify-between rounded-xl border border-primary/30 bg-primary/5 pr-1.5 pl-4"
       >
-        <span>
-          Access code{' '}
-          <span className="font-semibold tabular-nums">{activeCode}</span>{' '}
-          applied
-        </span>
+        <p className="text-sm">
+          <span className="text-muted-foreground">Code applied</span>
+          <span className="mx-2 text-muted-foreground/50">·</span>
+          <span className="font-semibold tracking-wide tabular-nums">
+            {activeCode}
+          </span>
+        </p>
         <button
           type="button"
           aria-label="Remove access code"
           onClick={onClear}
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className={cn(
+            'grid h-9 w-9 place-items-center rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-foreground',
+            PRESS
+          )}
         >
           <X className="h-4 w-4" />
         </button>
@@ -48,62 +57,55 @@ export default function AccessCodeField({
     );
   }
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="text-sm font-semibold text-primary"
-      >
-        Have an access code?
-      </button>
-    );
-  }
-
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const trimmed = code.trim();
-    if (!trimmed || pending) return;
+    if (!hasText || pending) return;
     setPending(true);
     setError(null);
-    const outcome = await onApply(trimmed);
+    const outcome = await onApply(code.trim());
     setPending(false);
-    if (outcome === 'unlocked') {
-      setCode('');
-      setOpen(false);
-    } else {
-      setError(ERROR_COPY[outcome]);
-    }
+    if (outcome === 'unlocked') setCode('');
+    else setError(ERROR_COPY[outcome]);
   }
 
   return (
-    <form onSubmit={submit} className="space-y-1.5">
-      <label htmlFor="access-code" className="text-sm font-semibold">
-        Access code
-      </label>
-      <div className="flex gap-2">
-        <Input
-          id="access-code"
+    <form onSubmit={submit}>
+      <div
+        className={cn(
+          'flex h-12 items-center rounded-xl border bg-card pr-1.5 pl-4 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/40',
+          error ? 'border-destructive/60' : 'border-border'
+        )}
+      >
+        <input
+          aria-label="Access code"
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          autoFocus
+          disabled={pending}
+          placeholder="Access code"
           autoCapitalize="characters"
           autoComplete="off"
+          autoCorrect="off"
           spellCheck={false}
-          placeholder="Enter code"
+          enterKeyHint="done"
           aria-invalid={!!error}
-          className="h-11 uppercase"
+          className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium tracking-wide uppercase outline-none placeholder:font-normal placeholder:tracking-normal placeholder:normal-case placeholder:text-muted-foreground disabled:opacity-60"
         />
         <button
           type="submit"
-          disabled={pending || !code.trim()}
-          className="h-11 shrink-0 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
+          disabled={pending || !hasText}
+          className={cn(
+            'h-9 rounded-lg px-3.5 text-sm font-semibold',
+            hasText
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+              : 'text-muted-foreground',
+            PRESS
+          )}
         >
-          {pending ? 'Checking…' : 'Apply'}
+          {pending ? 'Applying…' : 'Apply'}
         </button>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="mt-1.5 px-1 text-sm text-destructive">
           {error}
         </p>
       )}

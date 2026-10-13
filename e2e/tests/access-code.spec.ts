@@ -27,7 +27,6 @@ test('an access code reveals the gated ticket type, and it can be bought', async
   await test.step('The gated ticket type is hidden and a wrong code is refused', async () => {
     await openCheckout(page, event.id, /Get Tickets/);
     await expect(card).toHaveCount(0);
-    await page.getByRole('button', { name: 'Have an access code?' }).click();
     await page.getByLabel('Access code').fill('WRONG');
     await page.getByRole('button', { name: 'Apply' }).click();
     await expect(page.getByRole('alert')).toContainText(/didn't work/);
@@ -53,7 +52,6 @@ test('an access code reveals the gated ticket type, and it can be bought', async
   });
 
   await test.step('Re-apply and buy one', async () => {
-    await page.getByRole('button', { name: 'Have an access code?' }).click();
     await page.getByLabel('Access code').fill(EDGE.gateCode);
     await page.getByRole('button', { name: 'Apply' }).click();
     await addTickets(page, gated.id, 1);
