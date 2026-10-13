@@ -373,15 +373,6 @@ export default function CheckoutSheet({
     });
   }
 
-  function dropSelection(ids: string[]) {
-    if (ids.length === 0) return;
-    setSelection((prev) => {
-      const next = { ...prev };
-      for (const id of ids) delete next[id];
-      return next;
-    });
-  }
-
   async function handleApplyCode(code: string): Promise<ApplyCodeOutcome> {
     let res: Awaited<ReturnType<typeof applyCode.mutateAsync>>;
     try {
@@ -400,17 +391,20 @@ export default function CheckoutSheet({
       valid: true,
       unlocked_count: res.tickets.length,
     });
-    const keep = new Set(res.tickets.map((t) => t.id));
-    dropSelection(
-      (unlock?.tickets ?? []).filter((t) => !keep.has(t.id)).map((t) => t.id)
-    );
     setUnlock({ code: code.trim().toUpperCase(), tickets: res.tickets });
     return 'unlocked';
   }
 
+  // The field only offers the form while no code is active, so swapping codes
+  // is always clear-then-apply; this is the one place unlocked quantities drop.
   function clearCode() {
     if (!unlock) return;
-    dropSelection(unlock.tickets.map((t) => t.id));
+    const unlocked = unlock.tickets.map((t) => t.id);
+    setSelection((prev) => {
+      const next = { ...prev };
+      for (const id of unlocked) delete next[id];
+      return next;
+    });
     setUnlock(null);
   }
 
