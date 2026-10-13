@@ -1,10 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { publicProcedure, router } from '../trpc';
 import type { Context } from '../context';
-import {
-  applyCodeInputSchema,
-  checkoutConfigInputSchema,
-} from '../../contracts/checkout';
+import { applyCodeInputSchema } from '../../contracts/checkout';
 import {
   createReservationInputSchema,
   completeFreeInputSchema,
@@ -15,7 +12,7 @@ import {
   finalizePaymentInputSchema,
   getCheckoutStateInputSchema,
 } from '../../contracts/payments';
-import { applyCode, getCheckoutConfig } from '../../services/checkout';
+import { applyCode } from '../../services/checkout';
 import {
   createReservation,
   completeFree,
@@ -65,13 +62,10 @@ function requireStripe(ctx: Context): {
  * of the unguessable `reservationId`; `userId` comes from `ctx.actor`, never the client.
  */
 export const checkoutRouter = router({
-  config: publicProcedure
-    .input(checkoutConfigInputSchema)
-    .query(({ ctx, input }) => getCheckoutConfig(ctx.prisma, input)),
-
+  // A mutation so the code rides in the body, not a logged query string (ADR 0035).
   applyCode: publicProcedure
     .input(applyCodeInputSchema)
-    .query(({ ctx, input }) => applyCode(ctx.prisma, input)),
+    .mutation(({ ctx, input }) => applyCode(ctx.prisma, input)),
 
   createReservation: publicProcedure
     .input(createReservationInputSchema)

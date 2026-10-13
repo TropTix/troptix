@@ -20,6 +20,7 @@ import type {
 import type { CheckoutAnalytics, FulfilledVia } from '../contracts/analytics';
 import { generateId } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
+import { accessibleTicketTypesWhere } from './_shared/access-code';
 import { NotFoundError } from './_shared/errors';
 
 /**
@@ -240,11 +241,7 @@ export async function createReservation(
     where: {
       id: { in: tierIds },
       eventId: input.eventId,
-      // Public tiers only — gated tiers must be unlocked via a code first.
-      OR: [
-        { discountCode: { equals: null } },
-        { discountCode: { equals: '' } },
-      ],
+      ...accessibleTicketTypesWhere(input.accessCode),
     },
     select: {
       id: true,

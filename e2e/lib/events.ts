@@ -54,7 +54,7 @@ type TicketTypeInsert = {
   sold?: number;
   ticketingFees?: 'PASS_TICKET_FEES' | 'ABSORB_TICKET_FEES';
   saleStartsInDays?: number;
-  discountCode?: string | null;
+  accessCode?: string | null;
 };
 
 const DAY_MS = 86_400_000;
@@ -107,7 +107,7 @@ export class EventFactory {
            (id, "ticketType", "createdAt", "updatedAt", name, description,
             "maxPurchasePerUser", capacity, reserved, sold,
             "saleStartsAt", "saleEndsAt", price, "priceCents", "ticketingFees",
-            "discountCode", "eventId")
+            "accessCode", "eventId")
          values ($1, $2, now(), now(), $3, $4, $5, $6, 0, $7, $8, $9, $10, $11, $12, $13, $14)`,
         [
           id,
@@ -122,7 +122,7 @@ export class EventFactory {
           t.priceCents / 100,
           t.priceCents,
           t.ticketingFees ?? 'PASS_TICKET_FEES',
-          t.discountCode ?? null,
+          t.accessCode ?? null,
           eventId,
         ]
       );
@@ -195,7 +195,7 @@ export class EventFactory {
         priceCents: 6000,
         maxPerUser: 4,
         capacity: 80,
-        discountCode: EDGE.gateCode,
+        accessCode: EDGE.gateCode,
       },
     ]);
   }

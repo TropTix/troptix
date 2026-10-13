@@ -77,7 +77,7 @@ describe('getEventForEdit', () => {
       organizationId: 'org-1',
       deletedAt: null,
     });
-    expect(call.include.ticketTypes.select).toHaveProperty('discountCode');
+    expect(call.include.ticketTypes.select).toHaveProperty('accessCode');
   });
 
   it('returns the acting organization for the paid-ticketing flag', async () => {

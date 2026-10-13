@@ -51,7 +51,7 @@ export async function listTicketTypes(
             saleStartsAt: true,
             saleEndsAt: true,
             ticketingFees: true,
-            discountCode: true,
+            accessCode: true,
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -94,7 +94,7 @@ function buildTicketTypes(
     saleStartsAt: Date;
     saleEndsAt: Date;
     ticketingFees: TicketFeeStructure;
-    discountCode: string | null;
+    accessCode: string | null;
   }[],
   rollups: TicketTypeRollupRow[],
   now: Date
@@ -119,7 +119,7 @@ function buildTicketTypes(
       description: ticketType.description,
       maxPurchasePerUser: ticketType.maxPurchasePerUser,
       ticketingFees: ticketType.ticketingFees,
-      discountCode: ticketType.discountCode,
+      accessCode: ticketType.accessCode,
     };
   });
 }

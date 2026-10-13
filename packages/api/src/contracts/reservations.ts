@@ -26,6 +26,8 @@ export const createReservationInputSchema = z.object({
     )
     .min(1)
     .max(20),
+  /** Unlocks gated ticket types the buyer applied; re-checked here, never trusted from the list. */
+  accessCode: z.string().trim().min(1).max(100).optional(),
   contact: reservationContactSchema,
   // PostHog browser identity, stored on the hold so the server-side conversion
   // capture joins the buyer's person/session.
