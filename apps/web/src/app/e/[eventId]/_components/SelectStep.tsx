@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { getFormattedCurrency, cn } from '@/lib/utils';
 import type { EventTicket } from '@troptix/api';
+import AccessCodeField, { type ApplyCodeOutcome } from './AccessCodeField';
 
 const money = (cents: number) => getFormattedCurrency(cents / 100);
 
@@ -27,7 +28,7 @@ function Stepper({
     <div className="flex w-24 justify-end">
       <div className="flex items-center gap-0.5 rounded-full border border-border bg-card p-0.5">
         {value > 0 && (
-          <div className="flex items-center gap-0.5 duration-500 ease-[cubic-bezier(.34,1.56,.64,1)] animate-in fade-in slide-in-from-right-4">
+          <div className="flex items-center gap-0.5 duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] animate-in fade-in slide-in-from-right-2 motion-reduce:[--tw-enter-translate-x:0]">
             <button
               type="button"
               aria-label="Remove one"
@@ -64,6 +65,10 @@ export default function SelectStep({
   feesCents,
   eventName,
   onContinue,
+  unlockedIds,
+  activeCode,
+  onApplyCode,
+  onClearCode,
 }: {
   tickets: EventTicket[];
   selection: Record<string, number>;
@@ -73,6 +78,10 @@ export default function SelectStep({
   feesCents: number;
   eventName: string;
   onContinue: () => void;
+  unlockedIds: ReadonlySet<string>;
+  activeCode: string | null;
+  onApplyCode: (code: string) => Promise<ApplyCodeOutcome>;
+  onClearCode: () => void;
 }) {
   const [shake, setShake] = useState(false);
   return (
@@ -85,33 +94,48 @@ export default function SelectStep({
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+        <AccessCodeField
+          activeCode={activeCode}
+          onApply={onApplyCode}
+          onClear={onClearCode}
+        />
         {tickets.length === 0 && (
           <p className="text-sm text-muted-foreground">
             No tickets are currently available.
           </p>
         )}
-        {tickets.map((t) => {
+        {tickets.map((t, i) => {
           const q = selection[t.id] ?? 0;
           const unavailable = t.maxAllowedToAdd === 0;
+          const unlocked = unlockedIds.has(t.id);
           return (
             <div
               key={t.id}
               data-testid={`ticket-type-${t.id}`}
+              // Unlocked cards sit first, so `i` is their index within that group.
+              style={unlocked ? { animationDelay: `${i * 40}ms` } : undefined}
               className={cn(
                 'rounded-xl border p-4 transition-colors',
                 q > 0 ? 'border-primary bg-primary/5' : 'border-border',
-                unavailable && 'border-transparent bg-muted'
+                unavailable && 'border-transparent bg-muted',
+                unlocked &&
+                  'animate-in fade-in slide-in-from-top-1 fill-mode-backwards duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:[--tw-enter-translate-y:0]'
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div
                     className={cn(
-                      'font-semibold',
+                      'flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold',
                       unavailable && 'text-muted-foreground'
                     )}
                   >
                     {t.name}
+                    {unlocked && (
+                      <span className="text-[11px] font-semibold tracking-wide text-primary uppercase">
+                        Unlocked
+                      </span>
+                    )}
                   </div>
                   {t.description && (
                     <div className="mt-0.5 text-sm text-muted-foreground">
