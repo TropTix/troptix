@@ -83,6 +83,28 @@ describe('applyCode', () => {
     expect(res.tickets[2].saleStatus).toBe('soldOut');
   });
 
+  it('zeroes the add limit on a draft event and outside the sale window', async () => {
+    const draft = await applyCode(
+      fakePrisma([row({ event: { isDraft: true } })]).prisma,
+      { eventId: 'evt-1', code: 'VIP' }
+    );
+    const notYet = await applyCode(
+      fakePrisma([row({ saleStartsAt: FUTURE, saleEndsAt: FUTURE })]).prisma,
+      { eventId: 'evt-1', code: 'VIP' }
+    );
+    if (draft.type !== 'unlocked' || notYet.type !== 'unlocked') {
+      throw new Error('expected both codes to unlock');
+    }
+    expect(draft.tickets[0]).toMatchObject({
+      maxAllowedToAdd: 0,
+      saleStatus: 'onSale',
+    });
+    expect(notYet.tickets[0]).toMatchObject({
+      maxAllowedToAdd: 0,
+      saleStatus: 'notYetOnSale',
+    });
+  });
+
   it('is invalid when no ticket type carries the code', async () => {
     const { prisma } = fakePrisma([]);
     expect(await applyCode(prisma, { eventId: 'evt-1', code: 'NOPE' })).toEqual(

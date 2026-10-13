@@ -39,6 +39,10 @@ type outright, so even an unlocked one could not be bought.
   lookup since an event has a handful of ticket types.
 - Organizers see their code uppercased after save. That is the string buyers
   must type, modulo case, which the buyer path also uppercases.
+- The migration uppercases with Postgres, later writes with JavaScript. For
+  letters outside ASCII the two can disagree (`ß`, for one), so a legacy
+  non-ASCII code may need re-saving by its organizer. New codes never hit this
+  since every write goes through the same JavaScript path.
 - A buyer holds one code per checkout. Two hidden ticket types meant for the
   same group should share one code; a buyer with two different codes for one
   event cannot combine them in one order.

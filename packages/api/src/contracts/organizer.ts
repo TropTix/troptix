@@ -216,7 +216,7 @@ export const ticketTypeInputSchema = z
     saleStartsAt: z.date(),
     saleEndsAt: z.date(),
     ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
-    accessCode: z.string().optional(),
+    accessCode: z.string().max(100).optional(),
   })
   .refine((t) => t.saleEndsAt > t.saleStartsAt, {
     message: 'Sale end must be after sale start.',
