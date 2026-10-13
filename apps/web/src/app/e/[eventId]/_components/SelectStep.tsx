@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { getFormattedCurrency, cn } from '@/lib/utils';
 import type { EventTicket } from '@troptix/api';
+import AccessCodeField, { type ApplyCodeOutcome } from './AccessCodeField';
 
 const money = (cents: number) => getFormattedCurrency(cents / 100);
 
@@ -64,6 +65,10 @@ export default function SelectStep({
   feesCents,
   eventName,
   onContinue,
+  unlockedIds,
+  activeCode,
+  onApplyCode,
+  onClearCode,
 }: {
   tickets: EventTicket[];
   selection: Record<string, number>;
@@ -73,6 +78,10 @@ export default function SelectStep({
   feesCents: number;
   eventName: string;
   onContinue: () => void;
+  unlockedIds: ReadonlySet<string>;
+  activeCode: string | null;
+  onApplyCode: (code: string) => Promise<ApplyCodeOutcome>;
+  onClearCode: () => void;
 }) {
   const [shake, setShake] = useState(false);
   return (
@@ -107,11 +116,16 @@ export default function SelectStep({
                 <div className="min-w-0">
                   <div
                     className={cn(
-                      'font-semibold',
+                      'flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold',
                       unavailable && 'text-muted-foreground'
                     )}
                   >
                     {t.name}
+                    {unlockedIds.has(t.id) && (
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                        Unlocked
+                      </span>
+                    )}
                   </div>
                   {t.description && (
                     <div className="mt-0.5 text-sm text-muted-foreground">
@@ -154,6 +168,11 @@ export default function SelectStep({
             </div>
           );
         })}
+        <AccessCodeField
+          activeCode={activeCode}
+          onApply={onApplyCode}
+          onClear={onClearCode}
+        />
         <p className="pt-1 text-xs text-muted-foreground">
           Prices include fees. Tickets are held for 10 minutes once you
           continue.
