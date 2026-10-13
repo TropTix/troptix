@@ -20,8 +20,8 @@
 --    to price*100, but keep them in sync.
 --  - `saleStartsAt`/`saleEndsAt` are full timestamps and the only sale-window
 --    columns (ADR 0020).
---  - a non-empty `discountCode` makes a tier GATED (hidden until the code is
---    entered); null/empty is a public tier.
+--  - a non-empty `accessCode` makes a ticket type GATED (hidden until the code is
+--    entered); null is a public ticket type. Stored uppercased (ADR 0035).
 
 -- Demo organizer
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
@@ -134,7 +134,7 @@ insert into public."TicketTypes" (
   id, "ticketType", "createdAt", "updatedAt", name, description,
   "maxPurchasePerUser", capacity, reserved, sold,
   "saleStartsAt", "saleEndsAt",
-  price, "priceCents", "ticketingFees", "discountCode", "eventId"
+  price, "priceCents", "ticketingFees", "accessCode", "eventId"
 ) values
   -- seed_event_1: happy-path paid tiers, on sale now, plenty available
   ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 0, now(), now() + interval '60 days', 25.00, 2500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
@@ -150,7 +150,7 @@ insert into public."TicketTypes" (
   ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold tier',          4,  50, 0, 50, now(), now() + interval '90 days', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   upcoming: sale window opens in the future → not yet on sale
   ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', now() + interval '90 days', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
-  --   gated: non-empty discountCode → hidden until 'UNLOCK2026' is entered
+  --   gated: non-empty accessCode → hidden until 'UNLOCK2026' is entered
   ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), now() + interval '90 days', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3'),
 
   -- seed_event_4: private event still sells by direct link
@@ -192,7 +192,7 @@ insert into public."TicketTypes" (
   id, "ticketType", "createdAt", "updatedAt", name, description,
   "maxPurchasePerUser", capacity, reserved, sold,
   "saleStartsAt", "saleEndsAt",
-  price, "priceCents", "ticketingFees", "discountCode", "eventId"
+  price, "priceCents", "ticketingFees", "accessCode", "eventId"
 ) values
   ('seed_tt_past_ga',  'PAID', now() - interval '60 days', now(), 'General Admission', 'Standard entry', 10, 200, 0, 3, now() - interval '60 days', now() - interval '30 days 5 hours', 40.00, 4000, 'PASS_TICKET_FEES',   null, 'seed_event_5'),
   ('seed_tt_past_vip', 'PAID', now() - interval '60 days', now(), 'VIP',               'Fees absorbed',   4,  50, 0, 2, now() - interval '60 days', now() - interval '30 days 5 hours', 50.00, 5000, 'ABSORB_TICKET_FEES', null, 'seed_event_5'),

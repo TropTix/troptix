@@ -112,7 +112,7 @@ function defaultEventValues(): EventFormValues {
         price: 0,
         capacity: 100,
         maxPurchasePerUser: 10,
-        discountCode: undefined,
+        accessCode: undefined,
         ticketingFees: 'PASS_TICKET_FEES' as const,
         saleStartsAt: new Date(),
         saleEndsAt: nextDay,

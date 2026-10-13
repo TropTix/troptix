@@ -32,7 +32,7 @@ export {
 
 export { captureOrderCompleted } from './services/reservations';
 
-export { getCheckoutConfig, applyCode } from './services/checkout';
+export { applyCode } from './services/checkout';
 export {
   getEventDetail,
   getEventDetailRaw,

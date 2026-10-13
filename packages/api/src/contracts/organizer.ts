@@ -199,7 +199,7 @@ export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
   description: z.string(),
   maxPurchasePerUser: z.number().int(),
   ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
-  discountCode: z.string().nullable(),
+  accessCode: z.string().nullable(),
 });
 export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
 
@@ -216,7 +216,7 @@ export const ticketTypeInputSchema = z
     saleStartsAt: z.date(),
     saleEndsAt: z.date(),
     ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
-    discountCode: z.string().optional(),
+    accessCode: z.string().optional(),
   })
   .refine((t) => t.saleEndsAt > t.saleStartsAt, {
     message: 'Sale end must be after sale start.',

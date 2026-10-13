@@ -70,7 +70,7 @@ export default async function EditEventPage(props: EditEventPageProps) {
         ticketTypes={
           event?.ticketTypes.map((ticket) => ({
             ...ticket,
-            discountCode: ticket.discountCode || undefined,
+            accessCode: ticket.accessCode || undefined,
           })) ?? []
         }
         isDraft={event.isDraft}

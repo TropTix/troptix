@@ -80,7 +80,7 @@ export async function getEventForEdit(
             saleStartsAt: true,
             saleEndsAt: true,
             ticketingFees: true,
-            discountCode: true,
+            accessCode: true,
           },
         },
       },
