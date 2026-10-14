@@ -19,13 +19,18 @@ export default function AccessCodeField({
   activeCode,
   onApply,
   onClear,
+  initial,
 }: {
   activeCode: string | null;
   onApply: (code: string) => Promise<ApplyCodeOutcome>;
   onClear: () => void;
+  /** A code that arrived by link and failed: shown prefilled with its error. */
+  initial?: { code: string; outcome: Exclude<ApplyCodeOutcome, 'unlocked'> };
 }) {
-  const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState(initial?.code ?? '');
+  const [error, setError] = useState<string | null>(
+    initial ? ERROR_COPY[initial.outcome] : null
+  );
   const [pending, setPending] = useState(false);
   const hasText = code.trim().length > 0;
 

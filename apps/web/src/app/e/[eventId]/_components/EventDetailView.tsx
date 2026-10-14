@@ -122,9 +122,13 @@ export default function EventDetailView({
   const searchParams = useSearchParams();
   const posthog = usePostHog();
   const resumeReservationId = searchParams?.get('reservation') ?? null;
-  // The param stays in the URL on purpose — scrubbing it would break
-  // refresh-resume; the PostHog sanitizer keeps it out of analytics (ADR 0018).
-  const [sheetOpen, setSheetOpen] = useState(!!resumeReservationId);
+  // Both params stay in the URL on purpose — scrubbing them would break
+  // refresh-resume and the shareable link; the PostHog sanitizer keeps them
+  // out of analytics (ADR 0018, #604).
+  const linkCode = searchParams?.get('code')?.trim() || null;
+  const [sheetOpen, setSheetOpen] = useState(
+    !!resumeReservationId || !!linkCode
+  );
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
@@ -366,6 +370,7 @@ export default function EventDetailView({
         onOpenChange={setSheetOpen}
         event={event}
         resumeReservationId={resumeReservationId}
+        linkCode={linkCode}
       />
     </div>
   );

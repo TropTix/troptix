@@ -69,6 +69,7 @@ export default function SelectStep({
   activeCode,
   onApplyCode,
   onClearCode,
+  failedLinkCode,
 }: {
   tickets: EventTicket[];
   selection: Record<string, number>;
@@ -82,6 +83,7 @@ export default function SelectStep({
   activeCode: string | null;
   onApplyCode: (code: string) => Promise<ApplyCodeOutcome>;
   onClearCode: () => void;
+  failedLinkCode?: { code: string; outcome: 'invalid' | 'failed' } | null;
 }) {
   const [shake, setShake] = useState(false);
   return (
@@ -95,9 +97,12 @@ export default function SelectStep({
 
       <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
         <AccessCodeField
+          // A failed link code lands after mount; remount so it seeds the field.
+          key={failedLinkCode?.code ?? 'fresh'}
           activeCode={activeCode}
           onApply={onApplyCode}
           onClear={onClearCode}
+          initial={failedLinkCode ?? undefined}
         />
         {tickets.length === 0 && (
           <p className="text-sm text-muted-foreground">

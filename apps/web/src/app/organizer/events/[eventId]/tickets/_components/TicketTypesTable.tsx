@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, Pencil, Search } from 'lucide-react';
+import { toast } from 'sonner';
+import { Check, Copy, Link2, Pencil, Search } from 'lucide-react';
 import type { SaleState, TicketTypeRow } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import {
   Table,
   TableBody,
@@ -32,14 +34,28 @@ function saleDate(iso: string) {
 
 export function TicketTypesTable({
   ticketTypes,
+  eventId,
   onEdit,
   onDuplicate,
 }: {
   ticketTypes: TicketTypeRow[];
+  eventId: string;
   onEdit: (ticketType: TicketTypeRow) => void;
   onDuplicate: (ticketType: TicketTypeRow) => void;
 }) {
   const [query, setQuery] = useState('');
+  const { copyToClipboard } = useCopyToClipboard();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function copyInviteLink(ticketType: TicketTypeRow) {
+    const url = new URL(`/e/${eventId}`, window.location.origin);
+    url.searchParams.set('code', ticketType.accessCode ?? '');
+    if (await copyToClipboard(url.toString())) {
+      setCopiedId(ticketType.id);
+      setTimeout(() => setCopiedId(null), 2000);
+      toast.success('Invite link copied. Anyone with it can buy this ticket.');
+    }
+  }
 
   const q = query.trim().toLowerCase();
   const visible =
@@ -167,6 +183,21 @@ export function TicketTypesTable({
                         <Copy className="h-4 w-4" />
                         <span className="sr-only">Duplicate</span>
                       </Button>
+                      {ticketType.accessCode && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => copyInviteLink(ticketType)}
+                        >
+                          {copiedId === ticketType.id ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Link2 className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">Copy invite link</span>
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

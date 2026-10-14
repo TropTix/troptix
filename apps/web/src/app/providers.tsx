@@ -29,14 +29,17 @@ function GlobalLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// The reservationId is a bearer capability and stays in the URL by design
-// (resume-on-refresh) — strip it from URL properties before they reach PostHog.
+// The reservationId is a bearer capability and the access code is a shared
+// secret; both stay in the URL by design (resume-on-refresh, shareable link) —
+// strip them from URL properties before they reach PostHog.
+const PRIVATE_PARAMS = ['reservation', 'code'];
+
 function stripReservationParam(value: unknown): unknown {
   if (typeof value !== 'string') return value;
   try {
     const url = new URL(value);
-    if (!url.searchParams.has('reservation')) return value;
-    url.searchParams.delete('reservation');
+    if (!PRIVATE_PARAMS.some((p) => url.searchParams.has(p))) return value;
+    for (const p of PRIVATE_PARAMS) url.searchParams.delete(p);
     return url.toString();
   } catch {
     return value;

@@ -68,11 +68,14 @@ export default function CheckoutSheet({
   onOpenChange,
   event,
   resumeReservationId,
+  linkCode,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   event: EventDetail;
   resumeReservationId?: string | null;
+  /** `?code=` from a shared link, applied once when the sheet first opens (#604). */
+  linkCode?: string | null;
 }) {
   const { user } = useAuth();
   const posthog = usePostHog();
@@ -219,6 +222,23 @@ export default function CheckoutSheet({
     const id = resumeTargetRef.current;
     resumeTargetRef.current = null;
     void finalize(id, true);
+  }, [open]);
+
+  const linkCodeRef = useRef(linkCode ?? null);
+  const [failedLinkCode, setFailedLinkCode] = useState<{
+    code: string;
+    outcome: 'invalid' | 'failed';
+  } | null>(null);
+  // Latest-ref so the consume-once effect below depends only on `open`.
+  const applyLinkCodeRef = useRef(handleApplyCode);
+  applyLinkCodeRef.current = handleApplyCode;
+  useEffect(() => {
+    if (!open || !linkCodeRef.current) return;
+    const code = linkCodeRef.current;
+    linkCodeRef.current = null;
+    void applyLinkCodeRef.current(code, 'link').then((outcome) => {
+      if (outcome !== 'unlocked') setFailedLinkCode({ code, outcome });
+    });
   }, [open]);
 
   function applyCheckoutState(
@@ -373,7 +393,10 @@ export default function CheckoutSheet({
     });
   }
 
-  async function handleApplyCode(code: string): Promise<ApplyCodeOutcome> {
+  async function handleApplyCode(
+    code: string,
+    source: 'typed' | 'link' = 'typed'
+  ): Promise<ApplyCodeOutcome> {
     let res: Awaited<ReturnType<typeof applyCode.mutateAsync>>;
     try {
       res = await applyCode.mutateAsync({ eventId: event.id, code });
@@ -384,12 +407,14 @@ export default function CheckoutSheet({
       capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
         valid: false,
         unlocked_count: 0,
+        source,
       });
       return 'invalid';
     }
     capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
       valid: true,
       unlocked_count: res.tickets.length,
+      source,
     });
     setUnlock({ code: code.trim().toUpperCase(), tickets: res.tickets });
     return 'unlocked';
@@ -532,6 +557,7 @@ export default function CheckoutSheet({
                 activeCode={unlock?.code ?? null}
                 onApplyCode={handleApplyCode}
                 onClearCode={clearCode}
+                failedLinkCode={failedLinkCode}
                 onAdjust={adjust}
                 qty={qty}
                 totalCents={totalCents}
