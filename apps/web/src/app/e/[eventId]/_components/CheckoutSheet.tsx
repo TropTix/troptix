@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
 import { usePostHog } from 'posthog-js/react';
 import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -15,7 +21,7 @@ import type {
   ReservationContact,
 } from '@troptix/api';
 import SelectStep from './SelectStep';
-import type { ApplyCodeOutcome } from './AccessCodeField';
+import type { ApplyCodeOutcome, FailedCode } from './AccessCodeField';
 import ContactStep from './ContactStep';
 import PaymentStep from './PaymentStep';
 import SuccessTicket from './SuccessTicket';
@@ -68,11 +74,14 @@ export default function CheckoutSheet({
   onOpenChange,
   event,
   resumeReservationId,
+  linkCode,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   event: EventDetail;
   resumeReservationId?: string | null;
+  /** `?code=` from a shared link, applied once when the sheet first opens (#604). */
+  linkCode?: string | null;
 }) {
   const { user } = useAuth();
   const posthog = usePostHog();
@@ -221,6 +230,20 @@ export default function CheckoutSheet({
     void finalize(id, true);
   }, [open]);
 
+  const linkCodeRef = useRef(linkCode ?? null);
+  const [failedLinkCode, setFailedLinkCode] = useState<FailedCode | null>(null);
+  const applyLinkCode = useEffectEvent((code: string) =>
+    handleApplyCode(code, 'link')
+  );
+  useEffect(() => {
+    if (!open || !linkCodeRef.current) return;
+    const code = linkCodeRef.current;
+    linkCodeRef.current = null;
+    void applyLinkCode(code).then((outcome) => {
+      if (outcome !== 'unlocked') setFailedLinkCode({ code, outcome });
+    });
+  }, [open]);
+
   function applyCheckoutState(
     state: CheckoutState,
     forReservationId: string,
@@ -338,6 +361,7 @@ export default function CheckoutSheet({
   function resetState() {
     setStep('select');
     setSelection({});
+    setFailedLinkCode(null);
     setLocalError(null);
     setReservationId(null);
     setClientSecret(null);
@@ -373,7 +397,10 @@ export default function CheckoutSheet({
     });
   }
 
-  async function handleApplyCode(code: string): Promise<ApplyCodeOutcome> {
+  async function handleApplyCode(
+    code: string,
+    source: 'typed' | 'link' = 'typed'
+  ): Promise<ApplyCodeOutcome> {
     let res: Awaited<ReturnType<typeof applyCode.mutateAsync>>;
     try {
       res = await applyCode.mutateAsync({ eventId: event.id, code });
@@ -384,13 +411,16 @@ export default function CheckoutSheet({
       capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
         valid: false,
         unlocked_count: 0,
+        source,
       });
       return 'invalid';
     }
     capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
       valid: true,
       unlocked_count: res.tickets.length,
+      source,
     });
+    setFailedLinkCode(null);
     setUnlock({ code: code.trim().toUpperCase(), tickets: res.tickets });
     return 'unlocked';
   }
@@ -532,6 +562,7 @@ export default function CheckoutSheet({
                 activeCode={unlock?.code ?? null}
                 onApplyCode={handleApplyCode}
                 onClearCode={clearCode}
+                failedLinkCode={failedLinkCode}
                 onAdjust={adjust}
                 qty={qty}
                 totalCents={totalCents}

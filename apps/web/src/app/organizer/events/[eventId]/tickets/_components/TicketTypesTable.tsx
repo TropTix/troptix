@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { Copy, Pencil, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { Check, Copy, Link2, Lock, Pencil, Search } from 'lucide-react';
 import type { SaleState, TicketTypeRow } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import {
   Table,
   TableBody,
@@ -15,6 +17,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { formatPriceCents, getDateFormatter } from '@/lib/dateUtils';
 
 const SALE_STATE: Record<
@@ -30,16 +38,80 @@ function saleDate(iso: string) {
   return getDateFormatter(new Date(iso), 'MMM d, yyyy');
 }
 
+function AccessCodeTag({ code }: { code: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <Lock className="h-3 w-3" aria-hidden />
+      <span className="sr-only">Access code</span>
+      <span className="font-mono tracking-wide">{code}</span>
+    </span>
+  );
+}
+
+function RowAction({
+  label,
+  tip,
+  onClick,
+  children,
+}: {
+  label: string;
+  tip: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onClick}
+        >
+          {children}
+          <span className="sr-only">{label}</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{tip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function TicketTypesTable({
   ticketTypes,
+  eventId,
   onEdit,
   onDuplicate,
 }: {
   ticketTypes: TicketTypeRow[];
+  eventId: string;
   onEdit: (ticketType: TicketTypeRow) => void;
   onDuplicate: (ticketType: TicketTypeRow) => void;
 }) {
   const [query, setQuery] = useState('');
+  const { copyToClipboard } = useCopyToClipboard();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => clearTimeout(copiedTimer.current ?? undefined), []);
+
+  async function copyInviteLink(ticketType: TicketTypeRow) {
+    if (!ticketType.accessCode) return;
+    const url = new URL(`/e/${eventId}`, window.location.origin);
+    url.searchParams.set('code', ticketType.accessCode);
+    const link = url.toString();
+    if (await copyToClipboard(link)) {
+      setCopiedId(ticketType.id);
+      clearTimeout(copiedTimer.current ?? undefined);
+      copiedTimer.current = setTimeout(() => setCopiedId(null), 2000);
+      toast.success('Invite link copied', {
+        description: `Opens the event with ${ticketType.accessCode} applied. Anyone with the link can buy every ticket type that uses this code.`,
+      });
+    } else {
+      toast.error("Couldn't copy the link", {
+        description: `Copy it by hand: ${link}`,
+      });
+    }
+  }
 
   const q = query.trim().toLowerCase();
   const visible =
@@ -84,8 +156,11 @@ export function TicketTypesTable({
                       >
                         {ticketType.name}
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                         {formatPriceCents(ticketType.displayPriceCents)}
+                        {ticketType.accessCode && (
+                          <AccessCodeTag code={ticketType.accessCode} />
+                        )}
                       </span>
                     </div>
                     <SaleStateBadge state={ticketType.saleState} />
@@ -107,71 +182,91 @@ export function TicketTypesTable({
           </ul>
 
           <div className="hidden rounded-md border md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ticket Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Gross Price</TableHead>
-                  <TableHead className="text-right">Display Price</TableHead>
-                  <TableHead>Sold</TableHead>
-                  <TableHead>Start Sale</TableHead>
-                  <TableHead>End Sale</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visible.map((ticketType) => (
-                  <TableRow key={ticketType.id}>
-                    <TableCell className="p-0">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(ticketType)}
-                        className="block w-full truncate px-4 py-3 text-left font-medium"
-                        title={ticketType.name}
-                      >
-                        {ticketType.name}
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <SaleStateBadge state={ticketType.saleState} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatPriceCents(ticketType.grossPriceCents)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatPriceCents(ticketType.displayPriceCents)}
-                    </TableCell>
-                    <TableCell>
-                      {ticketType.sold.toLocaleString()} /{' '}
-                      {ticketType.capacity.toLocaleString()}
-                    </TableCell>
-                    <TableCell>{saleDate(ticketType.saleStartsAt)}</TableCell>
-                    <TableCell>{saleDate(ticketType.saleEndsAt)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => onEdit(ticketType)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => onDuplicate(ticketType)}
-                      >
-                        <Copy className="h-4 w-4" />
-                        <span className="sr-only">Duplicate</span>
-                      </Button>
-                    </TableCell>
+            <TooltipProvider delayDuration={400}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ticket Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Gross Price</TableHead>
+                    <TableHead className="text-right">Display Price</TableHead>
+                    <TableHead>Sold</TableHead>
+                    <TableHead>Start Sale</TableHead>
+                    <TableHead>End Sale</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {visible.map((ticketType) => (
+                    <TableRow key={ticketType.id}>
+                      <TableCell className="p-0">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(ticketType)}
+                          className="block w-full px-4 py-3 text-left"
+                          title={ticketType.name}
+                        >
+                          <span className="block truncate font-medium">
+                            {ticketType.name}
+                          </span>
+                          {ticketType.accessCode && (
+                            <AccessCodeTag code={ticketType.accessCode} />
+                          )}
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        <SaleStateBadge state={ticketType.saleState} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatPriceCents(ticketType.grossPriceCents)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatPriceCents(ticketType.displayPriceCents)}
+                      </TableCell>
+                      <TableCell>
+                        {ticketType.sold.toLocaleString()} /{' '}
+                        {ticketType.capacity.toLocaleString()}
+                      </TableCell>
+                      <TableCell>{saleDate(ticketType.saleStartsAt)}</TableCell>
+                      <TableCell>{saleDate(ticketType.saleEndsAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <RowAction
+                          label="Edit"
+                          tip="Edit this ticket type"
+                          onClick={() => onEdit(ticketType)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </RowAction>
+                        <RowAction
+                          label="Duplicate"
+                          tip="Start a new ticket type from this one"
+                          onClick={() => onDuplicate(ticketType)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </RowAction>
+                        {ticketType.accessCode && (
+                          <RowAction
+                            label="Copy invite link"
+                            tip={
+                              copiedId === ticketType.id
+                                ? 'Copied'
+                                : `Copy a link that opens the event with ${ticketType.accessCode} already applied`
+                            }
+                            onClick={() => copyInviteLink(ticketType)}
+                          >
+                            {copiedId === ticketType.id ? (
+                              <Check className="h-4 w-4" />
+                            ) : (
+                              <Link2 className="h-4 w-4" />
+                            )}
+                          </RowAction>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TooltipProvider>
           </div>
         </>
       )}

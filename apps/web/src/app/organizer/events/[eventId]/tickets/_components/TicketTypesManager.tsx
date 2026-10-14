@@ -67,6 +67,7 @@ export function TicketTypesManager({
       ) : (
         <TicketTypesTable
           ticketTypes={ticketTypes}
+          eventId={eventId}
           onEdit={(row) => setDrawer({ data: toFormValues(row) })}
           onDuplicate={(row) =>
             setDrawer({

@@ -2,6 +2,7 @@ import { test, expect } from '../lib/test';
 import { BUYER, EDGE } from '../lib/events';
 import {
   CARDS,
+  checkoutStep,
   openCheckout,
   ticketTypeCard,
   addTickets,
@@ -75,5 +76,44 @@ test('an access code reveals the gated ticket type, and it can be bought', async
     const inventory = await getInventory(gated.id);
     expect(inventory.sold).toBe(1);
     expect(inventory.reserved).toBe(0);
+  });
+});
+
+test('a shared link with the code opens checkout with the ticket type unlocked', async ({
+  page,
+  factory,
+}) => {
+  const event = await factory.createEdgeEvent();
+  const gated = event.ticketTypes.gated;
+
+  await page.goto(`/e/${event.id}?code=${EDGE.gateCode.toLowerCase()}`);
+  await expect(checkoutStep(page, 'Choose tickets')).toBeVisible();
+  await expect(ticketTypeCard(page, gated.id)).toContainText(EDGE.gated);
+  await expect(page.getByTestId('access-code-chip')).toContainText(
+    EDGE.gateCode
+  );
+  await addTickets(page, gated.id, 1);
+  await expect(page.getByText('$65.30')).toBeVisible();
+});
+
+test('a shared link with a wrong code opens checkout showing the error', async ({
+  page,
+  factory,
+}) => {
+  const event = await factory.createEdgeEvent();
+
+  await page.goto(`/e/${event.id}?code=WRONG`);
+  await expect(checkoutStep(page, 'Choose tickets')).toBeVisible();
+  await expect(page.getByLabel('Access code')).toHaveValue('WRONG');
+  await expect(page.getByRole('alert')).toContainText(/didn't work/);
+  await expect(ticketTypeCard(page, event.ticketTypes.gated.id)).toHaveCount(0);
+
+  await test.step('Fixing the code clears the stale error for good', async () => {
+    await page.getByLabel('Access code').fill(EDGE.gateCode);
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.getByTestId('access-code-chip')).toBeVisible();
+    await page.getByRole('button', { name: 'Remove access code' }).click();
+    await expect(page.getByLabel('Access code')).toHaveValue('');
+    await expect(page.getByRole('alert')).toHaveCount(0);
   });
 });
