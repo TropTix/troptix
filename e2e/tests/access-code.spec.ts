@@ -107,4 +107,13 @@ test('a shared link with a wrong code opens checkout showing the error', async (
   await expect(page.getByLabel('Access code')).toHaveValue('WRONG');
   await expect(page.getByRole('alert')).toContainText(/didn't work/);
   await expect(ticketTypeCard(page, event.ticketTypes.gated.id)).toHaveCount(0);
+
+  await test.step('Fixing the code clears the stale error for good', async () => {
+    await page.getByLabel('Access code').fill(EDGE.gateCode);
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.getByTestId('access-code-chip')).toBeVisible();
+    await page.getByRole('button', { name: 'Remove access code' }).click();
+    await expect(page.getByLabel('Access code')).toHaveValue('');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
 });

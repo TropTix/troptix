@@ -34,7 +34,7 @@ function GlobalLayout({ children }: { children: React.ReactNode }) {
 // strip them from URL properties before they reach PostHog.
 const PRIVATE_PARAMS = ['reservation', 'code'];
 
-function stripReservationParam(value: unknown): unknown {
+function stripPrivateParams(value: unknown): unknown {
   if (typeof value !== 'string') return value;
   try {
     const url = new URL(value);
@@ -62,7 +62,7 @@ function PostHogProvider({ children }: { children: React.ReactNode }) {
           '$initial_current_url',
         ]) {
           if (properties[key]) {
-            properties[key] = stripReservationParam(properties[key]);
+            properties[key] = stripPrivateParams(properties[key]);
           }
         }
         return properties;

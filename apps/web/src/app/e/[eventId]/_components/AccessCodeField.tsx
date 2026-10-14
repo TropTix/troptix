@@ -5,6 +5,11 @@ import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type ApplyCodeOutcome = 'unlocked' | 'invalid' | 'failed';
+/** A code that arrived by link and did not unlock anything. */
+export type FailedCode = {
+  code: string;
+  outcome: Exclude<ApplyCodeOutcome, 'unlocked'>;
+};
 
 const ERROR_COPY: Record<Exclude<ApplyCodeOutcome, 'unlocked'>, string> = {
   invalid: "That code didn't work. Check it and try again.",
@@ -24,8 +29,8 @@ export default function AccessCodeField({
   activeCode: string | null;
   onApply: (code: string) => Promise<ApplyCodeOutcome>;
   onClear: () => void;
-  /** A code that arrived by link and failed: shown prefilled with its error. */
-  initial?: { code: string; outcome: Exclude<ApplyCodeOutcome, 'unlocked'> };
+  /** Shown prefilled with its error. */
+  initial?: FailedCode;
 }) {
   const [code, setCode] = useState(initial?.code ?? '');
   const [error, setError] = useState<string | null>(

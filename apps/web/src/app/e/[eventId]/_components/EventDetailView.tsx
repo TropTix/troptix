@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -125,7 +125,10 @@ export default function EventDetailView({
   // Both params stay in the URL on purpose — scrubbing them would break
   // refresh-resume and the shareable link; the PostHog sanitizer keeps them
   // out of analytics (ADR 0018, #604).
-  const linkCode = searchParams?.get('code')?.trim() || null;
+  // An ended event keeps its disabled CTA; an old invite link must not bypass it.
+  const linkCode = eventEnded
+    ? null
+    : searchParams?.get('code')?.trim() || null;
   const [sheetOpen, setSheetOpen] = useState(
     !!resumeReservationId || !!linkCode
   );
@@ -144,6 +147,18 @@ export default function EventDetailView({
   // An event can mix free and paid tiers (fromPriceCents === 0 yet paid tickets
   // exist), so gate the "RSVP" wording on this rather than isFree.
   const hasPaidTickets = event.tickets.some((t) => t.priceCents > 0);
+
+  // A link opens the sheet without the button, so count that open too.
+  const linkOpenCaptured = useRef(false);
+  useEffect(() => {
+    if (!linkCode || linkOpenCaptured.current) return;
+    linkOpenCaptured.current = true;
+    posthog.capture(ANALYTICS_EVENTS.checkoutOpened, {
+      event_id: event.id,
+      has_paid_tickets: hasPaidTickets,
+      source: 'link',
+    });
+  }, [linkCode, posthog, event.id, hasPaidTickets]);
 
   const imageUrl = eventFlyerUrl(event.imageUrl) ?? DEFAULT_EVENT_IMAGE;
 
@@ -350,6 +365,7 @@ export default function EventDetailView({
               posthog.capture(ANALYTICS_EVENTS.checkoutOpened, {
                 event_id: event.id,
                 has_paid_tickets: hasPaidTickets,
+                source: 'button',
               });
               setSheetOpen(true);
             }}

@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
 import { usePostHog } from 'posthog-js/react';
 import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -15,7 +21,7 @@ import type {
   ReservationContact,
 } from '@troptix/api';
 import SelectStep from './SelectStep';
-import type { ApplyCodeOutcome } from './AccessCodeField';
+import type { ApplyCodeOutcome, FailedCode } from './AccessCodeField';
 import ContactStep from './ContactStep';
 import PaymentStep from './PaymentStep';
 import SuccessTicket from './SuccessTicket';
@@ -225,18 +231,15 @@ export default function CheckoutSheet({
   }, [open]);
 
   const linkCodeRef = useRef(linkCode ?? null);
-  const [failedLinkCode, setFailedLinkCode] = useState<{
-    code: string;
-    outcome: 'invalid' | 'failed';
-  } | null>(null);
-  // Latest-ref so the consume-once effect below depends only on `open`.
-  const applyLinkCodeRef = useRef(handleApplyCode);
-  applyLinkCodeRef.current = handleApplyCode;
+  const [failedLinkCode, setFailedLinkCode] = useState<FailedCode | null>(null);
+  const applyLinkCode = useEffectEvent((code: string) =>
+    handleApplyCode(code, 'link')
+  );
   useEffect(() => {
     if (!open || !linkCodeRef.current) return;
     const code = linkCodeRef.current;
     linkCodeRef.current = null;
-    void applyLinkCodeRef.current(code, 'link').then((outcome) => {
+    void applyLinkCode(code).then((outcome) => {
       if (outcome !== 'unlocked') setFailedLinkCode({ code, outcome });
     });
   }, [open]);
@@ -358,6 +361,7 @@ export default function CheckoutSheet({
   function resetState() {
     setStep('select');
     setSelection({});
+    setFailedLinkCode(null);
     setLocalError(null);
     setReservationId(null);
     setClientSecret(null);
@@ -416,6 +420,7 @@ export default function CheckoutSheet({
       unlocked_count: res.tickets.length,
       source,
     });
+    setFailedLinkCode(null);
     setUnlock({ code: code.trim().toUpperCase(), tickets: res.tickets });
     return 'unlocked';
   }

@@ -4,7 +4,10 @@ import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { getFormattedCurrency, cn } from '@/lib/utils';
 import type { EventTicket } from '@troptix/api';
-import AccessCodeField, { type ApplyCodeOutcome } from './AccessCodeField';
+import AccessCodeField, {
+  type ApplyCodeOutcome,
+  type FailedCode,
+} from './AccessCodeField';
 
 const money = (cents: number) => getFormattedCurrency(cents / 100);
 
@@ -83,7 +86,7 @@ export default function SelectStep({
   activeCode: string | null;
   onApplyCode: (code: string) => Promise<ApplyCodeOutcome>;
   onClearCode: () => void;
-  failedLinkCode?: { code: string; outcome: 'invalid' | 'failed' } | null;
+  failedLinkCode?: FailedCode | null;
 }) {
   const [shake, setShake] = useState(false);
   return (

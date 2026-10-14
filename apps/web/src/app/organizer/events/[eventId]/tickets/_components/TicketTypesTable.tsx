@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Check, Copy, Link2, Pencil, Search } from 'lucide-react';
 import type { SaleState, TicketTypeRow } from '@troptix/api';
@@ -46,14 +46,20 @@ export function TicketTypesTable({
   const [query, setQuery] = useState('');
   const { copyToClipboard } = useCopyToClipboard();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => clearTimeout(copiedTimer.current ?? undefined), []);
 
   async function copyInviteLink(ticketType: TicketTypeRow) {
+    if (!ticketType.accessCode) return;
     const url = new URL(`/e/${eventId}`, window.location.origin);
-    url.searchParams.set('code', ticketType.accessCode ?? '');
+    url.searchParams.set('code', ticketType.accessCode);
     if (await copyToClipboard(url.toString())) {
       setCopiedId(ticketType.id);
-      setTimeout(() => setCopiedId(null), 2000);
-      toast.success('Invite link copied. Anyone with it can buy this ticket.');
+      clearTimeout(copiedTimer.current ?? undefined);
+      copiedTimer.current = setTimeout(() => setCopiedId(null), 2000);
+      toast.success(
+        'Invite link copied. Anyone with it can buy every ticket type that uses this code.'
+      );
     }
   }
 
