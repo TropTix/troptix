@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, Copy, Link2, Pencil, Search } from 'lucide-react';
+import { Check, Copy, Link2, Lock, Pencil, Search } from 'lucide-react';
 import type { SaleState, TicketTypeRow } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,16 @@ const SALE_STATE: Record<
 
 function saleDate(iso: string) {
   return getDateFormatter(new Date(iso), 'MMM d, yyyy');
+}
+
+function AccessCodeTag({ code }: { code: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <Lock className="h-3 w-3" aria-hidden />
+      <span className="sr-only">Access code</span>
+      <span className="font-mono tracking-wide">{code}</span>
+    </span>
+  );
 }
 
 function RowAction({
@@ -146,8 +156,11 @@ export function TicketTypesTable({
                       >
                         {ticketType.name}
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                         {formatPriceCents(ticketType.displayPriceCents)}
+                        {ticketType.accessCode && (
+                          <AccessCodeTag code={ticketType.accessCode} />
+                        )}
                       </span>
                     </div>
                     <SaleStateBadge state={ticketType.saleState} />
@@ -190,10 +203,15 @@ export function TicketTypesTable({
                         <button
                           type="button"
                           onClick={() => onEdit(ticketType)}
-                          className="block w-full truncate px-4 py-3 text-left font-medium"
+                          className="block w-full px-4 py-3 text-left"
                           title={ticketType.name}
                         >
-                          {ticketType.name}
+                          <span className="block truncate font-medium">
+                            {ticketType.name}
+                          </span>
+                          {ticketType.accessCode && (
+                            <AccessCodeTag code={ticketType.accessCode} />
+                          )}
                         </button>
                       </TableCell>
                       <TableCell>
