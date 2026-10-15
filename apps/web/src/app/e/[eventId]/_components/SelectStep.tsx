@@ -31,7 +31,7 @@ function Stepper({
     <div className="flex w-24 justify-end">
       <div className="flex items-center gap-0.5 rounded-full border border-border bg-card p-0.5">
         {value > 0 && (
-          <div className="flex items-center gap-0.5 duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] animate-in fade-in slide-in-from-right-2 motion-reduce:[--tw-enter-translate-x:0]">
+          <div className="flex items-center gap-0.5 duration-md ease-out-strong animate-in fade-in slide-in-from-right-2 motion-reduce:[--tw-enter-translate-x:0]">
             <button
               type="button"
               aria-label="Remove one"
@@ -127,7 +127,7 @@ export default function SelectStep({
                 q > 0 ? 'border-primary bg-primary/5' : 'border-border',
                 unavailable && 'border-transparent bg-muted',
                 unlocked &&
-                  'animate-in fade-in slide-in-from-top-1 fill-mode-backwards duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:[--tw-enter-translate-y:0]'
+                  'animate-in fade-in slide-in-from-top-1 fill-mode-backwards duration-md ease-out-strong motion-reduce:[--tw-enter-translate-y:0]'
               )}
             >
               <div className="flex items-start justify-between gap-3">

@@ -542,7 +542,7 @@ export default function CheckoutSheet({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="bottom"
-        className="flex h-dvh w-full flex-col gap-0 border-0 p-0 sm:inset-0 sm:m-auto sm:h-[85vh] sm:max-w-md sm:overflow-hidden sm:rounded-2xl sm:border sm:border-border"
+        className="flex h-dvh w-full flex-col gap-0 border-0 p-0 sm:inset-0 sm:m-auto sm:h-[85vh] sm:max-w-md sm:overflow-hidden sm:rounded-2xl sm:border sm:border-border sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=open]:fade-in-0 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=closed]:fade-out-0 sm:data-[state=closed]:zoom-out-95 motion-reduce:sm:data-[state=open]:zoom-in-100 motion-reduce:sm:data-[state=closed]:zoom-out-100"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <SheetTitle className="sr-only">{STEP_TITLE[step]}</SheetTitle>
