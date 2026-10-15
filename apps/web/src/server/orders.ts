@@ -6,10 +6,10 @@ import {
 } from '@troptix/db';
 import prisma from '@/server/prisma';
 
-export interface EnrichedTicket extends PrismaTicket {
+interface EnrichedTicket extends PrismaTicket {
   ticketType: PrismaTicketType | null;
 }
-export interface EnrichedOrder extends PrismaOrder {
+interface EnrichedOrder extends PrismaOrder {
   event: PrismaEvent;
   _count: { tickets: number };
 }
@@ -39,7 +39,7 @@ export async function getOrderTickets(
   });
 }
 
-export interface ReceiptLine {
+interface ReceiptLine {
   key: string;
   name: string;
   quantity: number;
