@@ -223,11 +223,12 @@ export default function CheckoutSheet({
   // Consume-once, not the live searchParam: the payment step writes ?reservation=
   // via replaceState, and Next's echo of it would bounce payment → finalizing → payment.
   const resumeTargetRef = useRef(resumeReservationId ?? null);
+  const resumeFinalize = useEffectEvent((id: string) => finalize(id, true));
   useEffect(() => {
     if (!open || !resumeTargetRef.current) return;
     const id = resumeTargetRef.current;
     resumeTargetRef.current = null;
-    void finalize(id, true);
+    void resumeFinalize(id);
   }, [open]);
 
   const linkCodeRef = useRef(linkCode ?? null);
@@ -310,6 +311,10 @@ export default function CheckoutSheet({
     }
   }
 
+  const applyPolledState = useEffectEvent(
+    (state: CheckoutState, forReservationId: string) =>
+      applyCheckoutState(state, forReservationId, true)
+  );
   /* oxlint-disable react/set-state-in-effect -- the step follows the polled server state, an external system */
   useEffect(() => {
     if (step !== 'finalizing' || !reservationId) return;
@@ -318,8 +323,7 @@ export default function CheckoutSheet({
       setStep('expired');
       return;
     }
-    if (stateQuery.data)
-      applyCheckoutState(stateQuery.data, reservationId, true);
+    if (stateQuery.data) applyPolledState(stateQuery.data, reservationId);
   }, [step, stateQuery.data, stateQuery.error, reservationId]);
   /* oxlint-enable react/set-state-in-effect */
 
