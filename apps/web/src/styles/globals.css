@@ -166,8 +166,14 @@
 .animate-cta-shake {
   animation: cta-shake 0.4s ease-in-out;
 }
+/* No from/to keyframes: the pulse rises from the button's own opacity and returns to it. */
+@keyframes cta-pulse {
+  50% {
+    opacity: 1;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .animate-cta-shake {
-    animation: none;
+    animation: cta-pulse 0.4s ease-in-out;
   }
 }

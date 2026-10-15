@@ -211,8 +211,12 @@ export default function SelectStep({
         <button
           type="button"
           aria-disabled={qty === 0}
-          onClick={() => {
+          onClick={(e) => {
             if (qty === 0) {
+              for (const animation of e.currentTarget.getAnimations()) {
+                animation.cancel();
+                animation.play();
+              }
               setShake(true);
               return;
             }
