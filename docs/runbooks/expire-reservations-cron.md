@@ -14,12 +14,10 @@ the Stripe `sessions.expire` work can't run in SQL).
 ## Prerequisites
 
 1. Set `CRON_SECRET` in the app's environment (Vercel) to a strong random value.
-2. Enable the extensions (Supabase Dashboard → Database → Extensions, or SQL):
-
-```sql
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
-```
+2. The `pg_cron` and `pg_net` extensions are enabled by the migration
+   `20261015220000_enable_cron_extensions.sql`, so any database that has run
+   the migrations already has them. Confirm with
+   `select extname from pg_extension where extname in ('pg_cron', 'pg_net');`.
 
 ## Store the URL + secret in Vault
 
