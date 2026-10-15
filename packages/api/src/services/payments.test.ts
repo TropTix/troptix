@@ -12,6 +12,8 @@ import {
   getCheckoutState,
   statementDescriptorSuffix,
   sweepExpiredHolds,
+  SWEEP_BATCH,
+  SWEEP_LOCK_NAME,
 } from './payments';
 import { AlreadyPaidError, HoldExpiredError } from './_shared/errors';
 import type {
@@ -150,7 +152,11 @@ interface FakeSessionState {
 
 function fakeStripe(
   session?: Partial<FakeSessionState>,
-  opts?: { expireThrows?: boolean }
+  opts?: {
+    expireThrows?: boolean;
+    /** Runs on each expire call before the fake's own behaviour. */
+    expire?: (sessionId: string) => Promise<void>;
+  }
 ) {
   const calls = {
     create: [] as Array<{ params: unknown; opts: unknown }>,
@@ -179,6 +185,7 @@ function fakeStripe(
         },
         expire: async (id: string) => {
           calls.expire.push(id);
+          await opts?.expire?.(id);
           if (opts?.expireThrows) throw new Error('Session already completed');
           return current;
         },
@@ -668,6 +675,126 @@ describe('sweepExpiredHolds — cancel-then-release', () => {
     });
     expect(res?.status).toBe(ReservationStatus.EXPIRED);
     expect(fake.calls.expire).not.toContain(reservationId);
+  });
+
+  it('expires every Session before its own release, and keeps exactly the holds whose expire failed', async () => {
+    const tt = await makeTicketType(6);
+    const holds = await Promise.all(
+      Array.from({ length: 6 }, async (_, i) => {
+        const sessionId = `cs_test_${generateId()}`;
+        const id = await expiredHold(tt.id, 1, sessionId);
+        return { id, sessionId, fails: i % 2 === 1 };
+      })
+    );
+    const failing = new Set(
+      holds.filter((h) => h.fails).map((h) => h.sessionId)
+    );
+    const statusAtExpire = new Map<string, ReservationStatus>();
+
+    const fake = fakeStripe(undefined, {
+      expire: async (sessionId) => {
+        const r = await prisma.reservation.findUnique({
+          where: { stripeCheckoutSessionId: sessionId },
+        });
+        statusAtExpire.set(sessionId, r!.status);
+        if (failing.has(sessionId))
+          throw new Error('Session already completed');
+      },
+    });
+    const result = await sweepExpiredHolds(prisma, fake.stripe, new Date());
+
+    expect(result.released).toBe(3);
+    expect(result.keptLive).toBe(3);
+    for (const h of holds) {
+      expect(statusAtExpire.get(h.sessionId)).toBe(ReservationStatus.HELD);
+      const r = await prisma.reservation.findUnique({ where: { id: h.id } });
+      expect(r?.status).toBe(
+        h.fails ? ReservationStatus.HELD : ReservationStatus.EXPIRED
+      );
+    }
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(3);
+
+    await prisma.reservation.updateMany({
+      where: { id: { in: holds.filter((h) => h.fails).map((h) => h.id) } },
+      data: { status: ReservationStatus.EXPIRED },
+    });
+  });
+
+  it('processes at most SWEEP_BATCH holds per run, oldest expiry first', async () => {
+    const total = SWEEP_BATCH + 1;
+    const tt = await makeTicketType(total);
+    const epoch = Date.now() - 10 * 365 * 86_400_000;
+    const ids = Array.from({ length: total }, () => generateId());
+    await prisma.reservation.createMany({
+      data: ids.map((id, i) => ({
+        id,
+        eventId: TEST_EVENT_ID,
+        status: ReservationStatus.HELD,
+        expiresAt: new Date(epoch + i * 60_000),
+      })),
+    });
+    await prisma.reservationItem.createMany({
+      data: ids.map((reservationId) => ({
+        reservationId,
+        ticketTypeId: tt.id,
+        quantity: 1,
+        unitPriceCents: 1000,
+      })),
+    });
+    await prisma.ticketTypes.update({
+      where: { id: tt.id },
+      data: { reserved: total },
+    });
+
+    const fake = fakeStripe();
+    const first = await sweepExpiredHolds(prisma, fake.stripe, new Date());
+    expect(first).toEqual({
+      released: SWEEP_BATCH,
+      keptLive: 0,
+      skipped: false,
+    });
+    const newest = await prisma.reservation.findUnique({
+      where: { id: ids[total - 1] },
+    });
+    expect(newest?.status).toBe(ReservationStatus.HELD);
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(1);
+
+    const second = await sweepExpiredHolds(prisma, fake.stripe, new Date());
+    expect(second.released).toBeGreaterThanOrEqual(1);
+    expect(
+      (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.reserved
+    ).toBe(0);
+  });
+
+  it('does nothing while another run holds the lock', async () => {
+    const tt = await makeTicketType(1);
+    const reservationId = await expiredHold(tt.id, 1);
+    const fake = fakeStripe();
+
+    const whileLocked = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${SWEEP_LOCK_NAME}))`;
+      return sweepExpiredHolds(prisma, fake.stripe, new Date());
+    });
+    expect(whileLocked).toEqual({ released: 0, keptLive: 0, skipped: true });
+    expect(
+      (await prisma.reservation.findUnique({ where: { id: reservationId } }))
+        ?.status
+    ).toBe(ReservationStatus.HELD);
+
+    const afterUnlock = await sweepExpiredHolds(
+      prisma,
+      fake.stripe,
+      new Date()
+    );
+    expect(afterUnlock.skipped).toBe(false);
+    expect(
+      (await prisma.reservation.findUnique({ where: { id: reservationId } }))
+        ?.status
+    ).toBe(ReservationStatus.EXPIRED);
   });
 });
 
