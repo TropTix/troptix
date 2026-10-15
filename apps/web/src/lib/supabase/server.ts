@@ -31,24 +31,3 @@ export async function createClient() {
     }
   );
 }
-
-/**
- * Reads claims from an arbitrary cookie source (e.g. the Vercel Flags SDK's
- * reader, which isn't `next/headers` cookies()); never refreshes the session.
- */
-export async function readClaimsFromCookies(cookieReader: {
-  getAll(): { name: string; value: string }[];
-}) {
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieReader.getAll(),
-        setAll: () => {},
-      },
-    }
-  );
-  const { data } = await supabase.auth.getClaims();
-  return data?.claims ?? null;
-}
