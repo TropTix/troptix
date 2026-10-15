@@ -6,7 +6,7 @@ import { NotFoundError } from './_shared/errors';
 const PAST = new Date(Date.now() - 86_400_000);
 const FUTURE = new Date(Date.now() + 86_400_000);
 
-type TierRow = {
+type TicketTypeRow = {
   id: string;
   name: string;
   description: string;
@@ -21,7 +21,7 @@ type TierRow = {
   saleEndsAt: Date;
 };
 
-function tier(overrides: Partial<TierRow> = {}): TierRow {
+function ticketType(overrides: Partial<TicketTypeRow> = {}): TicketTypeRow {
   return {
     id: 'tt-1',
     name: 'General Admission',
@@ -52,7 +52,7 @@ type OrgRel = {
 
 function fakeEvent(
   overrides: {
-    ticketTypes?: TierRow[];
+    ticketTypes?: TicketTypeRow[];
     organization?: OrgRel;
     pageTheme?: 'off' | 'wash' | 'dark';
     flyerPalette?: unknown;
@@ -88,13 +88,13 @@ function fakePrisma(event: ReturnType<typeof fakeEvent> | null): PrismaClient {
 }
 
 describe('getEventDetail', () => {
-  it('derives fromPriceCents from the cheapest tier (priceCents)', async () => {
+  it('derives fromPriceCents from the cheapest ticket type (priceCents)', async () => {
     const prisma = fakePrisma(
       fakeEvent({
         ticketTypes: [
-          tier({ id: 'a', priceCents: 6000, price: 60 }),
-          tier({ id: 'b', priceCents: 2500, price: 25 }),
-          tier({ id: 'c', priceCents: 4000, price: 40 }),
+          ticketType({ id: 'a', priceCents: 6000, price: 60 }),
+          ticketType({ id: 'b', priceCents: 2500, price: 25 }),
+          ticketType({ id: 'c', priceCents: 4000, price: 40 }),
         ],
       })
     );
@@ -108,8 +108,8 @@ describe('getEventDetail', () => {
     const prisma = fakePrisma(
       fakeEvent({
         ticketTypes: [
-          tier({ id: 'a', priceCents: null, price: 25 }),
-          tier({ id: 'b', priceCents: null, price: 40 }),
+          ticketType({ id: 'a', priceCents: null, price: 25 }),
+          ticketType({ id: 'b', priceCents: null, price: 40 }),
         ],
       })
     );
@@ -117,20 +117,20 @@ describe('getEventDetail', () => {
     expect(result.fromPriceCents).toBe(2500);
   });
 
-  it('returns empty tickets and null fromPriceCents when there are no public tiers', async () => {
+  it('returns empty tickets and null fromPriceCents when there are no public ticket types', async () => {
     const prisma = fakePrisma(fakeEvent({ ticketTypes: [] }));
     const result = await getEventDetail(prisma, { eventId: 'ev-1' });
     expect(result.tickets).toEqual([]);
     expect(result.fromPriceCents).toBeNull();
   });
 
-  it('clamps maxAllowedToAdd to availability and sorts sold-out tiers last', async () => {
+  it('clamps maxAllowedToAdd to availability and sorts sold-out ticket types last', async () => {
     const prisma = fakePrisma(
       fakeEvent({
         ticketTypes: [
-          tier({ id: 'soldout', priceCents: 1000, capacity: 5, sold: 5 }),
-          tier({ id: 'open', priceCents: 5000, capacity: 5, sold: 2 }),
-          tier({ id: 'capped', priceCents: 7000, maxPurchasePerUser: 4 }),
+          ticketType({ id: 'soldout', priceCents: 1000, capacity: 5, sold: 5 }),
+          ticketType({ id: 'open', priceCents: 5000, capacity: 5, sold: 2 }),
+          ticketType({ id: 'capped', priceCents: 7000, maxPurchasePerUser: 4 }),
         ],
       })
     );
@@ -142,18 +142,18 @@ describe('getEventDetail', () => {
     expect(result.tickets[0].id).toBe('open');
   });
 
-  it('reports why each tier is unbuyable via saleStatus', async () => {
+  it('reports why each ticket type is unbuyable via saleStatus', async () => {
     const prisma = fakePrisma(
       fakeEvent({
         ticketTypes: [
-          tier({ id: 'live' }),
-          tier({ id: 'soldout', capacity: 5, sold: 5 }),
-          tier({
+          ticketType({ id: 'live' }),
+          ticketType({ id: 'soldout', capacity: 5, sold: 5 }),
+          ticketType({
             id: 'upcoming',
             saleStartsAt: FUTURE,
             saleEndsAt: new Date(FUTURE.getTime() + 86_400_000),
           }),
-          tier({
+          ticketType({
             id: 'closed',
             saleStartsAt: new Date(PAST.getTime() - 86_400_000),
             saleEndsAt: PAST,
@@ -175,7 +175,7 @@ describe('getEventDetail', () => {
     const prisma = fakePrisma(
       fakeEvent({
         ticketTypes: [
-          tier({
+          ticketType({
             id: 'gone',
             capacity: 5,
             sold: 5,
