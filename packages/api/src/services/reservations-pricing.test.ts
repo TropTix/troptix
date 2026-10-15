@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { deriveReserveItems, type PricedTierRow } from './reservations';
+import { deriveReserveItems, type PricedTicketTypeRow } from './reservations';
 import { NotFoundError } from './_shared/errors';
 
 const NOW = new Date('2026-06-15T12:00:00Z');
 
-function tier(overrides: Partial<PricedTierRow> = {}): PricedTierRow {
+function ticketType(
+  overrides: Partial<PricedTicketTypeRow> = {}
+): PricedTicketTypeRow {
   return {
     id: 'tt-1',
     priceCents: 2500,
@@ -19,9 +21,9 @@ function tier(overrides: Partial<PricedTierRow> = {}): PricedTierRow {
 }
 
 describe('deriveReserveItems', () => {
-  it('derives unit price + passed fees (8% + $0.50) from the tier, ignoring the client', () => {
+  it('derives unit price + passed fees (8% + $0.50) from the ticket type, ignoring the client', () => {
     const [item] = deriveReserveItems(
-      [tier({ id: 'a', priceCents: 5000 })],
+      [ticketType({ id: 'a', priceCents: 5000 })],
       [{ ticketTypeId: 'a', quantity: 2 }],
       NOW
     );
@@ -30,9 +32,9 @@ describe('deriveReserveItems', () => {
     expect(item.quantity).toBe(2);
   });
 
-  it('charges no fee for a free tier (keeps it genuinely free)', () => {
+  it('charges no fee for a free ticket type (keeps it genuinely free)', () => {
     const [item] = deriveReserveItems(
-      [tier({ id: 'a', priceCents: 0, price: 0 })],
+      [ticketType({ id: 'a', priceCents: 0, price: 0 })],
       [{ ticketTypeId: 'a', quantity: 1 }],
       NOW
     );
@@ -43,7 +45,7 @@ describe('deriveReserveItems', () => {
   it('charges no fee when the organizer absorbs fees', () => {
     const [item] = deriveReserveItems(
       [
-        tier({
+        ticketType({
           id: 'a',
           priceCents: 5000,
           ticketingFees: 'ABSORB_TICKET_FEES',
@@ -57,7 +59,7 @@ describe('deriveReserveItems', () => {
 
   it('falls back to legacy price*100 when priceCents is null (pre-backfill)', () => {
     const [item] = deriveReserveItems(
-      [tier({ id: 'a', priceCents: null, price: 25 })],
+      [ticketType({ id: 'a', priceCents: null, price: 25 })],
       [{ ticketTypeId: 'a', quantity: 1 }],
       NOW
     );
@@ -66,17 +68,17 @@ describe('deriveReserveItems', () => {
 
   it('clamps quantity to maxPurchasePerUser', () => {
     const [item] = deriveReserveItems(
-      [tier({ id: 'a', maxPurchasePerUser: 4 })],
+      [ticketType({ id: 'a', maxPurchasePerUser: 4 })],
       [{ ticketTypeId: 'a', quantity: 9 }],
       NOW
     );
     expect(item.quantity).toBe(4);
   });
 
-  it('throws NotFoundError for a tier not in the returned rows (missing/gated/wrong event)', () => {
+  it('throws NotFoundError for a ticket type not in the returned rows (missing/gated/wrong event)', () => {
     expect(() =>
       deriveReserveItems(
-        [tier({ id: 'a' })],
+        [ticketType({ id: 'a' })],
         [{ ticketTypeId: 'gated', quantity: 1 }],
         NOW
       )
@@ -88,7 +90,7 @@ describe('deriveReserveItems', () => {
       expect(() =>
         deriveReserveItems(
           [
-            tier({
+            ticketType({
               id: 'a',
               saleStartsAt: new Date(NOW.getTime() + 1000),
               saleEndsAt: new Date(NOW.getTime() + 86_400_000),
@@ -104,7 +106,7 @@ describe('deriveReserveItems', () => {
       expect(() =>
         deriveReserveItems(
           [
-            tier({
+            ticketType({
               id: 'a',
               saleStartsAt: new Date(NOW.getTime() - 86_400_000),
               saleEndsAt: new Date(NOW.getTime() - 1000),
@@ -119,16 +121,16 @@ describe('deriveReserveItems', () => {
     it('throws NotFoundError for a draft event even when on sale', () => {
       expect(() =>
         deriveReserveItems(
-          [tier({ id: 'a', isDraft: true })],
+          [ticketType({ id: 'a', isDraft: true })],
           [{ ticketTypeId: 'a', quantity: 1 }],
           NOW
         )
       ).toThrow(NotFoundError);
     });
 
-    it('allows an on-sale, non-draft tier through', () => {
+    it('allows an on-sale, non-draft ticket type through', () => {
       const [item] = deriveReserveItems(
-        [tier({ id: 'a', isDraft: false })],
+        [ticketType({ id: 'a', isDraft: false })],
         [{ ticketTypeId: 'a', quantity: 1 }],
         NOW
       );
@@ -136,10 +138,10 @@ describe('deriveReserveItems', () => {
     });
   });
 
-  describe('duplicate-tier aggregation + deterministic ordering', () => {
+  describe('duplicate-ticket-type aggregation + deterministic ordering', () => {
     it('sums duplicate ticketTypeId entries before clamping to maxPurchasePerUser (no cap bypass)', () => {
       const items = deriveReserveItems(
-        [tier({ id: 'a', maxPurchasePerUser: 4 })],
+        [ticketType({ id: 'a', maxPurchasePerUser: 4 })],
         [
           { ticketTypeId: 'a', quantity: 3 },
           { ticketTypeId: 'a', quantity: 3 },
@@ -152,7 +154,11 @@ describe('deriveReserveItems', () => {
 
     it('sorts output ascending by ticketTypeId regardless of input order', () => {
       const items = deriveReserveItems(
-        [tier({ id: 'z' }), tier({ id: 'a' }), tier({ id: 'm' })],
+        [
+          ticketType({ id: 'z' }),
+          ticketType({ id: 'a' }),
+          ticketType({ id: 'm' }),
+        ],
         [
           { ticketTypeId: 'z', quantity: 1 },
           { ticketTypeId: 'a', quantity: 1 },
