@@ -26,6 +26,7 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useContext, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { FeatureFlag } from '@troptix/api';
 import { useFeatureFlagAfterMount } from '@/hooks/useFeatureFlagAfterMount';
 import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
@@ -161,7 +162,10 @@ export default function UnifiedHeader() {
   }
 
   const handleSignOut = async () => {
-    await supabaseSignOut();
+    const { error } = await supabaseSignOut();
+    if (error) {
+      toast.error('Could not sign you out. Please try again.');
+    }
   };
 
   return (
