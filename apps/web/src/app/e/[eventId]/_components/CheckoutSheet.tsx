@@ -388,7 +388,6 @@ export default function CheckoutSheet({
         capture(ANALYTICS_EVENTS.checkoutAbandoned, { checkout_step: step });
       }
       setReservationParam(null);
-      setTimeout(resetState, 250);
     }
   }
 
@@ -548,6 +547,14 @@ export default function CheckoutSheet({
         side="bottom"
         className="flex h-dvh w-full flex-col gap-0 border-0 p-0 sm:inset-0 sm:m-auto sm:h-[85vh] sm:max-w-md sm:overflow-hidden sm:rounded-2xl sm:border sm:border-border"
         onInteractOutside={(e) => e.preventDefault()}
+        onAnimationEnd={(e) => {
+          if (
+            e.target === e.currentTarget &&
+            e.currentTarget.dataset.state === 'closed'
+          ) {
+            resetState();
+          }
+        }}
       >
         <SheetTitle className="sr-only">{STEP_TITLE[step]}</SheetTitle>
         {step === 'success' && successData ? (
