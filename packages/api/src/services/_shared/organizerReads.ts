@@ -36,7 +36,7 @@ export function toEventSummary(
     startsAt: event.startsAt.toISOString(),
     sold: event._count.tickets,
     capacity: event.ticketTypes.reduce(
-      (total, tier) => total + tier.capacity,
+      (total, ticketType) => total + ticketType.capacity,
       0
     ),
     status: getEventStatus(event, now),
