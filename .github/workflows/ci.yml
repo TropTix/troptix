@@ -125,10 +125,16 @@ jobs:
           # Pinned: the action's default lags far behind. Keep roughly in step
           # with the CLI version used for local dev.
           version: 2.110.0
+      # Pulling the Postgres image is the slowest step in the job and needs
+      # nothing from node_modules, so it runs while pnpm installs.
       - name: Start local Postgres (migrations + seed)
+        id: db
         run: supabase db start
+        background: true
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Wait for Postgres
+        wait: db
       - name: Run API integration tests
         run: pnpm --filter @troptix/api test
 
@@ -144,22 +150,33 @@ jobs:
       CI: 1
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.110.0
+      # Postgres and the Chromium download overlap with the steps that do not
+      # need them. The web build is not one of those: /discover is prerendered
+      # at build time from the seeded events, so it waits for the database.
       - name: Start local Postgres (migrations + seed)
+        id: db
         run: supabase db start
+        background: true
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Install Chromium
+        id: chromium
         run: pnpm --filter @troptix/e2e exec playwright install --with-deps chromium
+        background: true
+      - name: Wait for Postgres
+        wait: db
       - name: Build web
         run: pnpm --filter @troptix/e2e build:web
+      - name: Wait for Chromium
+        wait: chromium
       - name: Run browser tests
         run: pnpm --filter @troptix/e2e test
       - name: Upload report
