@@ -1,5 +1,4 @@
 import { clsx, type ClassValue } from 'clsx';
-import ShortUniqueId from 'short-unique-id';
 import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
@@ -36,13 +35,4 @@ export function initials(name: string): string {
     .join('')
     .toUpperCase();
   return result || '?';
-}
-
-export function generateId() {
-  const uid = new ShortUniqueId({
-    dictionary: 'alphanum_upper',
-    length: 12,
-  });
-
-  return uid.rnd();
 }

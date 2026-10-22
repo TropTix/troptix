@@ -69,6 +69,25 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+  # Dead dependencies, unresolved imports and unused exports in apps/web.
+  # Exports under src/components/ui are shadcn's full surface and are
+  # excluded in apps/web/knip.json.
+  knip:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Knip
+        run: pnpm --filter web knip
+
   # Always runs, unfiltered: its job is catching cross-workspace breakage
   # (a type change in @troptix/db breaking apps/web), which path filters
   # cannot predict.
