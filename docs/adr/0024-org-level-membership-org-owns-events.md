@@ -1,6 +1,6 @@
 # 24. Org-level Membership; the Organization owns every event
 
-- **Status:** Accepted
+- **Status:** Superseded by 31 (decisions 2 and 3 stand; see [ADR 0031](0031-personal-organizations-owner-membership-event-co-hosts.md))
 - **Date:** 2026-07-27
 
 ## Context
