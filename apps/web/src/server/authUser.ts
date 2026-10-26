@@ -20,9 +20,6 @@ export interface ServerUser {
  * instead of being swallowed as an auth failure.
  */
 async function getAuthUserId(token?: string): Promise<string | null> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    return null;
-  }
   // No session cookie (`sb-<ref>-auth-token`, possibly chunked) means getClaims
   // can't succeed — skip it.
   if (!token) {
@@ -35,6 +32,9 @@ async function getAuthUserId(token?: string): Promise<string | null> {
     }
   }
   const supabase = await createClient();
+  if (!supabase) {
+    return null;
+  }
   try {
     const { data } = await supabase.auth.getClaims(token);
     return data?.claims?.sub ?? null;

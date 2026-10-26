@@ -1,7 +1,7 @@
-import { createClient } from '@/lib/supabase/client';
+import { requireClient } from '@/lib/supabase/client';
 
 export async function signInWithMagicLink(email: string) {
-  const supabase = createClient();
+  const supabase = requireClient();
   return supabase.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
@@ -13,12 +13,12 @@ export async function signInWithMagicLink(email: string) {
  * template). `type: 'email'` covers both the signup and returning-login cases.
  */
 export async function verifyEmailOtp(email: string, token: string) {
-  const supabase = createClient();
+  const supabase = requireClient();
   return supabase.auth.verifyOtp({ email, token, type: 'email' });
 }
 
 export async function signInWithGoogle() {
-  const supabase = createClient();
+  const supabase = requireClient();
   return supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -29,6 +29,6 @@ export async function signInWithGoogle() {
 }
 
 export async function signOut() {
-  const supabase = createClient();
+  const supabase = requireClient();
   return supabase.auth.signOut();
 }

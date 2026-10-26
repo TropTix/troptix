@@ -23,18 +23,16 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
-  let failed = false;
-  if (code) {
+  let failed = true;
+  if (supabase && code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     failed = Boolean(error);
-  } else if (tokenHash && type) {
+  } else if (supabase && tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({
       type,
       token_hash: tokenHash,
     });
     failed = Boolean(error);
-  } else {
-    failed = true;
   }
 
   if (!failed) {
