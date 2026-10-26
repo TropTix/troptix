@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-10
 - **Amends:** [ADR 0011](0011-supabase-auth-identity.md) — supersedes its password-preserving scrypt import; the rest of 0011 (decoupled `authUserId` identity, orphan-safe sequencing, RLS strategy) stands.
+- **Amended by [ADR 0036](0036-provision-users-at-email-confirmation.md) (2026-10-15):** the trigger no longer fires `after insert on auth.users`. It fires on email confirmation, so an unverified OTP request creates and links nothing, and it never throws. Everything else here still holds.
 
 ## Context
 
