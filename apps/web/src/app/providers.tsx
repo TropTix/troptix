@@ -11,13 +11,17 @@ import { PostHogProvider as PHProvider } from 'posthog-js/react';
 
 import AuthProvider from '@/components/AuthProvider';
 import UnifiedHeader from '@/components/ui/unified-header';
+import SiteFooter from '@/components/SiteFooter';
 
 const queryClient = new QueryClient();
 
 function GlobalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isOrganizer = pathname?.startsWith('/organizer');
+  const isAuth = pathname?.startsWith('/auth');
   const offsetContent = !isOrganizer;
+  // The event page keeps a fixed ticket bar at the bottom; clear it.
+  const underStickyBar = pathname?.startsWith('/e/');
 
   return (
     <div>
@@ -25,6 +29,9 @@ function GlobalLayout({ children }: { children: React.ReactNode }) {
       <div className={`grow border-x ${offsetContent ? 'mt-16' : ''}`}>
         {children}
       </div>
+      {!isOrganizer && !isAuth && (
+        <SiteFooter className={underStickyBar ? 'pb-28' : undefined} />
+      )}
     </div>
   );
 }
