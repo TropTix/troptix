@@ -5,7 +5,7 @@ import prisma from '@/server/prisma';
 import { getServerUser } from '@/server/authUser';
 import type { Actor } from '@troptix/api/server';
 import { userToActor } from '@/server/actor';
-import { stripe } from '@/server/lib/stripe';
+import { payoutClients } from '@/server/lib/stripePayouts';
 import { formatCents } from '@/lib/dateUtils';
 import {
   resolvePayoutRequestInputSchema,
@@ -46,7 +46,7 @@ export async function sendPayoutViaStripe(
   input: SendPayoutViaStripeInput
 ): Promise<ActionResult> {
   return run(sendPayoutViaStripeInputSchema.safeParse(input), (actor, data) =>
-    sendPayoutViaStripeService(prisma, stripe, actor, data)
+    sendPayoutViaStripeService(prisma, payoutClients, actor, data)
   );
 }
 

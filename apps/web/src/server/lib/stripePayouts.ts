@@ -15,4 +15,5 @@ export const stripePayouts = new StripePreview(
 export const payoutClients: PayoutClients = {
   connect: stripe,
   global: stripePayouts,
+  financialAccountId: process.env.STRIPE_FINANCIAL_ACCOUNT_ID || undefined,
 };

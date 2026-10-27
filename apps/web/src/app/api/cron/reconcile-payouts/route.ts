@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { reconcileStripePayouts } from '@troptix/api/server';
 import prisma from '@/server/prisma';
-import { stripe } from '@/server/lib/stripe';
+import { payoutClients } from '@/server/lib/stripePayouts';
 
 /**
- * Daily check that Stripe's transfers and the payout rows agree (ADR 0030
- * decision 17). Reports, never repairs: a mismatch is a human's call.
+ * Daily check that Stripe's transfers, outbound payments and the payout rows
+ * agree (ADR 0030 decision 17, ADR 0034). Reports, never repairs: a mismatch is a human's call.
  */
 export const runtime = 'nodejs';
 
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const mismatches = await reconcileStripePayouts(prisma, stripe);
+    const mismatches = await reconcileStripePayouts(prisma, payoutClients);
     if (mismatches.length > 0) {
       console.error('[ReconcilePayouts] Mismatches found:', mismatches);
     }

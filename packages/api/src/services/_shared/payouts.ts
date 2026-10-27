@@ -55,3 +55,21 @@ export function releaseEarnings(
   }
   return { releasedCents: 0, pendingCents: earnedCents };
 }
+
+/**
+ * Stripe's worst case for a Global Payouts local-bank payout from a US
+ * sender (pricing page, 2026-09-27): $1.50 flat, up to 1.25% cross-border,
+ * 1% FX. Fees are billed to the financial account separately from the
+ * payout, so the send tops it up by this much over the amount (ADR 0034).
+ */
+export const GlobalPayoutFees = {
+  FLAT_CENTS: 150,
+  PERCENT: 2.25,
+} as const;
+
+export function globalPayoutFeeHeadroomCents(amountCents: number): number {
+  return (
+    Math.ceil((amountCents * GlobalPayoutFees.PERCENT) / 100) +
+    GlobalPayoutFees.FLAT_CENTS
+  );
+}

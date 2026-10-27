@@ -5,10 +5,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AlertTriangle, Copy, ExternalLink } from 'lucide-react';
-import type {
-  PayoutMismatch,
-  PayoutRailDto,
-  PlatformPayoutRequest,
+import {
+  globalPayoutFeeHeadroomCents,
+  type PayoutMismatch,
+  type PayoutRailDto,
+  type PlatformPayoutRequest,
 } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
@@ -67,11 +68,15 @@ const RAIL_LABELS = {
 } satisfies Record<PayoutRailDto, string>;
 
 const MISMATCH_LABELS: Record<PayoutMismatch['kind'], string> = {
-  paid_without_transfer: 'Marked paid, no Stripe transfer found',
-  requested_with_transfer: 'A Stripe transfer exists but the request is open',
-  duplicate_transfer: 'More than one Stripe transfer for this request',
-  closed_with_transfer: 'Resolved off Stripe, but a Stripe transfer exists',
-  transfer_without_request: 'A Stripe transfer points at no request',
+  paid_without_transfer: 'Marked paid, no Stripe transfer or payment found',
+  requested_with_transfer:
+    'A Stripe transfer or payment exists but the request is open',
+  duplicate_transfer:
+    'More than one Stripe transfer or payment for this request',
+  closed_with_transfer:
+    'Resolved off Stripe, but a Stripe transfer or payment exists',
+  transfer_without_request: 'A Stripe transfer or payment points at no request',
+  payment_returned: 'Marked paid, but the Stripe payment failed or came back',
 };
 
 /** Stripe's Connect pricing for a transfer: 0.25% plus 25¢, absorbed by TropTix. */
@@ -163,7 +168,7 @@ function RequestRow({
               <Badge
                 variant="outline"
                 className="border-warning/40 text-warning"
-                title={mismatch.transferIds.join(', ')}
+                title={mismatch.stripeIds.join(', ')}
               >
                 <AlertTriangle />
                 {MISMATCH_LABELS[mismatch.kind]}
@@ -264,6 +269,7 @@ function StripeSendPanel({
       }
     });
 
+  const recipient = request.stripeAccountKind === 'GLOBAL_PAYOUTS';
   return (
     <div className="space-y-3 rounded-lg bg-muted/40 p-4">
       <div>
@@ -273,8 +279,9 @@ function StripeSendPanel({
           {request.organizationName})
         </p>
         <p className="text-sm text-muted-foreground">
-          Stripe deposits to their bank within about two business days. Fee to
-          TropTix: about {formatCents(connectFeeCents(request.amountCents))}.
+          {recipient
+            ? `Converted to their currency at Stripe's rate, usually in their bank within a week. Fee to TropTix: up to ${formatCents(globalPayoutFeeHeadroomCents(request.amountCents))}.`
+            : `Stripe deposits to their bank within about two business days. Fee to TropTix: about ${formatCents(connectFeeCents(request.amountCents))}.`}
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
