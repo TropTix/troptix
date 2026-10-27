@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
 import { usePostHog } from 'posthog-js/react';
 import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -11,9 +17,11 @@ import type {
   BeginPaymentResponse,
   CheckoutState,
   EventDetail,
+  EventTicket,
   ReservationContact,
 } from '@troptix/api';
 import SelectStep from './SelectStep';
+import type { ApplyCodeOutcome, FailedCode } from './AccessCodeField';
 import ContactStep from './ContactStep';
 import PaymentStep from './PaymentStep';
 import SuccessTicket from './SuccessTicket';
@@ -66,16 +74,25 @@ export default function CheckoutSheet({
   onOpenChange,
   event,
   resumeReservationId,
+  linkCode,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   event: EventDetail;
   resumeReservationId?: string | null;
+  /** `?code=` from a shared link, applied once when the sheet first opens (#604). */
+  linkCode?: string | null;
 }) {
   const { user } = useAuth();
   const posthog = usePostHog();
   const [step, setStep] = useState<Step>('select');
   const [selection, setSelection] = useState<Record<string, number>>({});
+  // One code per checkout; it outlives close/reset so a reopened sheet still
+  // shows what the buyer unlocked (ADR 0035).
+  const [unlock, setUnlock] = useState<{
+    code: string;
+    tickets: EventTicket[];
+  } | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -176,6 +193,7 @@ export default function CheckoutSheet({
     [capture]
   );
 
+  const applyCode = trpc.checkout.applyCode.useMutation();
   const createReservation = trpc.checkout.createReservation.useMutation();
   const completeFree = trpc.checkout.completeFree.useMutation();
   const beginPayment = trpc.checkout.beginPayment.useMutation();
@@ -205,11 +223,26 @@ export default function CheckoutSheet({
   // Consume-once, not the live searchParam: the payment step writes ?reservation=
   // via replaceState, and Next's echo of it would bounce payment → finalizing → payment.
   const resumeTargetRef = useRef(resumeReservationId ?? null);
+  const resumeFinalize = useEffectEvent((id: string) => finalize(id, true));
   useEffect(() => {
     if (!open || !resumeTargetRef.current) return;
     const id = resumeTargetRef.current;
     resumeTargetRef.current = null;
-    void finalize(id, true);
+    void resumeFinalize(id);
+  }, [open]);
+
+  const linkCodeRef = useRef(linkCode ?? null);
+  const [failedLinkCode, setFailedLinkCode] = useState<FailedCode | null>(null);
+  const applyLinkCode = useEffectEvent((code: string) =>
+    handleApplyCode(code, 'link')
+  );
+  useEffect(() => {
+    if (!open || !linkCodeRef.current) return;
+    const code = linkCodeRef.current;
+    linkCodeRef.current = null;
+    void applyLinkCode(code).then((outcome) => {
+      if (outcome !== 'unlocked') setFailedLinkCode({ code, outcome });
+    });
   }, [open]);
 
   function applyCheckoutState(
@@ -278,6 +311,10 @@ export default function CheckoutSheet({
     }
   }
 
+  const applyPolledState = useEffectEvent(
+    (state: CheckoutState, forReservationId: string) =>
+      applyCheckoutState(state, forReservationId, true)
+  );
   /* oxlint-disable react/set-state-in-effect -- the step follows the polled server state, an external system */
   useEffect(() => {
     if (step !== 'finalizing' || !reservationId) return;
@@ -286,8 +323,7 @@ export default function CheckoutSheet({
       setStep('expired');
       return;
     }
-    if (stateQuery.data)
-      applyCheckoutState(stateQuery.data, reservationId, true);
+    if (stateQuery.data) applyPolledState(stateQuery.data, reservationId);
   }, [step, stateQuery.data, stateQuery.error, reservationId]);
   /* oxlint-enable react/set-state-in-effect */
 
@@ -329,6 +365,7 @@ export default function CheckoutSheet({
   function resetState() {
     setStep('select');
     setSelection({});
+    setFailedLinkCode(null);
     setLocalError(null);
     setReservationId(null);
     setClientSecret(null);
@@ -351,7 +388,6 @@ export default function CheckoutSheet({
         capture(ANALYTICS_EVENTS.checkoutAbandoned, { checkout_step: step });
       }
       setReservationParam(null);
-      setTimeout(resetState, 250);
     }
   }
 
@@ -364,7 +400,55 @@ export default function CheckoutSheet({
     });
   }
 
-  const chosen = event.tickets.filter((t) => (selection[t.id] ?? 0) > 0);
+  async function handleApplyCode(
+    code: string,
+    source: 'typed' | 'link' = 'typed'
+  ): Promise<ApplyCodeOutcome> {
+    let res: Awaited<ReturnType<typeof applyCode.mutateAsync>>;
+    try {
+      res = await applyCode.mutateAsync({ eventId: event.id, code });
+    } catch {
+      return 'failed';
+    }
+    if (res.type === 'invalid') {
+      capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
+        valid: false,
+        unlocked_count: 0,
+        source,
+      });
+      return 'invalid';
+    }
+    capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
+      valid: true,
+      unlocked_count: res.tickets.length,
+      source,
+    });
+    setFailedLinkCode(null);
+    setUnlock({ code: code.trim().toUpperCase(), tickets: res.tickets });
+    return 'unlocked';
+  }
+
+  // The field only offers the form while no code is active, so swapping codes
+  // is always clear-then-apply; this is the one place unlocked quantities drop.
+  function clearCode() {
+    if (!unlock) return;
+    const unlocked = unlock.tickets.map((t) => t.id);
+    setSelection((prev) => {
+      const next = { ...prev };
+      for (const id of unlocked) delete next[id];
+      return next;
+    });
+    setUnlock(null);
+  }
+
+  const unlockedIds = new Set(unlock?.tickets.map((t) => t.id) ?? []);
+  const tickets = unlock
+    ? [
+        ...unlock.tickets,
+        ...event.tickets.filter((t) => !unlockedIds.has(t.id)),
+      ]
+    : event.tickets;
+  const chosen = tickets.filter((t) => (selection[t.id] ?? 0) > 0);
   const qty = chosen.reduce((sum, t) => sum + selection[t.id], 0);
   const feesCents = chosen.reduce(
     (sum, t) => sum + selection[t.id] * t.feesCents,
@@ -386,6 +470,7 @@ export default function CheckoutSheet({
           ticketTypeId: t.id,
           quantity: selection[t.id],
         })),
+        ...(unlock ? { accessCode: unlock.code } : {}),
         contact,
         analytics: analyticsIds(),
       });
@@ -462,6 +547,14 @@ export default function CheckoutSheet({
         side="bottom"
         className="flex h-dvh w-full flex-col gap-0 border-0 p-0 sm:inset-0 sm:m-auto sm:h-[85vh] sm:max-w-md sm:overflow-hidden sm:rounded-2xl sm:border sm:border-border"
         onInteractOutside={(e) => e.preventDefault()}
+        onAnimationEnd={(e) => {
+          if (
+            e.target === e.currentTarget &&
+            e.currentTarget.dataset.state === 'closed'
+          ) {
+            resetState();
+          }
+        }}
       >
         <SheetTitle className="sr-only">{STEP_TITLE[step]}</SheetTitle>
         {step === 'success' && successData ? (
@@ -474,8 +567,13 @@ export default function CheckoutSheet({
           <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden">
             {step === 'select' && (
               <SelectStep
-                tickets={event.tickets}
+                tickets={tickets}
                 selection={selection}
+                unlockedIds={unlockedIds}
+                activeCode={unlock?.code ?? null}
+                onApplyCode={handleApplyCode}
+                onClearCode={clearCode}
+                failedLinkCode={failedLinkCode}
                 onAdjust={adjust}
                 qty={qty}
                 totalCents={totalCents}

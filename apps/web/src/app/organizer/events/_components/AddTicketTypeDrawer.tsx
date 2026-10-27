@@ -123,7 +123,7 @@ export function AddTicketTypeDrawer({
     price: 0,
     capacity: 100,
     maxPurchasePerUser: 10,
-    discountCode: undefined,
+    accessCode: undefined,
     ticketingFees: 'PASS_TICKET_FEES' as const,
     saleStartsAt: today,
     // Clamped: on an already-ended event the raw event end would seed a
@@ -486,7 +486,7 @@ export function AddTicketTypeDrawer({
               />
               <FormField
                 control={form.control}
-                name="discountCode"
+                name="accessCode"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>

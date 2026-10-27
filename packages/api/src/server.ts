@@ -32,7 +32,7 @@ export {
 
 export { captureOrderCompleted } from './services/reservations';
 
-export { getCheckoutConfig, applyCode } from './services/checkout';
+export { applyCode } from './services/checkout';
 export {
   getEventDetail,
   getEventDetailRaw,
@@ -40,7 +40,13 @@ export {
   listPublicEvents,
 } from './services/events';
 export { getDashboard } from './services/organizer-dashboard';
-export { listOrganizerEvents } from './services/organizer-events';
+export {
+  getEventForEdit,
+  getEventName,
+  getEventNavSummary,
+  listEventAttendees,
+  listOrganizerEvents,
+} from './services/organizer-events';
 export { getEventOverview } from './services/organizer-event-overview';
 export {
   listEventOrders,
@@ -59,9 +65,19 @@ export {
   type ScanTicketResult,
 } from './services/organizer-checkin';
 export {
+  eventsInScope,
+  isPlatformOwner,
+  organizationInScope,
+  resolveOrganizerScope,
+  type OrganizerScope,
+} from './services/organizer-scope';
+export {
+  createOrganization,
   ensureOrganizationForUser,
-  findOrganizationForOwner,
+  findActingOrganization,
   getOrganizationBySlug,
+  listOwnedOrganizations,
+  switchToOrganization,
   updateOrganizationProfile,
 } from './services/organizations';
 export {

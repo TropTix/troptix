@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { PayoutClients } from './organizer-connect';
@@ -27,7 +28,6 @@ export function fakePrisma(
 ) {
   const row = org === null ? null : { ...ORG, ...org };
   const findFirst = vi.fn().mockResolvedValue(row);
-  const findMany = vi.fn().mockResolvedValue([]);
   const create = vi.fn().mockResolvedValue({ ...ORG, id: 'org-new' });
   const orgFindUnique = vi.fn().mockResolvedValue({
     stripeAccountId: opts.raceId ?? null,
@@ -37,8 +37,8 @@ export function fakePrisma(
   const update = vi.fn().mockResolvedValue(row);
   const prisma = {
     organization: {
+      ...ownedOrganizations(org === null ? [] : ['org-1']),
       findFirst,
-      findMany,
       create,
       findUnique: orgFindUnique,
       update,

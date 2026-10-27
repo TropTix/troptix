@@ -23,7 +23,7 @@ import {
   resolvePayoutPolicy,
   type PayoutPolicy,
 } from './_shared/payouts';
-import { resolveOrganizerScope } from './organizer-scope';
+import { organizationInScope, resolveOrganizerScope } from './organizer-scope';
 import { termsAccepted } from './payout-terms';
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -119,8 +119,8 @@ async function computeBalances(
   let releasedCents = 0;
   let pendingCents = 0;
   for (const row of earnedRows) {
-    // Clamped: a cheap absorb tier can derive a fee above its own subtotal,
-    // and one event's deficit must not drain the others' earnings.
+    // Clamped: a cheap absorb ticket type can derive a fee above its own
+    // subtotal, and one event's deficit must not drain the others' earnings.
     const earned = Math.max(
       0,
       Number(row.subtotalCents) - (absorbedByEvent.get(row.eventId) ?? 0)
@@ -195,14 +195,14 @@ export async function getPayouts(
   input: GetPayoutsInput = {},
   now: Date = new Date()
 ): Promise<OrganizerPayouts> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
   );
 
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: organizerUserId },
+    where: organizationInScope(scope),
     select: ORG_PAYOUT_SELECT,
   });
 
@@ -264,8 +264,9 @@ export async function requestPayout(
     throw new UnauthorizedError('Sign in to request a payout');
   }
 
+  const scope = await resolveOrganizerScope(prisma, actor);
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: actor.userId },
+    where: organizationInScope(scope),
     select: ORG_PAYOUT_SELECT,
   });
   if (!org) throw new PayoutSetupIncompleteError();
@@ -321,11 +322,12 @@ export async function cancelPayoutRequest(
     throw new UnauthorizedError('Sign in to cancel a payout request');
   }
 
+  const scope = await resolveOrganizerScope(prisma, actor);
   const updated = await prisma.payoutRequest.updateMany({
     where: {
       id: input.id,
       status: 'REQUESTED',
-      organization: { ownerUserId: actor.userId },
+      organization: organizationInScope(scope),
     },
     data: { status: 'CANCELLED' },
   });

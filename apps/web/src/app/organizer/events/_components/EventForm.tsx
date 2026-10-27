@@ -70,6 +70,7 @@ import { createEvent, updateEvent } from '../_actions/eventActions';
 import { PaidTicketingBanner } from '@/components/PaidTicketingBanner';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
 import { cn } from '@/lib/utils';
+import { HostedByPicker } from './HostedByPicker';
 import { extractFlyerPaletteFromUrl, themeAvailable } from '@/lib/flyerTheme';
 
 interface EventFormProps {
@@ -79,6 +80,8 @@ interface EventFormProps {
   isDraft?: boolean;
   paidEventsEnabled: boolean;
   organizationName?: string;
+  organizations?: { id: string; displayName: string }[];
+  organizationId?: string | null;
 }
 
 type DrawerState = {
@@ -109,7 +112,7 @@ function defaultEventValues(): EventFormValues {
         price: 0,
         capacity: 100,
         maxPurchasePerUser: 10,
-        discountCode: undefined,
+        accessCode: undefined,
         ticketingFees: 'PASS_TICKET_FEES' as const,
         saleStartsAt: new Date(),
         saleEndsAt: nextDay,
@@ -129,6 +132,8 @@ export default function EventForm({
   isDraft,
   paidEventsEnabled,
   organizationName,
+  organizations,
+  organizationId = null,
 }: EventFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -485,8 +490,16 @@ export default function EventForm({
 
                   <FormItem>
                     <FormLabel>Hosted by</FormLabel>
-                    <div className="flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-medium">
-                      {organizationName ?? 'Your organizer profile'}
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-10 flex-1 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-medium">
+                        {organizationName ?? 'Your organizer profile'}
+                      </div>
+                      {organizations && (
+                        <HostedByPicker
+                          organizations={organizations}
+                          currentId={organizationId}
+                        />
+                      )}
                     </div>
                     <FormDescription>
                       Events are hosted by your organization.{' '}

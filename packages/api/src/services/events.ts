@@ -7,17 +7,10 @@ import type {
   EventTicket,
 } from '../contracts/events';
 import { parseStoredFlyerPalette } from '../contracts/events';
-import { calculateFeesCents } from './_shared/fees';
 import { publicEventsWhere } from './_shared/publicEvents';
 import { toEventSummary } from './_shared/eventSummary';
-import { getSaleState } from './_shared/saleState';
+import { sortEventTickets, toEventTicket } from './_shared/eventTicket';
 import { NotFoundError } from './_shared/errors';
-
-const SALE_STATUS = {
-  Scheduled: 'notYetOnSale',
-  OnSale: 'onSale',
-  Ended: 'saleEnded',
-} as const;
 
 export async function listPublicEvents(
   prisma: PrismaClient
@@ -84,12 +77,7 @@ export async function getEventDetailRaw(
       pageTheme: true,
       flyerPalette: true,
       ticketTypes: {
-        where: {
-          OR: [
-            { discountCode: { equals: null } },
-            { discountCode: { equals: '' } },
-          ],
-        },
+        where: { accessCode: null },
         select: {
           id: true,
           name: true,
@@ -130,42 +118,9 @@ export function shapeEventDetail(
   event: EventDetailRaw,
   now: Date
 ): EventDetail {
-  const tickets: EventTicket[] = event.ticketTypes
-    .map((tt) => {
-      const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
-      const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
-      const saleWindow = {
-        saleStartsAt: new Date(tt.saleStartsAt),
-        saleEndsAt: new Date(tt.saleEndsAt),
-      };
-      const saleStatus: EventTicket['saleStatus'] =
-        availability === 0
-          ? 'soldOut'
-          : SALE_STATUS[getSaleState(saleWindow, now)];
-      const maxAllowedToAdd =
-        saleStatus === 'onSale' && !event.isDraft
-          ? Math.max(0, Math.min(availability, tt.maxPurchasePerUser))
-          : 0;
-      const feesCents =
-        tt.ticketingFees === 'PASS_TICKET_FEES'
-          ? calculateFeesCents(priceCents)
-          : 0;
-
-      return {
-        id: tt.id,
-        name: tt.name,
-        description: tt.description,
-        priceCents,
-        feesCents,
-        maxAllowedToAdd,
-        saleStatus,
-      };
-    })
-    .sort((a, b) => {
-      const aOut = a.maxAllowedToAdd > 0 ? 0 : 1;
-      const bOut = b.maxAllowedToAdd > 0 ? 0 : 1;
-      return aOut !== bOut ? aOut - bOut : a.priceCents - b.priceCents;
-    });
+  const tickets: EventTicket[] = sortEventTickets(
+    event.ticketTypes.map((tt) => toEventTicket(tt, event.isDraft, now))
+  );
 
   const fromPriceCents =
     tickets.length > 0 ? Math.min(...tickets.map((t) => t.priceCents)) : null;

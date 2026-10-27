@@ -47,7 +47,8 @@ export async function createTicketType(
       toServiceInput(validationResult.data)
     );
     revalidatePath(`/organizer/events/${eventId}/tickets`);
-    // Tiers surface only on the event detail page — listings carry no tier data.
+    // Ticket types surface only on the event detail page — listings carry no
+    // ticket type data.
     revalidateEventDetail(eventId);
     return { success: true };
   } catch (error) {
@@ -102,7 +103,7 @@ function toServiceInput(data: TicketTypeFormValues) {
     saleStartsAt: data.saleStartsAt,
     saleEndsAt: data.saleEndsAt,
     ticketingFees: data.ticketingFees,
-    discountCode: data.discountCode,
+    accessCode: data.accessCode,
   };
 }
 

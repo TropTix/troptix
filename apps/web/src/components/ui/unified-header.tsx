@@ -26,8 +26,8 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useContext, useEffect, useState } from 'react';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { FeatureFlag } from '@troptix/api';
+import { useFeatureFlagAfterMount } from '@/hooks/useFeatureFlagAfterMount';
 import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
 
@@ -114,7 +114,9 @@ export default function UnifiedHeader() {
   const [hasScrolled, setHasScrolled] = useState<boolean>(false);
   const { user } = useContext(TropTixContext);
   const pathname = usePathname();
-  const payoutsEnabled = useFeatureFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS);
+  const payoutsEnabled = useFeatureFlagAfterMount(
+    FeatureFlag.ORGANIZER_PAYOUTS
+  );
 
   useEffect(() => {
     const handleScroll = () => {

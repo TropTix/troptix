@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { ArrowRight, HelpCircle, Mail } from 'lucide-react';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { FeatureFlag } from '@troptix/api';
+import { useFeatureFlagAfterMount } from '@/hooks/useFeatureFlagAfterMount';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +35,9 @@ const CALL_STEPS = ['Schedule a call', 'Get approved by TropTix'];
 
 export function PaidTicketingBanner() {
   // Only `=== true` is on — undefined means the flags haven't loaded yet.
-  const payoutsEnabled = useFeatureFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS);
+  const payoutsEnabled = useFeatureFlagAfterMount(
+    FeatureFlag.ORGANIZER_PAYOUTS
+  );
   const steps = payoutsEnabled === true ? PAYOUT_STEPS : CALL_STEPS;
   return (
     <div className="@container">

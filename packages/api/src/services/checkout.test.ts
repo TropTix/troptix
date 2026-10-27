@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
-import { applyCode, getCheckoutConfig } from './checkout';
+import { applyCode } from './checkout';
 
 const PAST = new Date(Date.now() - 86_400_000);
 const FUTURE = new Date(Date.now() + 86_400_000);
@@ -11,7 +11,6 @@ type Row = {
   description: string;
   maxPurchasePerUser: number;
   ticketingFees: 'PASS_TICKET_FEES' | 'ABSORB_TICKET_FEES';
-  ticketType: 'FREE' | 'PAID' | 'COMPLEMENTARY' | null;
   capacity: number;
   reserved: number;
   sold: number;
@@ -25,11 +24,10 @@ type Row = {
 function row(overrides: Partial<Row> = {}): Row {
   return {
     id: 'tt-1',
-    name: 'General Admission',
-    description: 'GA',
+    name: 'VIP',
+    description: 'VIP entry',
     maxPurchasePerUser: 10,
     ticketingFees: 'PASS_TICKET_FEES',
-    ticketType: 'PAID',
     capacity: 100,
     reserved: 0,
     sold: 0,
@@ -42,147 +40,83 @@ function row(overrides: Partial<Row> = {}): Row {
   };
 }
 
-function fakePrisma(opts: {
-  ticketTypes?: Row[];
-  matchedTicketType?: Row | null;
-  eventCount?: number;
-}): PrismaClient {
+function fakePrisma(rows: Row[]) {
+  const findMany = vi.fn(async (_args: unknown) => rows);
   return {
-    ticketTypes: {
-      findMany: async () => opts.ticketTypes ?? [],
-      findFirst: async () => opts.matchedTicketType ?? null,
-    },
-    events: {
-      count: async () => opts.eventCount ?? 0,
-    },
-  } as unknown as PrismaClient;
+    prisma: { ticketTypes: { findMany } } as unknown as PrismaClient,
+    findMany,
+  };
 }
-
-async function firstTicket(ticketType: Row) {
-  const { tickets } = await getCheckoutConfig(
-    fakePrisma({ ticketTypes: [ticketType] }),
-    { eventId: 'evt-1' }
-  );
-  return tickets[0];
-}
-
-describe('getCheckoutConfig', () => {
-  it('maps a ticket type to the cents contract', async () => {
-    const prisma = fakePrisma({ ticketTypes: [row()] });
-    const { tickets } = await getCheckoutConfig(prisma, { eventId: 'evt-1' });
-
-    expect(tickets).toHaveLength(1);
-    expect(tickets[0]).toMatchObject({
-      id: 'tt-1',
-      priceCents: 5000,
-      // 5000*0.08 + 50 = 450 fee (no tax). Literal, not calculateFeesCents(5000),
-      // so a wrong fee formula can't pass on both sides.
-      feesCents: 450,
-      maxAllowedToAdd: 10,
-      feeStructure: 'PASS_TICKET_FEES',
-      ticketType: 'PAID',
-      ticketQuantityLow: false,
-    });
-    expect(tickets[0].saleStartsAt).toBe(PAST.toISOString());
-    expect(tickets[0].isPasswordProtected).toBeUndefined();
-  });
-
-  it('nets active holds out of availability via reserved + sold', async () => {
-    const ticket = await firstTicket(
-      row({ capacity: 12, reserved: 3, sold: 4 })
-    );
-    expect(ticket.maxAllowedToAdd).toBe(5);
-    expect(ticket.ticketQuantityLow).toBe(true);
-  });
-
-  it('charges no fee when the organizer absorbs fees', async () => {
-    const ticket = await firstTicket(
-      row({ ticketingFees: 'ABSORB_TICKET_FEES' })
-    );
-    expect(ticket.feesCents).toBe(0);
-  });
-
-  it('blocks adds for draft events and closed sale windows', async () => {
-    expect(
-      (await firstTicket(row({ event: { isDraft: true } }))).maxAllowedToAdd
-    ).toBe(0);
-    expect(
-      (await firstTicket(row({ saleStartsAt: FUTURE, saleEndsAt: FUTURE })))
-        .maxAllowedToAdd
-    ).toBe(0);
-    expect(
-      (await firstTicket(row({ saleStartsAt: PAST, saleEndsAt: PAST })))
-        .maxAllowedToAdd
-    ).toBe(0);
-  });
-
-  it('sorts available tickets before sold-out, then by ascending price', async () => {
-    const prisma = fakePrisma({
-      ticketTypes: [
-        row({ id: 'cheap-soldout', priceCents: 1000, capacity: 0 }),
-        row({ id: 'pricey', priceCents: 9000 }),
-        row({ id: 'cheap', priceCents: 2000 }),
-      ],
-    });
-    const { tickets } = await getCheckoutConfig(prisma, { eventId: 'evt-1' });
-    expect(tickets.map((t) => t.id)).toEqual([
-      'cheap',
-      'pricey',
-      'cheap-soldout',
-    ]);
-  });
-
-  it('falls back to price * 100 when priceCents is null', async () => {
-    const ticket = await firstTicket(
-      row({
-        priceCents: null,
-        price: 42,
-        capacity: 7,
-      })
-    );
-    expect(ticket.priceCents).toBe(4200);
-    expect(ticket.ticketQuantityLow).toBe(true);
-    expect(ticket.maxAllowedToAdd).toBe(7);
-  });
-
-  it('returns an empty list for an event with no public tickets', async () => {
-    const prisma = fakePrisma({ ticketTypes: [], eventCount: 1 });
-    expect(await getCheckoutConfig(prisma, { eventId: 'evt-1' })).toEqual({
-      tickets: [],
-    });
-  });
-
-  it('throws NotFoundError when the event does not exist', async () => {
-    const prisma = fakePrisma({ ticketTypes: [], eventCount: 0 });
-    await expect(
-      getCheckoutConfig(prisma, { eventId: 'missing' })
-    ).rejects.toThrow('Event with ID missing not found.');
-  });
-});
 
 describe('applyCode', () => {
-  it('unlocks a matched code-gated ticket', async () => {
-    const prisma = fakePrisma({
-      matchedTicketType: row({ id: 'vip', name: 'VIP', priceCents: 15000 }),
-    });
-    const res = await applyCode(prisma, { eventId: 'evt-1', code: 'SECRET' });
+  it('looks the code up trimmed and uppercased, by exact match', async () => {
+    const { prisma, findMany } = fakePrisma([row()]);
+    await applyCode(prisma, { eventId: 'evt-1', code: '  vipList ' });
 
-    expect(res.type).toBe('password');
-    expect(res.isValid).toBe(true);
-    if (res.type === 'password') {
-      expect(res.unlockedTicket.id).toBe('vip');
-      expect(res.unlockedTicket.priceCents).toBe(15000);
-      expect(res.unlockedTicket.isPasswordProtected).toBe(true);
-    }
+    expect(findMany.mock.calls[0][0]).toMatchObject({
+      where: { eventId: 'evt-1', accessCode: 'VIPLIST' },
+    });
   });
 
-  it('returns an invalid result when no ticket matches the code', async () => {
-    const prisma = fakePrisma({ matchedTicketType: null });
-    const res = await applyCode(prisma, { eventId: 'evt-1', code: 'NOPE' });
-    expect(res).toEqual({
-      type: 'invalid',
-      isValid: false,
-      message: 'Invalid code.',
+  it('returns every ticket type carrying the code, in event-page shape and order', async () => {
+    const { prisma } = fakePrisma([
+      row({ id: 'table', name: 'VIP Table', priceCents: 15000 }),
+      row({ id: 'vip', priceCents: 5000 }),
+      row({ id: 'gone', name: 'VIP Early', priceCents: 1000, capacity: 0 }),
+    ]);
+    const res = await applyCode(prisma, { eventId: 'evt-1', code: 'VIP' });
+
+    expect(res.type).toBe('unlocked');
+    if (res.type !== 'unlocked') return;
+    expect(res.tickets.map((t) => t.id)).toEqual(['vip', 'table', 'gone']);
+    expect(res.tickets[0]).toEqual({
+      id: 'vip',
+      name: 'VIP',
+      description: 'VIP entry',
+      priceCents: 5000,
+      // 5000*0.08 + 50 = 450. Literal, not calculateFeesCents(5000), so a
+      // wrong fee formula can't pass on both sides.
+      feesCents: 450,
+      maxAllowedToAdd: 10,
+      saleStatus: 'onSale',
     });
+    expect(res.tickets[2].saleStatus).toBe('soldOut');
+  });
+
+  it('zeroes the add limit on a draft event and outside the sale window', async () => {
+    const draft = await applyCode(
+      fakePrisma([row({ event: { isDraft: true } })]).prisma,
+      { eventId: 'evt-1', code: 'VIP' }
+    );
+    const notYet = await applyCode(
+      fakePrisma([row({ saleStartsAt: FUTURE, saleEndsAt: FUTURE })]).prisma,
+      { eventId: 'evt-1', code: 'VIP' }
+    );
+    if (draft.type !== 'unlocked' || notYet.type !== 'unlocked') {
+      throw new Error('expected both codes to unlock');
+    }
+    expect(draft.tickets[0]).toMatchObject({
+      maxAllowedToAdd: 0,
+      saleStatus: 'onSale',
+    });
+    expect(notYet.tickets[0]).toMatchObject({
+      maxAllowedToAdd: 0,
+      saleStatus: 'notYetOnSale',
+    });
+  });
+
+  it('is invalid when no ticket type carries the code', async () => {
+    const { prisma } = fakePrisma([]);
+    expect(await applyCode(prisma, { eventId: 'evt-1', code: 'NOPE' })).toEqual(
+      { type: 'invalid' }
+    );
+  });
+
+  it('is invalid for a blank code without touching the database', async () => {
+    const { prisma, findMany } = fakePrisma([row()]);
+    expect(await applyCode(prisma, { eventId: 'evt-1', code: '   ' })).toEqual({
+      type: 'invalid',
+    });
+    expect(findMany).not.toHaveBeenCalled();
   });
 });

@@ -23,7 +23,7 @@ import {
   UnauthorizedError,
 } from './_shared/errors';
 import { ensureOrganizationForUser } from './organizations';
-import { resolveOrganizerScope } from './organizer-scope';
+import { organizationInScope, resolveOrganizerScope } from './organizer-scope';
 
 /**
  * The GA client makes every Connect call; the preview client makes the
@@ -129,13 +129,13 @@ export async function getConnectSetup(
   actor: Actor,
   input: { viewAsOrganizerUserId?: string } = {}
 ): Promise<ConnectSetup> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
   );
   const org = await prisma.organization.findFirst({
-    where: { ownerUserId: organizerUserId },
+    where: organizationInScope(scope),
     select: {
       stripeAccountId: true,
       stripeAccountKind: true,
@@ -206,25 +206,47 @@ export async function ownedOrg(
   if (actor.kind !== 'user') {
     throw new UnauthorizedError('Sign in to manage payouts');
   }
-  const select = { where: { ownerUserId: actor.userId }, select: ORG_SELECT };
-  const org = await prisma.organization.findFirst(select);
+  const scope = await resolveOrganizerScope(prisma, actor);
+  const org = await prisma.organization.findFirst({
+    where: organizationInScope(scope),
+    select: ORG_SELECT,
+  });
   if (org) return org;
-  if (!opts.provision) throw new NotFoundError('Organization not found');
+  if (!opts.provision || scope.organizationId) {
+    throw new NotFoundError('Organization not found');
+  }
 
   const user = await prisma.users.findUnique({
     where: { id: actor.userId },
     select: { email: true },
   });
-  await ensureOrganizationForUser(prisma, {
+  const provisioned = await ensureOrganizationForUser(prisma, {
     ownerUserId: actor.userId,
     displayName: user?.email ?? '',
   });
-  const created = await prisma.organization.findFirst(select);
+  const created = await prisma.organization.findUnique({
+    where: { id: provisioned.id },
+    select: ORG_SELECT,
+  });
   if (!created) throw new NotFoundError('Organization not found');
   return created;
 }
 
-function onboardingLink(
+function onboardingUrls(baseUrl: string) {
+  return {
+    refresh_url: `${baseUrl}/organizer/payouts/stripe/refresh`,
+    return_url: `${baseUrl}/organizer/payouts/stripe/return`,
+    collection_options: { fields: 'eventually_due' as const },
+  };
+}
+
+/**
+ * Two parameter shapes, one per client. The preview version (2026-09-30)
+ * dropped `configurations` from the link: it collects for whatever
+ * configurations the account carries. The GA client is still pinned to a
+ * version that takes the list.
+ */
+function connectOnboardingLink(
   account: StripeAccountRef,
   baseUrl: string
 ): Stripe.V2.Core.AccountLinkCreateParams {
@@ -233,13 +255,22 @@ function onboardingLink(
     use_case: {
       type: 'account_onboarding',
       account_onboarding: {
-        configurations: isGlobalPayouts(account.stripeAccountKind)
-          ? ['recipient']
-          : ['recipient', 'merchant'],
-        refresh_url: `${baseUrl}/organizer/payouts/stripe/refresh`,
-        return_url: `${baseUrl}/organizer/payouts/stripe/return`,
-        collection_options: { fields: 'eventually_due' },
+        configurations: ['recipient', 'merchant'],
+        ...onboardingUrls(baseUrl),
       },
+    },
+  };
+}
+
+function recipientOnboardingLink(
+  account: StripeAccountRef,
+  baseUrl: string
+): StripePreview.V2.Core.AccountLinkCreateParams {
+  return {
+    account: account.stripeAccountId,
+    use_case: {
+      type: 'account_onboarding',
+      account_onboarding: onboardingUrls(baseUrl),
     },
   };
 }
@@ -250,10 +281,13 @@ export async function mintOnboardingLink(
   account: StripeAccountRef,
   baseUrl: string
 ): Promise<string> {
-  const params = onboardingLink(account, baseUrl);
   const link = isGlobalPayouts(account.stripeAccountKind)
-    ? await clients.global.v2.core.accountLinks.create(params)
-    : await clients.connect.v2.core.accountLinks.create(params);
+    ? await clients.global.v2.core.accountLinks.create(
+        recipientOnboardingLink(account, baseUrl)
+      )
+    : await clients.connect.v2.core.accountLinks.create(
+        connectOnboardingLink(account, baseUrl)
+      );
   return link.url;
 }
 

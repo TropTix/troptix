@@ -5,7 +5,7 @@
 -- docs/adr/0006-hosted-branching-persistent-dev-branch.md) — NOT here.
 -- Keep this file free of any production PII; it is committed and runs on every branch.
 --
--- It seeds a spread of event/tier STATES so a reviewer can exercise the whole
+-- It seeds a spread of event/ticket type STATES so a reviewer can exercise the whole
 -- checkout UI on the PR's preview deploy without hand-editing rows:
 --   • seed_event_1 — happy-path paid festival (GA + VIP, plenty available)
 --   • seed_event_2 — free RSVP event
@@ -20,8 +20,8 @@
 --    to price*100, but keep them in sync.
 --  - `saleStartsAt`/`saleEndsAt` are full timestamps and the only sale-window
 --    columns (ADR 0020).
---  - a non-empty `discountCode` makes a tier GATED (hidden until the code is
---    entered); null/empty is a public tier.
+--  - a non-empty `accessCode` makes a ticket type GATED (hidden until the code is
+--    entered); null is a public ticket type. Stored uppercased (ADR 0035).
 
 -- Demo organizer
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
@@ -114,7 +114,7 @@ insert into public."Events" (
   ),
   (
     'seed_event_3', now(), now(), false, false,
-    'TropTix Edge-Case Showcase', 'Tiers in unusual states for testing the checkout UI.', 'Near-capacity, sold-out, upcoming, gated',
+    'TropTix Edge-Case Showcase', 'Ticket types in unusual states for testing the checkout UI.', 'Near-capacity, sold-out, upcoming, gated',
     'Demo Organizer', 'seed_org_1',
     now() + interval '90 days', now() + interval '90 days 6 hours',
     'Demo Hall', '9 Edge Lane, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
@@ -134,23 +134,23 @@ insert into public."TicketTypes" (
   id, "ticketType", "createdAt", "updatedAt", name, description,
   "maxPurchasePerUser", capacity, reserved, sold,
   "saleStartsAt", "saleEndsAt",
-  price, "priceCents", "ticketingFees", "discountCode", "eventId"
+  price, "priceCents", "ticketingFees", "accessCode", "eventId"
 ) values
-  -- seed_event_1: happy-path paid tiers, on sale now, plenty available
+  -- seed_event_1: happy-path paid ticket types, on sale now, plenty available
   ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 0, now(), now() + interval '60 days', 25.00, 2500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
   ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks',  4,  50, 0, 0, now(), now() + interval '60 days', 75.00, 7500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
 
-  -- seed_event_2: free RSVP tier, on sale now, organizer absorbs fees
+  -- seed_event_2: free RSVP ticket type, on sale now, organizer absorbs fees
   ('seed_tt_rsvp', 'FREE', now(), now(), 'Free RSVP', 'Reserve a free spot',          6, 300, 0, 0, now(), now() + interval '75 days', 0.00, 0, 'ABSORB_TICKET_FEES', null, 'seed_event_2'),
 
-  -- seed_event_3: edge-case tiers
+  -- seed_event_3: edge-case ticket types
   --   near-capacity: capacity - reserved - sold = 2  → "Only 2 left"
-  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity tier',      10, 100, 0, 98, now(), now() + interval '90 days', 30.00, 3000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity ticket type', 10, 100, 0, 98, now(), now() + interval '90 days', 30.00, 3000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   sold-out: capacity == sold → availability 0
-  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold tier',          4,  50, 0, 50, now(), now() + interval '90 days', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold ticket type',     4,  50, 0, 50, now(), now() + interval '90 days', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
   --   upcoming: sale window opens in the future → not yet on sale
   ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', now() + interval '90 days', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
-  --   gated: non-empty discountCode → hidden until 'UNLOCK2026' is entered
+  --   gated: non-empty accessCode → hidden until 'UNLOCK2026' is entered
   ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), now() + interval '90 days', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3'),
 
   -- seed_event_4: private event still sells by direct link
@@ -192,7 +192,7 @@ insert into public."TicketTypes" (
   id, "ticketType", "createdAt", "updatedAt", name, description,
   "maxPurchasePerUser", capacity, reserved, sold,
   "saleStartsAt", "saleEndsAt",
-  price, "priceCents", "ticketingFees", "discountCode", "eventId"
+  price, "priceCents", "ticketingFees", "accessCode", "eventId"
 ) values
   ('seed_tt_past_ga',  'PAID', now() - interval '60 days', now(), 'General Admission', 'Standard entry', 10, 200, 0, 3, now() - interval '60 days', now() - interval '30 days 5 hours', 40.00, 4000, 'PASS_TICKET_FEES',   null, 'seed_event_5'),
   ('seed_tt_past_vip', 'PAID', now() - interval '60 days', now(), 'VIP',               'Fees absorbed',   4,  50, 0, 2, now() - interval '60 days', now() - interval '30 days 5 hours', 50.00, 5000, 'ABSORB_TICKET_FEES', null, 'seed_event_5'),

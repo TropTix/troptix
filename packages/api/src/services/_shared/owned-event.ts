@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@troptix/db';
 import { NotFoundError } from './errors';
+import { eventsInScope, type OrganizerScope } from '../organizer-scope';
 
 /**
  * NotFound, never Forbidden, so foreign ids can't be probed. The one home of
@@ -7,11 +8,11 @@ import { NotFoundError } from './errors';
  */
 export async function requireOwnedEvent(
   prisma: PrismaClient,
-  organizerUserId: string,
+  scope: OrganizerScope,
   eventId: string
 ): Promise<void> {
   const owned = await prisma.events.findFirst({
-    where: { id: eventId, organizerUserId, deletedAt: null },
+    where: { id: eventId, ...eventsInScope(scope) },
     select: { id: true },
   });
   if (!owned) {

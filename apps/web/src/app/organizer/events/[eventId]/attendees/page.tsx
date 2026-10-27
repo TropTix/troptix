@@ -1,5 +1,7 @@
 import React from 'react';
 import prisma from '@/server/prisma';
+import { getEventName, listEventAttendees } from '@troptix/api/server';
+import { userToActor } from '@/server/actor';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { notFound, redirect } from 'next/navigation';
 import AttendeeTable from './_components/AttendeeTable';
@@ -36,49 +38,11 @@ import type { ServerUser } from '@/server/authUser';
 // The layout's 404 is not protection: this read carries its own ownership scope.
 // A DB failure must not render as an empty attendee list — let errors propagate.
 async function fetchTickets(eventId: string, user: ServerUser) {
-  {
-    const tickets = await prisma.tickets.findMany({
-      where: {
-        eventId: eventId,
-        event: { organizerUserId: user.uid, deletedAt: null },
-        order: {
-          status: 'COMPLETED',
-        },
-      },
-      select: {
-        id: true,
-        createdAt: true,
-        status: true,
-        checkinTimestamp: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        ticketType: {
-          select: {
-            name: true,
-          },
-        },
-        order: {
-          select: {
-            id: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-    return tickets;
-  }
+  return listEventAttendees(prisma, userToActor(user), eventId);
 }
 
 async function fetchEventName(eventId: string, user: ServerUser) {
-  const event = await prisma.events.findUnique({
-    where: { id: eventId, organizerUserId: user.uid, deletedAt: null },
-    select: {
-      name: true,
-    },
-  });
+  const event = await getEventName(prisma, userToActor(user), eventId);
   if (!event) {
     notFound();
   }
