@@ -7,11 +7,11 @@
 
 ADR 0030 made Stripe the only payout rail and said Global Payouts would serve
 Jamaican organizers after Connect. Connect shipped for US organizers in
-September 2026. Stripe's docs, checked on 2026-09-27, say Global Payouts is
+September 2026. Stripe's docs, checked on 2026-09-27 and again on 2026-10-27, say Global Payouts is
 generally available for US senders, reaches Jamaica by local bank transfer in
 JMD, and needs three things Connect did not: Treasury with a financial
-account, the `2026-08-26.preview` API version on every money-management
-call, and a restricted API key in live mode. Counsel cleared TropTix's
+account, the preview API version (`2026-09-30.preview` as of 2026-10-27)
+on every money-management call, and a restricted API key in live mode. Counsel cleared TropTix's
 position as the organizer's collection agent on 2026-09-22.
 
 The recipient is the same v2 Account object as a Connect account, with a

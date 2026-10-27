@@ -9,7 +9,7 @@ import { stripe } from './stripe';
  */
 export const stripePayouts = new StripePreview(
   process.env.STRIPE_PAYOUTS_KEY ?? process.env.STRIPE_SECRET_KEY!,
-  { apiVersion: '2026-08-26.preview', maxNetworkRetries: 2 }
+  { apiVersion: '2026-09-30.preview', maxNetworkRetries: 2 }
 );
 
 export const payoutClients: PayoutClients = {

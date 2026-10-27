@@ -8,7 +8,7 @@ import {
   useCheckoutElements,
 } from '@stripe/react-stripe-js/checkout';
 import { Spinner } from '@/components/ui/spinner';
-import { getFormattedCurrency } from '@/lib/utils';
+import { cn, getFormattedCurrency } from '@/lib/utils';
 import type { EventDetail } from '@troptix/api';
 
 const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
@@ -195,11 +195,12 @@ function PaymentInner({
           Back
         </button>
         <span
-          className={
+          className={cn(
+            'tabular-nums transition-colors duration-300',
             secondsLeft <= 60
               ? 'font-semibold text-destructive'
               : 'text-muted-foreground'
-          }
+          )}
         >
           Held for {mm}:{ss}
         </span>

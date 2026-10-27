@@ -78,7 +78,6 @@ describe('startGlobalPayoutsOnboarding', () => {
       use_case: {
         type: 'account_onboarding',
         account_onboarding: {
-          configurations: ['recipient'],
           refresh_url: `${BASE}/organizer/payouts/stripe/refresh`,
           return_url: `${BASE}/organizer/payouts/stripe/return`,
           collection_options: { fields: 'eventually_due' },
@@ -115,7 +114,7 @@ describe('startGlobalPayoutsOnboarding', () => {
     expect(updateMany).not.toHaveBeenCalled();
     expect(globalCalls.links[0]).toMatchObject({
       account: 'acct_have',
-      use_case: { account_onboarding: { configurations: ['recipient'] } },
+      use_case: { type: 'account_onboarding' },
     });
   });
 

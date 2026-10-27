@@ -40,7 +40,7 @@ const stripe = new Stripe(key, { apiVersion: '2026-06-24.dahlia' });
 // Global Payouts recipient capabilities (bank_accounts.*) and money movement
 // exist only on the preview API version, which the preview SDK is pinned to.
 const previewStripe = new StripePreview(key, {
-  apiVersion: '2026-08-26.preview',
+  apiVersion: '2026-09-30.preview',
 });
 
 type V2Params = Stripe.V2.Core.AccountCreateParams;
@@ -297,24 +297,28 @@ async function inspect(id: string): Promise<void> {
 async function link(id: string): Promise<void> {
   const account = await retrieve(id);
   const merchant = (account.applied_configurations ?? []).includes('merchant');
-  const configurations: Array<'recipient' | 'merchant'> = merchant
-    ? ['recipient', 'merchant']
-    : ['recipient'];
-  const params = {
-    account: id,
-    use_case: {
-      type: 'account_onboarding' as const,
-      account_onboarding: {
-        configurations,
-        refresh_url: `${BASE_URL}/organizer/payouts/stripe/refresh`,
-        return_url: `${BASE_URL}/organizer/payouts/stripe/return`,
-        collection_options: { fields: 'eventually_due' as const },
-      },
-    },
+  const urls = {
+    refresh_url: `${BASE_URL}/organizer/payouts/stripe/refresh`,
+    return_url: `${BASE_URL}/organizer/payouts/stripe/return`,
+    collection_options: { fields: 'eventually_due' as const },
   };
+  // The preview version dropped `configurations` from the link; the GA
+  // client, on the older pinned version, still takes it.
   const accountLink = merchant
-    ? await stripe.v2.core.accountLinks.create(params)
-    : await previewStripe.v2.core.accountLinks.create(params);
+    ? await stripe.v2.core.accountLinks.create({
+        account: id,
+        use_case: {
+          type: 'account_onboarding',
+          account_onboarding: {
+            configurations: ['recipient', 'merchant'],
+            ...urls,
+          },
+        },
+      })
+    : await previewStripe.v2.core.accountLinks.create({
+        account: id,
+        use_case: { type: 'account_onboarding', account_onboarding: urls },
+      });
   console.log(`  client         ${merchant ? 'connect (GA)' : 'preview'}`);
   console.log(`  expires        ${accountLink.expires_at}`);
   console.log(`  url            ${accountLink.url}`);
@@ -447,7 +451,7 @@ async function payoutMethods(accountId: string): Promise<void> {
     );
     if (method.bank_account) {
       console.log(
-        `  bank     ${method.bank_account.bank_name ?? '-'} ····${method.bank_account.last4}  ${method.bank_account.country}  archived ${method.bank_account.archived}`
+        `  bank     ${method.bank_account.bank_name ?? '-'} ····${method.bank_account.last4}  ${method.bank_account.country}  archived ${method.archived}`
       );
     }
   }
@@ -464,7 +468,7 @@ async function pay(accountId: string, cents: number): Promise<void> {
     if (
       candidate.type === 'bank_account' &&
       !candidate.restricted &&
-      !candidate.bank_account?.archived &&
+      !candidate.archived &&
       candidate.usage_status.payments === 'eligible'
     ) {
       method = candidate;

@@ -7,6 +7,8 @@
  */
 export const ANALYTICS_EVENTS = {
   checkoutOpened: 'checkout_opened',
+  /** One event for both outcomes: filter on `valid`. */
+  checkoutAccessCodeApplied: 'checkout_access_code_applied',
   checkoutTicketsSelected: 'checkout_tickets_selected',
   checkoutReservationCreated: 'checkout_reservation_created',
   /** Every requested quantity came back zero — not fired on a partial grant. */

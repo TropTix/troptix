@@ -36,6 +36,11 @@ const nextConfig = {
   // This is required to support PostHog trailing slash API requests
   skipTrailingSlashRedirect: true,
 
+  // Dev only. The browser usually sits on another machine on the LAN, and
+  // Next 16 answers 403 to /_next/* requests from any origin it isn't told
+  // about, so the page renders but never hydrates.
+  allowedDevOrigins: ['192.168.1.*', '100.74.93.31'],
+
   experimental: {
     externalDir: true,
   },

@@ -84,11 +84,11 @@ These changes restructure our data model to be cleaner, more accurate, and ready
 
 ---
 
-### 2.6 Rename discount code to password
+### 2.6 Rename discount code to access code
 
-**What:** Rename the `discountCode` field on ticket offerings to `password`.
+**Status:** Done. The column is `accessCode`, stored uppercased and matched exactly ([ADR 0035](adr/0035-access-codes-are-canonical-and-unlock-every-ticket-type.md), #603).
 
-**Why:** This field is used to gate access to password-protected ticket types (e.g., VIP tickets that only people with the code can see). Calling it "discountCode" is misleading — it doesn't apply a discount, it unlocks visibility. The name should match what it actually does.
+**Why:** This field gates access to hidden ticket types (e.g., VIP tickets that only people with the code can see). Calling it "discountCode" was misleading — it never applied a discount, it unlocked visibility.
 
 ---
 

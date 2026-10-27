@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+/** The preview link takes no `configurations`; the GA link still does. */
+function linkConfigurations(link: unknown): unknown {
+  return (
+    link as { use_case: { account_onboarding: { configurations?: unknown } } }
+  ).use_case.account_onboarding.configurations;
+}
 import type { Actor } from '../trpc/context';
 import {
   connectStateOf,
@@ -154,10 +161,11 @@ describe('startStripeOnboarding', () => {
 
   it('provisions an Organization for a first-time organizer, then connects', async () => {
     const { prisma, findFirst, create } = fakePrisma(null);
-    findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValue({ ...ORG, id: 'org-new' });
+    findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    vi.mocked(prisma.organization.findUnique).mockResolvedValue({
+      ...ORG,
+      id: 'org-new',
+    } as never);
     const { clients, connectCalls } = fakeClients();
 
     const result = await startStripeOnboarding(prisma, clients, OWNER, {
@@ -273,10 +281,9 @@ describe('startStripeOnboarding', () => {
     expect(connectCalls.links).toEqual([]);
     expect(globalCalls.links[0]).toMatchObject({
       account: 'acct_jm',
-      use_case: {
-        account_onboarding: { configurations: ['recipient'] },
-      },
+      use_case: { type: 'account_onboarding' },
     });
+    expect(linkConfigurations(globalCalls.links[0])).toBeUndefined();
   });
 
   it("adopts the winner's account, and its kind, when the claim loses a race", async () => {

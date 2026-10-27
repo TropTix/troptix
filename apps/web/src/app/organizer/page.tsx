@@ -50,7 +50,11 @@ export default async function OrganizerDashboardPage({
       {!setup.paidTicketingEnabled && <PaidTicketingBanner />}
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {dashboard.organization?.displayName ?? 'Dashboard'}
+          </h1>
+        </div>
         <div className="flex items-center gap-2">
           <RangeSelect value={dashboard.range} />
           <Button asChild>
