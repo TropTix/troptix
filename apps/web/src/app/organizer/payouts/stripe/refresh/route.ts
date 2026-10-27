@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { refreshStripeOnboarding } from '@troptix/api/server';
 import prisma from '@/server/prisma';
-import { stripe } from '@/server/lib/stripe';
+import { payoutClients } from '@/server/lib/stripePayouts';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import { getRequestOrigin } from '@/server/lib/requestOrigin';
@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   try {
     const { url } = await refreshStripeOnboarding(
       prisma,
-      stripe,
+      payoutClients,
       userToActor(user),
       { baseUrl: await getRequestOrigin() }
     );

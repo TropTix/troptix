@@ -5,19 +5,23 @@ import { ConnectBankDialog } from './ConnectBankDialog';
 import { StripeActionButton } from './StripeActionButton';
 
 /**
- * The bank step's copy and action, derived live from Stripe (plan decision
- * 4). `connect` is null when the Stripe rail is off for this viewer; the step
- * then shows the manual-rail copy only. `readOnly` keeps the copy and drops
- * the actions, which would act on the viewer's own organization.
+ * The bank step's copy and action, derived from the mirrored Stripe state
+ * (ADR 0032). `connect` is null when the Stripe rail is off for this viewer;
+ * the step then shows the manual-rail copy only. `readOnly` keeps the copy
+ * and drops the actions, which would act on the viewer's own organization.
+ * A recipient (Global Payouts) has no dashboard and is paid in its own
+ * currency; the copy says so.
  */
 export function BankStep({
   setup,
   connect,
+  globalPayouts = false,
   readOnly = false,
   showDashboard = false,
 }: {
   setup: PayoutSetupState;
   connect: ConnectSetup | null;
+  globalPayouts?: boolean;
   readOnly?: boolean;
   showDashboard?: boolean;
 }) {
@@ -43,10 +47,12 @@ export function BankStep({
           Add your bank securely through Stripe — TropTix never stores your
           details.
         </p>
-        <ConnectBankDialog />
+        <ConnectBankDialog globalPayouts={globalPayouts} />
       </div>
     );
   }
+
+  const recipient = connect.kind === 'GLOBAL_PAYOUTS';
 
   switch (connect.state) {
     case 'pending':
@@ -61,10 +67,11 @@ export function BankStep({
       return (
         <div className="space-y-2">
           <p>
-            Connected through Stripe. Payouts land in your bank on Stripe&apos;s
-            schedule, usually within two business days of our sending.
+            {recipient
+              ? 'Connected through Stripe. Payouts are converted to your currency at Stripe’s rate and land in your bank within about a week of our sending.'
+              : 'Connected through Stripe. Payouts land in your bank on Stripe’s schedule, usually within two business days of our sending.'}
           </p>
-          {showDashboard && !readOnly && (
+          {showDashboard && !readOnly && !recipient && (
             <StripeActionButton action="dashboard" variant="outline" size="sm">
               Open Stripe dashboard
             </StripeActionButton>

@@ -62,11 +62,13 @@ export function TermsStep({
 export function SetupChecklistCard({
   setup,
   connect,
+  globalPayouts,
   terms,
   readOnly,
 }: {
   setup: PayoutSetupState;
   connect: ConnectSetup | null;
+  globalPayouts: boolean;
   terms: PayoutTerms;
   readOnly: boolean;
 }) {
@@ -114,7 +116,12 @@ export function SetupChecklistCard({
           active={setup.meetingDone && !setup.bankLinked}
           title="Connect your bank account"
         >
-          <BankStep setup={setup} connect={connect} readOnly={readOnly} />
+          <BankStep
+            setup={setup}
+            connect={connect}
+            globalPayouts={globalPayouts}
+            readOnly={readOnly}
+          />
         </StepCard>
         <StepCard
           done={setup.termsAccepted}

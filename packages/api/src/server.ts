@@ -93,7 +93,9 @@ export {
   refreshStripeOnboarding,
   finishStripeOnboardingReturn,
   createStripeDashboardLink,
+  type PayoutClients,
 } from './services/organizer-connect';
+export { startGlobalPayoutsOnboarding } from './services/organizer-global-payouts';
 export { handleConnectEvent } from './services/connect-webhook';
 export {
   listPayoutRequests,

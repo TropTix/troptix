@@ -27,12 +27,14 @@ import {
 export function PayoutSettings({
   setup,
   connect,
+  globalPayouts,
   terms,
   readOnly,
   holdbackLine,
 }: {
   setup: PayoutSetupState;
   connect: ConnectSetup | null;
+  globalPayouts: boolean;
   terms: PayoutTerms;
   readOnly: boolean;
   holdbackLine: string;
@@ -78,6 +80,7 @@ export function PayoutSettings({
           <BankStep
             setup={setup}
             connect={connect}
+            globalPayouts={globalPayouts}
             readOnly={readOnly}
             showDashboard
           />

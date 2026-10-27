@@ -40,12 +40,12 @@ insert into public."Organization" (
   id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
   verified, "paidTicketingEnabled", "payoutMeetingAt", "payoutBankLinkedAt",
   "payoutTermsAcceptedAt", "payoutTermsVersion",
-  "stripeAccountId", "stripeTransfersStatus"
+  "stripeAccountId", "stripeAccountKind", "stripeTransfersStatus"
 ) values (
   'seed_organization_1', now(), now(), 'demo-organizer', 'Demo Organizer', 'seed_org_1',
   false, true, now() - interval '40 days', now() - interval '40 days',
   now() - interval '40 days', '2026-09-27',
-  null, null
+  null, null, null
 );
 
 -- A second organization with payout setup INCOMPLETE, so both payout screens
@@ -57,10 +57,10 @@ values ('seed_org_2', now(), now(), 'demo-organizer-2@troptix.test', 'Island Nig
 insert into public."Organization" (
   id, "createdAt", "updatedAt", slug, "displayName", "ownerUserId",
   verified, "paidTicketingEnabled", "payoutTermsAcceptedAt", "payoutTermsVersion",
-  "stripeAccountId", "stripeTransfersStatus"
+  "stripeAccountId", "stripeAccountKind", "stripeTransfersStatus"
 ) values (
   'seed_organization_2', now(), now(), 'island-nights', 'Island Nights', 'seed_org_2',
-  false, true, null, null, null, null
+  false, true, null, null, null, null, null
 );
 
 -- A third organization that asked to sell paid tickets but is not approved

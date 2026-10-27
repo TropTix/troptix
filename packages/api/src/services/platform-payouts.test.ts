@@ -39,6 +39,7 @@ const REQUEST_ROW = {
     displayName: 'Demo Organizer',
     slug: 'demo-organizer',
     stripeAccountId: null,
+    stripeAccountKind: null,
     stripeTransfersStatus: null,
     payoutBankLinkedAt: null,
     owner: { email: 'owner@example.test' },
@@ -151,6 +152,7 @@ const OPEN_REQUEST = {
     id: 'org-1',
     slug: 'island-nights',
     stripeAccountId: 'acct_1',
+    stripeAccountKind: 'CONNECT',
     stripeTransfersStatus: 'active',
     payoutBankLinkedAt: new Date('2026-09-01T00:00:00Z'),
   },
@@ -213,17 +215,19 @@ describe('listPayoutRequests', () => {
         organizationSlug: 'demo-organizer',
         ownerEmail: 'owner@example.test',
         stripeAccountId: null,
+        stripeAccountKind: null,
         connectState: 'manual',
       },
     ]);
   });
 
-  it('derives the Connect state from the organization row', async () => {
+  it('derives the Connect state and the kind from the organization row', async () => {
     const row = {
       ...REQUEST_ROW,
       organization: {
         ...REQUEST_ROW.organization,
         stripeAccountId: 'acct_1',
+        stripeAccountKind: 'GLOBAL_PAYOUTS',
         stripeTransfersStatus: 'active',
         payoutBankLinkedAt: new Date('2026-09-01T00:00:00Z'),
       },
@@ -231,6 +235,7 @@ describe('listPayoutRequests', () => {
     const { prisma } = fakePrisma({ requests: [row] });
     const [result] = await listPayoutRequests(prisma, STAFF);
     expect(result.stripeAccountId).toBe('acct_1');
+    expect(result.stripeAccountKind).toBe('GLOBAL_PAYOUTS');
     expect(result.connectState).toBe('active');
   });
 });
@@ -368,6 +373,25 @@ describe('sendPayoutViaStripe', () => {
     }
     expect(list).not.toHaveBeenCalled();
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a Global Payouts recipient until its send rail exists', async () => {
+    const { stripe, create, list } = fakeStripe();
+    const { prisma, requestUpdateMany } = fakePrisma({
+      request: {
+        ...OPEN_REQUEST,
+        organization: {
+          ...OPEN_REQUEST.organization,
+          stripeAccountKind: 'GLOBAL_PAYOUTS',
+        },
+      },
+    });
+    await expect(
+      sendPayoutViaStripe(prisma, stripe, STAFF, { id: 'req-1' })
+    ).rejects.toThrow(ConflictError);
+    expect(list).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(requestUpdateMany).not.toHaveBeenCalled();
   });
 
   it('rethrows any other Stripe failure untouched', async () => {
@@ -665,6 +689,7 @@ describe('listPayoutOrganizations', () => {
     payoutTermsAcceptedAt: null,
     payoutTermsVersion: null,
     stripeAccountId: null,
+    stripeAccountKind: null,
     stripeTransfersStatus: null,
     payoutReleaseAtSale: true,
     payoutHoldbackPercent: null,
@@ -686,6 +711,7 @@ describe('listPayoutOrganizations', () => {
         payoutTermsAcceptedAt: null,
         payoutTermsVersion: null,
         stripeAccountId: null,
+        stripeAccountKind: null,
         stripeTransfersStatus: null,
         setup: {
           meetingDone: true,
