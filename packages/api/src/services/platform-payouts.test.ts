@@ -179,7 +179,8 @@ function fakeGlobal(
         id: method.id,
         type: method.type ?? 'bank_account',
         restricted: method.restricted ?? false,
-        bank_account: { archived: method.archived ?? false },
+        archived: method.archived ?? false,
+        bank_account: {},
         usage_status: { payments: method.payments ?? 'eligible' },
       }))
     )

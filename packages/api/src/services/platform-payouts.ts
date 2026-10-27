@@ -342,7 +342,7 @@ async function pickPayoutMethod(
     if (
       method.type === 'bank_account' &&
       !method.restricted &&
-      !method.bank_account?.archived &&
+      !method.archived &&
       method.usage_status.payments === 'eligible'
     ) {
       return method.id;
