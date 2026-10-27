@@ -20,7 +20,7 @@ import {
   toRecentOrder,
   toTicketTypeBreakdown,
 } from './_shared/organizerReads';
-import { resolveOrganizerScope } from './organizer-scope';
+import { eventsInScope, resolveOrganizerScope } from './organizer-scope';
 
 const MAX_SERIES_DAYS = 30;
 
@@ -37,14 +37,14 @@ export async function getEventOverview(
   input: ViewAsInput = {},
   now: Date = new Date()
 ): Promise<EventOverview> {
-  const organizerUserId = await resolveOrganizerScope(
+  const scope = await resolveOrganizerScope(
     prisma,
     actor,
     input.viewAsOrganizerUserId
   );
 
   const event = await prisma.events.findFirst({
-    where: { id: eventId, organizerUserId, deletedAt: null },
+    where: { id: eventId, ...eventsInScope(scope) },
     select: {
       id: true,
       name: true,

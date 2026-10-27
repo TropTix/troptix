@@ -49,7 +49,7 @@ const validForm: TicketTypeFormValues = {
   saleStartsAt: new Date('2026-08-01T00:00:00Z'),
   saleEndsAt: new Date('2026-08-10T00:00:00Z'),
   ticketingFees: 'PASS_TICKET_FEES',
-  discountCode: undefined,
+  accessCode: undefined,
 };
 
 beforeEach(() => {

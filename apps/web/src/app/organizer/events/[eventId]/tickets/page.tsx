@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { DollarSign, Ticket } from 'lucide-react';
 import {
-  findOrganizationForOwner,
+  findActingOrganization,
   listTicketTypes,
   NotFoundError,
 } from '@troptix/api/server';
@@ -34,7 +34,7 @@ export default async function EventTicketsPage({
   // org. The .catch keeps a notFound() bail below from leaving this rejection unhandled.
   const orgPromise =
     actor.kind === 'user'
-      ? findOrganizationForOwner(prisma, actor.userId).catch(() => null)
+      ? findActingOrganization(prisma, actor).catch(() => null)
       : Promise.resolve(null);
 
   let view: TicketTypesView;

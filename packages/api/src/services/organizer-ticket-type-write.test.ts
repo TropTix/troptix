@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -48,6 +49,7 @@ function fakePrisma(
 
   const prisma = {
     organization: {
+      ...ownedOrganizations(),
       findFirst: vi
         .fn()
         .mockResolvedValue(
@@ -86,7 +88,7 @@ describe('createTicketType', () => {
     await createTicketType(prisma, OWNER, 'e1', input());
     expect(eventsFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 'e1',
-      organizerUserId: 'owner-1',
+      organizationId: 'org-1',
       deletedAt: null,
     });
   });
@@ -109,13 +111,25 @@ describe('createTicketType', () => {
     }
   });
 
-  it('writes the row with cents, the legacy float, the enum, and a null discountCode', async () => {
+  it('stores the access code trimmed and uppercased', async () => {
+    const { prisma, ticketTypesCreate } = fakePrisma({ paidEnabled: true });
+    await createTicketType(
+      prisma,
+      OWNER,
+      'e1',
+      input({ priceCents: 2550, accessCode: '  vipList ' })
+    );
+
+    expect(ticketTypesCreate.mock.calls[0][0].data.accessCode).toBe('VIPLIST');
+  });
+
+  it('writes the row with cents, the legacy float, the enum, and a null accessCode', async () => {
     const { prisma, ticketTypesCreate } = fakePrisma({ paidEnabled: true });
     const { ticketTypeId } = await createTicketType(
       prisma,
       OWNER,
       'e1',
-      input({ priceCents: 2550, discountCode: '' })
+      input({ priceCents: 2550, accessCode: '' })
     );
 
     expect(ticketTypesCreate.mock.calls[0][0].data).toMatchObject({
@@ -125,7 +139,7 @@ describe('createTicketType', () => {
       ticketType: 'PAID',
       priceCents: 2550,
       price: 25.5,
-      discountCode: null,
+      accessCode: null,
     });
   });
 });
@@ -137,7 +151,7 @@ describe('updateTicketType', () => {
     expect(ticketTypesFindFirst.mock.calls[0][0].where).toMatchObject({
       id: 't1',
       eventId: 'e1',
-      event: { organizerUserId: 'owner-1', deletedAt: null },
+      event: { organizationId: 'org-1', deletedAt: null },
     });
   });
 

@@ -20,6 +20,7 @@ import type {
 import type { CheckoutAnalytics, FulfilledVia } from '../contracts/analytics';
 import { generateId } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
+import { accessibleTicketTypesWhere } from './_shared/access-code';
 import { NotFoundError } from './_shared/errors';
 
 /**
@@ -171,7 +172,7 @@ export async function reserve(
   });
 }
 
-export type PricedTierRow = {
+export type PricedTicketTypeRow = {
   id: string;
   priceCents: number | null;
   price: number;
@@ -183,15 +184,16 @@ export type PricedTierRow = {
 };
 
 /**
- * Prices come from the tier rows, never the client. Duplicate ids sum before
- * clamping (no cap stacking); sorted output gives deterministic lock order.
+ * Prices come from the ticket type rows, never the client. Duplicate ids sum
+ * before clamping (no cap stacking); sorted output gives deterministic lock
+ * order.
  */
 export function deriveReserveItems(
-  tiers: PricedTierRow[],
+  ticketTypes: PricedTicketTypeRow[],
   items: CreateReservationInput['items'],
   now: Date
 ): ReserveItemInput[] {
-  const byId = new Map(tiers.map((t) => [t.id, t]));
+  const byId = new Map(ticketTypes.map((t) => [t.id, t]));
 
   const totals = new Map<string, number>();
   for (const item of items) {
@@ -205,26 +207,28 @@ export function deriveReserveItems(
   return Array.from(totals)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([ticketTypeId, requested]) => {
-      const tier = byId.get(ticketTypeId);
-      if (!tier) {
+      const ticketType = byId.get(ticketTypeId);
+      if (!ticketType) {
         throw new NotFoundError(
           `Ticket type ${ticketTypeId} is not available for this event.`
         );
       }
 
-      const onSale = now >= tier.saleStartsAt && now <= tier.saleEndsAt;
-      if (!onSale || tier.isDraft) {
+      const onSale =
+        now >= ticketType.saleStartsAt && now <= ticketType.saleEndsAt;
+      if (!onSale || ticketType.isDraft) {
         throw new NotFoundError(
           `Ticket type ${ticketTypeId} is not currently on sale.`
         );
       }
 
-      const unitPriceCents = tier.priceCents ?? Math.round(tier.price * 100);
+      const unitPriceCents =
+        ticketType.priceCents ?? Math.round(ticketType.price * 100);
       const feesCents =
-        tier.ticketingFees === 'PASS_TICKET_FEES'
+        ticketType.ticketingFees === 'PASS_TICKET_FEES'
           ? calculateFeesCents(unitPriceCents)
           : 0;
-      const quantity = Math.min(requested, tier.maxPurchasePerUser);
+      const quantity = Math.min(requested, ticketType.maxPurchasePerUser);
       return { ticketTypeId, quantity, unitPriceCents, feesCents };
     });
 }
@@ -235,16 +239,12 @@ export async function createReservation(
   input: CreateReservationInput,
   userId: string | null
 ): Promise<CreateReservationResponse> {
-  const tierIds = input.items.map((i) => i.ticketTypeId);
-  const tiers = await prisma.ticketTypes.findMany({
+  const ticketTypeIds = input.items.map((i) => i.ticketTypeId);
+  const ticketTypes = await prisma.ticketTypes.findMany({
     where: {
-      id: { in: tierIds },
+      id: { in: ticketTypeIds },
       eventId: input.eventId,
-      // Public tiers only — gated tiers must be unlocked via a code first.
-      OR: [
-        { discountCode: { equals: null } },
-        { discountCode: { equals: '' } },
-      ],
+      ...accessibleTicketTypesWhere(input.accessCode),
     },
     select: {
       id: true,
@@ -258,7 +258,7 @@ export async function createReservation(
     },
   });
 
-  const pricedTiers: PricedTierRow[] = tiers.map((t) => ({
+  const pricedTicketTypes: PricedTicketTypeRow[] = ticketTypes.map((t) => ({
     id: t.id,
     priceCents: t.priceCents,
     price: t.price,
@@ -269,7 +269,11 @@ export async function createReservation(
     isDraft: t.event.isDraft,
   }));
 
-  const reserveItems = deriveReserveItems(pricedTiers, input.items, new Date());
+  const reserveItems = deriveReserveItems(
+    pricedTicketTypes,
+    input.items,
+    new Date()
+  );
 
   const result = await reserve(prisma, {
     eventId: input.eventId,

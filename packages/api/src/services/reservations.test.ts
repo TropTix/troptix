@@ -63,7 +63,11 @@ afterAll(async () => {
 async function makeTicketType(
   capacity: number,
   priceCents = 1000,
-  overrides: { saleStartsAt?: Date; saleEndsAt?: Date } = {}
+  overrides: {
+    saleStartsAt?: Date;
+    saleEndsAt?: Date;
+    accessCode?: string;
+  } = {}
 ) {
   return prisma.ticketTypes.create({
     data: {
@@ -74,6 +78,7 @@ async function makeTicketType(
       capacity,
       price: priceCents / 100,
       priceCents,
+      accessCode: overrides.accessCode ?? null,
       saleStartsAt: overrides.saleStartsAt ?? new Date(Date.now() - 86_400_000),
       saleEndsAt: overrides.saleEndsAt ?? new Date(Date.now() + 86_400_000),
       event: { connect: { id: TEST_EVENT_ID } },
@@ -268,7 +273,7 @@ describe('expire', () => {
 });
 
 describe('createReservation — server pricing authority', () => {
-  it('derives fees from the tier and holds inventory', async () => {
+  it('derives fees from the ticket type and holds inventory', async () => {
     const tt = await makeTicketType(5, 5000);
     const res = await createReservation(
       prisma,
@@ -324,6 +329,56 @@ describe('createReservation — server pricing authority', () => {
         null
       )
     ).rejects.toThrow(/not currently on sale/);
+  });
+
+  it('rejects a gated ticket type without its code, or with the wrong one', async () => {
+    const tt = await makeTicketType(5, 5000, { accessCode: 'VIPLIST' });
+    const contact = { firstName: 'No', lastName: 'Code', email: 'no@code.com' };
+
+    await expect(
+      createReservation(
+        prisma,
+        {
+          eventId: TEST_EVENT_ID,
+          items: [{ ticketTypeId: tt.id, quantity: 1 }],
+          contact,
+        },
+        null
+      )
+    ).rejects.toThrow(/not available for this event/);
+    await expect(
+      createReservation(
+        prisma,
+        {
+          eventId: TEST_EVENT_ID,
+          items: [{ ticketTypeId: tt.id, quantity: 1 }],
+          accessCode: 'OTHER',
+          contact,
+        },
+        null
+      )
+    ).rejects.toThrow(/not available for this event/);
+  });
+
+  it('holds a gated ticket type when the code matches, whatever its case', async () => {
+    const gated = await makeTicketType(5, 5000, { accessCode: 'VIPLIST' });
+    const open = await makeTicketType(5, 1000);
+    const res = await createReservation(
+      prisma,
+      {
+        eventId: TEST_EVENT_ID,
+        items: [
+          { ticketTypeId: gated.id, quantity: 1 },
+          { ticketTypeId: open.id, quantity: 1 },
+        ],
+        accessCode: ' viplist ',
+        contact: { firstName: 'Has', lastName: 'Code', email: 'has@code.com' },
+      },
+      null
+    );
+
+    expect(res.wasAdjusted).toBe(false);
+    expect(res.totalCents).toBe(5000 + 450 + 1000 + 130);
   });
 });
 

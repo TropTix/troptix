@@ -91,6 +91,8 @@ export const organizerDashboardSchema = z.object({
   activeEvents: z.array(organizerEventSummarySchema),
   /** The latest orders, deliberately NOT range-scoped. */
   recentOrders: z.array(dashboardRecentOrderSchema),
+  /** Null until the person's first event creates their Organization. */
+  organization: z.object({ displayName: z.string() }).nullable(),
   setup: organizerSetupStateSchema,
 });
 export type OrganizerDashboard = z.infer<typeof organizerDashboardSchema>;
@@ -197,7 +199,7 @@ export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
   description: z.string(),
   maxPurchasePerUser: z.number().int(),
   ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
-  discountCode: z.string().nullable(),
+  accessCode: z.string().nullable(),
 });
 export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
 
@@ -214,7 +216,7 @@ export const ticketTypeInputSchema = z
     saleStartsAt: z.date(),
     saleEndsAt: z.date(),
     ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
-    discountCode: z.string().optional(),
+    accessCode: z.string().max(100).optional(),
   })
   .refine((t) => t.saleEndsAt > t.saleStartsAt, {
     message: 'Sale end must be after sale start.',

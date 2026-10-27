@@ -1,3 +1,4 @@
+import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
@@ -19,18 +20,19 @@ type TicketRow = {
 };
 type EventRow = {
   id: string;
-  organizerUserId: string;
+  organizationId: string;
   deletedAt: Date | null;
 };
 
 function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
   const prisma = {
+    organization: ownedOrganizations(['o1']),
     events: {
       findFirst: async ({ where }: any) =>
         events.find(
           (e) =>
             e.id === where.id &&
-            e.organizerUserId === where.organizerUserId &&
+            e.organizationId === where.organizationId &&
             e.deletedAt === null
         ) ?? null,
     },
@@ -44,7 +46,7 @@ function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
           const event = events.find((e) => e.id === t.eventId);
           return (
             !!event &&
-            event.organizerUserId === where.event.organizerUserId &&
+            event.organizationId === where.event.organizationId &&
             event.deletedAt === null
           );
         }) ?? null,
@@ -80,8 +82,8 @@ function makeFakePrisma(events: EventRow[], tickets: TicketRow[]) {
 
 const seed = (): { events: EventRow[]; tickets: TicketRow[] } => ({
   events: [
-    { id: 'e1', organizerUserId: 'org-1', deletedAt: null },
-    { id: 'e2', organizerUserId: 'org-2', deletedAt: null },
+    { id: 'e1', organizationId: 'o1', deletedAt: null },
+    { id: 'e2', organizationId: 'o2', deletedAt: null },
   ],
   tickets: [
     {
@@ -158,7 +160,7 @@ describe('scanTicket', () => {
   });
 
   it('checks in a VALID ticket (the status the checkout mints)', async () => {
-    const events = [{ id: 'e1', organizerUserId: 'org-1', deletedAt: null }];
+    const events = [{ id: 'e1', organizationId: 'o1', deletedAt: null }];
     const tickets: TicketRow[] = [
       {
         id: 't1',
@@ -178,7 +180,7 @@ describe('scanTicket', () => {
   });
 
   it("names a typeless ticket 'Complementary'", async () => {
-    const events = [{ id: 'e1', organizerUserId: 'org-1', deletedAt: null }];
+    const events = [{ id: 'e1', organizationId: 'o1', deletedAt: null }];
     const tickets: TicketRow[] = [
       {
         id: 't1',
