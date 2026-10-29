@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import prisma from '@/server/prisma';
 import { getDateFormatter, formatTime } from '@/lib/dateUtils';
 import Link from 'next/link';
@@ -102,6 +103,18 @@ function toCardProps(order: UserOrder) {
   };
 }
 
+// Cards rise into place one after another when the list replaces its skeleton.
+function RiseIn({ index, children }: { index: number; children: ReactNode }) {
+  return (
+    <div
+      className="animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:[--tw-enter-translate-y:0]"
+      style={{ animationDelay: `${Math.min(index, 11) * 60}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default async function OrdersPage() {
   const orders = await fetchUserOrders();
   const now = new Date().getTime();
@@ -128,8 +141,10 @@ export default async function OrdersPage() {
           {upcoming.length > 0 && (
             <section>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                {upcoming.map((order) => (
-                  <OrderCard key={order.id} order={toCardProps(order)} />
+                {upcoming.map((order, i) => (
+                  <RiseIn key={order.id} index={i}>
+                    <OrderCard order={toCardProps(order)} />
+                  </RiseIn>
                 ))}
               </div>
             </section>
@@ -140,8 +155,10 @@ export default async function OrdersPage() {
                 Past
               </h2>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                {past.map((order) => (
-                  <OrderCard key={order.id} order={toCardProps(order)} />
+                {past.map((order, i) => (
+                  <RiseIn key={order.id} index={upcoming.length + i}>
+                    <OrderCard order={toCardProps(order)} />
+                  </RiseIn>
                 ))}
               </div>
             </section>
