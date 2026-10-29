@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { getFormattedCurrency, cn } from '@/lib/utils';
+import { RollingText } from '@/components/ui/rolling-text';
 import type { EventTicket } from '@troptix/api';
 import AccessCodeField, {
   type ApplyCodeOutcome,
@@ -40,9 +41,11 @@ function Stepper({
             >
               <Minus className="h-4 w-4" />
             </button>
-            <span className="flex w-6 items-center justify-center text-sm font-bold leading-none tabular-nums">
-              {value}
-            </span>
+            <RollingText
+              value={value}
+              text={String(value)}
+              className="w-6 justify-items-center text-sm font-bold leading-none tabular-nums"
+            />
           </div>
         )}
         <button
@@ -196,17 +199,23 @@ export default function SelectStep({
         <div className="mb-3 flex items-baseline justify-between">
           <div>
             <div className="text-sm font-semibold">Total</div>
-            <div className="text-xs text-muted-foreground">
-              {qty > 0
-                ? `${qty} ${qty === 1 ? 'ticket' : 'tickets'} · incl. ${money(
-                    feesCents
-                  )} fees`
-                : 'incl. fees'}
-            </div>
+            <RollingText
+              value={qty}
+              text={
+                qty > 0
+                  ? `${qty} ${qty === 1 ? 'ticket' : 'tickets'} · incl. ${money(
+                      feesCents
+                    )} fees`
+                  : 'incl. fees'
+              }
+              className="text-xs text-muted-foreground"
+            />
           </div>
-          <div className="text-xl font-extrabold tabular-nums">
-            {money(totalCents)}
-          </div>
+          <RollingText
+            value={totalCents}
+            text={money(totalCents)}
+            className="justify-items-end text-xl font-extrabold tabular-nums"
+          />
         </div>
         <button
           type="button"
