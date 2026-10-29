@@ -171,3 +171,34 @@
     animation: none;
   }
 }
+
+@keyframes hold-nudge-a {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.07);
+  }
+}
+@keyframes hold-nudge-b {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.07);
+  }
+}
+.animate-hold-nudge-a {
+  animation: hold-nudge-a 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.animate-hold-nudge-b {
+  animation: hold-nudge-b 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-hold-nudge-a,
+  .animate-hold-nudge-b {
+    animation: none;
+  }
+}
