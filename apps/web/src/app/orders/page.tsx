@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { eventFlyerUrl, DEFAULT_EVENT_IMAGE } from '@/lib/supabase/storage';
-import { ListOrdered, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { formatOrderNumber, getFormattedCurrency } from '@/lib/utils';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import { OrderCard } from './_components/OrderCard';
@@ -102,6 +102,29 @@ function toCardProps(order: UserOrder) {
   };
 }
 
+// Three dashed ghosts of the order card, slowly shuffling: the page's own
+// shape standing in for the orders that are not there yet.
+function GhostCards() {
+  return (
+    <div aria-hidden className="relative mx-auto mb-5 h-[92px] w-[180px]">
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="animate-ghost-shuffle absolute inset-x-0 top-0 flex h-16 items-center gap-3 rounded-2xl border-[1.5px] border-dashed border-border bg-card p-2.5"
+          style={{ animationDelay: `${i * -2.6}s` }}
+        >
+          <div className="h-11 w-11 shrink-0 rounded-lg bg-muted" />
+          <div className="flex-1 space-y-2">
+            <div className="h-2 w-3/4 rounded bg-muted" />
+            <div className="h-2 w-1/2 rounded bg-muted" />
+          </div>
+          <div className="h-3 w-9 rounded-full bg-muted" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default async function OrdersPage() {
   const orders = await fetchUserOrders();
   const now = new Date().getTime();
@@ -150,9 +173,7 @@ export default async function OrdersPage() {
       ) : (
         <Card className="max-w-md mx-auto text-center">
           <CardContent className="pt-8 pb-6">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-              <ListOrdered className="w-8 h-8 text-muted-foreground" />
-            </div>
+            <GhostCards />
             <h3 className="text-xl font-semibold mb-2">No tickets yet</h3>
             <p className="text-muted-foreground mb-6">
               When you purchase tickets, they&apos;ll appear here for easy
