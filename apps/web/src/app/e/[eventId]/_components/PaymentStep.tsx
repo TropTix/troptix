@@ -75,6 +75,56 @@ function OrderSummary({
 // The server holds 2 min past the buyer's countdown (ADR 0018), so a payment
 // submitted at zero can still settle and webhook before the hold releases.
 const CLIENT_HOLD_BUFFER_MS = 2 * 60_000;
+// What the buyer sees count down: the 12-minute server hold minus the buffer.
+const CLIENT_HOLD_SECONDS = 10 * 60;
+const RING = 2 * Math.PI * 6;
+
+function HoldPill({ secondsLeft }: { secondsLeft: number }) {
+  const urgent = secondsLeft <= 60;
+  const ratio = Math.min(1, secondsLeft / CLIENT_HOLD_SECONDS);
+  const mm = Math.floor(secondsLeft / 60);
+  const ss = String(secondsLeft % 60).padStart(2, '0');
+  return (
+    <span
+      className={cn(
+        'inline-flex h-7 items-center gap-1.5 rounded-full pl-1.5 pr-2.5 text-xs font-semibold tabular-nums transition-colors duration-300',
+        urgent
+          ? 'bg-destructive/10 text-destructive'
+          : 'bg-muted text-muted-foreground',
+        // Two identical keyframes, alternated, restart the nudge on every tick
+        // without remounting the pill (which would reset the ring's drain).
+        urgent &&
+          secondsLeft > 0 &&
+          (secondsLeft % 2 ? 'animate-hold-nudge-a' : 'animate-hold-nudge-b')
+      )}
+    >
+      <svg className="size-4 -rotate-90" viewBox="0 0 16 16" aria-hidden>
+        <circle
+          cx="8"
+          cy="8"
+          r="6"
+          fill="none"
+          stroke="currentColor"
+          strokeOpacity={0.25}
+          strokeWidth="2.5"
+        />
+        <circle
+          cx="8"
+          cy="8"
+          r="6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray={RING}
+          strokeDashoffset={RING * (1 - ratio)}
+          className="transition-[stroke-dashoffset] duration-1000 ease-linear"
+        />
+      </svg>
+      {secondsLeft > 0 ? `Held for ${mm}:${ss}` : 'Hold expired'}
+    </span>
+  );
+}
 
 function useCountdown(expiresAt: string): number {
   const [secondsLeft, setSecondsLeft] = useState(() =>
@@ -152,8 +202,6 @@ function PaymentInner({
   }
 
   const { checkout } = checkoutState;
-  const mm = Math.floor(secondsLeft / 60);
-  const ss = String(secondsLeft % 60).padStart(2, '0');
 
   async function pay() {
     setSubmitting(true);
@@ -194,16 +242,7 @@ function PaymentInner({
         >
           Back
         </button>
-        <span
-          className={cn(
-            'tabular-nums transition-colors duration-300',
-            secondsLeft <= 60
-              ? 'font-semibold text-destructive'
-              : 'text-muted-foreground'
-          )}
-        >
-          Held for {mm}:{ss}
-        </span>
+        <HoldPill secondsLeft={secondsLeft} />
       </div>
 
       <OrderSummary event={event} summary={summary} />
