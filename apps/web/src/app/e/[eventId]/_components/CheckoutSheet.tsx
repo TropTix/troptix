@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { usePostHog } from 'posthog-js/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { ANALYTICS_EVENTS } from '@troptix/api/analytics';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
@@ -40,6 +41,24 @@ type Step =
   | 'success'
   | 'expired'
   | 'refunded';
+
+// Forward is a higher number; the terminals all count as forward from payment.
+const STEP_ORDER: Record<Step, number> = {
+  select: 0,
+  contact: 1,
+  payment: 2,
+  finalizing: 3,
+  pending: 3,
+  expired: 3,
+  refunded: 3,
+  success: 4,
+};
+
+const STEP_MOTION = {
+  enter: (dir: number) => ({ x: dir * 8, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: -dir * 8, opacity: 0 }),
+};
 
 const STEP_TITLE: Record<Step, string> = {
   select: 'Choose tickets',
@@ -86,6 +105,12 @@ export default function CheckoutSheet({
   const { user } = useAuth();
   const posthog = usePostHog();
   const [step, setStep] = useState<Step>('select');
+  const [shownStep, setShownStep] = useState<Step>('select');
+  const [stepDir, setStepDir] = useState(1);
+  if (step !== shownStep) {
+    setStepDir(STEP_ORDER[step] >= STEP_ORDER[shownStep] ? 1 : -1);
+    setShownStep(step);
+  }
   const [selection, setSelection] = useState<Record<string, number>>({});
   // One code per checkout; it outlives close/reset so a reopened sheet still
   // shows what the buyer unlocked (ADR 0035).
@@ -564,125 +589,140 @@ export default function CheckoutSheet({
             tickets={successData.tickets}
           />
         ) : (
-          <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden">
-            {step === 'select' && (
-              <SelectStep
-                tickets={tickets}
-                selection={selection}
-                unlockedIds={unlockedIds}
-                activeCode={unlock?.code ?? null}
-                onApplyCode={handleApplyCode}
-                onClearCode={clearCode}
-                failedLinkCode={failedLinkCode}
-                onAdjust={adjust}
-                qty={qty}
-                totalCents={totalCents}
-                feesCents={feesCents}
-                eventName={event.name}
-                onContinue={() => {
-                  capture(ANALYTICS_EVENTS.checkoutTicketsSelected, {
-                    ticket_count: qty,
-                    total_cents: totalCents,
-                    fees_cents: feesCents,
-                    is_free: isFree,
-                  });
-                  setStep('contact');
-                }}
-              />
-            )}
-            {step === 'contact' && (
-              <ContactStep
-                defaultValues={{
-                  firstName: user?.firstName ?? '',
-                  lastName: user?.lastName ?? '',
-                  email: user?.email ?? '',
-                }}
-                isFree={isFree}
-                submitting={submitting}
-                error={submitError}
-                eventName={event.name}
-                onBack={() => setStep('select')}
-                onSubmit={handleContact}
-              />
-            )}
-            {step === 'payment' &&
-              clientSecret &&
-              expiresAt &&
-              paymentSummary && (
-                <PaymentStep
-                  clientSecret={clientSecret}
-                  event={event}
-                  summary={paymentSummary}
-                  expiresAt={expiresAt}
-                  onPaid={() => {
-                    if (reservationId) void finalize(reservationId, false);
-                  }}
-                  onExpired={() => setStep('expired')}
-                  onBack={backFromPayment}
-                />
-              )}
-            {step === 'finalizing' && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-                <Spinner className="size-12 text-primary" />
-                <p className="text-base">Finalizing your tickets…</p>
-                {slowFinalize && (
-                  <p className="text-sm text-muted-foreground">
-                    This is taking longer than expected — your tickets will
-                    arrive by email shortly.
-                  </p>
+          <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden">
+            <AnimatePresence initial={false} mode="popLayout" custom={stepDir}>
+              <motion.div
+                key={step}
+                custom={stepDir}
+                variants={STEP_MOTION}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                {step === 'select' && (
+                  <SelectStep
+                    tickets={tickets}
+                    selection={selection}
+                    unlockedIds={unlockedIds}
+                    activeCode={unlock?.code ?? null}
+                    onApplyCode={handleApplyCode}
+                    onClearCode={clearCode}
+                    failedLinkCode={failedLinkCode}
+                    onAdjust={adjust}
+                    qty={qty}
+                    totalCents={totalCents}
+                    feesCents={feesCents}
+                    eventName={event.name}
+                    onContinue={() => {
+                      capture(ANALYTICS_EVENTS.checkoutTicketsSelected, {
+                        ticket_count: qty,
+                        total_cents: totalCents,
+                        fees_cents: feesCents,
+                        is_free: isFree,
+                      });
+                      setStep('contact');
+                    }}
+                  />
                 )}
-              </div>
-            )}
-            {step === 'pending' && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-                <p className="text-lg font-bold">Still confirming your order</p>
-                <p className="text-sm text-muted-foreground">
-                  If your payment went through, your tickets will arrive by
-                  email shortly. If it didn&rsquo;t, you weren&rsquo;t charged
-                  and you can start over.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => handleOpenChange(false)}
-                  className="mt-3 text-sm font-semibold text-primary"
-                >
-                  Close
-                </button>
-              </div>
-            )}
-            {step === 'expired' && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-                <p className="text-lg font-bold">Your hold expired</p>
-                <p className="text-sm text-muted-foreground">
-                  We couldn&rsquo;t keep your tickets reserved. Start over to
-                  try again.
-                </p>
-                <button
-                  type="button"
-                  onClick={startOver}
-                  className="mt-3 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
-                >
-                  Start over
-                </button>
-              </div>
-            )}
-            {step === 'refunded' && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-                <p className="text-lg font-bold">Payment refunded</p>
-                <p className="text-sm text-muted-foreground">
-                  These tickets sold out while your payment was processing, so
-                  we refunded you in full. It may take a few days to appear on
-                  your statement.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => handleOpenChange(false)}
-                  className="mt-3 text-sm font-semibold text-primary"
-                >
-                  Close
-                </button>
-              </div>
-            )}
+                {step === 'contact' && (
+                  <ContactStep
+                    defaultValues={{
+                      firstName: user?.firstName ?? '',
+                      lastName: user?.lastName ?? '',
+                      email: user?.email ?? '',
+                    }}
+                    isFree={isFree}
+                    submitting={submitting}
+                    error={submitError}
+                    eventName={event.name}
+                    onBack={() => setStep('select')}
+                    onSubmit={handleContact}
+                  />
+                )}
+                {step === 'payment' &&
+                  clientSecret &&
+                  expiresAt &&
+                  paymentSummary && (
+                    <PaymentStep
+                      clientSecret={clientSecret}
+                      event={event}
+                      summary={paymentSummary}
+                      expiresAt={expiresAt}
+                      onPaid={() => {
+                        if (reservationId) void finalize(reservationId, false);
+                      }}
+                      onExpired={() => setStep('expired')}
+                      onBack={backFromPayment}
+                    />
+                  )}
+                {step === 'finalizing' && (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+                    <Spinner className="size-12 text-primary" />
+                    <p className="text-base">Finalizing your tickets…</p>
+                    {slowFinalize && (
+                      <p className="text-sm text-muted-foreground">
+                        This is taking longer than expected — your tickets will
+                        arrive by email shortly.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {step === 'pending' && (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+                    <p className="text-lg font-bold">
+                      Still confirming your order
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      If your payment went through, your tickets will arrive by
+                      email shortly. If it didn&rsquo;t, you weren&rsquo;t
+                      charged and you can start over.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenChange(false)}
+                      className="mt-3 text-sm font-semibold text-primary"
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+                {step === 'expired' && (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+                    <p className="text-lg font-bold">Your hold expired</p>
+                    <p className="text-sm text-muted-foreground">
+                      We couldn&rsquo;t keep your tickets reserved. Start over
+                      to try again.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={startOver}
+                      className="mt-3 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+                    >
+                      Start over
+                    </button>
+                  </div>
+                )}
+                {step === 'refunded' && (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+                    <p className="text-lg font-bold">Payment refunded</p>
+                    <p className="text-sm text-muted-foreground">
+                      These tickets sold out while your payment was processing,
+                      so we refunded you in full. It may take a few days to
+                      appear on your statement.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenChange(false)}
+                      className="mt-3 text-sm font-semibold text-primary"
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         )}
       </SheetContent>
