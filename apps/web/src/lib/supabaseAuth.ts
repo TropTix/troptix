@@ -1,10 +1,16 @@
 import { createClient } from '@/lib/supabase/client';
 
-export async function signInWithMagicLink(email: string) {
+export async function signInWithMagicLink(
+  email: string,
+  captchaToken?: string
+) {
   const supabase = createClient();
   return supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    options: {
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+      captchaToken,
+    },
   });
 }
 

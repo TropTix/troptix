@@ -38,6 +38,7 @@ Next.js reads `.env` and `.env.local` in this directory. Both are gitignored.
 | `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`                   | Pooled and direct Postgres URLs. The Supabase↔Vercel integration sets them. |
 | `PG_POOL_MAX`                                                       | Optional cap on the Prisma pg pool size.                                    |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`  | Supabase auth and storage client.                                           |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`                                    | Cloudflare Turnstile on the email sign-in form. Unset renders no widget.    |
 | `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`           | Stripe server and browser keys.                                             |
 | `STRIPE_RESERVATION_WEBHOOK_SECRET`                                 | Signing secret for `/api/stripe/reservation-webhook`.                       |
 | `RESEND_API_KEY`                                                    | Transactional email.                                                        |

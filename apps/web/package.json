@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
+    "@marsidev/react-turnstile": "^1.6.2",
     "@stripe/react-stripe-js": "^6.6.0",
     "@stripe/stripe-js": "^9.9.0",
     "@supabase/ssr": "^0.12.0",
