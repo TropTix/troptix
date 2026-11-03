@@ -311,6 +311,8 @@ export const grantRowSchema = z.object({
   createdAt: z.string().datetime(),
   /** A hold on this grant is open; a revoked grant still lets it finish. */
   checkoutInProgress: z.boolean(),
+  /** An active invitation not sent in the last day (plan decision 23). */
+  canResend: z.boolean(),
   ticketTypes: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 export type GrantRow = z.infer<typeof grantRowSchema>;
@@ -349,3 +351,36 @@ export type CreateGrantInput = z.input<typeof createGrantInputSchema>;
 /** Only what extends a grant; a code already sent keeps its meaning. */
 export const updateGrantInputSchema = grantLimitsSchema;
 export type UpdateGrantInput = z.infer<typeof updateGrantInputSchema>;
+
+/** Most addresses in one invite batch (guest access plan, decision 24). */
+export const INVITE_BATCH_MAX = 200;
+/** Most invitation emails one organization may send in 24 hours. */
+export const INVITE_DAILY_MAX = 500;
+/** How long after a send an invitation may be resent; keeps resends inside the daily cap. */
+export const INVITE_RESEND_INTERVAL_MS = 86_400_000;
+
+export const inviteGuestsInputSchema = z.object({
+  emails: z
+    .array(
+      z
+        .string()
+        .trim()
+        .email()
+        .transform((value) => value.toLowerCase())
+    )
+    .min(1)
+    .max(INVITE_BATCH_MAX),
+  ticketTypeIds: z.array(z.string().min(1)).min(1).max(50),
+  maxUses: z.number().int().min(1).max(100).default(1),
+  quantity: z.number().int().min(1).max(50).default(1),
+  expiresAt: z.date().nullable(),
+  send: z.boolean(),
+});
+export type InviteGuestsInput = z.input<typeof inviteGuestsInputSchema>;
+
+export type InviteSkipReason = 'duplicate' | 'alreadyInvited';
+
+export type InviteGuestsResult = {
+  created: { grantId: string; email: string; code: string }[];
+  skipped: { email: string; reason: InviteSkipReason }[];
+};

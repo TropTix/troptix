@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Ban, Check, Link2, Pencil, Plus, Search } from 'lucide-react';
+import {
+  Ban,
+  Check,
+  Link2,
+  Mail,
+  Pencil,
+  Plus,
+  Search,
+  Send,
+} from 'lucide-react';
 import type { GrantRow, GrantStateDto, GrantsView } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
@@ -28,8 +37,10 @@ import {
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { getDateFormatter } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
-import { revokeGrant } from '../_actions/grantActions';
+import { LocalTime } from '@/components/LocalTime';
+import { resendInvitation, revokeGrant } from '../_actions/grantActions';
 import { GrantDialog } from './GrantDialog';
+import { InviteDialog } from './InviteDialog';
 
 const STATE: Record<
   GrantStateDto,
@@ -70,6 +81,17 @@ export function AccessCodesManager({
   const [dialog, setDialog] = useState<{ editing: GrantRow | null } | null>(
     null
   );
+  const [inviting, setInviting] = useState(false);
+  const [resending, setResending] = useState<string | null>(null);
+
+  async function resend(grant: GrantRow) {
+    setResending(grant.id);
+    const result = await resendInvitation(eventId, grant.id);
+    setResending(null);
+    if (result.success)
+      toast.success(`Sent ${grant.code} to ${grant.holderEmail}.`);
+    else toast.error(result.error);
+  }
   const [revoking, setRevoking] = useState<GrantRow | null>(null);
   const { copyToClipboard } = useCopyToClipboard();
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -109,6 +131,18 @@ export function AccessCodesManager({
     const usable = grant.state === 'active' || grant.state === 'inUse';
     return (
       <div className="flex justify-end gap-1">
+        {grant.canResend && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            disabled={resending === grant.id}
+            onClick={() => resend(grant)}
+            aria-label={`Resend ${grant.code} to ${grant.holderEmail}`}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        )}
         {usable && (
           <Button
             variant="ghost"
@@ -195,6 +229,10 @@ export function AccessCodesManager({
               aria-label="Search access codes"
             />
           </div>
+          <Button variant="outline" onClick={() => setInviting(true)}>
+            <Mail className="mr-2 h-4 w-4" />
+            Invite by email
+          </Button>
           <Button onClick={() => setDialog({ editing: null })}>
             <Plus className="mr-2 h-4 w-4" />
             New code
@@ -224,6 +262,15 @@ export function AccessCodesManager({
                       <p className="truncate text-xs text-muted-foreground">
                         {grant.holderName ? `${grant.holderName} · ` : ''}
                         {grant.holderEmail}
+                      </p>
+                    )}
+                    {grant.sentAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Sent{' '}
+                        <LocalTime
+                          at={grant.sentAt}
+                          dateFormat="MMM d, h:mm a"
+                        />
                       </p>
                     )}
                   </div>
@@ -274,6 +321,15 @@ export function AccessCodesManager({
                           {grant.holderEmail}
                         </span>
                       )}
+                      {grant.sentAt && (
+                        <span className="block text-xs text-muted-foreground">
+                          Sent{' '}
+                          <LocalTime
+                            at={grant.sentAt}
+                            dateFormat="MMM d, h:mm a"
+                          />
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>{stateBadge(grant)}</TableCell>
                     <TableCell className="max-w-56 truncate">
@@ -297,6 +353,13 @@ export function AccessCodesManager({
         editing={dialog?.editing ?? null}
         open={dialog !== null}
         onOpenChange={(open) => !open && setDialog(null)}
+      />
+
+      <InviteDialog
+        eventId={eventId}
+        ticketTypes={view.ticketTypes}
+        open={inviting}
+        onOpenChange={setInviting}
       />
 
       <RevokeDialog

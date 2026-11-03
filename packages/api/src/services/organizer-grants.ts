@@ -4,6 +4,7 @@ import { Prisma, ReservationStatus } from '@troptix/db';
 import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import {
+  INVITE_RESEND_INTERVAL_MS,
   createGrantInputSchema,
   updateGrantInputSchema,
   type CreateGrantInput,
@@ -76,22 +77,30 @@ export async function listGrants(
 
   return {
     ticketTypes: event.ticketTypes,
-    grants: event.grants.map((g) => ({
-      id: g.id,
-      code: g.code,
-      state: deriveGrantState(g, withHold.has(g.id), now),
-      maxUses: g.maxUses,
-      usedCount: g.usedCount,
-      quantity: g.quantity,
-      expiresAt: g.expiresAt?.toISOString() ?? null,
-      revokedAt: g.revokedAt?.toISOString() ?? null,
-      holderEmail: g.holderEmail,
-      holderName: g.holderName,
-      sentAt: g.sentAt?.toISOString() ?? null,
-      createdAt: g.createdAt.toISOString(),
-      checkoutInProgress: withHold.has(g.id),
-      ticketTypes: g.ticketTypes.map((t) => t.ticketType),
-    })),
+    grants: event.grants.map((g) => {
+      const state = deriveGrantState(g, withHold.has(g.id), now);
+      return {
+        id: g.id,
+        code: g.code,
+        state,
+        maxUses: g.maxUses,
+        usedCount: g.usedCount,
+        quantity: g.quantity,
+        expiresAt: g.expiresAt?.toISOString() ?? null,
+        revokedAt: g.revokedAt?.toISOString() ?? null,
+        holderEmail: g.holderEmail,
+        holderName: g.holderName,
+        sentAt: g.sentAt?.toISOString() ?? null,
+        createdAt: g.createdAt.toISOString(),
+        checkoutInProgress: withHold.has(g.id),
+        canResend:
+          g.holderEmail !== null &&
+          state === 'active' &&
+          (g.sentAt === null ||
+            now.getTime() - g.sentAt.getTime() >= INVITE_RESEND_INTERVAL_MS),
+        ticketTypes: g.ticketTypes.map((t) => t.ticketType),
+      };
+    }),
   };
 }
 

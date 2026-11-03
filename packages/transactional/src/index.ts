@@ -12,3 +12,7 @@ export {
   calendarFileName,
 } from './calendar';
 export type { CalendarLinks } from './calendar';
+export { default as GuestInvitationTemplate } from '../emails/GuestInvitation';
+export type { GuestInvitation } from '../emails/GuestInvitation';
+export { buildGuestInvitation } from './guestInvitation';
+export type { GuestInvitationEmail } from './guestInvitation';

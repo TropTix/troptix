@@ -90,3 +90,25 @@ export class StripeAccountRestrictedError extends Error {
     this.name = 'StripeAccountRestrictedError';
   }
 }
+
+/** Sending invitations needs a verified organization or one approved for paid ticketing. */
+export class InvitationsNotAllowedError extends Error {
+  constructor(
+    message = 'Sending invitations needs a verified organization or approval for paid ticketing'
+  ) {
+    super(message);
+    this.name = 'InvitationsNotAllowedError';
+  }
+}
+
+/** The organization's invitation emails for the last 24 hours would pass the cap. */
+export class InvitationLimitError extends Error {
+  constructor(public readonly remaining: number) {
+    super(
+      remaining === 0
+        ? 'No more invitations can be sent today'
+        : `Only ${remaining} more invitations can be sent today`
+    );
+    this.name = 'InvitationLimitError';
+  }
+}

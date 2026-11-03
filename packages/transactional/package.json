@@ -14,7 +14,8 @@
   },
   "scripts": {
     "email": "email dev",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "react-email": "6.6.3"
@@ -28,6 +29,7 @@
     "@types/react": "19.2.7",
     "react": "19.2.1",
     "react-dom": "19.2.1",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "vitest": "^4.1.9"
   }
 }

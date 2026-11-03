@@ -140,6 +140,22 @@ describe('createGrant', () => {
     expect(row.ticketTypes.map((t) => t.ticketTypeId).sort()).toEqual(
       [gala, dinner].sort()
     );
+
+    const listed = async () =>
+      (await listGrants(prisma, OWNER, EVENT_ID)).grants.find(
+        (g) => g.id === row.id
+      );
+    expect((await listed())?.canResend).toBe(true);
+    await prisma.grant.update({
+      where: { id: row.id },
+      data: { sentAt: new Date(Date.now() - 3_600_000) },
+    });
+    expect((await listed())?.canResend).toBe(false);
+    await prisma.grant.update({
+      where: { id: row.id },
+      data: { sentAt: new Date(Date.now() - 25 * 3_600_000) },
+    });
+    expect((await listed())?.canResend).toBe(true);
   });
 
   it('refuses a ticket type from another event', async () => {
