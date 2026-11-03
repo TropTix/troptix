@@ -43,7 +43,6 @@ export default function AuthProvider({
   const loadSeq = useRef(0);
 
   useEffect(() => {
-    const supabase = createClient();
     let active = true;
 
     async function loadUser() {
@@ -71,6 +70,16 @@ export default function AuthProvider({
       } finally {
         if (active && seq === loadSeq.current) setLoading(false);
       }
+    }
+
+    // No client (Supabase env missing): the server has no env either, so the
+    // same /api/user/me call settles the signed-out state without a subscription.
+    const supabase = createClient();
+    if (!supabase) {
+      void loadUser();
+      return () => {
+        active = false;
+      };
     }
 
     // onAuthStateChange fires INITIAL_SESSION right after subscribing, so this

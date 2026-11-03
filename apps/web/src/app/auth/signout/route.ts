@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 // a session.
 export async function POST(request: Request) {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase?.auth.signOut();
   // 303 so the browser follows with a GET; 307 would replay the POST.
   return NextResponse.redirect(new URL('/', request.url).toString(), {
     status: 303,

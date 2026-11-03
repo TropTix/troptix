@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client';
+import { requireClient } from '@/lib/supabase/client';
 
 /**
  * `Events.imageUrl` stores the object PATH within the bucket, never a full URL
@@ -34,7 +34,7 @@ export function organizationLogoUrl(
 }
 
 export async function uploadOrganizationLogo(file: File): Promise<string> {
-  const supabase = createClient();
+  const supabase = requireClient();
   const ext = file.name.includes('.')
     ? file.name.split('.').pop()!.toLowerCase()
     : 'bin';
@@ -56,7 +56,7 @@ export async function deleteOrganizationLogo(
   value: string | null | undefined
 ): Promise<void> {
   if (!value || isAbsoluteUrl(value)) return;
-  const supabase = createClient();
+  const supabase = requireClient();
   const path = value.replace(/^\/+/, '');
   const { error } = await supabase.storage
     .from(ORGANIZATION_LOGOS_BUCKET)
@@ -65,7 +65,7 @@ export async function deleteOrganizationLogo(
 }
 
 export async function uploadEventFlyer(file: File): Promise<string> {
-  const supabase = createClient();
+  const supabase = requireClient();
   const ext = file.name.includes('.')
     ? file.name.split('.').pop()!.toLowerCase()
     : 'bin';
@@ -87,7 +87,7 @@ export async function deleteEventFlyer(
   value: string | null | undefined
 ): Promise<void> {
   if (!value || isAbsoluteUrl(value)) return;
-  const supabase = createClient();
+  const supabase = requireClient();
   const path = value.replace(/^\/+/, '');
   const { error } = await supabase.storage
     .from(EVENT_FLYERS_BUCKET)

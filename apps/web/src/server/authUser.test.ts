@@ -33,13 +33,8 @@ const SESSION_COOKIE = { name: 'sb-example-auth-token', value: 'jwt' };
 const AUTH_SUB = '11111111-1111-1111-1111-111111111111';
 const APP_USER_ID = 'app-user-1';
 
-// process.env is shared across every file in a Jest worker, so restore rather
-// than delete.
-const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
   mockCreateClient.mockResolvedValue({
     auth: { getClaims: mockGetClaims },
   });
@@ -48,11 +43,6 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
-  if (ORIGINAL_SUPABASE_URL === undefined) {
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-  } else {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = ORIGINAL_SUPABASE_URL;
-  }
 });
 
 describe('getServerUser', () => {
@@ -99,13 +89,14 @@ describe('getServerUser', () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 
-  it('returns null and skips createClient when Supabase env is unset', async () => {
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  it('returns null and skips getClaims and Prisma when createClient yields no client (env missing)', async () => {
+    mockCreateClient.mockResolvedValue(null);
 
     const result = await getServerUser();
 
     expect(result).toBeNull();
-    expect(mockCreateClient).not.toHaveBeenCalled();
+    expect(mockGetClaims).not.toHaveBeenCalled();
+    expect(mockFindUnique).not.toHaveBeenCalled();
   });
 
   it('returns null and skips getClaims when no session cookie is present', async () => {
