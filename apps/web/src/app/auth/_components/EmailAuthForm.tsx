@@ -17,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { signInWithMagicLink, verifyEmailOtp } from '@/lib/supabaseAuth';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useState } from 'react';
@@ -27,6 +28,7 @@ import { FormDivider } from './FormDivider';
 import { GoogleSignInButton } from './GoogleSignInButton';
 
 const RESEND_COOLDOWN_SECONDS = 45;
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 const emailSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -50,6 +52,12 @@ export function EmailAuthForm() {
   const router = useRouter();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
+  const [captchaToken, setCaptchaToken] = useState<string>();
+  const [captchaFailed, setCaptchaFailed] = useState(false);
+  const [captchaKey, setCaptchaKey] = useState(0);
+  // A widget that errors sends no token; Supabase decides whether that is allowed.
+  const captchaPending =
+    Boolean(TURNSTILE_SITE_KEY) && !captchaToken && !captchaFailed;
 
   const emailForm = useForm<EmailValues>({
     resolver: zodResolver(emailSchema),
@@ -68,7 +76,10 @@ export function EmailAuthForm() {
   }, [resendIn]);
 
   const sendLink = async (email: string) => {
-    const { error } = await signInWithMagicLink(email);
+    const { error } = await signInWithMagicLink(email, captchaToken);
+    // Turnstile tokens are single-use: remount the widget for a fresh one.
+    setCaptchaToken(undefined);
+    setCaptchaKey((k) => k + 1);
     if (error) {
       toast.error('Could not send your email. Please try again in a moment.');
       return false;
@@ -95,68 +106,164 @@ export function EmailAuthForm() {
   };
   const submitCode = codeForm.handleSubmit(onVerifyCode);
 
+  const captcha = TURNSTILE_SITE_KEY ? (
+    <Turnstile
+      key={captchaKey}
+      siteKey={TURNSTILE_SITE_KEY}
+      onSuccess={(token) => {
+        setCaptchaToken(token);
+        setCaptchaFailed(false);
+      }}
+      onExpire={() => setCaptchaToken(undefined)}
+      onError={() => setCaptchaFailed(true)}
+      options={{ appearance: 'interaction-only', theme: 'auto' }}
+      className="flex justify-center mt-4"
+    />
+  ) : null;
+
   if (sentTo) {
     return (
-      <div className="max-w-md mx-auto text-center">
-        <h2 className="text-2xl font-bold text-foreground mb-2">
-          Check your email
-        </h2>
-        <p className="text-muted-foreground mb-8">
-          We sent a 6-digit code and a sign-in link to{' '}
-          <span className="font-medium text-foreground">{sentTo}</span>. Enter
-          the code below, or just tap the link in the email.
-        </p>
+      <>
+        <div className="max-w-md mx-auto text-center">
+          <h2 className="text-2xl font-bold text-foreground mb-2">
+            Check your email
+          </h2>
+          <p className="text-muted-foreground mb-8">
+            We sent a 6-digit code and a sign-in link to{' '}
+            <span className="font-medium text-foreground">{sentTo}</span>. Enter
+            the code below, or just tap the link in the email.
+          </p>
 
-        <Form {...codeForm}>
-          <form onSubmit={submitCode} className="space-y-6" noValidate>
-            {/* Autofill decoys: absorb username/password autofill so it doesn't
+          <Form {...codeForm}>
+            <form onSubmit={submitCode} className="space-y-6" noValidate>
+              {/* Autofill decoys: absorb username/password autofill so it doesn't
                 dump the email into the OTP boxes; display:none would be skipped. */}
-            <input
-              type="text"
-              name="username"
-              autoComplete="username"
-              tabIndex={-1}
-              aria-hidden="true"
-              style={decoyStyle}
-            />
-            <input
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              tabIndex={-1}
-              aria-hidden="true"
-              style={decoyStyle}
-            />
+              <input
+                type="text"
+                name="username"
+                autoComplete="username"
+                tabIndex={-1}
+                aria-hidden="true"
+                style={decoyStyle}
+              />
+              <input
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                tabIndex={-1}
+                aria-hidden="true"
+                style={decoyStyle}
+              />
+              <FormField
+                control={codeForm.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col items-center">
+                    <FormControl>
+                      <InputOTP
+                        maxLength={6}
+                        pattern={REGEXP_ONLY_DIGITS}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onComplete={() => submitCode()}
+                        containerClassName="justify-center"
+                        autoComplete="one-time-code"
+                        autoFocus
+                        data-1p-ignore="true"
+                        data-lpignore="true"
+                        data-form-type="other"
+                      >
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} />
+                          <InputOTPSlot index={1} />
+                          <InputOTPSlot index={2} />
+                          <InputOTPSlot index={3} />
+                          <InputOTPSlot index={4} />
+                          <InputOTPSlot index={5} />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </FormControl>
+                    <FormMessage className="mt-2" />
+                  </FormItem>
+                )}
+              />
+
+              <Button
+                type="submit"
+                className="w-full h-12 font-medium"
+                disabled={codeForm.formState.isSubmitting}
+              >
+                {codeForm.formState.isSubmitting
+                  ? 'Verifying...'
+                  : 'Verify code'}
+              </Button>
+            </form>
+          </Form>
+
+          <p className="text-sm text-muted-foreground mt-6">
+            Didn&apos;t get it? Check your spam folder
+            {resendIn > 0 ? (
+              <>, or resend in {resendIn}s.</>
+            ) : (
+              <>
+                , or{' '}
+                <button
+                  type="button"
+                  className="text-primary hover:underline font-medium disabled:opacity-50 disabled:no-underline"
+                  disabled={captchaPending}
+                  onClick={() => sendLink(sentTo)}
+                >
+                  resend the code
+                </button>
+                .
+              </>
+            )}
+          </p>
+          <button
+            type="button"
+            className="text-sm text-muted-foreground hover:text-foreground hover:underline mt-3"
+            onClick={() => {
+              setSentTo(null);
+              setResendIn(0);
+              codeForm.reset();
+            }}
+          >
+            Use a different email
+          </button>
+        </div>
+        {captcha}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="max-w-md mx-auto">
+        <GoogleSignInButton />
+
+        <FormDivider />
+
+        <Form {...emailForm}>
+          <form
+            onSubmit={emailForm.handleSubmit(onSendEmail)}
+            className="space-y-4"
+            noValidate
+          >
             <FormField
-              control={codeForm.control}
-              name="code"
+              control={emailForm.control}
+              name="email"
               render={({ field }) => (
-                <FormItem className="flex flex-col items-center">
+                <FormItem>
+                  <FormLabel className="font-medium">Email</FormLabel>
                   <FormControl>
-                    <InputOTP
-                      maxLength={6}
-                      pattern={REGEXP_ONLY_DIGITS}
-                      value={field.value}
-                      onChange={field.onChange}
-                      onComplete={() => submitCode()}
-                      containerClassName="justify-center"
-                      autoComplete="one-time-code"
-                      autoFocus
-                      data-1p-ignore="true"
-                      data-lpignore="true"
-                      data-form-type="other"
-                    >
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
-                      </InputOTPGroup>
-                    </InputOTP>
+                    <Input
+                      type="email"
+                      autoComplete="email"
+                      placeholder="Enter your email address"
+                      {...field}
+                    />
                   </FormControl>
-                  <FormMessage className="mt-2" />
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -164,88 +271,16 @@ export function EmailAuthForm() {
             <Button
               type="submit"
               className="w-full h-12 font-medium"
-              disabled={codeForm.formState.isSubmitting}
+              disabled={emailForm.formState.isSubmitting || captchaPending}
             >
-              {codeForm.formState.isSubmitting ? 'Verifying...' : 'Verify code'}
+              {emailForm.formState.isSubmitting
+                ? 'Sending...'
+                : 'Email me a sign-in link'}
             </Button>
           </form>
         </Form>
-
-        <p className="text-sm text-muted-foreground mt-6">
-          Didn&apos;t get it? Check your spam folder
-          {resendIn > 0 ? (
-            <>, or resend in {resendIn}s.</>
-          ) : (
-            <>
-              , or{' '}
-              <button
-                type="button"
-                className="text-primary hover:underline font-medium"
-                onClick={() => sendLink(sentTo)}
-              >
-                resend the code
-              </button>
-              .
-            </>
-          )}
-        </p>
-        <button
-          type="button"
-          className="text-sm text-muted-foreground hover:text-foreground hover:underline mt-3"
-          onClick={() => {
-            setSentTo(null);
-            setResendIn(0);
-            codeForm.reset();
-          }}
-        >
-          Use a different email
-        </button>
       </div>
-    );
-  }
-
-  return (
-    <div className="max-w-md mx-auto">
-      <GoogleSignInButton />
-
-      <FormDivider />
-
-      <Form {...emailForm}>
-        <form
-          onSubmit={emailForm.handleSubmit(onSendEmail)}
-          className="space-y-4"
-          noValidate
-        >
-          <FormField
-            control={emailForm.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-medium">Email</FormLabel>
-                <FormControl>
-                  <Input
-                    type="email"
-                    autoComplete="email"
-                    placeholder="Enter your email address"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <Button
-            type="submit"
-            className="w-full h-12 font-medium"
-            disabled={emailForm.formState.isSubmitting}
-          >
-            {emailForm.formState.isSubmitting
-              ? 'Sending...'
-              : 'Email me a sign-in link'}
-          </Button>
-        </form>
-      </Form>
-    </div>
+      {captcha}
+    </>
   );
 }
