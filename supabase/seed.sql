@@ -20,8 +20,8 @@
 --    to price*100, but keep them in sync.
 --  - `saleStartsAt`/`saleEndsAt` are full timestamps and the only sale-window
 --    columns (ADR 0020).
---  - a non-empty `accessCode` makes a ticket type GATED (hidden until the code is
---    entered); null is a public ticket type. Stored uppercased (ADR 0035).
+--  - `hidden` keeps a ticket type off the event page; a Grant listing it sells
+--    it to whoever enters the grant's code (ADR 0037). Codes are stored uppercased.
 
 -- Demo organizer
 insert into public."Users" (id, "createdAt", "updatedAt", email, name, "firstName", "lastName", role)
@@ -134,27 +134,40 @@ insert into public."TicketTypes" (
   id, "ticketType", "createdAt", "updatedAt", name, description,
   "maxPurchasePerUser", capacity, reserved, sold,
   "saleStartsAt", "saleEndsAt",
-  price, "priceCents", "ticketingFees", "accessCode", "eventId"
+  price, "priceCents", "ticketingFees", hidden, "eventId"
 ) values
   -- seed_event_1: happy-path paid ticket types, on sale now, plenty available
-  ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 0, now(), now() + interval '60 days', 25.00, 2500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
-  ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks',  4,  50, 0, 0, now(), now() + interval '60 days', 75.00, 7500, 'PASS_TICKET_FEES',   null, 'seed_event_1'),
+  ('seed_tt_ga',  'PAID', now(), now(), 'General Admission', 'Standard entry',       10, 500, 0, 0, now(), now() + interval '60 days', 25.00, 2500, 'PASS_TICKET_FEES',   false, 'seed_event_1'),
+  ('seed_tt_vip', 'PAID', now(), now(), 'VIP',               'VIP entry with perks',  4,  50, 0, 0, now(), now() + interval '60 days', 75.00, 7500, 'PASS_TICKET_FEES',   false, 'seed_event_1'),
 
   -- seed_event_2: free RSVP ticket type, on sale now, organizer absorbs fees
-  ('seed_tt_rsvp', 'FREE', now(), now(), 'Free RSVP', 'Reserve a free spot',          6, 300, 0, 0, now(), now() + interval '75 days', 0.00, 0, 'ABSORB_TICKET_FEES', null, 'seed_event_2'),
+  ('seed_tt_rsvp', 'FREE', now(), now(), 'Free RSVP', 'Reserve a free spot',          6, 300, 0, 0, now(), now() + interval '75 days', 0.00, 0, 'ABSORB_TICKET_FEES', false, 'seed_event_2'),
 
   -- seed_event_3: edge-case ticket types
   --   near-capacity: capacity - reserved - sold = 2  → "Only 2 left"
-  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity ticket type', 10, 100, 0, 98, now(), now() + interval '90 days', 30.00, 3000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_near',   'PAID', now(), now(), 'Almost Gone',   'Near-capacity ticket type', 10, 100, 0, 98, now(), now() + interval '90 days', 30.00, 3000, 'PASS_TICKET_FEES', false, 'seed_event_3'),
   --   sold-out: capacity == sold → availability 0
-  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold ticket type',     4,  50, 0, 50, now(), now() + interval '90 days', 40.00, 4000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
+  ('seed_tt_sold',   'PAID', now(), now(), 'Sold Out',      'Fully sold ticket type',     4,  50, 0, 50, now(), now() + interval '90 days', 40.00, 4000, 'PASS_TICKET_FEES', false, 'seed_event_3'),
   --   upcoming: sale window opens in the future → not yet on sale
-  ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', now() + interval '90 days', 20.00, 2000, 'PASS_TICKET_FEES', null, 'seed_event_3'),
-  --   gated: non-empty accessCode → hidden until 'UNLOCK2026' is entered
-  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), now() + interval '90 days', 60.00, 6000, 'PASS_TICKET_FEES', 'UNLOCK2026', 'seed_event_3'),
+  ('seed_tt_soon',   'PAID', now(), now(), 'Early Bird',    'Sale opens next week',    10, 200, 0,  0, now() + interval '7 days', now() + interval '90 days', 20.00, 2000, 'PASS_TICKET_FEES', false, 'seed_event_3'),
+  --   gated: hidden, sold through seed_grant_unlock below
+  ('seed_tt_gated',  'PAID', now(), now(), 'Members Only',  'Unlock with UNLOCK2026',   4,  80, 0,  0, now(), now() + interval '90 days', 60.00, 6000, 'PASS_TICKET_FEES', true, 'seed_event_3'),
 
   -- seed_event_4: private event still sells by direct link
-  ('seed_tt_priv',   'PAID', now(), now(), 'Invite Ticket', 'For link holders',        10, 150, 0,  0, now(), now() + interval '100 days', 35.00, 3500, 'PASS_TICKET_FEES', null, 'seed_event_4');
+  ('seed_tt_priv',   'PAID', now(), now(), 'Invite Ticket', 'For link holders',        10, 150, 0,  0, now(), now() + interval '100 days', 35.00, 3500, 'PASS_TICKET_FEES', false, 'seed_event_4');
+
+-- Grants on seed_event_3 (ADR 0037): an unlimited code, as a migrated one
+-- reads, and a one-use invitation with a holder, a cap of 2 and an expiry.
+insert into public."Grant" (
+  id, "createdAt", "updatedAt", "eventId", code,
+  "maxUses", "usedCount", quantity, "expiresAt", "holderEmail", "holderName"
+) values
+  ('seed_grant_unlock', now(), now(), 'seed_event_3', 'UNLOCK2026', null, 0, null, null, null, null),
+  ('seed_grant_invite', now(), now(), 'seed_event_3', 'INVITE7K', 1, 0, 2, now() + interval '30 days', 'guest@troptix.test', 'Seed Guest');
+
+insert into public."GrantTicketType" ("grantId", "ticketTypeId") values
+  ('seed_grant_unlock', 'seed_tt_gated'),
+  ('seed_grant_invite', 'seed_tt_gated');
 
 -- ── Payout fixtures (docs/plans/2026-08-organizer-payout-requests.md) ────────
 -- Two ENDED events with COMPLETED orders give the demo org every balance
@@ -192,11 +205,11 @@ insert into public."TicketTypes" (
   id, "ticketType", "createdAt", "updatedAt", name, description,
   "maxPurchasePerUser", capacity, reserved, sold,
   "saleStartsAt", "saleEndsAt",
-  price, "priceCents", "ticketingFees", "accessCode", "eventId"
+  price, "priceCents", "ticketingFees", hidden, "eventId"
 ) values
-  ('seed_tt_past_ga',  'PAID', now() - interval '60 days', now(), 'General Admission', 'Standard entry', 10, 200, 0, 3, now() - interval '60 days', now() - interval '30 days 5 hours', 40.00, 4000, 'PASS_TICKET_FEES',   null, 'seed_event_5'),
-  ('seed_tt_past_vip', 'PAID', now() - interval '60 days', now(), 'VIP',               'Fees absorbed',   4,  50, 0, 2, now() - interval '60 days', now() - interval '30 days 5 hours', 50.00, 5000, 'ABSORB_TICKET_FEES', null, 'seed_event_5'),
-  ('seed_tt_recent',   'PAID', now() - interval '45 days', now(), 'General Admission', 'Standard entry', 10, 150, 0, 2, now() - interval '45 days', now() - interval '5 days 4 hours',  30.00, 3000, 'PASS_TICKET_FEES',   null, 'seed_event_6');
+  ('seed_tt_past_ga',  'PAID', now() - interval '60 days', now(), 'General Admission', 'Standard entry', 10, 200, 0, 3, now() - interval '60 days', now() - interval '30 days 5 hours', 40.00, 4000, 'PASS_TICKET_FEES',   false, 'seed_event_5'),
+  ('seed_tt_past_vip', 'PAID', now() - interval '60 days', now(), 'VIP',               'Fees absorbed',   4,  50, 0, 2, now() - interval '60 days', now() - interval '30 days 5 hours', 50.00, 5000, 'ABSORB_TICKET_FEES', false, 'seed_event_5'),
+  ('seed_tt_recent',   'PAID', now() - interval '45 days', now(), 'General Admission', 'Standard entry', 10, 150, 0, 2, now() - interval '45 days', now() - interval '5 days 4 hours',  30.00, 3000, 'PASS_TICKET_FEES',   false, 'seed_event_6');
 
 -- Completed orders. Money columns: integer-cents are canonical; the legacy
 -- Float dollars mirror them (the ledger falls back to subtotal * 100 when

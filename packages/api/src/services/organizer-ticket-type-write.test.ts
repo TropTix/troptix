@@ -46,8 +46,9 @@ function fakePrisma(
     );
   const ticketTypesCreate = vi.fn().mockResolvedValue({});
   const ticketTypesUpdate = vi.fn().mockResolvedValue({});
+  const grantUpsert = vi.fn().mockResolvedValue({ id: 'g1' });
 
-  const prisma = {
+  const prisma: Record<string, unknown> = {
     organization: {
       ...ownedOrganizations(),
       findFirst: vi
@@ -64,10 +65,17 @@ function fakePrisma(
       create: ticketTypesCreate,
       update: ticketTypesUpdate,
     },
-  } as unknown as PrismaClient;
+    grant: { upsert: grantUpsert },
+    grantTicketType: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+  };
+  prisma.$transaction = (fn: (tx: unknown) => unknown) => fn(prisma);
 
   return {
-    prisma,
+    prisma: prisma as unknown as PrismaClient,
+    grantUpsert,
     eventsFindFirst,
     ticketTypesFindFirst,
     ticketTypesCreate,
@@ -111,20 +119,29 @@ describe('createTicketType', () => {
     }
   });
 
-  it('stores the access code trimmed and uppercased', async () => {
-    const { prisma, ticketTypesCreate } = fakePrisma({ paidEnabled: true });
-    await createTicketType(
+  it('writes the access code as a grant, trimmed and uppercased, and hides the type', async () => {
+    const { prisma, grantUpsert, ticketTypesUpdate } = fakePrisma({
+      paidEnabled: true,
+    });
+    const { ticketTypeId } = await createTicketType(
       prisma,
       OWNER,
       'e1',
       input({ priceCents: 2550, accessCode: '  vipList ' })
     );
 
-    expect(ticketTypesCreate.mock.calls[0][0].data.accessCode).toBe('VIPLIST');
+    expect(grantUpsert.mock.calls[0][0].where).toEqual({
+      eventId_code: { eventId: 'e1', code: 'VIPLIST' },
+    });
+    expect(ticketTypesUpdate).toHaveBeenCalledWith({
+      where: { id: ticketTypeId },
+      data: { hidden: true },
+    });
   });
 
-  it('writes the row with cents, the legacy float, the enum, and a null accessCode', async () => {
-    const { prisma, ticketTypesCreate } = fakePrisma({ paidEnabled: true });
+  it('writes the row with cents, the legacy float and the enum, public without a code', async () => {
+    const { prisma, ticketTypesCreate, ticketTypesUpdate, grantUpsert } =
+      fakePrisma({ paidEnabled: true });
     const { ticketTypeId } = await createTicketType(
       prisma,
       OWNER,
@@ -139,8 +156,9 @@ describe('createTicketType', () => {
       ticketType: 'PAID',
       priceCents: 2550,
       price: 25.5,
-      accessCode: null,
     });
+    expect(ticketTypesUpdate.mock.calls[0][0].data).toEqual({ hidden: false });
+    expect(grantUpsert).not.toHaveBeenCalled();
   });
 });
 

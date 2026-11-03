@@ -435,7 +435,7 @@ export default function CheckoutSheet({
     } catch {
       return 'failed';
     }
-    if (res.type === 'invalid') {
+    if (res.type !== 'unlocked') {
       capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
         valid: false,
         unlocked_count: 0,
@@ -499,6 +499,15 @@ export default function CheckoutSheet({
         contact,
         analytics: analyticsIds(),
       });
+      if (reservation.type !== 'held') {
+        // The grant refused the hold and nothing was held: drop the code and
+        // send the buyer back to the field, showing why.
+        const refused = unlock?.code ?? '';
+        clearCode();
+        setFailedLinkCode({ code: refused, outcome: 'invalid' });
+        setStep('select');
+        return;
+      }
       heldReservationId = reservation.reservationId;
       if (reservation.items.every((g) => g.granted === 0)) {
         capture(ANALYTICS_EVENTS.checkoutSoldOut, { ticket_count: qty });

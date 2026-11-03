@@ -12,7 +12,9 @@ import { ownedOrganizations } from './_shared/owned-organizations.fixtures';
 const PERSON: Actor = { kind: 'user', userId: 'person-1', role: 'PATRON' };
 
 function fakePrisma(opts: { platformOwner?: boolean } = {}) {
-  const eventsFindFirst = vi.fn().mockResolvedValue({ name: 'Fest' });
+  const eventsFindFirst = vi.fn(async (args: any) =>
+    args.include ? { name: 'Fest', ticketTypes: [] } : { name: 'Fest' }
+  );
   const organizationFindFirst = vi
     .fn()
     .mockResolvedValue({ displayName: 'Org', paidTicketingEnabled: true });
@@ -77,7 +79,7 @@ describe('getEventForEdit', () => {
       organizationId: 'org-1',
       deletedAt: null,
     });
-    expect(call.include.ticketTypes.select).toHaveProperty('accessCode');
+    expect(call.include.ticketTypes.select).toHaveProperty('grants');
   });
 
   it('returns the acting organization for the paid-ticketing flag', async () => {

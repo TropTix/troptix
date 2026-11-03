@@ -6,6 +6,7 @@ import {
   ticketTypeInputSchema,
   type TicketTypeInput,
 } from '../contracts/organizer';
+import { writeLegacyAccessCode } from './_shared/access-code';
 import { NotFoundError } from './_shared/errors';
 import { requireOwnedEvent } from './_shared/owned-event';
 import { generateId } from './_shared/ids';
@@ -37,8 +38,11 @@ export async function createTicketType(
   );
 
   const ticketTypeId = generateId();
-  await prisma.ticketTypes.create({
-    data: { id: ticketTypeId, eventId, ...ticketTypeWriteFields(data) },
+  await prisma.$transaction(async (tx) => {
+    await tx.ticketTypes.create({
+      data: { id: ticketTypeId, eventId, ...ticketTypeWriteFields(data) },
+    });
+    await writeLegacyAccessCode(tx, eventId, ticketTypeId, data.accessCode);
   });
 
   return { ticketTypeId };
@@ -78,8 +82,11 @@ export async function updateTicketType(
     );
   }
 
-  await prisma.ticketTypes.update({
-    where: { id: ticketTypeId },
-    data: ticketTypeWriteFields(data),
+  await prisma.$transaction(async (tx) => {
+    await tx.ticketTypes.update({
+      where: { id: ticketTypeId },
+      data: ticketTypeWriteFields(data),
+    });
+    await writeLegacyAccessCode(tx, eventId, ticketTypeId, data.accessCode);
   });
 }

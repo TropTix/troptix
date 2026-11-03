@@ -18,9 +18,15 @@ import type {
   CompleteFreeResponse,
 } from '../contracts/reservations';
 import type { CheckoutAnalytics, FulfilledVia } from '../contracts/analytics';
+import type { CodeRefusal } from '../contracts/checkout';
 import { generateId } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
-import { accessibleTicketTypesWhere } from './_shared/access-code';
+import { normalizeAccessCode } from './_shared/access-code';
+import {
+  retakeGrantUseInTx,
+  returnGrantUseInTx,
+  takeGrantUseInTx,
+} from './_shared/grants';
 import { NotFoundError } from './_shared/errors';
 
 /**
@@ -50,6 +56,8 @@ export interface ReserveInput {
     sessionId?: string | null;
   };
   userId?: string | null;
+  /** The grant this hold takes a use of; the caller decided it applies. */
+  grantId?: string | null;
   ttlMinutes?: number;
 }
 
@@ -94,19 +102,33 @@ async function holdInventoryInTx(
   return rows[0]?.granted ?? 0;
 }
 
+/** Thrown inside `reserve`'s transaction so a refused grant takes nothing. */
+export class GrantRefusedError extends Error {
+  constructor(public readonly refusal: CodeRefusal) {
+    super(`Grant refused the hold: ${refusal.type}`);
+    this.name = 'GrantRefusedError';
+  }
+}
+
 /**
- * Purely the inventory hold — sale-window, per-user-cap, and gating rules are
- * the caller's job.
+ * The inventory hold, plus the grant's use when `grantId` is set — sale-window,
+ * per-user-cap, and gating rules are the caller's job.
  */
 export async function reserve(
   prisma: PrismaClient,
   input: ReserveInput
 ): Promise<ReserveResult> {
   const ttlMinutes = input.ttlMinutes ?? DEFAULT_TTL_MINUTES;
-  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + ttlMinutes * 60_000);
   const reservationId = generateId();
 
   return prisma.$transaction(async (tx) => {
+    if (input.grantId) {
+      const refusal = await takeGrantUseInTx(tx, input.grantId, now);
+      if (refusal) throw new GrantRefusedError(refusal);
+    }
+
     const grantedItems: ReserveGrantedItem[] = [];
     const itemRows: Prisma.ReservationItemCreateManyReservationInput[] = [];
     let subtotalCents = 0;
@@ -156,6 +178,7 @@ export async function reserve(
         totalCents,
         event: { connect: { id: input.eventId } },
         ...(input.userId ? { user: { connect: { id: input.userId } } } : {}),
+        ...(input.grantId ? { grant: { connect: { id: input.grantId } } } : {}),
         items: { createMany: { data: itemRows } },
       },
     });
@@ -183,15 +206,23 @@ export type PricedTicketTypeRow = {
   isDraft: boolean;
 };
 
+/** The grant a hold applies under: the types it covers and its per-checkout cap. */
+export type ReserveGrant = {
+  ticketTypeIds: ReadonlySet<string>;
+  quantity: number | null;
+};
+
 /**
  * Prices come from the ticket type rows, never the client. Duplicate ids sum
  * before clamping (no cap stacking); sorted output gives deterministic lock
- * order.
+ * order. A grant's quantity replaces each covered type's own cap and bounds
+ * their total, filled in that sorted order.
  */
 export function deriveReserveItems(
   ticketTypes: PricedTicketTypeRow[],
   items: CreateReservationInput['items'],
-  now: Date
+  now: Date,
+  grant: ReserveGrant | null = null
 ): ReserveItemInput[] {
   const byId = new Map(ticketTypes.map((t) => [t.id, t]));
 
@@ -203,6 +234,8 @@ export function deriveReserveItems(
         Math.max(0, Math.floor(item.quantity))
     );
   }
+
+  let grantLeft = grant?.quantity ?? Infinity;
 
   return Array.from(totals)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -228,23 +261,60 @@ export function deriveReserveItems(
         ticketType.ticketingFees === 'PASS_TICKET_FEES'
           ? calculateFeesCents(unitPriceCents)
           : 0;
-      const quantity = Math.min(requested, ticketType.maxPurchasePerUser);
+      const covered = grant?.ticketTypeIds.has(ticketTypeId) ?? false;
+      if (!covered) {
+        const quantity = Math.min(requested, ticketType.maxPurchasePerUser);
+        return { ticketTypeId, quantity, unitPriceCents, feesCents };
+      }
+      const quantity = Math.min(
+        requested,
+        grant?.quantity ?? ticketType.maxPurchasePerUser,
+        grantLeft
+      );
+      grantLeft -= quantity;
       return { ticketTypeId, quantity, unitPriceCents, feesCents };
     });
 }
 
-/** `userId` comes from the actor, never the client. */
+/**
+ * `userId` comes from the actor, never the client. The code's grant applies
+ * only when the order includes a type it lists; then it opens those types if
+ * hidden, caps them, and takes a use with the hold.
+ */
 export async function createReservation(
   prisma: PrismaClient,
   input: CreateReservationInput,
   userId: string | null
 ): Promise<CreateReservationResponse> {
+  const code = normalizeAccessCode(input.accessCode);
+  const found =
+    code === null
+      ? null
+      : await prisma.grant.findUnique({
+          where: { eventId_code: { eventId: input.eventId, code } },
+          select: {
+            id: true,
+            quantity: true,
+            ticketTypes: { select: { ticketTypeId: true } },
+          },
+        });
+  const grantTypeIds = new Set(
+    found?.ticketTypes.map((t) => t.ticketTypeId) ?? []
+  );
   const ticketTypeIds = input.items.map((i) => i.ticketTypeId);
+  const grant =
+    found && ticketTypeIds.some((id) => grantTypeIds.has(id))
+      ? { id: found.id, ticketTypeIds: grantTypeIds, quantity: found.quantity }
+      : null;
+
   const ticketTypes = await prisma.ticketTypes.findMany({
     where: {
       id: { in: ticketTypeIds },
       eventId: input.eventId,
-      ...accessibleTicketTypesWhere(input.accessCode),
+      OR: [
+        { hidden: false },
+        ...(grant ? [{ id: { in: Array.from(grant.ticketTypeIds) } }] : []),
+      ],
     },
     select: {
       id: true,
@@ -272,18 +342,27 @@ export async function createReservation(
   const reserveItems = deriveReserveItems(
     pricedTicketTypes,
     input.items,
-    new Date()
+    new Date(),
+    grant
   );
 
-  const result = await reserve(prisma, {
-    eventId: input.eventId,
-    items: reserveItems,
-    contact: input.contact,
-    analytics: input.analytics,
-    userId,
-  });
+  let result: ReserveResult;
+  try {
+    result = await reserve(prisma, {
+      eventId: input.eventId,
+      items: reserveItems,
+      contact: input.contact,
+      analytics: input.analytics,
+      userId,
+      grantId: grant?.id ?? null,
+    });
+  } catch (err) {
+    if (err instanceof GrantRefusedError) return err.refusal;
+    throw err;
+  }
 
   return {
+    type: 'held',
     reservationId: result.reservationId,
     items: result.items,
     totalCents: result.totalCents,
@@ -493,8 +572,15 @@ export async function settle(
       }
 
       if (reservation.status !== ReservationStatus.HELD) {
-        // EXPIRED / RELEASED — re-acquire the exact quantities; any shortfall
-        // throws to roll back the whole re-acquire and signal a refund.
+        // EXPIRED / RELEASED — re-acquire the grant's use and the exact
+        // quantities; any shortfall throws to roll back the whole re-acquire
+        // and signal a refund.
+        if (
+          reservation.grantId &&
+          !(await retakeGrantUseInTx(tx, reservation.grantId))
+        ) {
+          throw new NeedsRefundError();
+        }
         for (const item of reservation.items) {
           const granted = await holdInventoryInTx(
             tx,
@@ -625,12 +711,20 @@ async function releaseHeldInTx(
   reservationId: string,
   toStatus: ReservationStatus
 ): Promise<boolean> {
-  const reservation = await tx.reservation.findUnique({
+  // The conditional transition locks the row, so a client release racing the
+  // sweep returns inventory and the grant's use once, not twice.
+  const { count } = await tx.reservation.updateMany({
+    where: { id: reservationId, status: ReservationStatus.HELD },
+    data: { status: toStatus },
+  });
+  if (count === 0) return false;
+
+  const reservation = await tx.reservation.findUniqueOrThrow({
     where: { id: reservationId },
     include: { items: true },
   });
-  if (!reservation || reservation.status !== ReservationStatus.HELD) {
-    return false;
+  if (reservation.grantId) {
+    await returnGrantUseInTx(tx, reservation.grantId);
   }
   for (const item of reservation.items) {
     await tx.ticketTypes.update({
@@ -638,10 +732,6 @@ async function releaseHeldInTx(
       data: { reserved: { decrement: item.quantity } },
     });
   }
-  await tx.reservation.update({
-    where: { id: reservationId },
-    data: { status: toStatus },
-  });
   return true;
 }
 

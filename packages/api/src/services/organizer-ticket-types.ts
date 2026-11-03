@@ -7,6 +7,10 @@ import type {
   TicketTypesView,
   ViewAsInput,
 } from '../contracts/organizer';
+import {
+  legacyAccessCodeOf,
+  legacyAccessCodeSelect,
+} from './_shared/access-code';
 import { NotFoundError } from './_shared/errors';
 import { calculateFeesCents } from './_shared/fees';
 import { toCents } from './_shared/organizerMapping';
@@ -51,7 +55,7 @@ export async function listTicketTypes(
             saleStartsAt: true,
             saleEndsAt: true,
             ticketingFees: true,
-            accessCode: true,
+            grants: legacyAccessCodeSelect,
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -94,7 +98,7 @@ function buildTicketTypes(
     saleStartsAt: Date;
     saleEndsAt: Date;
     ticketingFees: TicketFeeStructure;
-    accessCode: string | null;
+    grants: { grant: { code: string } }[];
   }[],
   rollups: TicketTypeRollupRow[],
   now: Date
@@ -119,7 +123,7 @@ function buildTicketTypes(
       description: ticketType.description,
       maxPurchasePerUser: ticketType.maxPurchasePerUser,
       ticketingFees: ticketType.ticketingFees,
-      accessCode: ticketType.accessCode,
+      accessCode: legacyAccessCodeOf(ticketType),
     };
   });
 }

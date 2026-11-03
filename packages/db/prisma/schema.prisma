@@ -374,6 +374,7 @@ model Events {
   ticketTypes  TicketTypes[]
   orders       Orders[]
   reservations Reservation[]
+  grants       Grant[]
 
   organization Organization @relation(fields: [organizationId], references: [id])
   spotlight    Spotlight[]
@@ -411,11 +412,14 @@ model TicketTypes {
   priceCents    Int?
   ticketingFees TicketFeeStructure @default(PASS_TICKET_FEES)
 
+  // Kept off the public event page; only a Grant listing it can sell it.
+  hidden Boolean @default(false)
+
   event            Events            @relation(fields: [eventId], references: [id])
   eventId          String
-  accessCode       String?
   tickets          Tickets[]
   reservationItems ReservationItem[]
+  grants           GrantTicketType[]
 
   @@index([eventId])
 }
@@ -453,10 +457,14 @@ model Reservation {
   userId  String?
   order   Orders?           @relation(fields: [orderId], references: [id])
   orderId String?           @unique
+  // The grant whose use this hold took; released with the hold (ADR 0037).
+  grant   Grant?            @relation(fields: [grantId], references: [id])
+  grantId String?
 
   @@index([eventId])
   @@index([status])
   @@index([expiresAt])
+  @@index([grantId])
 }
 
 model ReservationItem {
@@ -470,6 +478,47 @@ model ReservationItem {
   feesCents      Int         @default(0)
 
   @@index([reservationId])
+  @@index([ticketTypeId])
+}
+
+// A right to buy the listed ticket types, carried to a person by its code
+// (ADR 0037). State is derived from these columns, never stored. `usedCount`
+// is held like inventory: taken at hold, returned on release or expiry. The
+// migration adds CHECKs (usedCount within 0..maxUses, positive caps).
+model Grant {
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  // Stored trimmed and uppercased; unique within the event.
+  code        String
+  maxUses     Int?
+  usedCount   Int       @default(0)
+  // Most tickets one checkout may take across the listed ticket types; beats
+  // each type's maxPurchasePerUser. Null leaves the type's own cap.
+  quantity    Int?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  // Recorded and prefilled, not enforced until sign-in at checkout.
+  holderEmail String?
+  holderName  String?
+  sentAt      DateTime?
+
+  event        Events            @relation(fields: [eventId], references: [id])
+  eventId      String
+  ticketTypes  GrantTicketType[]
+  reservations Reservation[]
+
+  // The leading column serves bare eventId lookups — no separate index.
+  @@unique([eventId, code])
+}
+
+model GrantTicketType {
+  grant        Grant       @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  grantId      String
+  ticketType   TicketTypes @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  ticketTypeId String
+
+  @@id([grantId, ticketTypeId])
   @@index([ticketTypeId])
 }
 

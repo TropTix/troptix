@@ -13,6 +13,7 @@ import { generateId } from './_shared/ids';
 import { NotFoundError } from './_shared/errors';
 import { assertPaidTicketingAllowed } from './_shared/paid-ticketing';
 import { ticketTypeWriteFields } from './_shared/ticket-type-fields';
+import { writeLegacyAccessCode } from './_shared/access-code';
 import {
   eventsInScope,
   resolveOrganizerScope,
@@ -47,13 +48,22 @@ export async function createEvent(
     });
 
     if (ticketTypes.length > 0) {
-      await tx.ticketTypes.createMany({
-        data: ticketTypes.map((ticketType) => ({
-          id: generateId(),
-          eventId,
-          ...ticketTypeWriteFields(ticketType),
-        })),
-      });
+      const rows = ticketTypes.map((ticketType) => ({
+        id: generateId(),
+        eventId,
+        ...ticketTypeWriteFields(ticketType),
+      }));
+      await tx.ticketTypes.createMany({ data: rows });
+      for (let i = 0; i < rows.length; i++) {
+        if (ticketTypes[i].accessCode) {
+          await writeLegacyAccessCode(
+            tx,
+            eventId,
+            rows[i].id,
+            ticketTypes[i].accessCode
+          );
+        }
+      }
     }
   });
 

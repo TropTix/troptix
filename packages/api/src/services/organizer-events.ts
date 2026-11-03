@@ -11,6 +11,10 @@ import {
   organizationInScope,
   resolveOrganizerScope,
 } from './organizer-scope';
+import {
+  legacyAccessCodeOf,
+  legacyAccessCodeSelect,
+} from './_shared/access-code';
 
 export async function listOrganizerEvents(
   prisma: PrismaClient,
@@ -80,7 +84,7 @@ export async function getEventForEdit(
             saleStartsAt: true,
             saleEndsAt: true,
             ticketingFees: true,
-            accessCode: true,
+            grants: legacyAccessCodeSelect,
           },
         },
       },
@@ -90,7 +94,16 @@ export async function getEventForEdit(
       select: { displayName: true, paidTicketingEnabled: true },
     }),
   ]);
-  return { event, organization };
+  return {
+    event: event && {
+      ...event,
+      ticketTypes: event.ticketTypes.map(({ grants, ...ticketType }) => ({
+        ...ticketType,
+        accessCode: legacyAccessCodeOf({ grants }),
+      })),
+    },
+    organization,
+  };
 }
 
 export async function listEventAttendees(
