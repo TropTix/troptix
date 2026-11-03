@@ -87,7 +87,7 @@ export async function writeLegacyAccessCode(
   raw: string | null | undefined
 ): Promise<void> {
   const code = normalizeAccessCode(raw);
-  await tx.grantTicketType.deleteMany({
+  const unlinked = await tx.grantTicketType.deleteMany({
     where: {
       ticketTypeId,
       grant: {
@@ -100,11 +100,21 @@ export async function writeLegacyAccessCode(
       },
     },
   });
+  if (code === null) {
+    // A type hidden with the toggle and sold only by invitation has no legacy
+    // code to clear; an empty field must not put it on public sale.
+    if (unlinked.count > 0) {
+      await tx.ticketTypes.update({
+        where: { id: ticketTypeId },
+        data: { hidden: false },
+      });
+    }
+    return;
+  }
   await tx.ticketTypes.update({
     where: { id: ticketTypeId },
-    data: { hidden: code !== null },
+    data: { hidden: true },
   });
-  if (code === null) return;
 
   const grant = await tx.grant.upsert({
     where: { eventId_code: { eventId, code } },

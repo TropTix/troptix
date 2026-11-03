@@ -157,7 +157,7 @@ describe('createTicketType', () => {
       priceCents: 2550,
       price: 25.5,
     });
-    expect(ticketTypesUpdate.mock.calls[0][0].data).toEqual({ hidden: false });
+    expect(ticketTypesUpdate).not.toHaveBeenCalled();
     expect(grantUpsert).not.toHaveBeenCalled();
   });
 });

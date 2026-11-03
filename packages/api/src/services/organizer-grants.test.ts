@@ -311,7 +311,7 @@ describe('ticket types alongside grants', () => {
     expect(after.grants.map((g) => g.grant.code)).toEqual(['TABLES']);
   });
 
-  it('never moves a type off an invitation through the old code field', async () => {
+  it('never moves a type off an invitation, nor unhides it, through the old code field', async () => {
     const { ticketTypeId } = await createTicketType(prisma, OWNER, EVENT_ID, {
       ...form,
       hidden: true,
@@ -333,5 +333,12 @@ describe('ticket types alongside grants', () => {
       include: { grant: true },
     });
     expect(links.map((l) => l.grant.code)).toEqual([code]);
+    expect(
+      (
+        await prisma.ticketTypes.findUniqueOrThrow({
+          where: { id: ticketTypeId },
+        })
+      ).hidden
+    ).toBe(true);
   });
 });
