@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 
@@ -14,8 +14,8 @@ function resolveNext(next: string | null, origin: string): string {
   }
 }
 
-export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+export async function GET(request: NextRequest) {
+  const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get('code');
   const tokenHash = searchParams.get('token_hash');
   const type = searchParams.get('type') as EmailOtpType | null;
@@ -40,7 +40,5 @@ export async function GET(request: Request) {
   if (!failed) {
     return NextResponse.redirect(resolveNext(next, origin));
   }
-  return NextResponse.redirect(
-    new URL('/auth/signin?error=auth', origin).toString()
-  );
+  return NextResponse.redirect(`${origin}/auth/signin?error=auth`);
 }
