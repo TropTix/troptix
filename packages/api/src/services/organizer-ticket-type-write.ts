@@ -42,7 +42,9 @@ export async function createTicketType(
     await tx.ticketTypes.create({
       data: { id: ticketTypeId, eventId, ...ticketTypeWriteFields(data) },
     });
-    await writeLegacyAccessCode(tx, eventId, ticketTypeId, data.accessCode);
+    if (data.hidden === undefined) {
+      await writeLegacyAccessCode(tx, eventId, ticketTypeId, data.accessCode);
+    }
   });
 
   return { ticketTypeId };
@@ -87,6 +89,8 @@ export async function updateTicketType(
       where: { id: ticketTypeId },
       data: ticketTypeWriteFields(data),
     });
-    await writeLegacyAccessCode(tx, eventId, ticketTypeId, data.accessCode);
+    if (data.hidden === undefined) {
+      await writeLegacyAccessCode(tx, eventId, ticketTypeId, data.accessCode);
+    }
   });
 }

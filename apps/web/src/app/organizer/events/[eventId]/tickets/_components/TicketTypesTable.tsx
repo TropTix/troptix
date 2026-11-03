@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, Copy, Link2, Lock, Pencil, Search } from 'lucide-react';
+import { Check, Copy, EyeOff, Link2, Lock, Pencil, Search } from 'lucide-react';
 import type { SaleState, TicketTypeRow } from '@troptix/api';
 
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { formatPriceCents, getDateFormatter } from '@/lib/dateUtils';
+import { cn } from '@/lib/utils';
 
 const SALE_STATE: Record<
   SaleState,
@@ -44,6 +45,24 @@ function AccessCodeTag({ code }: { code: string }) {
       <Lock className="h-3 w-3" aria-hidden />
       <span className="sr-only">Access code</span>
       <span className="font-mono tracking-wide">{code}</span>
+    </span>
+  );
+}
+
+/** The type's code if it has one, else whether it is hidden and still sellable. */
+function VisibilityTag({ ticketType }: { ticketType: TicketTypeRow }) {
+  if (ticketType.accessCode)
+    return <AccessCodeTag code={ticketType.accessCode} />;
+  if (!ticketType.hidden) return null;
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 text-xs',
+        ticketType.hasActiveCode ? 'text-muted-foreground' : 'text-amber-600'
+      )}
+    >
+      <EyeOff className="h-3 w-3" aria-hidden />
+      {ticketType.hasActiveCode ? 'Hidden' : 'Hidden, no active code'}
     </span>
   );
 }
@@ -158,9 +177,7 @@ export function TicketTypesTable({
                       </span>
                       <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                         {formatPriceCents(ticketType.displayPriceCents)}
-                        {ticketType.accessCode && (
-                          <AccessCodeTag code={ticketType.accessCode} />
-                        )}
+                        <VisibilityTag ticketType={ticketType} />
                       </span>
                     </div>
                     <SaleStateBadge state={ticketType.saleState} />
@@ -209,9 +226,7 @@ export function TicketTypesTable({
                           <span className="block truncate font-medium">
                             {ticketType.name}
                           </span>
-                          {ticketType.accessCode && (
-                            <AccessCodeTag code={ticketType.accessCode} />
-                          )}
+                          <VisibilityTag ticketType={ticketType} />
                         </button>
                       </TableCell>
                       <TableCell>

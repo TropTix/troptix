@@ -104,6 +104,7 @@ function toServiceInput(data: TicketTypeFormValues) {
     saleEndsAt: data.saleEndsAt,
     ticketingFees: data.ticketingFees,
     accessCode: data.accessCode,
+    hidden: data.hidden,
   };
 }
 

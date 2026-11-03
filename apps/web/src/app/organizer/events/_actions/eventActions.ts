@@ -53,6 +53,7 @@ export async function createEvent(
         saleStartsAt: ticket.saleStartsAt,
         saleEndsAt: ticket.saleEndsAt,
         ticketingFees: ticket.ticketingFees,
+        hidden: ticket.hidden,
       })),
     });
 

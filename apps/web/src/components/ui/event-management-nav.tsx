@@ -9,8 +9,11 @@ import {
   Users,
   ClipboardList,
   LayoutDashboard,
+  KeyRound,
   Pencil,
 } from 'lucide-react';
+import { FeatureFlag } from '@troptix/api';
+import { useFeatureFlagAfterMount } from '@/hooks/useFeatureFlagAfterMount';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
@@ -31,6 +34,7 @@ export function EventManagementNav({
   const withScope = (href: string) =>
     viewAs ? `${href}?viewAs=${encodeURIComponent(viewAs)}` : href;
   const router = useRouter();
+  const guestAccess = useFeatureFlagAfterMount(FeatureFlag.GUEST_ACCESS);
   const [isPublished, setIsPublished] = useState(!isDraft);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -98,6 +102,15 @@ export function EventManagementNav({
       href: `/organizer/events/${eventId}/tickets`,
       icon: Ticket,
     },
+    ...(guestAccess === true
+      ? [
+          {
+            name: 'Access codes',
+            href: `/organizer/events/${eventId}/access-codes`,
+            icon: KeyRound,
+          },
+        ]
+      : []),
     {
       name: 'Attendees',
       href: `/organizer/events/${eventId}/attendees`,

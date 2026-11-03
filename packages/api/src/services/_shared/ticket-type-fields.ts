@@ -13,5 +13,6 @@ export function ticketTypeWriteFields(input: TicketTypeInput) {
     saleStartsAt: input.saleStartsAt,
     saleEndsAt: input.saleEndsAt,
     ticketingFees: input.ticketingFees,
+    ...(input.hidden === undefined ? {} : { hidden: input.hidden }),
   };
 }

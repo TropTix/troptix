@@ -13,7 +13,7 @@ import {
 } from './organizer-scope';
 import {
   legacyAccessCodeOf,
-  legacyAccessCodeSelect,
+  ticketTypeGrantsSelect,
 } from './_shared/access-code';
 
 export async function listOrganizerEvents(
@@ -84,7 +84,7 @@ export async function getEventForEdit(
             saleStartsAt: true,
             saleEndsAt: true,
             ticketingFees: true,
-            grants: legacyAccessCodeSelect,
+            grants: ticketTypeGrantsSelect,
           },
         },
       },
@@ -99,7 +99,7 @@ export async function getEventForEdit(
       ...event,
       ticketTypes: event.ticketTypes.map(({ grants, ...ticketType }) => ({
         ...ticketType,
-        accessCode: legacyAccessCodeOf({ grants }),
+        accessCode: legacyAccessCodeOf(grants),
       })),
     },
     organization,

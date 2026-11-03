@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import type { Prisma } from '@troptix/db';
 import { generateId } from './ids';
 
@@ -8,27 +9,76 @@ export function normalizeAccessCode(
   return code === '' ? null : code;
 }
 
-/**
- * The ticket type form's single code field, read and written through grants
- * until the Access codes page replaces it (guest access plan, decision 19).
- */
-export const legacyAccessCodeSelect = {
-  where: { grant: { revokedAt: null } },
-  select: { grant: { select: { code: true } } },
-  orderBy: { grant: { createdAt: 'asc' } },
-  take: 1,
-} satisfies Prisma.TicketTypes$grantsArgs;
+// No 0/O or 1/I, so a code read aloud or off a screen survives.
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-export function legacyAccessCodeOf(ticketType: {
-  grants: { grant: { code: string } }[];
-}): string | null {
-  return ticketType.grants[0]?.grant.code ?? null;
+export function generateAccessCode(): string {
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  }
+  return code;
 }
 
 /**
- * Mirrors the old column: the type sits on exactly the unlimited grant for
+ * Enough of each grant on a ticket type to answer the ticket type list's two
+ * questions: which code the form edits, and whether any code still works.
+ */
+export const ticketTypeGrantsSelect = {
+  select: {
+    grant: {
+      select: {
+        code: true,
+        createdAt: true,
+        maxUses: true,
+        usedCount: true,
+        quantity: true,
+        expiresAt: true,
+        revokedAt: true,
+        holderEmail: true,
+      },
+    },
+  },
+} satisfies Prisma.TicketTypes$grantsArgs;
+
+type TicketTypeGrant = {
+  grant: {
+    code: string;
+    createdAt: Date;
+    maxUses: number | null;
+    usedCount: number;
+    quantity: number | null;
+    expiresAt: Date | null;
+    revokedAt: Date | null;
+    holderEmail: string | null;
+  };
+};
+
+/**
+ * The ticket type form's single code field (guest access plan, decision 19):
+ * the oldest grant shaped like the old column — unlimited, no cap, no expiry,
+ * no holder, not revoked. An invitation is never the type's code.
+ */
+export function legacyAccessCodeOf(grants: TicketTypeGrant[]): string | null {
+  const legacy = grants
+    .map(({ grant }) => grant)
+    .filter(
+      (g) =>
+        g.revokedAt === null &&
+        g.maxUses === null &&
+        g.quantity === null &&
+        g.expiresAt === null &&
+        g.holderEmail === null
+    )
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  return legacy[0]?.code ?? null;
+}
+
+/**
+ * Mirrors the old column: the type sits on exactly one unlimited grant for
  * its code, or on none and public. Moves join rows, which a grant otherwise
- * never allows, so it must not outlive the form field.
+ * never allows, so it touches only legacy-shaped grants and must not outlive
+ * the form field.
  */
 export async function writeLegacyAccessCode(
   tx: Prisma.TransactionClient,
@@ -40,7 +90,14 @@ export async function writeLegacyAccessCode(
   await tx.grantTicketType.deleteMany({
     where: {
       ticketTypeId,
-      ...(code === null ? {} : { grant: { code: { not: code } } }),
+      grant: {
+        maxUses: null,
+        quantity: null,
+        expiresAt: null,
+        holderEmail: null,
+        revokedAt: null,
+        ...(code === null ? {} : { code: { not: code } }),
+      },
     },
   });
   await tx.ticketTypes.update({
