@@ -7,6 +7,15 @@ import type { EmailOrder } from '../emails/EmailConfirmation';
 
 const DEFAULT_DURATION_MS = 2 * 60 * 60 * 1000;
 
+const ISO_SEPARATORS = /[-:]/g;
+const ISO_MILLISECONDS = /\.\d{3}/;
+const BACKSLASHES = /\\/g;
+const SEMICOLONS = /;/g;
+const COMMAS = /,/g;
+const LINE_BREAKS = /\r?\n/g;
+const NON_ALPHANUMERIC_RUN = /[^a-z0-9]+/g;
+const EDGE_HYPHENS = /^-+|-+$/g;
+
 function eventEnd(event: EmailOrder['event']): Date {
   if (event.endsAt) return new Date(event.endsAt);
   return new Date(new Date(event.startsAt).getTime() + DEFAULT_DURATION_MS);
@@ -16,17 +25,17 @@ function eventEnd(event: EmailOrder['event']): Date {
 function toIcsUtc(date: Date): string {
   return new Date(date)
     .toISOString()
-    .replace(/[-:]/g, '')
-    .replace(/\.\d{3}/, '');
+    .replace(ISO_SEPARATORS, '')
+    .replace(ISO_MILLISECONDS, '');
 }
 
 /** Escape a value for an ICS TEXT field (RFC 5545 §3.3.11). */
 function escapeIcsText(value: string): string {
   return value
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
+    .replace(BACKSLASHES, '\\\\')
+    .replace(SEMICOLONS, '\\;')
+    .replace(COMMAS, '\\,')
+    .replace(LINE_BREAKS, '\\n');
 }
 
 /** Fold a content line to the 75-octet limit (RFC 5545 §3.1). */
@@ -89,8 +98,8 @@ export function buildCalendarLinks(
 export function calendarFileName(order: EmailOrder): string {
   const slug = order.event.name
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(NON_ALPHANUMERIC_RUN, '-')
+    .replace(EDGE_HYPHENS, '');
   return `${slug || 'event'}.ics`;
 }
 
