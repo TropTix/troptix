@@ -18,7 +18,10 @@ import {
   resolveOrganizerScope,
   type OrganizerScope,
 } from './organizer-scope';
-import { ensureOrganizationForUser } from './organizations';
+import {
+  OWNED_ORGANIZATION_SELECT,
+  ensureOrganizationForUser,
+} from './organizations';
 
 export async function createEvent(
   prisma: PrismaClient,
@@ -44,6 +47,7 @@ export async function createEvent(
         organizer: org.displayName,
         ...eventFields(data),
       },
+      select: { id: true },
     });
 
     if (ticketTypes.length > 0) {
@@ -80,6 +84,7 @@ export async function updateEvent(
   await prisma.events.update({
     where: { id: eventId },
     data: { organizer: event.organization.displayName, ...eventFields(data) },
+    select: { id: true },
   });
 
   return { organizationSlug: event.organization.slug };
@@ -92,6 +97,7 @@ async function resolveOrganization(
   if (scope.organizationId) {
     const org = await prisma.organization.findUnique({
       where: { id: scope.organizationId },
+      select: OWNED_ORGANIZATION_SELECT,
     });
     if (org) return org;
   }

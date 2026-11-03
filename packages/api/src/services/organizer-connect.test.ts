@@ -217,12 +217,14 @@ describe('startStripeOnboarding', () => {
       baseUrl: BASE,
     });
 
-    expect(create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        ownerUserId: 'owner-1',
-        displayName: 'owner@example.test',
-      }),
-    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ownerUserId: 'owner-1',
+          displayName: 'owner@example.test',
+        }),
+      })
+    );
     expect(calls.create[0].params).toMatchObject({
       metadata: { organizationId: 'org-new' },
     });
@@ -364,6 +366,7 @@ describe('finishStripeOnboardingReturn', () => {
     expect(update).toHaveBeenCalledWith({
       where: { id: 'org-1' },
       data: { stripeTransfersStatus: 'active' },
+      select: { id: true },
     });
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: 'org-1', payoutBankLinkedAt: null },
@@ -385,6 +388,7 @@ describe('finishStripeOnboardingReturn', () => {
     expect(update).toHaveBeenCalledWith({
       where: { id: 'org-1' },
       data: { stripeTransfersStatus: status },
+      select: { id: true },
     });
     expect(updateMany).not.toHaveBeenCalled();
   });
@@ -398,6 +402,7 @@ describe('finishStripeOnboardingReturn', () => {
     expect(update).toHaveBeenCalledWith({
       where: { id: 'org-1' },
       data: { stripeTransfersStatus: null },
+      select: { id: true },
     });
   });
 
