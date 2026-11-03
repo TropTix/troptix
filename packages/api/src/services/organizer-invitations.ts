@@ -22,6 +22,8 @@ import { generateId } from './_shared/ids';
 import { eventsInScope, resolveOrganizerScope } from './organizer-scope';
 
 const DAY_MS = 86_400_000;
+// A batch can wait on another batch's lock; Prisma's 5s default is too short.
+const LOCKED_TX = { maxWait: 10_000, timeout: 20_000 };
 
 /** What the transport needs to send one invitation. */
 export type InvitationToSend = {
@@ -86,16 +88,27 @@ function assertMaySend(event: EventForInvite) {
 }
 
 /**
- * Serializes sends per organization so two batches cannot both pass the
- * daily cap, then counts the last 24 hours across its events.
+ * Serializes invitation writes per organization, so two batches can neither
+ * both pass the daily cap nor both invite the same address.
  */
-async function reserveSendsInTx(
+async function lockInvitesInTx(
+  tx: Prisma.TransactionClient,
+  organizationId: string
+) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`invite-sends:${organizationId}`}))`;
+}
+
+/**
+ * Counts invitations stamped in the last 24 hours across the organization's
+ * events. A resend restamps a grant, so it may happen once a day per grant;
+ * otherwise a resend would send without being counted.
+ */
+async function assertSendQuotaInTx(
   tx: Prisma.TransactionClient,
   organizationId: string,
   count: number,
   now: Date
 ) {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`invite-sends:${organizationId}`}))`;
   const sent = await tx.grant.count({
     where: {
       sentAt: { gt: new Date(now.getTime() - DAY_MS) },
@@ -186,6 +199,7 @@ export async function inviteGuests(
   }
 
   return prisma.$transaction(async (tx) => {
+    await lockInvitesInTx(tx, event.organization.id);
     const existing = await tx.grant.findMany({
       where: { eventId, holderEmail: { in: unique }, revokedAt: null },
       select: {
@@ -196,11 +210,10 @@ export async function inviteGuests(
         revokedAt: true,
       },
     });
+    // Only an active invitation can be resent, so only one blocks a new one.
     const invited = new Set(
       existing
-        .filter((g) =>
-          ['active', 'inUse'].includes(deriveGrantState(g, true, now))
-        )
+        .filter((g) => deriveGrantState(g, false, now) === 'active')
         .map((g) => g.holderEmail)
     );
     const fresh = unique.filter((email) => {
@@ -211,7 +224,7 @@ export async function inviteGuests(
     if (fresh.length === 0) return { created: [], skipped, toSend: [] };
 
     if (data.send) {
-      await reserveSendsInTx(tx, event.organization.id, fresh.length, now);
+      await assertSendQuotaInTx(tx, event.organization.id, fresh.length, now);
     }
 
     const codes = await freshCodes(tx, eventId, fresh.length);
@@ -241,7 +254,7 @@ export async function inviteGuests(
       skipped,
       toSend: data.send ? grants.map((g) => toSend(event, g, now, null)) : [],
     };
-  });
+  }, LOCKED_TX);
 }
 
 /** Same code again; offered only while the grant is active (plan decision 23). */
@@ -256,6 +269,7 @@ export async function resendInvitation(
   assertMaySend(event);
 
   return prisma.$transaction(async (tx) => {
+    await lockInvitesInTx(tx, event.organization.id);
     const grant = await tx.grant.findFirst({
       where: { id: grantId, eventId },
       select: {
@@ -279,7 +293,12 @@ export async function resendInvitation(
       );
     }
 
-    await reserveSendsInTx(tx, event.organization.id, 1, now);
+    if (grant.sentAt && now.getTime() - grant.sentAt.getTime() < DAY_MS) {
+      throw new ConflictError(
+        'This invitation was sent less than a day ago. Try again tomorrow.'
+      );
+    }
+    await assertSendQuotaInTx(tx, event.organization.id, 1, now);
     await tx.grant.update({ where: { id: grant.id }, data: { sentAt: now } });
     return toSend(
       event,
@@ -287,7 +306,7 @@ export async function resendInvitation(
       now,
       grant.sentAt
     );
-  });
+  }, LOCKED_TX);
 }
 
 /**

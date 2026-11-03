@@ -173,6 +173,26 @@ describe('inviteGuests', () => {
     expect(again.created.map((c) => c.email)).toEqual(['cy@example.com']);
   });
 
+  it('re-invites an address whose invitation is used up, since it cannot be resent', async () => {
+    const first = await inviteGuests(
+      prisma,
+      OWNER,
+      EVENT_ID,
+      batch(['ana@example.com'])
+    );
+    await prisma.grant.update({
+      where: { id: first.created[0].grantId },
+      data: { usedCount: 1 },
+    });
+    const again = await inviteGuests(
+      prisma,
+      OWNER,
+      EVENT_ID,
+      batch(['ana@example.com'])
+    );
+    expect(again.created).toHaveLength(1);
+  });
+
   it('re-invites an address whose invitation was revoked', async () => {
     const first = await inviteGuests(
       prisma,
@@ -274,6 +294,8 @@ describe('inviteGuests', () => {
   });
 });
 
+const inTwoDays = () => new Date(Date.now() + 2 * DAY);
+
 describe('resendInvitation and releaseInvitationSend', () => {
   it('restamps an active invitation, and a failed send hands the stamp back', async () => {
     const { created } = await inviteGuests(
@@ -287,7 +309,7 @@ describe('resendInvitation and releaseInvitationSend', () => {
       await prisma.grant.findUniqueOrThrow({ where: { id: grantId } })
     ).sentAt;
 
-    const later = new Date(Date.now() + 60_000);
+    const later = new Date(Date.now() + DAY + 60_000);
     const resend = await resendInvitation(
       prisma,
       OWNER,
@@ -326,8 +348,20 @@ describe('resendInvitation and releaseInvitationSend', () => {
 
     await prisma.grant.update({ where: { id: grantId }, data: { maxUses: 2 } });
     await expect(
-      resendInvitation(prisma, OWNER, EVENT_ID, grantId)
+      resendInvitation(prisma, OWNER, EVENT_ID, grantId, inTwoDays())
     ).resolves.toMatchObject({ grantId });
+  });
+
+  it('resends a grant at most once a day, so resends stay inside the cap', async () => {
+    const { created } = await inviteGuests(
+      prisma,
+      OWNER,
+      EVENT_ID,
+      batch(['ana@example.com'])
+    );
+    await expect(
+      resendInvitation(prisma, OWNER, EVENT_ID, created[0].grantId)
+    ).rejects.toThrow(/less than a day ago/);
   });
 
   it('does not resend a code that has no holder', async () => {
