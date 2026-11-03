@@ -21,7 +21,8 @@ settles the model; this record keeps the decisions the code depends on.
 - **Visibility is its own flag.** `TicketTypes.hidden` keeps a type off the
   public event page. Nothing derives it from whether a grant exists.
 - **State is derived.** Revoked, then expired, then exhausted (in use while a
-  `HELD` reservation on the grant exists), else active. No status column.
+  `HELD` reservation on the grant is inside its window), else active. No
+  status column.
 - **A use is held like inventory.** The hold takes a use under the grant's
   row lock, in the same transaction as the inventory hold; release and expiry
   return it; conversion keeps it. `Reservation.grantId` records which grant a
@@ -58,8 +59,9 @@ settles the model; this record keeps the decisions the code depends on.
   field and writes through `writeLegacyAccessCode`, which moves a type
   between unlimited grants as the column did. It is the one writer allowed to
   change a grant's ticket types, and it goes with the field.
-- A grant's state for a guest depends on the sweep: an exhausted grant whose
-  only hold has lapsed reads `inUse` until the sweep expires that hold.
+- `inUse` counts only holds still inside their window. An exhausted grant
+  whose only hold has lapsed reads `unavailable` until the sweep returns the
+  use; the sweep, not the read, is what frees it.
 - Apply-code returns the holder's email for the contact step to prefill. Who
   holds a code can read the address it was sent to, so a guessed code now
   reveals an address as well as a ticket type. Generated codes have 40 bits;

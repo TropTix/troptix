@@ -18,9 +18,9 @@ export interface GrantStateFields {
 type Db = Prisma.TransactionClient;
 
 /**
- * Derived, never stored (ADR 0037). An exhausted grant with a HELD hold reads
- * `inUse` even past the hold's expiry: until the sweep releases it, that hold
- * can still be paid, and "try again in a few minutes" is the true answer.
+ * Derived, never stored (ADR 0037). `inUse` needs a hold still inside its
+ * window; a hold past it reads `exhausted` until the sweep returns the use,
+ * so a stale hold cannot keep a code "in use" for good where no sweep runs.
  */
 export function deriveGrantState(
   grant: GrantStateFields,
@@ -43,7 +43,11 @@ export async function grantState(
   const state = deriveGrantState(grant, true, now);
   if (state !== 'inUse') return state;
   const held = await db.reservation.count({
-    where: { grantId: grant.id, status: ReservationStatus.HELD },
+    where: {
+      grantId: grant.id,
+      status: ReservationStatus.HELD,
+      expiresAt: { gt: now },
+    },
   });
   return deriveGrantState(grant, held > 0, now);
 }

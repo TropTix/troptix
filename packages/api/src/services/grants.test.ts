@@ -189,7 +189,7 @@ describe('hold under a grant', () => {
     expect(await reservedOf(tt.id)).toBe(0);
   });
 
-  it('reads unavailable once the use converts, and in use while it is held', async () => {
+  it('reads in use only while a live hold exists, and unavailable once the use converts', async () => {
     const tt = await ticketType();
     const g = await grant([tt.id], { maxUses: 1 });
     const res = held(await hold(g.code, [[tt.id, 1]]));
@@ -197,6 +197,14 @@ describe('hold under a grant', () => {
     expect(
       await applyCode(prisma, { eventId: EVENT_ID, code: g.code })
     ).toEqual({ type: 'inUse' });
+
+    await prisma.reservation.update({
+      where: { id: res.reservationId },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+    expect(
+      await applyCode(prisma, { eventId: EVENT_ID, code: g.code })
+    ).toEqual({ type: 'unavailable' });
 
     await prisma.reservation.update({
       where: { id: res.reservationId },
