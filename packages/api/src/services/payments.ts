@@ -81,7 +81,7 @@ export async function beginPayment(
     );
   }
 
-  const [ticketTypes, event] = await Promise.all([
+  const [ticketTypes, event, existing] = await Promise.all([
     prisma.ticketTypes.findMany({
       where: { id: { in: reservation.items.map((i) => i.ticketTypeId) } },
       select: { id: true, name: true },
@@ -90,6 +90,9 @@ export async function beginPayment(
       where: { id: reservation.eventId },
       select: { name: true },
     }),
+    reservation.stripeCheckoutSessionId
+      ? stripe.checkout.sessions.retrieve(reservation.stripeCheckoutSessionId)
+      : null,
   ]);
   const nameById = new Map(ticketTypes.map((t) => [t.id, t.name]));
   const summary = {
@@ -109,10 +112,7 @@ export async function beginPayment(
   const extendedExpiresAt = new Date(Date.now() + HOLD_TTL_MINUTES * 60_000);
 
   let staleSessionId: string | null = null;
-  if (reservation.stripeCheckoutSessionId) {
-    const existing = await stripe.checkout.sessions.retrieve(
-      reservation.stripeCheckoutSessionId
-    );
+  if (existing) {
     if (existing.status === 'open' && existing.client_secret) {
       await prisma.reservation.update({
         where: { id: reservation.id },
@@ -131,7 +131,7 @@ export async function beginPayment(
     }
     // Expired: mint a fresh Session — remember the dead id so the create's
     // key differs, else Stripe replays this dead Session.
-    staleSessionId = reservation.stripeCheckoutSessionId;
+    staleSessionId = existing.id;
   }
 
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
@@ -232,16 +232,19 @@ export async function confirmPaid(
   if (result.kind === 'converted') {
     // `alreadyProcessed` gates the capture to the first converter, so webhook
     // retries and racing polls can't double-count the conversion.
-    if (!result.alreadyProcessed && analytics) {
-      await captureOrderCompleted(
-        prisma,
-        analytics,
-        input.reservationId,
-        result.orderId,
-        input.fulfilledVia
-      );
-    }
-    return orderCheckoutState(prisma, result.orderId);
+    const [state] = await Promise.all([
+      orderCheckoutState(prisma, result.orderId),
+      !result.alreadyProcessed && analytics
+        ? captureOrderCompleted(
+            prisma,
+            analytics,
+            input.reservationId,
+            result.orderId,
+            input.fulfilledVia
+          )
+        : undefined,
+    ]);
+    return state;
   }
   if (result.kind === 'already_refunded') {
     return { kind: 'refunded' };

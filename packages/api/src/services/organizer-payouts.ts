@@ -276,19 +276,15 @@ export async function requestPayout(
   }
   if (!setup.termsAccepted) throw new PayoutTermsNotAcceptedError();
 
-  const open = await prisma.payoutRequest.count({
-    where: { organizationId: org.id, status: 'REQUESTED' },
-  });
+  const [open, balances] = await Promise.all([
+    prisma.payoutRequest.count({
+      where: { organizationId: org.id, status: 'REQUESTED' },
+    }),
+    computeBalances(prisma, org.id, resolvePayoutPolicy(org), now),
+  ]);
   if (open > 0) {
     throw new PayoutRequestPendingError();
   }
-
-  const balances = await computeBalances(
-    prisma,
-    org.id,
-    resolvePayoutPolicy(org),
-    now
-  );
   if (input.amountCents <= 0 || input.amountCents > balances.availableCents) {
     throw new InvalidPayoutAmountError(
       'Requested amount exceeds the available balance'

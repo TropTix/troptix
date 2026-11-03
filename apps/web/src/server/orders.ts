@@ -11,7 +11,7 @@ export interface EnrichedTicket extends PrismaTicket {
 }
 export interface EnrichedOrder extends PrismaOrder {
   event: PrismaEvent;
-  _count: { tickets: number };
+  tickets: EnrichedTicket[];
 }
 
 export async function getOrder(orderId: string): Promise<EnrichedOrder | null> {
@@ -20,23 +20,16 @@ export async function getOrder(orderId: string): Promise<EnrichedOrder | null> {
       where: { id: orderId },
       include: {
         event: true,
-        _count: { select: { tickets: true } },
+        tickets: {
+          include: { ticketType: true },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
   } catch (error) {
     console.error('Failed to fetch order:', error);
     return null;
   }
-}
-
-export async function getOrderTickets(
-  orderId: string
-): Promise<EnrichedTicket[]> {
-  return prisma.tickets.findMany({
-    where: { orderId },
-    include: { ticketType: true },
-    orderBy: { createdAt: 'asc' },
-  });
 }
 
 export interface ReceiptLine {

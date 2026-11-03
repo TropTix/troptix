@@ -28,12 +28,13 @@ export async function scanTicket(
   input: { ticketId: string; eventId: string }
 ): Promise<ScanTicketResult> {
   const scope = await resolveOrganizerScope(prisma, actor);
-  await requireOwnedEvent(prisma, scope, input.eventId);
-
-  const ticket = await prisma.tickets.findUnique({
-    where: { id: input.ticketId, eventId: input.eventId },
-    include: { ticketType: true },
-  });
+  const [, ticket] = await Promise.all([
+    requireOwnedEvent(prisma, scope, input.eventId),
+    prisma.tickets.findUnique({
+      where: { id: input.ticketId, eventId: input.eventId },
+      include: { ticketType: true },
+    }),
+  ]);
   if (!ticket) {
     return {
       ticketName: undefined,

@@ -43,33 +43,29 @@ export async function getEventOverview(
     input.viewAsOrganizerUserId
   );
 
-  const event = await prisma.events.findFirst({
-    where: { id: eventId, ...eventsInScope(scope) },
-    select: {
-      id: true,
-      name: true,
-      isDraft: true,
-      startsAt: true,
-      endsAt: true,
-      venue: true,
-      createdAt: true,
-      ticketTypes: {
-        select: { id: true, name: true, capacity: true, sold: true },
-      },
-    },
-  });
-
-  if (!event) {
-    throw new NotFoundError('Event not found');
-  }
-
   const startOfToday = startOfUtcDay(now);
   const earliest = addUtcDays(startOfToday, -(MAX_SERIES_DAYS - 1));
-  const created = startOfUtcDay(event.createdAt);
-  const seriesFrom = created > earliest ? created : earliest;
 
-  const [revenue, rollups, seriesRows, checkedIn, recentOrderRows] =
+  // The series is read from the window's start, not the event's creation:
+  // tickets can't predate the event, and the builder starts at `seriesFrom`.
+  const [event, revenue, rollups, seriesRows, checkedIn, recentOrderRows] =
     await Promise.all([
+      prisma.events.findFirst({
+        where: { id: eventId, ...eventsInScope(scope) },
+        select: {
+          id: true,
+          name: true,
+          isDraft: true,
+          startsAt: true,
+          endsAt: true,
+          venue: true,
+          createdAt: true,
+          ticketTypes: {
+            select: { id: true, name: true, capacity: true, sold: true },
+          },
+        },
+      }),
+
       prisma.orders.aggregate({
         _sum: { subtotal: true },
         _count: true,
@@ -89,7 +85,7 @@ export async function getEventOverview(
         JOIN "Orders" o ON o."id" = t."orderId"
         WHERE t."eventId" = ${eventId}
           AND o."status" = 'COMPLETED'
-          AND t."createdAt" >= ${seriesFrom}
+          AND t."createdAt" >= ${earliest}
         GROUP BY 1
         ORDER BY 1
       `,
@@ -106,6 +102,13 @@ export async function getEventOverview(
         recentOrdersQuery({ eventId, status: 'COMPLETED' })
       ),
     ]);
+
+  if (!event) {
+    throw new NotFoundError('Event not found');
+  }
+
+  const created = startOfUtcDay(event.createdAt);
+  const seriesFrom = created > earliest ? created : earliest;
 
   const revenueByType = revenueCentsByTicketType(rollups);
   const ticketTypes = event.ticketTypes.map((ticketType) =>
