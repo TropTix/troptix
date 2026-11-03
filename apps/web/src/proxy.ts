@@ -25,12 +25,12 @@ export async function proxy(req: NextRequest) {
   const isAuthenticated = Boolean(claims);
 
   if (isAuthPage && isAuthenticated) {
-    return redirectPreservingCookies(new URL('/', req.url), response);
+    return redirectPreservingCookies(`${req.nextUrl.origin}/`, response);
   }
 
   if (isProtected && !isAuthenticated) {
     return redirectPreservingCookies(
-      new URL('/auth/signin', req.url),
+      `${req.nextUrl.origin}/auth/signin`,
       response
     );
   }
@@ -38,7 +38,10 @@ export async function proxy(req: NextRequest) {
   return response;
 }
 
-function redirectPreservingCookies(url: URL, from: NextResponse): NextResponse {
+function redirectPreservingCookies(
+  url: string,
+  from: NextResponse
+): NextResponse {
   const redirect = NextResponse.redirect(url);
   from.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
   return redirect;

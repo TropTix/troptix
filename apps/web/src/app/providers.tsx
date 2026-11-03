@@ -36,6 +36,7 @@ const PRIVATE_PARAMS = ['reservation', 'code'];
 
 function stripPrivateParams(value: unknown): unknown {
   if (typeof value !== 'string') return value;
+  if (!PRIVATE_PARAMS.some((p) => value.includes(`${p}=`))) return value;
   try {
     const url = new URL(value);
     if (!PRIVATE_PARAMS.some((p) => url.searchParams.has(p))) return value;

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import type { ConnectReturnOutcome } from '@troptix/api';
 import { finishStripeOnboardingReturn } from '@troptix/api/server';
 import prisma from '@/server/prisma';
@@ -12,10 +12,11 @@ import { userToActor } from '@/server/actor';
  */
 export const runtime = 'nodejs';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+  const { origin } = req.nextUrl;
   const user = await getServerUser();
   if (!user) {
-    return NextResponse.redirect(new URL('/auth/signin', req.url));
+    return NextResponse.redirect(`${origin}/auth/signin`);
   }
 
   let outcome: ConnectReturnOutcome = 'incomplete';
@@ -29,7 +30,5 @@ export async function GET(req: Request) {
     console.error('[ConnectReturn] Could not read the account:', err);
   }
 
-  return NextResponse.redirect(
-    new URL(`/organizer/payouts?stripe=${outcome}`, req.url)
-  );
+  return NextResponse.redirect(`${origin}/organizer/payouts?stripe=${outcome}`);
 }

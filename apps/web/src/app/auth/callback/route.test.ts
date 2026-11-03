@@ -6,6 +6,7 @@ jest.mock('@/lib/supabase/server', () => ({
   createClient: jest.fn(),
 }));
 
+import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { GET } from './route';
 
@@ -14,7 +15,7 @@ const mockCreateClient = createClient as jest.Mock;
 const APP_ORIGIN = 'https://example.com';
 
 function makeRequest(query: string) {
-  return new Request(`${APP_ORIGIN}/auth/callback${query}`);
+  return new NextRequest(`${APP_ORIGIN}/auth/callback${query}`);
 }
 
 function mockSupabase({

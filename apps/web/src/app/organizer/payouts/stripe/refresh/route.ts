@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { refreshStripeOnboarding } from '@troptix/api/server';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
@@ -9,10 +9,11 @@ import { getRequestOrigin } from '@/server/lib/requestOrigin';
 /** An expired or reused Account Link lands here and gets a fresh one. */
 export const runtime = 'nodejs';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+  const { origin } = req.nextUrl;
   const user = await getServerUser();
   if (!user) {
-    return NextResponse.redirect(new URL('/auth/signin', req.url));
+    return NextResponse.redirect(`${origin}/auth/signin`);
   }
 
   try {
@@ -27,5 +28,5 @@ export async function GET(req: Request) {
     console.error('[ConnectRefresh] Could not mint a new link:', err);
   }
 
-  return NextResponse.redirect(new URL('/organizer/payouts', req.url));
+  return NextResponse.redirect(`${origin}/organizer/payouts`);
 }
