@@ -29,6 +29,7 @@ export const ticketTypeSchema = z
       .string()
       .max(100, 'Access code must be 100 characters or fewer.')
       .optional(),
+    hidden: z.boolean().optional(),
   })
   .refine((data) => data.saleEndsAt > data.saleStartsAt, {
     message: 'Sale end date must be after the start date.',

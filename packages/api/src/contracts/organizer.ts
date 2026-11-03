@@ -199,7 +199,11 @@ export const ticketTypeRowSchema = ticketTypeBreakdownSchema.extend({
   description: z.string(),
   maxPurchasePerUser: z.number().int(),
   ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
+  /** The unlimited code the ticket type form edits; never an invitation's. */
   accessCode: z.string().nullable(),
+  hidden: z.boolean(),
+  /** Some grant listing this type can still open a checkout. */
+  hasActiveCode: z.boolean(),
 });
 export type TicketTypeRow = z.infer<typeof ticketTypeRowSchema>;
 
@@ -217,6 +221,8 @@ export const ticketTypeInputSchema = z
     saleEndsAt: z.date(),
     ticketingFees: z.enum(['ABSORB_TICKET_FEES', 'PASS_TICKET_FEES']),
     accessCode: z.string().max(100).optional(),
+    /** Set by the Access codes era form; when present, `accessCode` is ignored. */
+    hidden: z.boolean().optional(),
   })
   .refine((t) => t.saleEndsAt > t.saleStartsAt, {
     message: 'Sale end must be after sale start.',
@@ -276,3 +282,66 @@ export const ticketTypesViewSchema = z.object({
   }),
 });
 export type TicketTypesView = z.infer<typeof ticketTypesViewSchema>;
+
+export const grantStateSchema = z.enum([
+  'active',
+  'inUse',
+  'exhausted',
+  'expired',
+  'revoked',
+]);
+export type GrantStateDto = z.infer<typeof grantStateSchema>;
+
+export const grantRowSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  state: grantStateSchema,
+  maxUses: z.number().int().nullable(),
+  usedCount: z.number().int(),
+  quantity: z.number().int().nullable(),
+  expiresAt: z.string().datetime().nullable(),
+  revokedAt: z.string().datetime().nullable(),
+  holderEmail: z.string().nullable(),
+  holderName: z.string().nullable(),
+  sentAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  /** A hold on this grant is open; a revoked grant still lets it finish. */
+  checkoutInProgress: z.boolean(),
+  ticketTypes: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+export type GrantRow = z.infer<typeof grantRowSchema>;
+
+export const grantsViewSchema = z.object({
+  ticketTypes: z.array(
+    z.object({ id: z.string(), name: z.string(), hidden: z.boolean() })
+  ),
+  grants: z.array(grantRowSchema),
+});
+export type GrantsView = z.infer<typeof grantsViewSchema>;
+
+const grantLimitsSchema = z.object({
+  /** Null is unlimited. */
+  maxUses: z.number().int().min(1).max(100_000).nullable(),
+  /** Null leaves each ticket type's own cap. Matches the hold's 50 per line. */
+  quantity: z.number().int().min(1).max(50).nullable(),
+  expiresAt: z.date().nullable(),
+});
+
+export const createGrantInputSchema = grantLimitsSchema.extend({
+  /** Blank generates one. */
+  code: z.string().trim().max(100).optional(),
+  ticketTypeIds: z.array(z.string().min(1)).min(1).max(50),
+  holderEmail: z
+    .string()
+    .trim()
+    .email()
+    .transform((value) => value.toLowerCase())
+    .nullable()
+    .optional(),
+  holderName: z.string().trim().max(100).nullable().optional(),
+});
+export type CreateGrantInput = z.input<typeof createGrantInputSchema>;
+
+/** Only what extends a grant; a code already sent keeps its meaning. */
+export const updateGrantInputSchema = grantLimitsSchema;
+export type UpdateGrantInput = z.infer<typeof updateGrantInputSchema>;

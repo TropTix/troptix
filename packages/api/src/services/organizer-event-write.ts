@@ -55,7 +55,7 @@ export async function createEvent(
       }));
       await tx.ticketTypes.createMany({ data: rows });
       for (let i = 0; i < rows.length; i++) {
-        if (ticketTypes[i].accessCode) {
+        if (ticketTypes[i].hidden === undefined && ticketTypes[i].accessCode) {
           await writeLegacyAccessCode(
             tx,
             eventId,

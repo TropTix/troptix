@@ -22,6 +22,7 @@ const ticketType = (over: Record<string, unknown> = {}) => ({
   saleStartsAt: new Date('2026-07-01T00:00:00Z'),
   saleEndsAt: new Date('2026-07-31T00:00:00Z'),
   ticketingFees: 'PASS_TICKET_FEES',
+  hidden: false,
   grants: [],
   ...over,
 });
@@ -152,6 +153,8 @@ describe('listTicketTypes — shaping', () => {
         maxPurchasePerUser: 10,
         ticketingFees: 'PASS_TICKET_FEES',
         accessCode: null,
+        hidden: false,
+        hasActiveCode: false,
       },
     ]);
   });

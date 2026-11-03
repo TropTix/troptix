@@ -54,6 +54,12 @@ export {
   ORDERS_LIST_LIMIT,
 } from './services/organizer-orders';
 export { listTicketTypes } from './services/organizer-ticket-types';
+export {
+  createGrant,
+  listGrants,
+  revokeGrant,
+  updateGrant,
+} from './services/organizer-grants';
 export { createEvent, updateEvent } from './services/organizer-event-write';
 export {
   createTicketType,

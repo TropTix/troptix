@@ -48,7 +48,8 @@ import {
 } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { PaidTicketingBanner } from '@/components/PaidTicketingBanner';
-import { calculateFeesCents, FeeConfig } from '@troptix/api';
+import { calculateFeesCents, FeatureFlag, FeeConfig } from '@troptix/api';
+import { useFeatureFlagAfterMount } from '@/hooks/useFeatureFlagAfterMount';
 
 // The STORED `price` is what checkout computes fees on: the organizer's
 // earnings under PASS, the buyer's sticker under ABSORB.
@@ -124,6 +125,7 @@ export function AddTicketTypeDrawer({
     capacity: 100,
     maxPurchasePerUser: 10,
     accessCode: undefined,
+    hidden: false,
     ticketingFees: 'PASS_TICKET_FEES' as const,
     saleStartsAt: today,
     // Clamped: on an already-ended event the raw event end would seed a
@@ -134,6 +136,11 @@ export function AddTicketTypeDrawer({
     resolver: zodResolver(ticketTypeSchema),
     defaultValues: initialData || defaultValues,
   });
+
+  // Access codes live on their own page once this is on; the form keeps
+  // only the visibility toggle.
+  const guestAccess =
+    useFeatureFlagAfterMount(FeatureFlag.GUEST_ACCESS) === true;
 
   const [isFree, setIsFree] = useState(true);
   const [grossInput, setGrossInput] = useState('');
@@ -212,7 +219,11 @@ export function AddTicketTypeDrawer({
 
   const [submitting, setSubmitting] = useState(false);
 
-  const onValidSubmit = async (data: TicketTypeFormValues) => {
+  const onValidSubmit = async (formData: TicketTypeFormValues) => {
+    const { hidden, accessCode, ...rest } = formData;
+    const data = guestAccess
+      ? { ...rest, hidden: hidden ?? false }
+      : { ...rest, accessCode };
     const dataToSubmit = initialData?.id
       ? { ...data, id: initialData.id }
       : data;
@@ -484,33 +495,57 @@ export function AddTicketTypeDrawer({
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="accessCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Access code{' '}
-                      <span className="text-xs text-muted-foreground">
-                        (Optional)
-                      </span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., VIPLIST"
-                        {...field}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value)}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Buyers need this code to see and buy this ticket. Leave
-                      blank to sell to everyone.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {guestAccess ? (
+                <FormField
+                  control={form.control}
+                  name="hidden"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                      <div className="space-y-0.5">
+                        <FormLabel>Hidden</FormLabel>
+                        <FormDescription>
+                          Keep this ticket off the event page. Only people with
+                          an access code for it can buy it.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="accessCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Access code{' '}
+                        <span className="text-xs text-muted-foreground">
+                          (Optional)
+                        </span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., VIPLIST"
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Buyers need this code to see and buy this ticket. Leave
+                        blank to sell to everyone.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
           </form>
         </Form>

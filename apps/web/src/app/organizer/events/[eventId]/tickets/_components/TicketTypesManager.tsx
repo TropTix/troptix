@@ -78,6 +78,7 @@ export function TicketTypesManager({
                 // Never inherited: a copy silently gated behind the source's
                 // access code is unsellable with no visible reason.
                 accessCode: undefined,
+                hidden: false,
               },
             })
           }
@@ -111,5 +112,6 @@ function toFormValues(
     saleEndsAt: new Date(row.saleEndsAt),
     ticketingFees: row.ticketingFees,
     accessCode: row.accessCode ?? undefined,
+    hidden: row.hidden,
   };
 }
