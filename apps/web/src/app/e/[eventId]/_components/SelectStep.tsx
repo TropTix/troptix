@@ -108,8 +108,8 @@ export default function SelectStep({
 
       <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
         <AccessCodeField
-          // A failed link code lands after mount; remount so it seeds the field.
-          key={failedLinkCode?.code ?? 'fresh'}
+          // A failed code lands after mount; remount so it seeds the field.
+          key={failedLinkCode?.seq ?? 'fresh'}
           activeCode={activeCode}
           onApply={onApplyCode}
           onClear={onClearCode}

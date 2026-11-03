@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 /** Null when the code unlocked; otherwise what to tell the buyer. */
 export type ApplyCodeOutcome = string | null;
 /** A code that did not unlock, shown back in the field with why. */
-export type FailedCode = { code: string; message: string };
+export type FailedCode = { code: string; message: string; seq: number };
 
 // Press snaps on a strong ease-out; colour changes ease. Disabled never scales.
 const PRESS =

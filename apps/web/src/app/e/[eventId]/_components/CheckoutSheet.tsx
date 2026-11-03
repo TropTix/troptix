@@ -78,7 +78,8 @@ type SuccessData = {
   tickets: { id: string; ticketTypeName: string | null }[];
 };
 
-// Expiry reads in the same zone the event page shows its own times in.
+// An expiry is a venue-local deadline, so it reads in the event's zone,
+// labelled, the same way the organizer set and sees it (ADR 0021).
 function refusalMessage(refusal: CodeRefusal): string {
   switch (refusal.type) {
     case 'invalid':
@@ -90,7 +91,7 @@ function refusalMessage(refusal: CodeRefusal): string {
     case 'expired':
       return `This code expired on ${getDateFormatter(
         new Date(refusal.expiresAt),
-        "MMM d, yyyy 'at' h:mm a"
+        "MMM d, yyyy 'at' h:mm a zzz"
       )}.`;
   }
 }
@@ -278,6 +279,13 @@ export default function CheckoutSheet({
 
   const linkCodeRef = useRef(linkCode ?? null);
   const [failedLinkCode, setFailedLinkCode] = useState<FailedCode | null>(null);
+  // The same code can fail twice in a row (by link, then at hold); the
+  // sequence number tells the field apart each time.
+  const failSeqRef = useRef(0);
+  function failCode(code: string, message: FailedCode['message']) {
+    failSeqRef.current += 1;
+    setFailedLinkCode({ code, message, seq: failSeqRef.current });
+  }
   const applyLinkCode = useEffectEvent((code: string) =>
     handleApplyCode(code, 'link')
   );
@@ -286,7 +294,7 @@ export default function CheckoutSheet({
     const code = linkCodeRef.current;
     linkCodeRef.current = null;
     void applyLinkCode(code).then((message) => {
-      if (message !== null) setFailedLinkCode({ code, message });
+      if (message !== null) failCode(code, message);
     });
   }, [open]);
 
@@ -551,18 +559,13 @@ export default function CheckoutSheet({
       if (reservation.type !== 'held') {
         // The grant refused the hold and nothing was held: drop the code and
         // send the buyer back to the field, showing why.
-        capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
-          valid: false,
+        capture(ANALYTICS_EVENTS.checkoutAccessCodeHoldRefused, {
           result: reservation.type,
-          unlocked_count: 0,
-          source: 'hold',
+          grant_kind: unlock?.kind,
         });
         const refused = unlock?.code ?? '';
         clearCode();
-        setFailedLinkCode({
-          code: refused,
-          message: refusalMessage(reservation),
-        });
+        failCode(refused, refusalMessage(reservation));
         setStep('select');
         return;
       }

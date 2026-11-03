@@ -9,6 +9,8 @@ export const ANALYTICS_EVENTS = {
   checkoutOpened: 'checkout_opened',
   /** One event for both outcomes: filter on `valid`. */
   checkoutAccessCodeApplied: 'checkout_access_code_applied',
+  /** A code that unlocked was refused when the hold tried to take its use. */
+  checkoutAccessCodeHoldRefused: 'checkout_access_code_hold_refused',
   checkoutTicketsSelected: 'checkout_tickets_selected',
   checkoutReservationCreated: 'checkout_reservation_created',
   /** Every requested quantity came back zero — not fired on a partial grant. */
