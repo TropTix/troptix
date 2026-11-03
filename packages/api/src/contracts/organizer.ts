@@ -181,6 +181,10 @@ export const orderDetailSchema = z.object({
   feesCents: z.number().int(),
   totalCents: z.number().int(),
   paymentMethod: z.string().nullable(),
+  /** The access code the order was bought with, read through its hold. */
+  grant: z
+    .object({ code: z.string(), holderEmail: z.string().nullable() })
+    .nullable(),
 });
 export type OrderDetail = z.infer<typeof orderDetailSchema>;
 

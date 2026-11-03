@@ -101,6 +101,16 @@ export default async function OrderDetailPage({
           <InfoRow label="Email" value={order.customer.email} />
           <InfoRow label="Phone" value={order.customer.phone} />
           <InfoRow label="Payment" value={order.paymentMethod} />
+          {order.grant && (
+            <InfoRow
+              label={order.grant.holderEmail ? 'Invitation' : 'Access code'}
+              value={
+                order.grant.holderEmail
+                  ? `${order.grant.code} · ${order.grant.holderEmail}`
+                  : order.grant.code
+              }
+            />
+          )}
         </CardContent>
       </Card>
     </div>

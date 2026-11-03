@@ -30,7 +30,13 @@ export interface FetchedTicketData {
   firstName: string | null;
   lastName: string | null;
   ticketType: Pick<TicketTypes, 'name'> | null;
-  order: Pick<Orders, 'id'> | null;
+  order:
+    | (Pick<Orders, 'id'> & {
+        reservation: {
+          grant: { code: string; holderEmail: string | null } | null;
+        } | null;
+      })
+    | null;
 }
 
 import type { ServerUser } from '@/server/authUser';

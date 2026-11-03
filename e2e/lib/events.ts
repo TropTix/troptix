@@ -213,6 +213,42 @@ export class EventFactory {
     ]);
   }
 
+  /** A grant on `eventId` with the given limits; returns its code. */
+  async addGrant(
+    eventId: string,
+    ticketTypeIds: string[],
+    fields: {
+      code: string;
+      maxUses?: number;
+      quantity?: number;
+      expiresAt?: Date;
+      holderEmail?: string;
+    }
+  ) {
+    const id = this.uid('grant');
+    await query(
+      `insert into public."Grant"
+         (id, "createdAt", "updatedAt", "eventId", code, "maxUses", quantity, "expiresAt", "holderEmail")
+       values ($1, now(), now(), $2, $3, $4, $5, $6, $7)`,
+      [
+        id,
+        eventId,
+        fields.code,
+        fields.maxUses ?? null,
+        fields.quantity ?? null,
+        fields.expiresAt ?? null,
+        fields.holderEmail ?? null,
+      ]
+    );
+    for (const ticketTypeId of ticketTypeIds) {
+      await query(
+        `insert into public."GrantTicketType" ("grantId", "ticketTypeId") values ($1, $2)`,
+        [id, ticketTypeId]
+      );
+    }
+    return fields.code;
+  }
+
   async cleanup() {
     for (const { eventId, orgId, userId } of this.created.reverse()) {
       await deleteEventChain(eventId);

@@ -4,17 +4,10 @@ import { useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type ApplyCodeOutcome = 'unlocked' | 'invalid' | 'failed';
-/** A code that arrived by link and did not unlock anything. */
-export type FailedCode = {
-  code: string;
-  outcome: Exclude<ApplyCodeOutcome, 'unlocked'>;
-};
-
-const ERROR_COPY: Record<Exclude<ApplyCodeOutcome, 'unlocked'>, string> = {
-  invalid: "That code didn't work. Check it and try again.",
-  failed: "We couldn't check that code. Try again in a moment.",
-};
+/** Null when the code unlocked; otherwise what to tell the buyer. */
+export type ApplyCodeOutcome = string | null;
+/** A code that did not unlock, shown back in the field with why. */
+export type FailedCode = { code: string; message: string };
 
 // Press snaps on a strong ease-out; colour changes ease. Disabled never scales.
 const PRESS =
@@ -33,9 +26,7 @@ export default function AccessCodeField({
   initial?: FailedCode;
 }) {
   const [code, setCode] = useState(initial?.code ?? '');
-  const [error, setError] = useState<string | null>(
-    initial ? ERROR_COPY[initial.outcome] : null
-  );
+  const [error, setError] = useState<string | null>(initial?.message ?? null);
   const [pending, setPending] = useState(false);
   const hasText = code.trim().length > 0;
 
@@ -72,10 +63,10 @@ export default function AccessCodeField({
     if (!hasText || pending) return;
     setPending(true);
     setError(null);
-    const outcome = await onApply(code.trim());
+    const message = await onApply(code.trim());
     setPending(false);
-    if (outcome === 'unlocked') setCode('');
-    else setError(ERROR_COPY[outcome]);
+    if (message === null) setCode('');
+    else setError(message);
   }
 
   return (

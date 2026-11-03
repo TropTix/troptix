@@ -29,6 +29,8 @@ export const applyCodeResponseSchema = z.discriminatedUnion('type', [
     quantity: z.number().int().nullable(),
     /** Who the grant was issued to, for the contact step to prefill. */
     holderEmail: z.string().nullable(),
+    /** For analytics: a holder makes an invitation; any limit makes it limited. */
+    kind: z.enum(['unlimited', 'limited', 'invitation']),
   }),
   ...codeRefusalSchemas,
 ]);
