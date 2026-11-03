@@ -2,7 +2,7 @@
 title: Guest access — grants, codes and invitations
 status: active
 created: 2026-10-28
-tracking-issue: TBD
+tracking-issue: #648
 ---
 
 # Guest access — grants, codes and invitations
