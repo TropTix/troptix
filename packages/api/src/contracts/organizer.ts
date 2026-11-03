@@ -349,3 +349,34 @@ export type CreateGrantInput = z.input<typeof createGrantInputSchema>;
 /** Only what extends a grant; a code already sent keeps its meaning. */
 export const updateGrantInputSchema = grantLimitsSchema;
 export type UpdateGrantInput = z.infer<typeof updateGrantInputSchema>;
+
+/** Most addresses in one invite batch (guest access plan, decision 24). */
+export const INVITE_BATCH_MAX = 200;
+/** Most invitation emails one organization may send in 24 hours. */
+export const INVITE_DAILY_MAX = 500;
+
+export const inviteGuestsInputSchema = z.object({
+  emails: z
+    .array(
+      z
+        .string()
+        .trim()
+        .email()
+        .transform((value) => value.toLowerCase())
+    )
+    .min(1)
+    .max(INVITE_BATCH_MAX),
+  ticketTypeIds: z.array(z.string().min(1)).min(1).max(50),
+  maxUses: z.number().int().min(1).max(100).default(1),
+  quantity: z.number().int().min(1).max(50).default(1),
+  expiresAt: z.date().nullable(),
+  send: z.boolean(),
+});
+export type InviteGuestsInput = z.input<typeof inviteGuestsInputSchema>;
+
+export type InviteSkipReason = 'duplicate' | 'alreadyInvited';
+
+export type InviteGuestsResult = {
+  created: { grantId: string; email: string; code: string }[];
+  skipped: { email: string; reason: InviteSkipReason }[];
+};

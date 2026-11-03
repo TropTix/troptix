@@ -7,13 +7,24 @@ import prisma from '@/server/prisma';
 import { getServerUser } from '@/server/authUser';
 import { userToActor } from '@/server/actor';
 import { isFlagEnabled } from '@/server/lib/featureFlags';
+import { sendGuestInvitations } from '@/server/lib/email';
 import { FeatureFlag } from '@troptix/api';
-import type { CreateGrantInput, UpdateGrantInput } from '@troptix/api';
+import type {
+  CreateGrantInput,
+  InviteGuestsInput,
+  InviteGuestsResult,
+  UpdateGrantInput,
+} from '@troptix/api';
 import {
   createGrant as createGrantService,
   updateGrant as updateGrantService,
   revokeGrant as revokeGrantService,
+  inviteGuests as inviteGuestsService,
+  resendInvitation as resendInvitationService,
+  releaseInvitationSend,
   ConflictError,
+  InvitationLimitError,
+  InvitationsNotAllowedError,
   NotFoundError,
   UnauthorizedError,
 } from '@troptix/api/server';
@@ -40,6 +51,16 @@ async function guestAccessActor() {
 function failure(error: unknown, fallback: string): Failure {
   if (error instanceof ConflictError) {
     return { success: false, error: error.message };
+  }
+  if (error instanceof InvitationLimitError) {
+    return { success: false, error: `${error.message}.` };
+  }
+  if (error instanceof InvitationsNotAllowedError) {
+    return {
+      success: false,
+      error:
+        'Sending invitations needs a verified organization or approval for paid tickets. You can still create the codes without sending.',
+    };
   }
   if (error instanceof NotFoundError) {
     return { success: false, error: 'Access code or event not found.' };
@@ -108,5 +129,56 @@ export async function revokeGrant(
     return { success: true };
   } catch (error) {
     return failure(error, "Couldn't revoke the code. Please try again.");
+  }
+}
+
+export async function inviteGuests(
+  eventId: string,
+  input: InviteGuestsInput
+): Promise<ActionResult<InviteGuestsResult & { failed: string[] }>> {
+  const actor = await guestAccessActor();
+  if (!actor) return UNAVAILABLE;
+  try {
+    const { toSend, ...result } = await inviteGuestsService(
+      prisma,
+      actor,
+      eventId,
+      input
+    );
+    const failed = await sendGuestInvitations(toSend);
+    await Promise.all(failed.map((f) => releaseInvitationSend(prisma, f)));
+    revalidatePath(`/organizer/events/${eventId}/access-codes`);
+    revalidatePath(`/organizer/events/${eventId}/tickets`);
+    return { success: true, ...result, failed: failed.map((f) => f.to) };
+  } catch (error) {
+    return failure(error, "Couldn't create the invitations. Please try again.");
+  }
+}
+
+export async function resendInvitation(
+  eventId: string,
+  grantId: string
+): Promise<ActionResult> {
+  const actor = await guestAccessActor();
+  if (!actor) return UNAVAILABLE;
+  try {
+    const invitation = await resendInvitationService(
+      prisma,
+      actor,
+      eventId,
+      grantId
+    );
+    const [failed] = await sendGuestInvitations([invitation]);
+    if (failed) {
+      await releaseInvitationSend(prisma, failed);
+      return {
+        success: false,
+        error: "The email didn't go out. Try again in a moment.",
+      };
+    }
+    revalidatePath(`/organizer/events/${eventId}/access-codes`);
+    return { success: true };
+  } catch (error) {
+    return failure(error, "Couldn't resend the invitation. Please try again.");
   }
 }

@@ -1,9 +1,11 @@
 import prisma from '@/server/prisma';
 import { Prisma } from '@troptix/db';
 import {
+  buildGuestInvitation,
   buildOrderConfirmation,
   type EmailAttachment,
 } from '@troptix/transactional';
+import type { InvitationToSend } from '@troptix/api/server';
 import { getAppBaseUrl } from '@/lib/appUrl';
 import { formatCents } from '@/lib/dateUtils';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
@@ -132,6 +134,51 @@ export async function sendRefundNoticeEmail(reservationId: string) {
   } catch (error) {
     console.error('[Refund] Failed to send refund notice email:', error);
   }
+}
+
+// Resend's batch endpoint takes 100 emails per request, and the account's
+// request rate limit would refuse a 200-address batch sent one by one.
+const RESEND_BATCH_MAX = 100;
+
+/**
+ * Sends each invitation and returns the ones that did not go out, so the
+ * caller can hand their send back. A batch succeeds or fails whole.
+ */
+export async function sendGuestInvitations(
+  invitations: InvitationToSend[]
+): Promise<InvitationToSend[]> {
+  const failed: InvitationToSend[] = [];
+  for (let i = 0; i < invitations.length; i += RESEND_BATCH_MAX) {
+    const chunk = invitations.slice(i, i + RESEND_BATCH_MAX);
+    try {
+      const emails = await Promise.all(
+        chunk.map(async (invitation) => {
+          const { subject, html, text } = await buildGuestInvitation(
+            invitation.invite,
+            { baseUrl: getAppBaseUrl() }
+          );
+          return {
+            from: 'TropTix <info@usetroptix.com>',
+            to: invitation.to,
+            ...(invitation.replyTo ? { replyTo: invitation.replyTo } : {}),
+            subject,
+            html,
+            text,
+          };
+        })
+      );
+      const { error } = await resend.batch.send(emails, {
+        idempotencyKey: `invite-${chunk[0].grantId}-${chunk[0].sentAt.getTime()}-${chunk.length}`,
+      });
+      if (error && !isConcurrentIdempotencyConflict(error)) {
+        throw new Error(error.message);
+      }
+    } catch (error) {
+      console.error('[Invite] Resend failed to send invitations:', error);
+      failed.push(...chunk);
+    }
+  }
+  return failed;
 }
 
 /**

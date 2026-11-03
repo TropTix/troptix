@@ -55,6 +55,12 @@ export {
 } from './services/organizer-orders';
 export { listTicketTypes } from './services/organizer-ticket-types';
 export {
+  inviteGuests,
+  releaseInvitationSend,
+  resendInvitation,
+  type InvitationToSend,
+} from './services/organizer-invitations';
+export {
   createGrant,
   listGrants,
   revokeGrant,
@@ -118,6 +124,8 @@ export {
   UnauthorizedError,
   ConflictError,
   PaidTicketingNotEnabledError,
+  InvitationLimitError,
+  InvitationsNotAllowedError,
   PayoutSetupIncompleteError,
   InvalidPayoutAmountError,
   PayoutRequestPendingError,
