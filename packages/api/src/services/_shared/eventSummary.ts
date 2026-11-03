@@ -1,5 +1,5 @@
-// Card-level fields only — listings deliberately carry no tier data (#549),
-// so tier writes never invalidate them.
+// Card-level fields only — listings deliberately carry no ticket type data
+// (#549), so ticket type writes never invalidate them.
 import type { EventSummary } from '../../contracts/events';
 
 export type EventSummaryRow = {

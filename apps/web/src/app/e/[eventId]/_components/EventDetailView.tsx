@@ -144,8 +144,8 @@ export default function EventDetailView({
   };
 
   const isFree = event.fromPriceCents === 0;
-  // An event can mix free and paid tiers (fromPriceCents === 0 yet paid tickets
-  // exist), so gate the "RSVP" wording on this rather than isFree.
+  // An event can mix free and paid ticket types (fromPriceCents === 0 yet
+  // paid tickets exist), so gate the "RSVP" wording on this rather than isFree.
   const hasPaidTickets = event.tickets.some((t) => t.priceCents > 0);
 
   // A link opens the sheet without the button, so count that open too.

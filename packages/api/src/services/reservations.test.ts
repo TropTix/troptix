@@ -273,7 +273,7 @@ describe('expire', () => {
 });
 
 describe('createReservation — server pricing authority', () => {
-  it('derives fees from the tier and holds inventory', async () => {
+  it('derives fees from the ticket type and holds inventory', async () => {
     const tt = await makeTicketType(5, 5000);
     const res = await createReservation(
       prisma,

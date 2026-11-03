@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Public DTOs — client-safe by construction: no ticket rows, discount codes,
-// raw inventory counts, or gated-tier data may ever appear here.
+// raw inventory counts, or gated ticket type data may ever appear here.
 
 export const eventDetailInputSchema = z.object({
   eventId: z.string().min(1),
@@ -42,8 +42,8 @@ export const eventTicketSchema = z.object({
 });
 export type EventTicket = z.infer<typeof eventTicketSchema>;
 
-// Deliberately no tier data on listings — prices live on the event detail
-// page, so listings never depend on tiers.
+// Deliberately no ticket type data on listings — prices live on the event
+// detail page, so listings never depend on ticket types.
 export const eventSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -85,7 +85,7 @@ export const eventDetailSchema = z.object({
   address: z.string(),
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
-  /** Cheapest public tier. Null = no public tiers, not free. */
+  /** Cheapest public ticket type. Null = no public ticket types, not free. */
   fromPriceCents: z.number().int().nullable(),
   pageTheme: eventPageThemeSchema,
   flyerPalette: flyerPaletteSchema.nullable(),

@@ -1,10 +1,16 @@
 import { createClient } from '@/lib/supabase/client';
 
-export async function signInWithMagicLink(email: string) {
+export async function signInWithMagicLink(
+  email: string,
+  captchaToken?: string
+) {
   const supabase = createClient();
   return supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    options: {
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+      captchaToken,
+    },
   });
 }
 
@@ -21,7 +27,10 @@ export async function signInWithGoogle() {
   const supabase = createClient();
   return supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: `${window.location.origin}/auth/callback` },
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+      queryParams: { prompt: 'select_account' },
+    },
   });
 }
 

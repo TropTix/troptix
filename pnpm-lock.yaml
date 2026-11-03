@@ -155,6 +155,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.0.1
         version: 5.4.0(react-hook-form@7.80.0(react@19.2.1))
+      '@marsidev/react-turnstile':
+        specifier: ^1.6.2
+        version: 1.6.2(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       '@stripe/react-stripe-js':
         specifier: ^6.6.0
         version: 6.6.0(@stripe/stripe-js@9.9.0)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
@@ -2497,6 +2500,15 @@ packages:
       {
         integrity: sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w==,
       }
+
+  '@marsidev/react-turnstile@1.6.2':
+    resolution:
+      {
+        integrity: sha512-0CL9hNI/t39C8JfBCHQWj+A7llq2xdf9cjg0bYVbiywQlVS0bi1LTTTnF3S59OaBYgc+tMrxMedSDICJfaAkdg==,
+      }
+    peerDependencies:
+      react: ^17.0.2 || ^18.0.0 || ^19.0
+      react-dom: ^17.0.2 || ^18.0.0 || ^19.0
 
   '@napi-rs/wasm-runtime@1.1.5':
     resolution:
@@ -14447,6 +14459,11 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@kurkle/color@0.3.4': {}
+
+  '@marsidev/react-turnstile@1.6.2(react-dom@19.2.1(react@19.2.1))(react@19.2.1)':
+    dependencies:
+      react: 19.2.1
+      react-dom: 19.2.1(react@19.2.1)
 
   '@napi-rs/wasm-runtime@1.1.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:

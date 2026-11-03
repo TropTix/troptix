@@ -119,8 +119,8 @@ async function computeBalances(
   let releasedCents = 0;
   let pendingCents = 0;
   for (const row of earnedRows) {
-    // Clamped: a cheap absorb tier can derive a fee above its own subtotal,
-    // and one event's deficit must not drain the others' earnings.
+    // Clamped: a cheap absorb ticket type can derive a fee above its own
+    // subtotal, and one event's deficit must not drain the others' earnings.
     const earned = Math.max(
       0,
       Number(row.subtotalCents) - (absorbedByEvent.get(row.eventId) ?? 0)

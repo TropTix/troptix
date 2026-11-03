@@ -161,7 +161,8 @@ describe('getPayouts — earnings math', () => {
       earnedRows: [
         { eventId: 'e-old', endsAt: daysAgo(30), subtotalCents: 10000n },
       ],
-      // Two $25.00 tickets on an absorb tier: 2 × (8% × 2500 + 50) = 500.
+      // Two $25.00 tickets on an absorb ticket type:
+      // 2 × (8% × 2500 + 50) = 500.
       absorbedGroups: [{ eventId: 'e-old', subtotal: 25, quantity: 2n }],
     });
 

@@ -81,7 +81,7 @@ export async function beginPayment(
     );
   }
 
-  const [tiers, event] = await Promise.all([
+  const [ticketTypes, event] = await Promise.all([
     prisma.ticketTypes.findMany({
       where: { id: { in: reservation.items.map((i) => i.ticketTypeId) } },
       select: { id: true, name: true },
@@ -91,7 +91,7 @@ export async function beginPayment(
       select: { name: true },
     }),
   ]);
-  const nameById = new Map(tiers.map((t) => [t.id, t.name]));
+  const nameById = new Map(ticketTypes.map((t) => [t.id, t.name]));
   const summary = {
     totalCents: reservation.totalCents,
     subtotalCents: reservation.subtotalCents,
