@@ -36,10 +36,13 @@ settles the model; this record keeps the decisions the code depends on.
   returns its state and holds nothing.
 - **Lock order is grant, then ticket types,** on hold, release and settle, so
   the paths cannot deadlock each other.
-- **Release is a conditional transition.** `HELD → RELEASED/EXPIRED` is one
-  `UPDATE … WHERE status = 'HELD'`, so a client release racing the sweep
-  returns inventory and the use once. Before this, both could read `HELD` and
-  both decrement.
+- **Release is a conditional transition, and conversion locks the hold.**
+  `HELD → RELEASED/EXPIRED` is one `UPDATE … WHERE status = 'HELD'`, and
+  `completeFree` and `confirm` take the reservation row lock first, as
+  `settle` already did. Before this, a release racing the sweep could return
+  inventory twice, and a release racing a free conversion could issue the
+  tickets and return the use. Ticket types are always touched in id order.
+- **A hold that gets no tickets keeps no use.**
 - **The database guards the counter.** CHECKs keep `usedCount` within
   `0..maxUses` and the caps positive. `Grant` and `GrantTicketType` have RLS
   enabled with no policies, like every other application table.
@@ -64,3 +67,7 @@ settles the model; this record keeps the decisions the code depends on.
 - A per-checkout cap clamps silently, like `maxPurchasePerUser`; the client
   caps the stepper so a buyer never sees it.
 - Refunding or cancelling an order later does not return its grant's use.
+- The migration drops `accessCode` in the same release that stops reading it.
+  Supabase applies it on merge while Vercel builds separately, so event pages
+  and checkout can fail for the minutes between the two, as they could for
+  the rename in 20261013160000. Merge at a quiet hour.

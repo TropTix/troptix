@@ -7,7 +7,13 @@ import { generateId } from './_shared/ids';
 import { writeLegacyAccessCode } from './_shared/access-code';
 import { applyCode } from './checkout';
 import { getEventDetail } from './events';
-import { createReservation, expireHold, release, settle } from './reservations';
+import {
+  completeFree,
+  createReservation,
+  expireHold,
+  release,
+  settle,
+} from './reservations';
 
 const EVENT_ID = `test-grant-evt-${generateId()}`;
 const OWNER_ID = `test-grant-owner-${generateId()}`;
@@ -60,7 +66,12 @@ afterAll(async () => {
 });
 
 async function ticketType(
-  opts: { hidden?: boolean; capacity?: number; maxPerUser?: number } = {}
+  opts: {
+    hidden?: boolean;
+    capacity?: number;
+    maxPerUser?: number;
+    priceCents?: number;
+  } = {}
 ) {
   return prisma.ticketTypes.create({
     data: {
@@ -69,8 +80,8 @@ async function ticketType(
       description: 'A seat',
       maxPurchasePerUser: opts.maxPerUser ?? 4,
       capacity: opts.capacity ?? 50,
-      price: 50,
-      priceCents: 5000,
+      price: (opts.priceCents ?? 5000) / 100,
+      priceCents: opts.priceCents ?? 5000,
       hidden: opts.hidden ?? true,
       saleStartsAt: new Date(Date.now() - DAY),
       saleEndsAt: new Date(Date.now() + 5 * DAY),
@@ -272,6 +283,56 @@ describe('hold under a grant', () => {
     await expect(hold(g.code, [[other.id, 1]])).rejects.toThrow(
       /not available for this event/
     );
+  });
+});
+
+describe('races on one hold', () => {
+  it('never issues tickets and returns the use for the same free hold', async () => {
+    for (let i = 0; i < 5; i++) {
+      const tt = await ticketType({ priceCents: 0 });
+      const g = await grant([tt.id], { maxUses: 1 });
+      const res = held(await hold(g.code, [[tt.id, 2]]));
+
+      const [completed, released] = await Promise.allSettled([
+        completeFree(prisma, { reservationId: res.reservationId }),
+        release(prisma, res.reservationId),
+      ]);
+
+      const after = await prisma.ticketTypes.findUniqueOrThrow({
+        where: { id: tt.id },
+      });
+      const issued =
+        completed.status === 'fulfilled' &&
+        (await prisma.tickets.count({ where: { ticketTypeId: tt.id } })) > 0;
+      if (issued) {
+        expect(released).toEqual({ status: 'fulfilled', value: false });
+        expect(await usedCount(g.id)).toBe(1);
+        expect(after).toMatchObject({ sold: 2, reserved: 0 });
+      } else {
+        expect(await usedCount(g.id)).toBe(0);
+        expect(after).toMatchObject({ sold: 0, reserved: 0 });
+      }
+    }
+  });
+});
+
+describe('a hold that gets no tickets', () => {
+  it('keeps no use of the grant', async () => {
+    const tt = await ticketType({ capacity: 1 });
+    await prisma.ticketTypes.update({
+      where: { id: tt.id },
+      data: { sold: 1 },
+    });
+    const g = await grant([tt.id], { maxUses: 1 });
+
+    const res = held(await hold(g.code, [[tt.id, 1]]));
+
+    expect(res.items[0].granted).toBe(0);
+    expect(await usedCount(g.id)).toBe(0);
+    const row = await prisma.reservation.findUniqueOrThrow({
+      where: { id: res.reservationId },
+    });
+    expect(row.grantId).toBeNull();
   });
 });
 

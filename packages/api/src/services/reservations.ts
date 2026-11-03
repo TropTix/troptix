@@ -102,6 +102,29 @@ async function holdInventoryInTx(
   return rows[0]?.granted ?? 0;
 }
 
+/**
+ * Every path that touches several ticket types walks them in id order, as
+ * `deriveReserveItems` does for the hold, so two transactions cannot lock the
+ * same rows in opposite orders.
+ */
+function inLockOrder<T extends { ticketTypeId: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) =>
+    a.ticketTypeId.localeCompare(b.ticketTypeId)
+  );
+}
+
+/** Locks the hold for the rest of the transaction; see `settle`. */
+async function lockReservationInTx(
+  tx: Prisma.TransactionClient,
+  where: { id: string } | { stripePaymentIntentId: string }
+): Promise<void> {
+  if ('id' in where) {
+    await tx.$queryRaw`SELECT id FROM "Reservation" WHERE id = ${where.id} FOR UPDATE`;
+  } else {
+    await tx.$queryRaw`SELECT id FROM "Reservation" WHERE "stripePaymentIntentId" = ${where.stripePaymentIntentId} FOR UPDATE`;
+  }
+}
+
 /** Thrown inside `reserve`'s transaction so a refused grant takes nothing. */
 export class GrantRefusedError extends Error {
   constructor(public readonly refusal: CodeRefusal) {
@@ -162,6 +185,11 @@ export async function reserve(
     }
 
     const totalCents = subtotalCents + feesCents;
+    const anyGranted = grantedItems.some((g) => g.granted > 0);
+    // A sold-out hold must not sit on a one-use grant until the sweep.
+    if (input.grantId && !anyGranted) {
+      await returnGrantUseInTx(tx, input.grantId);
+    }
 
     await tx.reservation.create({
       data: {
@@ -178,7 +206,9 @@ export async function reserve(
         totalCents,
         event: { connect: { id: input.eventId } },
         ...(input.userId ? { user: { connect: { id: input.userId } } } : {}),
-        ...(input.grantId ? { grant: { connect: { id: input.grantId } } } : {}),
+        ...(input.grantId && anyGranted
+          ? { grant: { connect: { id: input.grantId } } }
+          : {}),
         items: { createMany: { data: itemRows } },
       },
     });
@@ -190,7 +220,7 @@ export async function reserve(
       feesCents,
       totalCents,
       expiresAt,
-      granted: grantedItems.some((g) => g.granted > 0),
+      granted: anyGranted,
     };
   });
 }
@@ -404,7 +434,7 @@ async function materializeOrder(
   const ticketsType = isFree ? TicketType.FREE : TicketType.PAID;
 
   const ticketRows: Prisma.TicketsCreateManyOrderInput[] = [];
-  for (const item of reservation.items) {
+  for (const item of inLockOrder(reservation.items)) {
     await tx.ticketTypes.update({
       where: { id: item.ticketTypeId },
       data: {
@@ -478,6 +508,9 @@ export async function confirm(
   input: ConfirmInput
 ): Promise<ConfirmResult> {
   return prisma.$transaction(async (tx) => {
+    await lockReservationInTx(tx, {
+      stripePaymentIntentId: input.paymentIntentId,
+    });
     const reservation = await tx.reservation.findUnique({
       where: { stripePaymentIntentId: input.paymentIntentId },
       include: { items: true },
@@ -541,7 +574,7 @@ export async function settle(
     return await prisma.$transaction(async (tx) => {
       // The webhook and sync poll can race; without this row lock both could
       // read HELD under READ COMMITTED and both materialize — a double order.
-      await tx.$queryRaw`SELECT id FROM "Reservation" WHERE id = ${input.reservationId} FOR UPDATE`;
+      await lockReservationInTx(tx, { id: input.reservationId });
 
       const reservation = await tx.reservation.findUnique({
         where: { id: input.reservationId },
@@ -581,7 +614,7 @@ export async function settle(
         ) {
           throw new NeedsRefundError();
         }
-        for (const item of reservation.items) {
+        for (const item of inLockOrder(reservation.items)) {
           const granted = await holdInventoryInTx(
             tx,
             item.ticketTypeId,
@@ -649,6 +682,9 @@ export async function completeFree(
   analytics?: CheckoutAnalytics
 ): Promise<CompleteFreeResponse> {
   const { orderId, fresh } = await prisma.$transaction(async (tx) => {
+    // Without the lock a release committing mid-way would return the hold's
+    // inventory and grant use while this still issues the tickets.
+    await lockReservationInTx(tx, { id: input.reservationId });
     const reservation = await tx.reservation.findUnique({
       where: { id: input.reservationId },
       include: { items: true },
@@ -726,7 +762,7 @@ async function releaseHeldInTx(
   if (reservation.grantId) {
     await returnGrantUseInTx(tx, reservation.grantId);
   }
-  for (const item of reservation.items) {
+  for (const item of inLockOrder(reservation.items)) {
     await tx.ticketTypes.update({
       where: { id: item.ticketTypeId },
       data: { reserved: { decrement: item.quantity } },
