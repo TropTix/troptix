@@ -47,7 +47,9 @@ type Filter = 'current' | 'revoked';
 // Same formatter as the sale window on the ticket type list, so an expiry and
 // a sale end set side by side read in the same zone.
 function expiry(iso: string | null) {
-  return iso ? getDateFormatter(new Date(iso), 'MMM d, yyyy, h:mm a') : 'Never';
+  return iso
+    ? getDateFormatter(new Date(iso), 'MMM d, yyyy, h:mm a zzz')
+    : 'Never';
 }
 
 function uses(grant: GrantRow) {

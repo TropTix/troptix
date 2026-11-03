@@ -61,5 +61,12 @@ export async function applyCode(
     ),
     quantity: grant.quantity,
     holderEmail: grant.holderEmail,
+    kind: grant.holderEmail
+      ? 'invitation'
+      : grant.maxUses !== null ||
+          grant.expiresAt !== null ||
+          grant.quantity !== null
+        ? 'limited'
+        : 'unlimited',
   };
 }

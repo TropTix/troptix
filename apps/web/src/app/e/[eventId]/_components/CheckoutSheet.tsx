@@ -15,12 +15,14 @@ import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/components/AuthProvider';
 import { trpc } from '@/lib/trpc';
 import type {
+  ApplyCodeResponse,
   BeginPaymentResponse,
   CheckoutState,
+  CodeRefusal,
   EventDetail,
-  EventTicket,
   ReservationContact,
 } from '@troptix/api';
+import { getDateFormatter } from '@/lib/dateUtils';
 import SelectStep from './SelectStep';
 import type { ApplyCodeOutcome, FailedCode } from './AccessCodeField';
 import ContactStep from './ContactStep';
@@ -76,6 +78,26 @@ type SuccessData = {
   tickets: { id: string; ticketTypeName: string | null }[];
 };
 
+// An expiry is a venue-local deadline, so it reads in the event's zone,
+// labelled, the same way the organizer set and sees it (ADR 0021).
+function refusalMessage(refusal: CodeRefusal): string {
+  switch (refusal.type) {
+    case 'invalid':
+      return "That code isn't recognised. Check it and try again.";
+    case 'inUse':
+      return 'Someone is checking out with this code. Try again in a few minutes.';
+    case 'unavailable':
+      return 'This code has already been used or is no longer valid.';
+    case 'expired':
+      return `This code expired on ${getDateFormatter(
+        new Date(refusal.expiresAt),
+        "MMM d, yyyy 'at' h:mm a zzz"
+      )}.`;
+  }
+}
+
+const APPLY_FAILED = "We couldn't check that code. Try again in a moment.";
+
 function trpcCode(err: unknown): string | undefined {
   return (err as { data?: { code?: string } })?.data?.code;
 }
@@ -114,10 +136,9 @@ export default function CheckoutSheet({
   const [selection, setSelection] = useState<Record<string, number>>({});
   // One code per checkout; it outlives close/reset so a reopened sheet still
   // shows what the buyer unlocked (ADR 0035).
-  const [unlock, setUnlock] = useState<{
-    code: string;
-    tickets: EventTicket[];
-  } | null>(null);
+  const [unlock, setUnlock] = useState<
+    (Extract<ApplyCodeResponse, { type: 'unlocked' }> & { code: string }) | null
+  >(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -258,6 +279,13 @@ export default function CheckoutSheet({
 
   const linkCodeRef = useRef(linkCode ?? null);
   const [failedLinkCode, setFailedLinkCode] = useState<FailedCode | null>(null);
+  // The same code can fail twice in a row (by link, then at hold); the
+  // sequence number tells the field apart each time.
+  const failSeqRef = useRef(0);
+  function failCode(code: string, message: FailedCode['message']) {
+    failSeqRef.current += 1;
+    setFailedLinkCode({ code, message, seq: failSeqRef.current });
+  }
   const applyLinkCode = useEffectEvent((code: string) =>
     handleApplyCode(code, 'link')
   );
@@ -265,8 +293,8 @@ export default function CheckoutSheet({
     if (!open || !linkCodeRef.current) return;
     const code = linkCodeRef.current;
     linkCodeRef.current = null;
-    void applyLinkCode(code).then((outcome) => {
-      if (outcome !== 'unlocked') setFailedLinkCode({ code, outcome });
+    void applyLinkCode(code).then((message) => {
+      if (message !== null) failCode(code, message);
     });
   }, [open]);
 
@@ -429,28 +457,46 @@ export default function CheckoutSheet({
     code: string,
     source: 'typed' | 'link' = 'typed'
   ): Promise<ApplyCodeOutcome> {
-    let res: Awaited<ReturnType<typeof applyCode.mutateAsync>>;
+    let res: ApplyCodeResponse;
     try {
       res = await applyCode.mutateAsync({ eventId: event.id, code });
     } catch {
-      return 'failed';
+      return APPLY_FAILED;
     }
     if (res.type !== 'unlocked') {
       capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
         valid: false,
+        result: res.type,
         unlocked_count: 0,
         source,
       });
-      return 'invalid';
+      return refusalMessage(res);
     }
     capture(ANALYTICS_EVENTS.checkoutAccessCodeApplied, {
       valid: true,
+      result: res.type,
+      grant_kind: res.kind,
       unlocked_count: res.tickets.length,
       source,
     });
     setFailedLinkCode(null);
-    setUnlock({ code: code.trim().toUpperCase(), tickets: res.tickets });
-    return 'unlocked';
+    setUnlock({ ...res, code: code.trim().toUpperCase() });
+    // A public type on the grant may already be picked past the grant's cap.
+    if (res.quantity !== null) {
+      const cap = res.quantity;
+      setSelection((prev) => {
+        const next = { ...prev };
+        let left = cap;
+        for (const t of res.tickets) {
+          const q = Math.min(next[t.id] ?? 0, left);
+          left -= q;
+          if (q === 0) delete next[t.id];
+          else next[t.id] = q;
+        }
+        return next;
+      });
+    }
+    return null;
   }
 
   // The field only offers the form while no code is active, so swapping codes
@@ -473,6 +519,17 @@ export default function CheckoutSheet({
         ...event.tickets.filter((t) => !unlockedIds.has(t.id)),
       ]
     : event.tickets;
+  // A grant's quantity bounds the total across its types, so each stepper
+  // may only rise by what the others have left.
+  const grantLeft =
+    unlock?.quantity == null
+      ? Infinity
+      : unlock.quantity -
+        unlock.tickets.reduce((sum, t) => sum + (selection[t.id] ?? 0), 0);
+  const stepperMax = (t: (typeof tickets)[number]) =>
+    unlockedIds.has(t.id)
+      ? Math.min(t.maxAllowedToAdd, (selection[t.id] ?? 0) + grantLeft)
+      : t.maxAllowedToAdd;
   const chosen = tickets.filter((t) => (selection[t.id] ?? 0) > 0);
   const qty = chosen.reduce((sum, t) => sum + selection[t.id], 0);
   const feesCents = chosen.reduce(
@@ -502,9 +559,13 @@ export default function CheckoutSheet({
       if (reservation.type !== 'held') {
         // The grant refused the hold and nothing was held: drop the code and
         // send the buyer back to the field, showing why.
+        capture(ANALYTICS_EVENTS.checkoutAccessCodeHoldRefused, {
+          result: reservation.type,
+          grant_kind: unlock?.kind,
+        });
         const refused = unlock?.code ?? '';
         clearCode();
-        setFailedLinkCode({ code: refused, outcome: 'invalid' });
+        failCode(refused, refusalMessage(reservation));
         setStep('select');
         return;
       }
@@ -616,6 +677,8 @@ export default function CheckoutSheet({
                     selection={selection}
                     unlockedIds={unlockedIds}
                     activeCode={unlock?.code ?? null}
+                    perOrderCap={unlock?.quantity ?? null}
+                    stepperMax={stepperMax}
                     onApplyCode={handleApplyCode}
                     onClearCode={clearCode}
                     failedLinkCode={failedLinkCode}
@@ -640,7 +703,8 @@ export default function CheckoutSheet({
                     defaultValues={{
                       firstName: user?.firstName ?? '',
                       lastName: user?.lastName ?? '',
-                      email: user?.email ?? '',
+                      // An invitation is addressed to someone; start from them.
+                      email: unlock?.holderEmail ?? user?.email ?? '',
                     }}
                     isFree={isFree}
                     submitting={submitting}

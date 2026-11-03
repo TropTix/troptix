@@ -169,6 +169,22 @@ const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
       },
     },
     {
+      id: 'accessCode',
+      accessorFn: (row) => row.order?.reservation?.grant?.code ?? '',
+      header: 'Access Code',
+      cell: ({ row }) => {
+        const grant = row.original.order?.reservation?.grant;
+        return grant ? (
+          <span className="font-mono text-xs tracking-wide">{grant.code}</span>
+        ) : (
+          '—'
+        );
+      },
+      meta: {
+        hideOnMobile: true,
+      },
+    },
+    {
       accessorKey: 'order.id',
       header: 'Order ID',
       cell: ({ row }) => row.original.order?.id || 'N/A',
@@ -214,13 +230,17 @@ const AttendeeTable = ({ attendees }: AttendeeTableProps) => {
       const email = (attendee.email || '').toLowerCase();
       const ticketType = (attendee.ticketType?.name || '').toLowerCase();
       const orderId = (attendee.order?.id || '').toLowerCase();
+      const code = (
+        attendee.order?.reservation?.grant?.code || ''
+      ).toLowerCase();
 
       const search = searchTerm.toLowerCase();
       return (
         name.includes(search) ||
         email.includes(search) ||
         ticketType.includes(search) ||
-        orderId.includes(search)
+        orderId.includes(search) ||
+        code.includes(search)
       );
     });
   }, [attendees, searchTerm]);

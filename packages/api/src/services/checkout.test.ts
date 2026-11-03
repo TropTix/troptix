@@ -116,6 +116,7 @@ describe('applyCode', () => {
     expect(res.tickets[2].saleStatus).toBe('soldOut');
     expect(res.quantity).toBeNull();
     expect(res.holderEmail).toBeNull();
+    expect(res.kind).toBe('unlimited');
   });
 
   it('lets the grant quantity replace the per-type cap, clamped by availability', async () => {
@@ -136,6 +137,7 @@ describe('applyCode', () => {
     ]);
     expect(res.quantity).toBe(10);
     expect(res.holderEmail).toBe('guest@example.com');
+    expect(res.kind).toBe('invitation');
   });
 
   it('refuses a revoked grant, even an unused one, as unavailable', async () => {

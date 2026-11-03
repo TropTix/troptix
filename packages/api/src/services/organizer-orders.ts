@@ -109,6 +109,9 @@ export async function getOrderDetail(
           ticketType: { select: { id: true, name: true, price: true } },
         },
       },
+      reservation: {
+        select: { grant: { select: { code: true, holderEmail: true } } },
+      },
     },
   });
 
@@ -135,6 +138,7 @@ export async function getOrderDetail(
       order.cardType && order.cardLast4
         ? `${order.cardType} ····${order.cardLast4}`
         : null,
+    grant: order.reservation?.grant ?? null,
   };
 }
 

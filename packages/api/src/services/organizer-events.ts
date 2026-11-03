@@ -127,7 +127,14 @@ export async function listEventAttendees(
       firstName: true,
       lastName: true,
       ticketType: { select: { name: true } },
-      order: { select: { id: true } },
+      order: {
+        select: {
+          id: true,
+          reservation: {
+            select: { grant: { select: { code: true, holderEmail: true } } },
+          },
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });

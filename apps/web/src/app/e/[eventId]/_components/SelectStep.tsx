@@ -73,6 +73,8 @@ export default function SelectStep({
   onContinue,
   unlockedIds,
   activeCode,
+  perOrderCap,
+  stepperMax,
   onApplyCode,
   onClearCode,
   failedLinkCode,
@@ -87,6 +89,9 @@ export default function SelectStep({
   onContinue: () => void;
   unlockedIds: ReadonlySet<string>;
   activeCode: string | null;
+  /** The applied code's per-order cap across the types it unlocked. */
+  perOrderCap: number | null;
+  stepperMax: (ticket: EventTicket) => number;
   onApplyCode: (code: string) => Promise<ApplyCodeOutcome>;
   onClearCode: () => void;
   failedLinkCode?: FailedCode | null;
@@ -103,13 +108,19 @@ export default function SelectStep({
 
       <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
         <AccessCodeField
-          // A failed link code lands after mount; remount so it seeds the field.
-          key={failedLinkCode?.code ?? 'fresh'}
+          // A failed code lands after mount; remount so it seeds the field.
+          key={failedLinkCode?.seq ?? 'fresh'}
           activeCode={activeCode}
           onApply={onApplyCode}
           onClear={onClearCode}
           initial={failedLinkCode ?? undefined}
         />
+        {activeCode && perOrderCap !== null && (
+          <p className="px-1 text-xs text-muted-foreground">
+            This code allows up to {perOrderCap}{' '}
+            {perOrderCap === 1 ? 'ticket' : 'tickets'} in this order.
+          </p>
+        )}
         {tickets.length === 0 && (
           <p className="text-sm text-muted-foreground">
             No tickets are currently available.
@@ -178,10 +189,8 @@ export default function SelectStep({
                   ) : (
                     <Stepper
                       value={q}
-                      max={t.maxAllowedToAdd}
-                      onChange={(delta) =>
-                        onAdjust(t.id, delta, t.maxAllowedToAdd)
-                      }
+                      max={stepperMax(t)}
+                      onChange={(delta) => onAdjust(t.id, delta, stepperMax(t))}
                     />
                   )}
                 </div>

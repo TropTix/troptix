@@ -194,6 +194,24 @@ describe('getOrderDetail', () => {
     ]);
   });
 
+  it('shows the access code the order was bought with, or none', async () => {
+    const grant = { code: 'INVITE7K', holderEmail: 'guest@example.com' };
+    const withCode = await getOrderDetail(
+      fakePrisma({ order: order({ reservation: { grant } }) }).prisma,
+      OWNER,
+      'e1',
+      'o1'
+    );
+    const without = await getOrderDetail(
+      fakePrisma({ order: order({ reservation: null }) }).prisma,
+      OWNER,
+      'e1',
+      'o1'
+    );
+    expect(withCode.grant).toEqual(grant);
+    expect(without.grant).toBeNull();
+  });
+
   it('builds the breakdown, payment method, and full name', async () => {
     // Cents columns deliberately disagree with the legacy floats (4000/250/4250)
     // to prove the cents columns win when both are present.

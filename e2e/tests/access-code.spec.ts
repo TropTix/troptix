@@ -30,7 +30,7 @@ test('an access code reveals the gated ticket type, and it can be bought', async
     await expect(card).toHaveCount(0);
     await page.getByLabel('Access code').fill('WRONG');
     await page.getByRole('button', { name: 'Apply' }).click();
-    await expect(page.getByRole('alert')).toContainText(/didn't work/);
+    await expect(page.getByRole('alert')).toContainText(/isn't recognised/);
     await expect(card).toHaveCount(0);
   });
 
@@ -105,7 +105,7 @@ test('a shared link with a wrong code opens checkout showing the error', async (
   await page.goto(`/e/${event.id}?code=WRONG`);
   await expect(checkoutStep(page, 'Choose tickets')).toBeVisible();
   await expect(page.getByLabel('Access code')).toHaveValue('WRONG');
-  await expect(page.getByRole('alert')).toContainText(/didn't work/);
+  await expect(page.getByRole('alert')).toContainText(/isn't recognised/);
   await expect(ticketTypeCard(page, event.ticketTypes.gated.id)).toHaveCount(0);
 
   await test.step('Fixing the code clears the stale error for good', async () => {
