@@ -473,6 +473,21 @@ export default function CheckoutSheet({
     });
     setFailedLinkCode(null);
     setUnlock({ ...res, code: code.trim().toUpperCase() });
+    // A public type on the grant may already be picked past the grant's cap.
+    if (res.quantity !== null) {
+      const cap = res.quantity;
+      setSelection((prev) => {
+        const next = { ...prev };
+        let left = cap;
+        for (const t of res.tickets) {
+          const q = Math.min(next[t.id] ?? 0, left);
+          left -= q;
+          if (q === 0) delete next[t.id];
+          else next[t.id] = q;
+        }
+        return next;
+      });
+    }
     return null;
   }
 
