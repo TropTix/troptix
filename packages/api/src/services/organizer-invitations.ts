@@ -6,6 +6,7 @@ import type { PrismaClient } from '@troptix/db';
 import type { Actor } from '../trpc/context';
 import {
   INVITE_DAILY_MAX,
+  INVITE_RESEND_INTERVAL_MS,
   inviteGuestsInputSchema,
   type InviteGuestsInput,
   type InviteGuestsResult,
@@ -293,7 +294,10 @@ export async function resendInvitation(
       );
     }
 
-    if (grant.sentAt && now.getTime() - grant.sentAt.getTime() < DAY_MS) {
+    if (
+      grant.sentAt &&
+      now.getTime() - grant.sentAt.getTime() < INVITE_RESEND_INTERVAL_MS
+    ) {
       throw new ConflictError(
         'This invitation was sent less than a day ago. Try again tomorrow.'
       );

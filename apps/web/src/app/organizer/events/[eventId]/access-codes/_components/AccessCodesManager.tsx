@@ -131,7 +131,7 @@ export function AccessCodesManager({
     const usable = grant.state === 'active' || grant.state === 'inUse';
     return (
       <div className="flex justify-end gap-1">
-        {grant.holderEmail && grant.state === 'active' && (
+        {grant.canResend && (
           <Button
             variant="ghost"
             size="icon"

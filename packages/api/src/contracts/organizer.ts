@@ -311,6 +311,8 @@ export const grantRowSchema = z.object({
   createdAt: z.string().datetime(),
   /** A hold on this grant is open; a revoked grant still lets it finish. */
   checkoutInProgress: z.boolean(),
+  /** An active invitation not sent in the last day (plan decision 23). */
+  canResend: z.boolean(),
   ticketTypes: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 export type GrantRow = z.infer<typeof grantRowSchema>;
@@ -354,6 +356,8 @@ export type UpdateGrantInput = z.infer<typeof updateGrantInputSchema>;
 export const INVITE_BATCH_MAX = 200;
 /** Most invitation emails one organization may send in 24 hours. */
 export const INVITE_DAILY_MAX = 500;
+/** How long after a send an invitation may be resent; keeps resends inside the daily cap. */
+export const INVITE_RESEND_INTERVAL_MS = 86_400_000;
 
 export const inviteGuestsInputSchema = z.object({
   emails: z
