@@ -2,8 +2,8 @@
 -- inserted. An OTP request inserts the auth row before anyone proves they own
 -- the address, so provisioning there filled "Users" with junk and let a
 -- stranger link an existing account by typing its email. Rationale: ADR 0036.
--- The function must never throw: it runs inside the auth write, and an error
--- here blocks the login.
+-- An error here rolls back the auth write on purpose: the sign-in fails visibly
+-- and a retry runs this again, instead of leaving a session with no "Users" row.
 
 create or replace function public.handle_new_auth_user()
 returns trigger
@@ -30,17 +30,8 @@ begin
   end if;
 
   insert into public."Users" ("id", "authUserId", "email", "createdAt", "updatedAt")
-  values (gen_random_uuid()::text, new.id, lower(new.email), now(), now())
-  on conflict do nothing;
-  if not found then
-    raise warning 'handle_new_auth_user: % is already linked to another identity (auth %)',
-      lower(new.email), new.id;
-  end if;
+  values (gen_random_uuid()::text, new.id, lower(new.email), now(), now());
 
-  return new;
-exception when others then
-  raise warning 'handle_new_auth_user failed for % (auth %): %',
-    lower(new.email), new.id, sqlerrm;
   return new;
 end;
 $$;

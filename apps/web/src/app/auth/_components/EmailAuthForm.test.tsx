@@ -2,19 +2,25 @@ import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 const mockSignIn = jest.fn();
+const mockVerify = jest.fn();
+const mockCapture = jest.fn();
 let widgetMounts = 0;
 
 jest.mock('@/lib/supabaseAuth', () => ({
   signInWithMagicLink: (...args: unknown[]) => mockSignIn(...args),
-  verifyEmailOtp: jest.fn(),
+  verifyEmailOtp: (...args: unknown[]) => mockVerify(...args),
   signInWithGoogle: jest.fn(),
+}));
+jest.mock('posthog-js/react', () => ({
+  usePostHog: () => ({ capture: mockCapture }),
 }));
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }),
 }));
 jest.mock('sonner', () => ({
-  toast: { error: jest.fn(), success: jest.fn() },
+  toast: { error: (msg: string) => mockToastError(msg), success: jest.fn() },
 }));
+const mockToastError = jest.fn();
 jest.mock('@marsidev/react-turnstile', () => ({
   Turnstile: ({
     onSuccess,
@@ -61,6 +67,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   mockSignIn.mockReset().mockResolvedValue({ error: null });
+  mockVerify.mockReset();
+  mockCapture.mockReset();
+  mockToastError.mockReset();
   widgetMounts = 0;
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -126,4 +135,51 @@ test('sends without a token when the widget errors', async () => {
   await click('Email me a sign-in link');
 
   expect(mockSignIn).toHaveBeenCalledWith('buyer@example.com', undefined);
+});
+
+async function reachCodeStep() {
+  typeEmail('buyer@example.com');
+  await click('solve');
+  await click('Email me a sign-in link');
+  const otp = container.querySelector(
+    'input[autocomplete="one-time-code"]'
+  ) as HTMLInputElement;
+  const setValue = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    'value'
+  )!.set!;
+  await act(async () => {
+    setValue.call(otp, '123456');
+    otp.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+test('a server error on verify says to try again and reports it', async () => {
+  mockVerify.mockResolvedValue({
+    error: { message: 'db', status: 500, code: 'unexpected_failure' },
+  });
+  await reachCodeStep();
+  await click('Verify code');
+
+  expect(mockToastError).toHaveBeenCalledWith(
+    "We couldn't finish signing you in. Please try again."
+  );
+  expect(mockCapture).toHaveBeenCalledWith('auth_sign_in_failed', {
+    source: 'code',
+    status: 500,
+    error_code: 'unexpected_failure',
+  });
+});
+
+test('a wrong code is not reported', async () => {
+  mockVerify.mockResolvedValue({
+    error: { message: 'expired', status: 403, code: 'otp_expired' },
+  });
+  await reachCodeStep();
+  await click('Verify code');
+
+  expect(mockToastError).toHaveBeenCalledWith(
+    'That code is invalid or expired. Try again or resend it.'
+  );
+  expect(mockCapture).not.toHaveBeenCalled();
 });

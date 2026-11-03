@@ -24,6 +24,13 @@ export const ANALYTICS_EVENTS = {
   orderCompleted: 'order_completed',
 } as const;
 
+/** Sign-in failures our side caused (ADR 0036), not bad or expired codes. */
+export const AUTH_EVENTS = {
+  signInFailed: 'auth_sign_in_failed',
+  /** A Supabase session with no linked "Users" row: the app treats it as signed out. */
+  userUnprovisioned: 'auth_user_unprovisioned',
+} as const;
+
 export type AnalyticsEventName =
   (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
 
