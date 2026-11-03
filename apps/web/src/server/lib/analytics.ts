@@ -6,6 +6,37 @@ import {
 } from '@troptix/api/analytics';
 
 /**
+ * A signed-in auth user with no linked "Users" row: the provisioning trigger
+ * failed (ADR 0036), and the app treats them as signed out. Its Postgres
+ * warning carries the cause.
+ */
+export async function captureUnprovisionedAuthUser(
+  authUserId: string
+): Promise<void> {
+  const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  if (!apiKey) return;
+
+  const client = new PostHog(apiKey, {
+    host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    flushAt: 1,
+    flushInterval: 0,
+    requestTimeout: 3000,
+  });
+  try {
+    client.capture({
+      distinctId: `auth:${authUserId}`,
+      event: 'auth_user_unprovisioned',
+      properties: {
+        $process_person_profile: false,
+        auth_user_id: authUserId,
+      },
+    });
+  } finally {
+    await client.shutdown().catch(() => {});
+  }
+}
+
+/**
  * Create, flush (`shutdown`), and discard a client per capture — a long-lived
  * client in serverless leaks sockets (same pattern as `featureFlags.ts`).
  */

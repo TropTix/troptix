@@ -13,10 +13,17 @@ jest.mock('@/server/prisma', () => ({
 jest.mock('next/headers', () => ({
   cookies: jest.fn(),
 }));
+jest.mock('next/server', () => ({
+  after: (task: () => unknown) => task(),
+}));
+jest.mock('@/server/lib/analytics', () => ({
+  captureUnprovisionedAuthUser: jest.fn(),
+}));
 
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import prisma from '@/server/prisma';
+import { captureUnprovisionedAuthUser } from '@/server/lib/analytics';
 import {
   getCurrentUserProfile,
   getServerUser,
@@ -27,6 +34,7 @@ const mockCreateClient = createClient as jest.Mock;
 const mockCookies = cookies as jest.Mock;
 const mockFindUnique = prisma.users.findUnique as jest.Mock;
 const mockGetClaims = jest.fn();
+const mockCaptureUnprovisioned = captureUnprovisionedAuthUser as jest.Mock;
 
 const SESSION_COOKIE = { name: 'sb-example-auth-token', value: 'jwt' };
 
@@ -71,13 +79,16 @@ describe('getServerUser', () => {
     expect(result?.uid).not.toBe(AUTH_SUB);
   });
 
-  it('returns null when the auth sub has no linked Users row', async () => {
+  it('returns null and reports when the auth sub has no linked Users row', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     mockGetClaims.mockResolvedValue({ data: { claims: { sub: AUTH_SUB } } });
     mockFindUnique.mockResolvedValue(null);
 
     const result = await getServerUser();
 
     expect(result).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(expect.any(String), AUTH_SUB);
+    expect(mockCaptureUnprovisioned).toHaveBeenCalledWith(AUTH_SUB);
   });
 
   it('returns null and skips Prisma when getClaims yields no claims', async () => {
