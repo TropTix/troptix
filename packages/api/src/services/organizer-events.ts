@@ -84,7 +84,7 @@ export async function getEventForEdit(
             saleStartsAt: true,
             saleEndsAt: true,
             ticketingFees: true,
-            grants: ticketTypeGrantsSelect,
+            grants: ticketTypeGrantsSelect(new Date()),
           },
         },
       },

@@ -46,7 +46,7 @@ function fakePrisma(
     );
   const ticketTypesCreate = vi.fn().mockResolvedValue({});
   const ticketTypesUpdate = vi.fn().mockResolvedValue({});
-  const grantUpsert = vi.fn().mockResolvedValue({ id: 'g1' });
+  const grantCreate = vi.fn().mockResolvedValue({ id: 'g1' });
 
   const prisma: Record<string, unknown> = {
     organization: {
@@ -65,7 +65,10 @@ function fakePrisma(
       create: ticketTypesCreate,
       update: ticketTypesUpdate,
     },
-    grant: { upsert: grantUpsert },
+    grant: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: grantCreate,
+    },
     grantTicketType: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -75,7 +78,7 @@ function fakePrisma(
 
   return {
     prisma: prisma as unknown as PrismaClient,
-    grantUpsert,
+    grantCreate,
     eventsFindFirst,
     ticketTypesFindFirst,
     ticketTypesCreate,
@@ -120,7 +123,7 @@ describe('createTicketType', () => {
   });
 
   it('writes the access code as a grant, trimmed and uppercased, and hides the type', async () => {
-    const { prisma, grantUpsert, ticketTypesUpdate } = fakePrisma({
+    const { prisma, grantCreate, ticketTypesUpdate } = fakePrisma({
       paidEnabled: true,
     });
     const { ticketTypeId } = await createTicketType(
@@ -130,8 +133,9 @@ describe('createTicketType', () => {
       input({ priceCents: 2550, accessCode: '  vipList ' })
     );
 
-    expect(grantUpsert.mock.calls[0][0].where).toEqual({
-      eventId_code: { eventId: 'e1', code: 'VIPLIST' },
+    expect(grantCreate.mock.calls[0][0].data).toMatchObject({
+      eventId: 'e1',
+      code: 'VIPLIST',
     });
     expect(ticketTypesUpdate).toHaveBeenCalledWith({
       where: { id: ticketTypeId },
@@ -140,7 +144,7 @@ describe('createTicketType', () => {
   });
 
   it('writes the row with cents, the legacy float and the enum, public without a code', async () => {
-    const { prisma, ticketTypesCreate, ticketTypesUpdate, grantUpsert } =
+    const { prisma, ticketTypesCreate, ticketTypesUpdate, grantCreate } =
       fakePrisma({ paidEnabled: true });
     const { ticketTypeId } = await createTicketType(
       prisma,
@@ -158,7 +162,7 @@ describe('createTicketType', () => {
       price: 25.5,
     });
     expect(ticketTypesUpdate).not.toHaveBeenCalled();
-    expect(grantUpsert).not.toHaveBeenCalled();
+    expect(grantCreate).not.toHaveBeenCalled();
   });
 });
 

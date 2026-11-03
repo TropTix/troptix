@@ -8,10 +8,10 @@ import type {
   ViewAsInput,
 } from '../contracts/organizer';
 import {
+  hasActiveGrant,
   legacyAccessCodeOf,
   ticketTypeGrantsSelect,
 } from './_shared/access-code';
-import { deriveGrantState } from './_shared/grants';
 import { NotFoundError } from './_shared/errors';
 import { calculateFeesCents } from './_shared/fees';
 import { toCents } from './_shared/organizerMapping';
@@ -57,7 +57,7 @@ export async function listTicketTypes(
             saleEndsAt: true,
             ticketingFees: true,
             hidden: true,
-            grants: ticketTypeGrantsSelect,
+            grants: ticketTypeGrantsSelect(now),
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -128,10 +128,7 @@ function buildTicketTypes(
       ticketingFees: ticketType.ticketingFees,
       accessCode: legacyAccessCodeOf(ticketType.grants),
       hidden: ticketType.hidden,
-      // An exhausted grant with a hold open may still free up, so it counts.
-      hasActiveCode: ticketType.grants.some(({ grant }) =>
-        ['active', 'inUse'].includes(deriveGrantState(grant, true, now))
-      ),
+      hasActiveCode: hasActiveGrant(ticketType.grants, now),
     };
   });
 }

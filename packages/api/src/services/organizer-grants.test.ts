@@ -280,7 +280,7 @@ describe('ticket types alongside grants', () => {
       accessCode: null,
     });
 
-    await createGrant(prisma, OWNER, EVENT_ID, {
+    const { grantId } = await createGrant(prisma, OWNER, EVENT_ID, {
       ...limits,
       maxUses: 1,
       holderEmail: 'one@example.com',
@@ -290,6 +290,38 @@ describe('ticket types alongside grants', () => {
       hasActiveCode: true,
       accessCode: null,
     });
+
+    await prisma.grant.update({
+      where: { id: grantId },
+      data: { usedCount: 1 },
+    });
+    expect(await row()).toMatchObject({ hasActiveCode: false });
+  });
+
+  it('refuses, through the old code field, a code a limited or revoked grant owns', async () => {
+    const { ticketTypeId } = await createTicketType(prisma, OWNER, EVENT_ID, {
+      ...form,
+      hidden: true,
+    });
+    const { code } = await createGrant(prisma, OWNER, EVENT_ID, {
+      ...limits,
+      maxUses: 5,
+      ticketTypeIds: [ticketTypeId],
+    });
+    const other = await createTicketType(prisma, OWNER, EVENT_ID, form);
+
+    await expect(
+      updateTicketType(prisma, OWNER, EVENT_ID, other.ticketTypeId, {
+        ...form,
+        accessCode: code,
+      })
+    ).rejects.toBeInstanceOf(ConflictError);
+    const after = await prisma.ticketTypes.findUniqueOrThrow({
+      where: { id: other.ticketTypeId },
+      include: { grants: true },
+    });
+    expect(after.hidden).toBe(false);
+    expect(after.grants).toEqual([]);
   });
 
   it('leaves grants alone when the form sends the hidden toggle', async () => {

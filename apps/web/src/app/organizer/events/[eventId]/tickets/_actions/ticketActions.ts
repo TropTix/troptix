@@ -15,6 +15,7 @@ import {
   createTicketType as createTicketTypeService,
   updateTicketType as updateTicketTypeService,
   toCents,
+  ConflictError,
   NotFoundError,
   PaidTicketingNotEnabledError,
   UnauthorizedError,
@@ -118,6 +119,9 @@ function failure(
       error:
         'Paid tickets need approval — contact us to enable them, or make this ticket free.',
     };
+  }
+  if (error instanceof ConflictError) {
+    return { success: false, error: error.message };
   }
   if (error instanceof NotFoundError) {
     return { success: false, error: messages.notFound };
