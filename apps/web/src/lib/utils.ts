@@ -23,7 +23,7 @@ export function priceLabelFor(fromPriceCents: number | null): string {
 
 /** Display-only reference; the id stays the real key in URLs. */
 export function formatOrderNumber(id: string): string {
-  return `TT-${id.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+  return `TT-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 }
 
 export function initials(name: string): string {
