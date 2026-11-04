@@ -82,15 +82,3 @@ export async function uploadEventFlyer(file: File): Promise<string> {
   if (error) throw error;
   return path;
 }
-
-export async function deleteEventFlyer(
-  value: string | null | undefined
-): Promise<void> {
-  if (!value || isAbsoluteUrl(value)) return;
-  const supabase = createClient();
-  const path = value.replace(/^\/+/, '');
-  const { error } = await supabase.storage
-    .from(EVENT_FLYERS_BUCKET)
-    .remove([path]);
-  if (error && !/not\s*found/i.test(error.message)) throw error;
-}

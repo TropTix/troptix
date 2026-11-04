@@ -13,6 +13,7 @@
     "test:watch": "jest --watch",
     "db:new": "tsx --env-file=.env scripts/new-migration.ts",
     "db:apply": "tsx --env-file=.env scripts/apply-migration.ts",
+    "gc:flyers": "tsx --env-file=.env scripts/gc-flyers.ts",
     "knip": "knip"
   },
   "engines": {

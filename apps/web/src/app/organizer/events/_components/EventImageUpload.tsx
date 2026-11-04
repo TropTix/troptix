@@ -1,11 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useId } from 'react';
-import {
-  uploadEventFlyer,
-  deleteEventFlyer,
-  eventFlyerUrl,
-} from '@/lib/supabase/storage';
+import { uploadEventFlyer, eventFlyerUrl } from '@/lib/supabase/storage';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -74,24 +70,11 @@ export function EventImageUploader({
     void upload(selectedFile);
   };
 
-  const handleRemoveImage = async () => {
+  const handleRemoveImage = () => {
     setError(null);
     setPendingUrl(null);
     setIsUploading(false);
-    const previous = currentImageUrl;
     onUploadComplete(null, null);
-
-    if (previous) {
-      try {
-        await deleteEventFlyer(previous);
-      } catch (deleteError: unknown) {
-        console.error('Failed to delete existing image:', deleteError);
-        setError(
-          'Could not remove existing image from storage, but cleared from form.'
-        );
-      }
-    }
-
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
