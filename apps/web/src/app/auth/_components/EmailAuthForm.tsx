@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input';
 import { signInWithMagicLink, verifyEmailOtp } from '@/lib/supabaseAuth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Turnstile } from '@marsidev/react-turnstile';
+import { AUTH_EVENTS } from '@troptix/api/analytics';
+import { usePostHog } from 'posthog-js/react';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useState } from 'react';
@@ -50,6 +52,7 @@ const decoyStyle: CSSProperties = {
 
 export function EmailAuthForm() {
   const router = useRouter();
+  const posthog = usePostHog();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
   const [captchaToken, setCaptchaToken] = useState<string>();
@@ -95,6 +98,17 @@ export function EmailAuthForm() {
   const onVerifyCode = async ({ code }: CodeValues) => {
     if (!sentTo) return;
     const { error } = await verifyEmailOtp(sentTo, code);
+    // A 5xx is our side failing (e.g. the provisioning trigger, ADR 0036); the
+    // code itself may still be good, so keep it for the retry.
+    if (error && (error.status ?? 0) >= 500) {
+      posthog.capture(AUTH_EVENTS.signInFailed, {
+        source: 'code',
+        status: error.status,
+        error_code: error.code,
+      });
+      toast.error("We couldn't finish signing you in. Please try again.");
+      return;
+    }
     if (error) {
       toast.error('That code is invalid or expired. Try again or resend it.');
       codeForm.reset();

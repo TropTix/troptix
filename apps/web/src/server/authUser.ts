@@ -1,6 +1,8 @@
 import type { Role } from '@troptix/db';
 import { cookies } from 'next/headers';
+import { after } from 'next/server';
 import prisma from '@/server/prisma';
+import { captureUnprovisionedAuthUser } from '@/server/lib/analytics';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -52,8 +54,8 @@ async function resolveByAuthUserId(
     select: { id: true, email: true, role: true, isPlatformOwner: true },
   });
   if (!appUser) {
-    // Authenticated with Supabase but no linked Users row (e.g. an email the
-    // provisioning trigger couldn't match). Treat as unauthenticated.
+    console.error('Signed-in auth user has no linked Users row:', authUserId);
+    after(() => captureUnprovisionedAuthUser(authUserId));
     return null;
   }
   return {

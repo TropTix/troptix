@@ -5,11 +5,21 @@
 jest.mock('@/lib/supabase/server', () => ({
   createClient: jest.fn(),
 }));
+jest.mock('next/server', () => ({
+  ...jest.requireActual('next/server'),
+  after: (task: () => unknown) => task(),
+}));
+jest.mock('@/server/lib/analytics', () => ({
+  captureSignInFailed: jest.fn(),
+}));
 
+import type { AuthError } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { captureSignInFailed } from '@/server/lib/analytics';
 import { GET } from './route';
 
 const mockCreateClient = createClient as jest.Mock;
+const mockCaptureSignInFailed = captureSignInFailed as jest.Mock;
 
 const APP_ORIGIN = 'https://example.com';
 
@@ -21,8 +31,8 @@ function mockSupabase({
   exchangeError = null,
   verifyError = null,
 }: {
-  exchangeError?: Error | null;
-  verifyError?: Error | null;
+  exchangeError?: Partial<AuthError> | null;
+  verifyError?: Partial<AuthError> | null;
 } = {}) {
   mockCreateClient.mockResolvedValue({
     auth: {
@@ -108,5 +118,41 @@ describe('flow cases', () => {
     const location = res.headers.get('location')!;
 
     expect(location).toBe(`${APP_ORIGIN}/auth/signin?error=auth`);
+  });
+
+  it('does not report a bad or expired link', async () => {
+    mockSupabase({ verifyError: { message: 'expired', status: 403 } });
+
+    await GET(makeRequest('?token_hash=tok123&type=email'));
+
+    expect(mockCaptureSignInFailed).not.toHaveBeenCalled();
+  });
+
+  it('reports a server error from Supabase', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockSupabase({
+      exchangeError: { message: 'db', status: 500, code: 'unexpected_failure' },
+    });
+
+    const res = await GET(makeRequest('?code=abc123'));
+
+    expect(res.headers.get('location')).toBe(
+      `${APP_ORIGIN}/auth/signin?error=auth`
+    );
+    expect(mockCaptureSignInFailed).toHaveBeenCalledWith({
+      status: 500,
+      errorCode: 'unexpected_failure',
+    });
+  });
+
+  it('reports a server_error redirect from Supabase (Google sign-in)', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockSupabase();
+
+    await GET(makeRequest('?error=server_error&error_code=unexpected_failure'));
+
+    expect(mockCaptureSignInFailed).toHaveBeenCalledWith({
+      errorCode: 'unexpected_failure',
+    });
   });
 });

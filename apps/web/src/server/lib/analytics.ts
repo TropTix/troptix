@@ -1,9 +1,54 @@
 import { PostHog } from 'posthog-node';
 import {
   ANALYTICS_EVENTS,
+  AUTH_EVENTS,
   type CheckoutAnalytics,
   type OrderCompletedProps,
 } from '@troptix/api/analytics';
+
+async function captureAnonymous(
+  distinctId: string,
+  event: string,
+  properties: Record<string, unknown>
+): Promise<void> {
+  const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  if (!apiKey) return;
+
+  const client = new PostHog(apiKey, {
+    host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    flushAt: 1,
+    flushInterval: 0,
+    requestTimeout: 3000,
+  });
+  try {
+    client.capture({
+      distinctId,
+      event,
+      properties: { ...properties, $process_person_profile: false },
+    });
+  } finally {
+    await client.shutdown().catch(() => {});
+  }
+}
+
+export function captureUnprovisionedAuthUser(
+  authUserId: string
+): Promise<void> {
+  return captureAnonymous(`auth:${authUserId}`, AUTH_EVENTS.userUnprovisioned, {
+    auth_user_id: authUserId,
+  });
+}
+
+export function captureSignInFailed(props: {
+  status?: number;
+  errorCode?: string;
+}): Promise<void> {
+  return captureAnonymous('server:auth-callback', AUTH_EVENTS.signInFailed, {
+    source: 'callback',
+    status: props.status,
+    error_code: props.errorCode,
+  });
+}
 
 /**
  * Create, flush (`shutdown`), and discard a client per capture — a long-lived
