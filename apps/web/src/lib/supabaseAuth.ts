@@ -1,21 +1,12 @@
 import { createClient } from '@/lib/supabase/client';
 
-export async function signInWithMagicLink(
-  email: string,
-  captchaToken?: string
-) {
+export async function sendSignInCode(email: string, captchaToken?: string) {
   const supabase = createClient();
-  return supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${window.location.origin}/auth/callback`,
-      captchaToken,
-    },
-  });
+  return supabase.auth.signInWithOtp({ email, options: { captchaToken } });
 }
 
 /**
- * Verify the 6-digit code from the magic-link email (the `{{ .Token }}` in the
+ * Verify the 6-digit code from the sign-in email (the `{{ .Token }}` in the
  * template). `type: 'email'` covers both the signup and returning-login cases.
  */
 export async function verifyEmailOtp(email: string, token: string) {
