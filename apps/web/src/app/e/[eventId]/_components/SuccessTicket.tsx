@@ -66,7 +66,7 @@ export default function SuccessTicket({
           {qty === 1 ? 'ticket' : 'tickets'}
         </p>
 
-        <div className="relative mx-auto mt-5 aspect-4/5 w-full max-w-[300px] overflow-hidden rounded-3xl shadow-2xl duration-500 animate-in fade-in zoom-in-95">
+        <div className="relative mx-auto mt-5 aspect-4/5 w-full max-w-[300px] overflow-hidden rounded-3xl shadow-2xl duration-500 animate-in fade-in zoom-in-95 motion-reduce:[--tw-enter-scale:1]">
           <Image
             src={poster}
             alt={event.name}
