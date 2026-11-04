@@ -457,6 +457,7 @@ model Reservation {
   @@index([eventId])
   @@index([status])
   @@index([expiresAt])
+  @@index([status, expiresAt])
 }
 
 model ReservationItem {

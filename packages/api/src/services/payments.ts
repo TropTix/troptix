@@ -381,39 +381,79 @@ export interface SweepResult {
   released: number;
   /** Holds kept because their Session couldn't be expired (paid / transient). */
   keptLive: number;
+  /** Another run held the lock, so this one did nothing. */
+  skipped: boolean;
 }
+
+/** Holds per run; the once-a-minute cron drains a backlog at this rate. */
+export const SWEEP_BATCH = 200;
+// The lock transaction pins one pool connection and the pool holds 5.
+const SWEEP_CONCURRENCY = 4;
+const SWEEP_RUN_TIMEOUT_MS = 60_000;
+/** Advisory lock name, owned by this sweep alone. */
+export const SWEEP_LOCK_NAME = 'sweepExpiredHolds';
+
+type HoldOutcome = 'released' | 'keptLive' | 'noop';
 
 /**
  * Expire the Stripe Session BEFORE releasing inventory (ADR 0018): Stripe only
  * expires an OPEN Session, so success proves it can never be paid; on failure
  * the hold stays put. Never "inventory released + a still-payable Session".
+ *
+ * A transaction-scoped advisory lock keeps overlapping cron runs from doing the
+ * same Stripe work twice; session-level locks don't survive the pooler.
  */
 export async function sweepExpiredHolds(
   prisma: PrismaClient,
   stripe: Stripe,
   now: Date = new Date()
 ): Promise<SweepResult> {
-  const expired = await prisma.reservation.findMany({
-    where: { status: ReservationStatus.HELD, expiresAt: { lt: now } },
-    select: { id: true, stripeCheckoutSessionId: true },
-  });
+  return prisma.$transaction(
+    async (tx) => {
+      const [{ locked }] = await tx.$queryRaw<[{ locked: boolean }]>`
+        select pg_try_advisory_xact_lock(hashtext(${SWEEP_LOCK_NAME})) as locked`;
+      if (!locked) return { released: 0, keptLive: 0, skipped: true };
 
-  let released = 0;
-  let keptLive = 0;
-  for (const reservation of expired) {
-    if (reservation.stripeCheckoutSessionId) {
-      try {
-        await stripe.checkout.sessions.expire(
-          reservation.stripeCheckoutSessionId
+      const expired = await tx.reservation.findMany({
+        where: { status: ReservationStatus.HELD, expiresAt: { lt: now } },
+        orderBy: { expiresAt: 'asc' },
+        take: SWEEP_BATCH,
+        select: { id: true, stripeCheckoutSessionId: true },
+      });
+
+      let released = 0;
+      let keptLive = 0;
+      for (let i = 0; i < expired.length; i += SWEEP_CONCURRENCY) {
+        const outcomes = await Promise.allSettled(
+          expired
+            .slice(i, i + SWEEP_CONCURRENCY)
+            .map((hold) => expireOne(prisma, stripe, hold))
         );
-      } catch {
-        // Already paid/complete (can't expire) or a transient error — keep the
-        // hold; conversion or a later sweep resolves it. Never release here.
-        keptLive++;
-        continue;
+        for (const outcome of outcomes) {
+          if (outcome.status === 'rejected') throw outcome.reason;
+          if (outcome.value === 'released') released++;
+          else if (outcome.value === 'keptLive') keptLive++;
+        }
       }
+      return { released, keptLive, skipped: false };
+    },
+    { timeout: SWEEP_RUN_TIMEOUT_MS }
+  );
+}
+
+async function expireOne(
+  prisma: PrismaClient,
+  stripe: Stripe,
+  hold: { id: string; stripeCheckoutSessionId: string | null }
+): Promise<HoldOutcome> {
+  if (hold.stripeCheckoutSessionId) {
+    try {
+      await stripe.checkout.sessions.expire(hold.stripeCheckoutSessionId);
+    } catch {
+      // Already paid/complete (can't expire) or a transient error — keep the
+      // hold; conversion or a later sweep resolves it. Never release here.
+      return 'keptLive';
     }
-    if (await expireHold(prisma, reservation.id)) released++;
   }
-  return { released, keptLive };
+  return (await expireHold(prisma, hold.id)) ? 'released' : 'noop';
 }
