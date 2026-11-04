@@ -87,6 +87,13 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --transition-duration-sm: 150ms;
+  --transition-duration-md: 200ms;
+  --transition-duration-lg: 300ms;
+  --transition-duration-xl: 500ms;
 }
 
 @utility container {
