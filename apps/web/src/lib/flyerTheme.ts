@@ -130,9 +130,7 @@ function hueDist(a: number, b: number): number {
  * The image must be loaded and fetched with crossOrigin="anonymous" — a tainted
  * canvas throws and every palette silently comes back null.
  */
-export function extractFlyerPalette(
-  img: HTMLImageElement
-): FlyerPalette | null {
+function extractFlyerPalette(img: HTMLImageElement): FlyerPalette | null {
   try {
     const w = 96;
     const h = Math.max(
@@ -218,7 +216,7 @@ export function extractFlyerPaletteFromUrl(
 const t = ({ h, s, l }: HSL) =>
   `hsl(${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
 
-export type ThemeVars = Record<string, string>;
+type ThemeVars = Record<string, string>;
 
 export function leadColor(palette: FlyerPalette | null): string | null {
   if (!palette) return null;

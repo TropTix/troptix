@@ -28,7 +28,7 @@ export function getTimeRangeFormatter(start: Date, end: Date) {
   return `${formatInTimeZone(start, 'America/New_York', 'h:mm a')} - ${formatInTimeZone(end, 'America/New_York', 'h:mm a')}`;
 }
 
-export const formatCurrency = (amount: number | null): string => {
+const formatCurrency = (amount: number | null): string => {
   if (amount === null || isNaN(amount)) return '$--.--';
   return amount.toLocaleString('en-US', {
     style: 'currency',

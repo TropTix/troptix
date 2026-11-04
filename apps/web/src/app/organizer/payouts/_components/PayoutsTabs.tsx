@@ -2,8 +2,8 @@ import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
 
-export const PAYOUT_TABS = ['overview', 'requests', 'settings'] as const;
-export type PayoutTab = (typeof PAYOUT_TABS)[number];
+const PAYOUT_TABS = ['overview', 'requests', 'settings'] as const;
+type PayoutTab = (typeof PAYOUT_TABS)[number];
 
 export function parsePayoutTab(value: string | undefined): PayoutTab {
   return PAYOUT_TABS.find((tab) => tab === value) ?? 'overview';

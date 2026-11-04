@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 // instagram/twitter are stored as usernames (URL built here); linkedin/website
 // are full URLs (a scheme is prepended if missing).
 
-export type OrgSocials = {
+type OrgSocials = {
   instagram: string | null;
   twitter: string | null;
   linkedin: string | null;

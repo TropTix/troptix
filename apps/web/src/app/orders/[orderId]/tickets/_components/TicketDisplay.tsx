@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, CalendarDays, MapPin } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatOrderNumber } from '@/lib/utils';
 
-export type TicketInfo = {
+type TicketInfo = {
   id: string;
   status: string;
   firstName: string;

@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 
 const displayFont = Bricolage_Grotesque({ subsets: ['latin'] });
 
-export type OrderCardProps = {
+type OrderCardProps = {
   order: {
     id: string;
     orderNumber: string;

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
  * (ADR 0016) — public URLs are derived at render time by `eventFlyerUrl()`.
  */
 
-export const EVENT_FLYERS_BUCKET = 'event-flyers';
+const EVENT_FLYERS_BUCKET = 'event-flyers';
 
 export const DEFAULT_EVENT_IMAGE = '/placeholder-event.jpg';
 
@@ -22,7 +22,7 @@ export function eventFlyerUrl(value: string | null | undefined): string | null {
   return `${PUBLIC_BASE}/${EVENT_FLYERS_BUCKET}/${path}`;
 }
 
-export const ORGANIZATION_LOGOS_BUCKET = 'organization-logos';
+const ORGANIZATION_LOGOS_BUCKET = 'organization-logos';
 
 export function organizationLogoUrl(
   value: string | null | undefined
@@ -50,18 +50,6 @@ export async function uploadOrganizationLogo(file: File): Promise<string> {
 
   if (error) throw error;
   return path;
-}
-
-export async function deleteOrganizationLogo(
-  value: string | null | undefined
-): Promise<void> {
-  if (!value || isAbsoluteUrl(value)) return;
-  const supabase = createClient();
-  const path = value.replace(/^\/+/, '');
-  const { error } = await supabase.storage
-    .from(ORGANIZATION_LOGOS_BUCKET)
-    .remove([path]);
-  if (error && !/not\s*found/i.test(error.message)) throw error;
 }
 
 export async function uploadEventFlyer(file: File): Promise<string> {
