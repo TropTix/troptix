@@ -228,6 +228,7 @@ const eventFieldsSchema = z.object({
   name: z.string().min(3),
   description: z.string().optional(),
   isPrivate: z.boolean().optional(),
+  hidePrice: z.boolean().optional(),
   startsAt: z.date(),
   endsAt: z.date(),
   venue: z.string().min(1),

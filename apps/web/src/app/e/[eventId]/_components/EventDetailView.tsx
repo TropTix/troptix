@@ -165,6 +165,7 @@ export default function EventDetailView({
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
   const priceLabel = priceLabelFor(event.fromPriceCents);
+  const showPrice = !event.hidePrice || event.fromPriceCents == null;
 
   const aboutIsLong = (event.description?.length ?? 0) > 400;
 
@@ -351,8 +352,10 @@ export default function EventDetailView({
       <div className="fixed inset-x-0 bottom-0 z-40 animate-in border-t border-border bg-background/95 backdrop-blur-xl duration-300 slide-in-from-bottom">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-5 py-3.5">
           <div className="min-w-0 flex-1">
-            <div className="text-lg font-extrabold">{priceLabel}</div>
-            {!isFree && !eventEnded && (
+            {showPrice && (
+              <div className="text-lg font-extrabold">{priceLabel}</div>
+            )}
+            {showPrice && !isFree && !eventEnded && (
               <div className="text-xs text-muted-foreground">
                 fees calculated at checkout
               </div>

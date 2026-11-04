@@ -1,0 +1,1 @@
+ALTER TABLE "Events" ADD COLUMN "hidePrice" BOOLEAN NOT NULL DEFAULT false;

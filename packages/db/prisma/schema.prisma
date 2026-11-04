@@ -341,6 +341,7 @@ model Events {
   updatedAt DateTime  @updatedAt
   isDraft   Boolean   @default(true)
   isPrivate Boolean   @default(false)
+  hidePrice Boolean   @default(false)
   deletedAt DateTime?
 
   imageUrl        String? @db.VarChar(2000)
