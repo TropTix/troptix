@@ -1,57 +1,327 @@
-<!--
-  TropTix passwordless sign-in email.
+<!doctype html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <!--
+      TropTix passwordless sign-in email.
 
-  Paste this SAME html into BOTH templates in the Supabase dashboard
-  (Authentication -> Emails -> Templates) so new signups and returning logins
-  look identical:
-    - "Confirm signup"  (sent the first time an email is used)
-    - "Magic Link"      (sent for returning logins)
+      Paste this SAME html into BOTH templates in the Supabase dashboard
+      (Authentication -> Emails -> Templates) so new signups and returning logins
+      look identical:
+        - "Confirm signup"  (sent the first time an email is used)
+        - "Magic Link"      (sent for returning logins)
 
-  Supabase variables used:
-    {{ .Token }}            the 6-digit code to type on the sign-in page
+      Supabase variables used:
+        .Token   the 6-digit code to type on the sign-in page
 
-  No sign-in link: mail scanners open links, which confirms the
-  address and provisions a "Users" row for a request nobody finished (ADR 0038).
--->
-<table
-  role="presentation"
-  width="100%"
-  cellpadding="0"
-  cellspacing="0"
-  style="background:#f4f4f5;margin:0;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
->
-  <tr>
-    <td align="center">
-      <table
-        role="presentation"
-        width="100%"
-        cellpadding="0"
-        cellspacing="0"
-        style="max-width:480px;background:#ffffff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;"
-      >
-        <tr>
-          <td style="padding:32px 32px 8px 32px;">
-            <h1 style="margin:0 0 8px 0;font-size:22px;font-weight:700;color:#18181b;">
-              Sign in to TropTix
-            </h1>
-            <p style="margin:0 0 24px 0;font-size:15px;line-height:1.5;color:#52525b;">
-              Enter this code on the sign-in page. It works once and expires
-              in 1 hour.
-            </p>
-            <div
-              style="font-size:30px;font-weight:700;letter-spacing:8px;color:#18181b;background:#f4f4f5;border-radius:8px;text-align:center;padding:16px 0;"
-            >
-              {{ .Token }}
-            </div>
+      No sign-in link: mail scanners open links, which confirms the
+      address and provisions a "Users" row for a request nobody finished (ADR 0038).
+      "1 hour" matches otp_expiry in config.toml; change both together.
+    -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>Your TropTix sign-in code</title>
+    <!--[if mso
+      ]><style>
+        table,
+        td,
+        a,
+        span,
+        p {
+          font-family: Arial, Helvetica, sans-serif !important;
+        }
+      </style><!
+    [endif]-->
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        -webkit-text-size-adjust: 100%;
+      }
+      a {
+        color: #4f46e5;
+      }
+      @media (max-width: 620px) {
+        .px {
+          padding-left: 24px !important;
+          padding-right: 24px !important;
+        }
+        .code {
+          font-size: 34px !important;
+          letter-spacing: 8px !important;
+        }
+      }
+      @media (prefers-color-scheme: dark) {
+        .bg {
+          background-color: #111827 !important;
+        }
+        .card {
+          background-color: #1e2533 !important;
+          border-color: #374151 !important;
+        }
+        .ink {
+          color: #f3f4f6 !important;
+        }
+        .muted {
+          color: #9ca3af !important;
+        }
+        .codebox {
+          background-color: #272f45 !important;
+          border-color: #4f46e5 !important;
+        }
+        .codetxt {
+          color: #c7d2fe !important;
+        }
+      }
+    </style>
+  </head>
+  <body class="bg" style="margin: 0; padding: 0; background-color: #f8fafc">
+    <span
+      style="
+        display: none;
+        font-size: 1px;
+        line-height: 1px;
+        max-height: 0;
+        max-width: 0;
+        opacity: 0;
+        overflow: hidden;
+        mso-hide: all;
+      "
+      >Your TropTix sign-in code is {{ .Token }}. It expires in 1 hour. Never
+      share it with anyone.</span
+    >
 
-            <p style="margin:24px 0 0 0;font-size:13px;line-height:1.5;color:#a1a1aa;">
-              If you didn&rsquo;t request this, you can safely ignore this email.
-            </p>
-          </td>
-        </tr>
-      </table>
+    <table
+      role="presentation"
+      class="bg"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      bgcolor="#F8FAFC"
+      style="background-color: #f8fafc"
+    >
+      <tr>
+        <td align="center" style="padding: 40px 12px">
+          <table
+            role="presentation"
+            width="600"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="width: 100%; max-width: 600px"
+          >
+            <tr>
+              <td
+                class="px"
+                style="
+                  padding: 0 40px 24px 40px;
+                  font-family: Arial, Helvetica, sans-serif;
+                  font-size: 24px;
+                  line-height: 28px;
+                  font-weight: bold;
+                  letter-spacing: -0.5px;
+                  color: #6366f1;
+                "
+              >
+                TropTix
+              </td>
+            </tr>
 
-      <p style="margin:16px 0 0 0;font-size:12px;color:#a1a1aa;">TropTix</p>
-    </td>
-  </tr>
-</table>
+            <tr>
+              <td>
+                <table
+                  role="presentation"
+                  class="card"
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  border="0"
+                  bgcolor="#FFFFFF"
+                  style="
+                    background-color: #ffffff;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 12px;
+                  "
+                >
+                  <tr>
+                    <td
+                      class="px"
+                      style="
+                        padding: 40px 40px 8px 40px;
+                        font-family: Arial, Helvetica, sans-serif;
+                      "
+                    >
+                      <h1
+                        class="ink"
+                        style="
+                          margin: 0;
+                          font-size: 26px;
+                          line-height: 32px;
+                          font-weight: bold;
+                          letter-spacing: -0.5px;
+                          color: #1e293b;
+                        "
+                      >
+                        Your sign-in code
+                      </h1>
+                      <p
+                        class="muted"
+                        style="
+                          margin: 12px 0 0 0;
+                          font-size: 16px;
+                          line-height: 24px;
+                          color: #6b7280;
+                        "
+                      >
+                        Enter this code on TropTix to sign in. It can only be
+                        used once.
+                      </p>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td class="px" style="padding: 24px 40px">
+                      <table
+                        role="presentation"
+                        class="codebox"
+                        width="100%"
+                        cellpadding="0"
+                        cellspacing="0"
+                        border="0"
+                        bgcolor="#EEF2FF"
+                        style="
+                          background-color: #eef2ff;
+                          border: 1px solid #c7d2fe;
+                          border-radius: 8px;
+                        "
+                      >
+                        <tr>
+                          <td
+                            align="center"
+                            style="padding: 24px 16px 8px 16px"
+                          >
+                            <span
+                              class="code codetxt"
+                              style="
+                                font-family: 'Courier New', Courier, monospace;
+                                font-size: 40px;
+                                line-height: 48px;
+                                font-weight: bold;
+                                letter-spacing: 12px;
+                                color: #312e81;
+                              "
+                              >{{ .Token }}</span
+                            >
+                          </td>
+                        </tr>
+                        <tr>
+                          <td
+                            align="center"
+                            class="muted"
+                            style="
+                              padding: 0 16px 20px 16px;
+                              font-family: Arial, Helvetica, sans-serif;
+                              font-size: 14px;
+                              line-height: 20px;
+                              color: #4b5563;
+                            "
+                          >
+                            Expires in 1 hour
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td
+                      class="px"
+                      style="
+                        padding: 0 40px 32px 40px;
+                        font-family: Arial, Helvetica, sans-serif;
+                      "
+                    >
+                      <p
+                        class="ink"
+                        style="
+                          margin: 0;
+                          font-size: 15px;
+                          line-height: 22px;
+                          color: #1e293b;
+                        "
+                      >
+                        <strong>Never share this code.</strong> TropTix will
+                        never call, text, or email you asking for it.
+                      </p>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td
+                      class="px"
+                      style="
+                        padding: 0 40px 40px 40px;
+                        font-family: Arial, Helvetica, sans-serif;
+                      "
+                    >
+                      <p
+                        class="muted"
+                        style="
+                          margin: 0;
+                          font-size: 14px;
+                          line-height: 22px;
+                          color: #4b5563;
+                        "
+                      >
+                        Didn't request this code? You can safely ignore this
+                        email. No one can sign in without it. If you keep
+                        getting codes you didn't ask for, email
+                        <a
+                          href="mailto:info@usetroptix.com"
+                          style="
+                            color: #4f46e5;
+                            font-weight: bold;
+                            text-decoration: underline;
+                          "
+                          >info@usetroptix.com</a
+                        >.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td
+                class="px muted"
+                align="center"
+                style="
+                  padding: 28px 40px 0 40px;
+                  font-family: Arial, Helvetica, sans-serif;
+                  font-size: 12px;
+                  line-height: 18px;
+                  color: #6b7280;
+                "
+              >
+                You're receiving this because a sign-in code was requested for
+                {{ .Email }}. This is a security email and can't be unsubscribed
+                from.<br /><br />
+                <a
+                  href="https://www.usetroptix.com/privacypolicy"
+                  style="color: #6b7280; text-decoration: underline"
+                  >Privacy</a
+                ><br /><br />
+                TropTix · Kingston, Jamaica
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
