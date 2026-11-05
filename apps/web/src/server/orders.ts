@@ -1,27 +1,48 @@
-import {
-  Orders as PrismaOrder,
-  Tickets as PrismaTicket,
-  Events as PrismaEvent,
-  TicketTypes as PrismaTicketType,
-} from '@troptix/db';
+import type { Prisma } from '@troptix/db';
 import prisma from '@/server/prisma';
 
-export interface EnrichedTicket extends PrismaTicket {
-  ticketType: PrismaTicketType | null;
-}
-export interface EnrichedOrder extends PrismaOrder {
-  event: PrismaEvent;
-  _count: { tickets: number };
-}
+const ORDER_SELECT = {
+  id: true,
+  status: true,
+  type: true,
+  createdAt: true,
+  total: true,
+  totalCents: true,
+  subtotal: true,
+  subtotalCents: true,
+  fees: true,
+  feesCents: true,
+  cardType: true,
+  cardLast4: true,
+  event: {
+    select: {
+      id: true,
+      name: true,
+      imageUrl: true,
+      startsAt: true,
+      endsAt: true,
+      venue: true,
+    },
+  },
+  _count: { select: { tickets: true } },
+} satisfies Prisma.OrdersSelect;
+
+const RECEIPT_TICKET_SELECT = {
+  ticketsType: true,
+  total: true,
+  ticketType: { select: { id: true, name: true } },
+} satisfies Prisma.TicketsSelect;
+
+type EnrichedOrder = Prisma.OrdersGetPayload<{ select: typeof ORDER_SELECT }>;
+type EnrichedTicket = Prisma.TicketsGetPayload<{
+  select: typeof RECEIPT_TICKET_SELECT;
+}>;
 
 export async function getOrder(orderId: string): Promise<EnrichedOrder | null> {
   try {
     return await prisma.orders.findUnique({
       where: { id: orderId },
-      include: {
-        event: true,
-        _count: { select: { tickets: true } },
-      },
+      select: ORDER_SELECT,
     });
   } catch (error) {
     console.error('Failed to fetch order:', error);
@@ -34,7 +55,7 @@ export async function getOrderTickets(
 ): Promise<EnrichedTicket[]> {
   return prisma.tickets.findMany({
     where: { orderId },
-    include: { ticketType: true },
+    select: RECEIPT_TICKET_SELECT,
     orderBy: { createdAt: 'asc' },
   });
 }
