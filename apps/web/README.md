@@ -109,7 +109,7 @@ Event times are venue-local and render through the shared formatter. Operational
 
 ## Deploys
 
-Vercel builds production on every merge to `main`. Before a preview build, Vercel runs `scripts/vercel-ignore-build.sh` and skips the build when nothing the web build reads has changed since the branch's last successful deploy. Changes limited to `docs/`, `supabase/`, `apps/mobile`, `apps/organizer`, `.github/`, Markdown, or test files get no new preview. A branch's first push always builds. Put `[skip preview]` in a commit message to skip on purpose. To build anyway, use **Redeploy** in the Vercel dashboard and untick "Use project's Ignore Build Step".
+Vercel builds production on every merge to `main`. Pushes that touch only other workspace packages, such as `apps/mobile`, never start a preview: the project has Vercel's built-in skipping of unaffected projects turned on. Before any other preview build, Vercel runs `scripts/vercel-ignore-build.sh` and skips the build when nothing the web build reads has changed since the branch's last successful deploy. Changes limited to `docs/`, `supabase/`, `apps/mobile`, `apps/organizer`, `.github/`, Markdown, or test files get no new preview. A branch's first push always builds. Put `[skip preview]` in a commit message to skip on purpose. To build anyway, use **Redeploy** in the Vercel dashboard and untick "Use project's Ignore Build Step".
 
 ## More
 
