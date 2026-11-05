@@ -78,7 +78,7 @@ export async function getEventDetailRaw(
       pageTheme: true,
       flyerPalette: true,
       ticketTypes: {
-        where: { accessCode: null },
+        where: { hidden: false },
         select: {
           id: true,
           name: true,

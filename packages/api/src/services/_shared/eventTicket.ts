@@ -23,10 +23,12 @@ export interface EventTicketRow {
   saleEndsAt: Date | string;
 }
 
+/** `grantQuantity` is an unlocking grant's per-checkout cap, which beats the type's own. */
 export function toEventTicket(
   tt: EventTicketRow,
   isDraft: boolean,
-  now: Date
+  now: Date,
+  grantQuantity: number | null = null
 ): EventTicket {
   const priceCents = tt.priceCents ?? Math.round(tt.price * 100);
   const availability = Math.max(0, tt.capacity - tt.reserved - tt.sold);
@@ -38,7 +40,10 @@ export function toEventTicket(
     availability === 0 ? 'soldOut' : SALE_STATUS[getSaleState(saleWindow, now)];
   const maxAllowedToAdd =
     saleStatus === 'onSale' && !isDraft
-      ? Math.max(0, Math.min(availability, tt.maxPurchasePerUser))
+      ? Math.max(
+          0,
+          Math.min(availability, grantQuantity ?? tt.maxPurchasePerUser)
+        )
       : 0;
   const feesCents =
     tt.ticketingFees === 'PASS_TICKET_FEES'

@@ -1,8 +1,8 @@
 ---
 title: Guest access — grants, codes and invitations
-status: proposed
+status: active
 created: 2026-10-28
-tracking-issue: TBD
+tracking-issue: #648
 ---
 
 # Guest access — grants, codes and invitations
@@ -303,7 +303,7 @@ working.
    `TicketTypes.hidden`, backfill, drop `accessCode`. Apply-code and hold
    resolve a grant and return the five states. Release, sweep and settle
    count uses. The ticket type form's code field writes an unlimited grant.
-   Contracts, unit tests, and the existing access-code e2e green. ADR 0036:
+   Contracts, unit tests, and the existing access-code e2e green. ADR 0037:
    grants replace ticket-type codes.
 2. **Access codes page.** List with derived state and filter, create, edit,
    revoke. The ticket type form swaps the code field for the hidden toggle

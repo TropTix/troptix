@@ -1,5 +1,4 @@
 import type { TicketTypeInput } from '../../contracts/organizer';
-import { normalizeAccessCode } from './access-code';
 
 export function ticketTypeWriteFields(input: TicketTypeInput) {
   return {
@@ -14,6 +13,5 @@ export function ticketTypeWriteFields(input: TicketTypeInput) {
     saleStartsAt: input.saleStartsAt,
     saleEndsAt: input.saleEndsAt,
     ticketingFees: input.ticketingFees,
-    accessCode: normalizeAccessCode(input.accessCode),
   };
 }

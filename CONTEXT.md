@@ -85,6 +85,18 @@ A free ticket (`price = 0`). Any Organizer can create these — no approval need
 **Paid ticket**:
 A priced ticket (`price > 0`). Creating one requires the owning Organization's `paidTicketingEnabled`. There is no `Event`-level RSVP/paid flag — an event is "paid" simply if it has any Paid ticket; the create-form toggle is a **visibility** affordance over the ticket price field, not stored state. The gate is enforced in the ticket-type write service (application layer, per ADR 0013), **not** a database constraint. Paid tickets can be added to an existing RSVP event later, once approved.
 
+**Hidden ticket type**:
+A Ticket type the organizer keeps off the public event page (`TicketTypes.hidden`). Only a Grant that lists it can sell it. Visibility is the organizer's choice alone; nothing derives it from whether a Grant exists. _Avoid_: "gated" (the old word for a type with a code on it).
+
+**Grant**:
+A right to buy, scoped to one Event: the Ticket types it unlocks, how many checkouts may use it, the most tickets one checkout may take, an expiry, and optionally the email it was issued to. Its state (active, in use, exhausted, expired, revoked) is derived, never stored. A Grant only unlocks; it never changes a price (ADR 0037).
+
+**Access code**:
+The string that carries a Grant to a person, typed at checkout or carried in the event link's `?code=`. Unique within the Event, stored uppercased. _Avoid_: "discount code", "promo code" — it discounts nothing.
+
+**Invitation** (guest):
+A Grant issued to one email address, usually sent by email with its code. Distinct from an **Invite**, which offers a Membership. _Avoid_: "invite" for this — that word belongs to Membership.
+
 ### Time
 
 **Event time zone**:

@@ -107,7 +107,7 @@ export class EventFactory {
            (id, "ticketType", "createdAt", "updatedAt", name, description,
             "maxPurchasePerUser", capacity, reserved, sold,
             "saleStartsAt", "saleEndsAt", price, "priceCents", "ticketingFees",
-            "accessCode", "eventId")
+            hidden, "eventId")
          values ($1, $2, now(), now(), $3, $4, $5, $6, 0, $7, $8, $9, $10, $11, $12, $13, $14)`,
         [
           id,
@@ -122,10 +122,23 @@ export class EventFactory {
           t.priceCents / 100,
           t.priceCents,
           t.ticketingFees ?? 'PASS_TICKET_FEES',
-          t.accessCode ?? null,
+          !!t.accessCode,
           eventId,
         ]
       );
+      if (t.accessCode) {
+        await query(
+          `insert into public."Grant" (id, "createdAt", "updatedAt", "eventId", code)
+           values ($1, now(), now(), $2, $3)
+           on conflict ("eventId", code) do nothing`,
+          [this.uid('grant'), eventId, t.accessCode]
+        );
+        await query(
+          `insert into public."GrantTicketType" ("grantId", "ticketTypeId")
+           select id, $1 from public."Grant" where "eventId" = $2 and code = $3`,
+          [id, eventId, t.accessCode]
+        );
+      }
       out.ticketTypes[t.key] = { id, name: t.name };
     }
 
@@ -216,6 +229,7 @@ export async function deleteEventChain(eventId: string) {
   await query(`delete from public."Reservation" where "eventId" = $1`, [
     eventId,
   ]);
+  await query(`delete from public."Grant" where "eventId" = $1`, [eventId]);
   await query(`delete from public."TicketTypes" where "eventId" = $1`, [
     eventId,
   ]);
