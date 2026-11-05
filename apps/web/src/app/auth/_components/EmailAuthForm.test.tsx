@@ -7,7 +7,7 @@ const mockCapture = jest.fn();
 let widgetMounts = 0;
 
 jest.mock('@/lib/supabaseAuth', () => ({
-  signInWithMagicLink: (...args: unknown[]) => mockSignIn(...args),
+  sendSignInCode: (...args: unknown[]) => mockSignIn(...args),
   verifyEmailOtp: (...args: unknown[]) => mockVerify(...args),
   signInWithGoogle: jest.fn(),
 }));
@@ -112,10 +112,10 @@ function typeEmail(value: string) {
 test('waits for a token, sends it, and gets a fresh one for the resend', async () => {
   jest.useFakeTimers();
   typeEmail('buyer@example.com');
-  expect(button('Email me a sign-in link').disabled).toBe(true);
+  expect(button('Email me a sign-in code').disabled).toBe(true);
 
   await click('solve');
-  await click('Email me a sign-in link');
+  await click('Email me a sign-in code');
 
   expect(mockSignIn).toHaveBeenCalledWith('buyer@example.com', 'tok-1');
   expect(container.textContent).toContain('Check your email');
@@ -132,7 +132,7 @@ test('waits for a token, sends it, and gets a fresh one for the resend', async (
 test('sends without a token when the widget errors', async () => {
   typeEmail('buyer@example.com');
   await click('fail');
-  await click('Email me a sign-in link');
+  await click('Email me a sign-in code');
 
   expect(mockSignIn).toHaveBeenCalledWith('buyer@example.com', undefined);
 });
@@ -140,7 +140,7 @@ test('sends without a token when the widget errors', async () => {
 async function reachCodeStep() {
   typeEmail('buyer@example.com');
   await click('solve');
-  await click('Email me a sign-in link');
+  await click('Email me a sign-in code');
   const otp = container.querySelector(
     'input[autocomplete="one-time-code"]'
   ) as HTMLInputElement;

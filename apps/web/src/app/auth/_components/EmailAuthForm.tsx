@@ -15,7 +15,7 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { Input } from '@/components/ui/input';
-import { signInWithMagicLink, verifyEmailOtp } from '@/lib/supabaseAuth';
+import { sendSignInCode, verifyEmailOtp } from '@/lib/supabaseAuth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { AUTH_EVENTS } from '@troptix/api/analytics';
@@ -78,8 +78,8 @@ export function EmailAuthForm() {
     return () => clearTimeout(t);
   }, [resendIn]);
 
-  const sendLink = async (email: string) => {
-    const { error } = await signInWithMagicLink(email, captchaToken);
+  const sendCode = async (email: string) => {
+    const { error } = await sendSignInCode(email, captchaToken);
     // Turnstile tokens are single-use: remount the widget for a fresh one.
     setCaptchaToken(undefined);
     setCaptchaKey((k) => k + 1);
@@ -92,7 +92,7 @@ export function EmailAuthForm() {
   };
 
   const onSendEmail = async ({ email }: EmailValues) => {
-    if (await sendLink(email)) setSentTo(email);
+    if (await sendCode(email)) setSentTo(email);
   };
 
   const onVerifyCode = async ({ code }: CodeValues) => {
@@ -143,9 +143,9 @@ export function EmailAuthForm() {
             Check your email
           </h2>
           <p className="text-muted-foreground mb-8">
-            We sent a 6-digit code and a sign-in link to{' '}
+            We sent a 6-digit code to{' '}
             <span className="font-medium text-foreground">{sentTo}</span>. Enter
-            the code below, or just tap the link in the email.
+            it below.
           </p>
 
           <Form {...codeForm}>
@@ -225,7 +225,7 @@ export function EmailAuthForm() {
                   type="button"
                   className="text-primary hover:underline font-medium disabled:opacity-50 disabled:no-underline"
                   disabled={captchaPending}
-                  onClick={() => sendLink(sentTo)}
+                  onClick={() => sendCode(sentTo)}
                 >
                   resend the code
                 </button>
@@ -289,7 +289,7 @@ export function EmailAuthForm() {
             >
               {emailForm.formState.isSubmitting
                 ? 'Sending...'
-                : 'Email me a sign-in link'}
+                : 'Email me a sign-in code'}
             </Button>
           </form>
         </Form>

@@ -245,6 +245,15 @@ pass = "env(SMTP_PASS)"
 admin_email = "info@usetroptix.com"
 sender_name = "TropTix"
 
+# Production's templates live in the dashboard: paste this same file there.
+[auth.email.template.magic_link]
+subject = "Your TropTix sign-in code"
+content_path = "./supabase/templates/magic-link.html"
+
+[auth.email.template.confirmation]
+subject = "Your TropTix sign-in code"
+content_path = "./supabase/templates/magic-link.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
