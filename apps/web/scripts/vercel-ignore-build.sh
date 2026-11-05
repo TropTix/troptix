@@ -25,8 +25,7 @@ if git diff --quiet "$base" HEAD -- \
   ':(exclude)*.md' \
   ':(exclude)*.test.ts' ':(exclude)*.test.tsx' \
   ':(exclude)apps/web/jest.config.ts' ':(exclude)packages/api/vitest.config.ts' \
-  ':(exclude)apps/web/knip.json' \
-  ':(exclude)apps/web/eslint.config.mjs' ':(exclude)apps/web/.eslintrc.json'; then
+  ':(exclude)apps/web/knip.json'; then
   skip "nothing the web build reads changed since $base"
 fi
 build "web sources changed since $base"

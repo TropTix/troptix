@@ -1,4 +1,4 @@
-# 31. Preview builds skip when the web build's inputs are unchanged
+# 39. Preview builds skip when the web build's inputs are unchanged
 
 - **Status:** Accepted
 - **Date:** 2026-09-22
