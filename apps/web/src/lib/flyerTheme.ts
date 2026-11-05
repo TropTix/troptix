@@ -3,6 +3,8 @@ import type { EventPageTheme, FlyerPalette } from '@troptix/api';
 
 type HSL = { h: number; s: number; l: number };
 
+const HSL_TRIPLET = /^(?:hsl\()?(-?[\d.]+) ([\d.]+)% ([\d.]+)%\)?$/;
+
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   h = ((h % 360) + 360) % 360;
   const c = (1 - Math.abs(2 * l - 1)) * s;
@@ -79,7 +81,7 @@ function contrast(a: HSL, b: HSL): number {
 }
 
 function parseTriplet(value: string): HSL {
-  const m = value.match(/^(?:hsl\()?(-?[\d.]+) ([\d.]+)% ([\d.]+)%\)?$/);
+  const m = value.match(HSL_TRIPLET);
   if (!m) throw new Error(`not an HSL color: "${value}"`);
   return {
     h: parseFloat(m[1]),

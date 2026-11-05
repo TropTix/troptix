@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 const THEMES = { light: '', dark: '.dark' } as const;
 
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const;
+const ID_COLONS = /:/g;
 type TooltipNameType = number | string;
 
 export type ChartConfig = Record<
@@ -56,7 +57,7 @@ function ChartContainer({
   };
 }) {
   const uniqueId = React.useId();
-  const chartId = `chart-${id ?? uniqueId.replace(/:/g, '')}`;
+  const chartId = `chart-${id ?? uniqueId.replace(ID_COLONS, '')}`;
 
   return (
     <ChartContext.Provider value={{ config }}>

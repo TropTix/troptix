@@ -13,7 +13,9 @@ export function getAppBaseUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 }
 
+const LEADING_SLASHES = /^\/+/;
+
 export function absoluteUrl(path = ''): string {
   const base = getAppBaseUrl();
-  return path ? `${base}/${path.replace(/^\/+/, '')}` : base;
+  return path ? `${base}/${path.replace(LEADING_SLASHES, '')}` : base;
 }

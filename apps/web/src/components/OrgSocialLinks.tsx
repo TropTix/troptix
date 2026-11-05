@@ -16,9 +16,12 @@ export type OrgSocials = {
   website: string | null;
 };
 
+const ABSOLUTE_URL = /^https?:\/\//i;
+const LEADING_ATS = /^@+/;
+
 const withScheme = (url: string) =>
-  /^https?:\/\//i.test(url) ? url : `https://${url}`;
-const handle = (username: string) => username.replace(/^@+/, '').trim();
+  ABSOLUTE_URL.test(url) ? url : `https://${url}`;
+const handle = (username: string) => username.replace(LEADING_ATS, '').trim();
 
 function build(socials: OrgSocials) {
   return [
