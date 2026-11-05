@@ -120,6 +120,7 @@ function toEventFields(data: EventFormValues) {
     pageTheme: data.pageTheme,
     flyerPalette: data.flyerPalette,
     isPrivate: data.isPrivate,
+    hidePrice: data.hidePrice,
   };
 }
 

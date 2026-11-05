@@ -54,6 +54,7 @@ export async function getEventDetailRaw(
       imageUrl: true,
       isDraft: true,
       isPrivate: true,
+      hidePrice: true,
       organizer: true,
       organizerUserId: true,
       organization: {
@@ -133,6 +134,7 @@ export function shapeEventDetail(
     imageUrl: event.imageUrl,
     isDraft: event.isDraft,
     isPrivate: event.isPrivate,
+    hidePrice: event.hidePrice,
     organizer: event.organizer,
     organizerUserId: event.organizerUserId,
     hostedBy: event.organization

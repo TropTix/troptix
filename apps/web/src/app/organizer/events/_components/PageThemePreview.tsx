@@ -17,6 +17,7 @@ export function PageThemePreview({
   venue,
   /** Ticket prices in dollars; empty when none exist yet. */
   prices,
+  hidePrice,
 }: {
   theme: EventPageTheme;
   palette: FlyerPalette | null;
@@ -26,6 +27,7 @@ export function PageThemePreview({
   endsAt: Date;
   venue: string;
   prices: number[];
+  hidePrice: boolean;
 }) {
   const priceLabel = priceLabelFor(
     prices.length ? Math.round(Math.min(...prices) * 100) : null
@@ -63,7 +65,9 @@ export function PageThemePreview({
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between gap-2 rounded-md border border-border bg-card px-2.5 py-2 text-card-foreground">
-            <span className="truncate text-xs font-bold">{priceLabel}</span>
+            <span className="truncate text-xs font-bold">
+              {(!hidePrice || prices.length === 0) && priceLabel}
+            </span>
             <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
               Get Tickets
               <ArrowRight className="h-3 w-3" />

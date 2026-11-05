@@ -64,6 +64,7 @@ export const eventDetailSchema = z.object({
   imageUrl: z.string().nullable(),
   isDraft: z.boolean(),
   isPrivate: z.boolean(),
+  hidePrice: z.boolean(),
   organizer: z.string(),
   organizerUserId: z.string(),
   hostedBy: z

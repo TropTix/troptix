@@ -122,6 +122,7 @@ function defaultEventValues(): EventFormValues {
     pageTheme: 'off',
     flyerPalette: null,
     isPrivate: false,
+    hidePrice: false,
   };
 }
 
@@ -407,6 +408,7 @@ export default function EventForm({
                     endsAt={form.watch('endsAt')}
                     venue={form.watch('venue')}
                     prices={previewPrices}
+                    hidePrice={form.watch('hidePrice')}
                   />
                 </CardContent>
               </CollapsibleContent>
@@ -608,6 +610,30 @@ export default function EventForm({
                             onCheckedChange={field.onChange}
                             disabled={isPending}
                             aria-label="Private event"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="hidePrice"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-3 space-y-0 rounded-md border px-3 py-3">
+                        <div className="flex-1 space-y-1">
+                          <FormLabel>Hide price</FormLabel>
+                          <FormDescription>
+                            Leaves the price off your event page. Buyers see
+                            ticket prices when they open checkout.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={isPending}
+                            aria-label="Hide price"
                           />
                         </FormControl>
                       </FormItem>

@@ -94,7 +94,7 @@ insert into public."Events" (
   id, "createdAt", "updatedAt", "isDraft", "isPrivate", name, description, summary,
   organizer, "organizerUserId", "startsAt", "endsAt",
   venue, address, country, "countryCode", "organizationId",
-  "pageTheme", "flyerPalette"
+  "pageTheme", "flyerPalette", "hidePrice"
 ) values
   (
     'seed_event_1', now(), now(), false, false,
@@ -102,7 +102,7 @@ insert into public."Events" (
     'Demo Organizer', 'seed_org_1',
     now() + interval '60 days', now() + interval '60 days 5 hours',
     'Demo Arena', '123 Demo Street, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
-    'wash', '{"dominant": "#7A1E2B", "candidates": ["#FF4757", "#FFD23F", "#7A1E2B"], "chosenAccent": null}'
+    'wash', '{"dominant": "#7A1E2B", "candidates": ["#FF4757", "#FFD23F", "#7A1E2B"], "chosenAccent": null}', false
   ),
   (
     'seed_event_2', now(), now(), false, false,
@@ -110,7 +110,7 @@ insert into public."Events" (
     'Demo Organizer', 'seed_org_1',
     now() + interval '75 days', now() + interval '75 days 6 hours',
     'Demo Park', '45 Community Ave, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
-    'dark', '{"dominant": "#131020", "candidates": ["#FF4D97", "#FFB454", "#2EE6FF"], "chosenAccent": null}'
+    'dark', '{"dominant": "#131020", "candidates": ["#FF4D97", "#FFB454", "#2EE6FF"], "chosenAccent": null}', false
   ),
   (
     'seed_event_3', now(), now(), false, false,
@@ -118,7 +118,7 @@ insert into public."Events" (
     'Demo Organizer', 'seed_org_1',
     now() + interval '90 days', now() + interval '90 days 6 hours',
     'Demo Hall', '9 Edge Lane, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
-    'off', null
+    'off', null, true
   ),
   (
     'seed_event_4', now(), now(), false, true,
@@ -126,7 +126,7 @@ insert into public."Events" (
     'Demo Organizer', 'seed_org_1',
     now() + interval '100 days', now() + interval '100 days 4 hours',
     'Demo Loft', '7 Hidden Row, Kingston', 'Jamaica', 'JM', 'seed_organization_1',
-    'off', null
+    'off', null, false
   );
 
 -- Ticket types across the four events, one row per state we want to test.

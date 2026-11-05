@@ -56,6 +56,7 @@ function fakeEvent(
     organization?: OrgRel;
     pageTheme?: 'off' | 'wash' | 'dark';
     flyerPalette?: unknown;
+    hidePrice?: boolean;
   } = {}
 ) {
   return {
@@ -66,6 +67,7 @@ function fakeEvent(
     imageUrl: 'flyer.jpg',
     isDraft: false,
     isPrivate: false,
+    hidePrice: overrides.hidePrice ?? false,
     organizer: 'Island Brunch Co.',
     organizerUserId: 'user-1',
     organization: overrides.organization ?? null,
@@ -102,6 +104,12 @@ describe('getEventDetail', () => {
     expect(result.fromPriceCents).toBe(2500);
     expect(result.tickets).toHaveLength(3);
     expect(result.tickets.map((t) => t.priceCents)).toEqual([2500, 4000, 6000]);
+  });
+
+  it('passes through hidePrice', async () => {
+    const prisma = fakePrisma(fakeEvent({ hidePrice: true }));
+    const result = await getEventDetail(prisma, { eventId: 'ev-1' });
+    expect(result.hidePrice).toBe(true);
   });
 
   it('falls back to legacy price*100 when priceCents is null (pre-backfill)', async () => {

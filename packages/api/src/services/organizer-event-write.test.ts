@@ -224,6 +224,15 @@ describe('updateEvent', () => {
     expect(call.data.ticketTypes).toBeUndefined();
   });
 
+  it('writes hidePrice when given and leaves it untouched when omitted', async () => {
+    const { prisma, eventsUpdate } = fakePrisma();
+    await updateEvent(prisma, OWNER, 'e1', { ...updateInput, hidePrice: true });
+    expect(eventsUpdate.mock.calls[0][0].data.hidePrice).toBe(true);
+
+    await updateEvent(prisma, OWNER, 'e1', updateInput);
+    expect(eventsUpdate.mock.calls[1][0].data.hidePrice).toBeUndefined();
+  });
+
   it('leaves isPrivate untouched when omitted', async () => {
     const { prisma, eventsUpdate } = fakePrisma();
     await updateEvent(prisma, OWNER, 'e1', updateInput);

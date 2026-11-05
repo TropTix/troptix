@@ -110,6 +110,7 @@ function eventFields(data: UpdateEventInput) {
     name: data.name,
     description: data.description ?? '',
     isPrivate: data.isPrivate,
+    hidePrice: data.hidePrice,
     startsAt: data.startsAt,
     endsAt: data.endsAt,
     venue: data.venue,

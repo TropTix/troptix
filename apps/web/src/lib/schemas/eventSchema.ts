@@ -36,6 +36,7 @@ export const eventFormSchema = z
     pageTheme: eventPageThemeSchema.optional(),
     flyerPalette: flyerPaletteSchema.nullable().optional(),
     isPrivate: z.boolean(),
+    hidePrice: z.boolean(),
   })
   // Strictly after — must match the service's createEventInputSchema, or input
   // that passes here dies deeper in the stack with a generic error.
