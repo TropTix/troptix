@@ -6,12 +6,13 @@ const mockPrisma = {
 };
 const mockConfirmPaid = jest.fn();
 const mockDispatchEmails = jest.fn();
-const mockSendRefundNotice = jest.fn();
+const mockEnqueueDisputeNotice = jest.fn();
 const mockAfterTasks: Promise<unknown>[] = [];
 
 jest.mock('@/server/prisma', () => ({ __esModule: true, default: mockPrisma }));
 jest.mock('@troptix/api/server', () => ({
   confirmPaid: mockConfirmPaid,
+  enqueueDisputeNotice: mockEnqueueDisputeNotice,
   paymentIntentIdOf: (session: { payment_intent?: string | { id: string } }) =>
     typeof session.payment_intent === 'string'
       ? session.payment_intent
@@ -19,7 +20,6 @@ jest.mock('@troptix/api/server', () => ({
 }));
 jest.mock('@/server/lib/email', () => ({
   dispatchDueEmails: mockDispatchEmails,
-  sendRefundNoticeEmail: mockSendRefundNotice,
 }));
 jest.mock('@/server/lib/analytics', () => ({
   serverAnalytics: () => undefined,
@@ -141,5 +141,38 @@ describe('reservation webhook', () => {
 
     expect(res.status).toBe(400);
     expect(mockPrisma.processedStripeEvent.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('sends the refund notice after an expiry-race refund', async () => {
+    mockConfirmPaid.mockResolvedValue({ kind: 'refunded' });
+
+    const res = await post(completedEvent());
+
+    expect(res.status).toBe(200);
+    await Promise.all(mockAfterTasks);
+    expect(mockDispatchEmails).toHaveBeenCalled();
+  });
+
+  it('enqueues a dispute notice before answering, then sends it', async () => {
+    const res = await post({
+      id: 'evt_2',
+      object: 'event',
+      type: 'charge.dispute.created',
+      data: {
+        object: {
+          id: 'dp_1',
+          object: 'dispute',
+          charge: 'ch_1',
+          amount: 5000,
+          currency: 'usd',
+          reason: 'fraudulent',
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockEnqueueDisputeNotice).toHaveBeenCalledWith(mockPrisma, 'dp_1');
+    await Promise.all(mockAfterTasks);
+    expect(mockDispatchEmails).toHaveBeenCalled();
   });
 });

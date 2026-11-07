@@ -118,7 +118,9 @@ export const checkoutRouter = router({
         { reservationId: input.reservationId },
         ctx.analytics
       ).catch(checkoutError);
-      if (state.kind === 'order') sendEmails(ctx);
+      if (state.kind === 'order' || state.kind === 'refunded') {
+        sendEmails(ctx);
+      }
       return state;
     }),
 
