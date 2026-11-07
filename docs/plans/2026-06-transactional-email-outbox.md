@@ -1,8 +1,8 @@
 ---
 title: Email outbox with delivery status
-status: proposed
+status: active
 created: 2026-06-26
-tracking-issue: TBD
+tracking-issue: '#664'
 ---
 
 # Email outbox with delivery status
