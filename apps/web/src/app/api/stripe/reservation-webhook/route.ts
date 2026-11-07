@@ -1,14 +1,14 @@
 import { NextResponse, after } from 'next/server';
 import type Stripe from 'stripe';
-import { confirmPaid, paymentIntentIdOf } from '@troptix/api/server';
+import {
+  confirmPaid,
+  enqueueDisputeNotice,
+  paymentIntentIdOf,
+} from '@troptix/api/server';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { serverAnalytics } from '@/server/lib/analytics';
-import {
-  dispatchDueEmails,
-  sendDisputeNoticeEmail,
-  sendRefundNoticeEmail,
-} from '@/server/lib/email';
+import { dispatchDueEmails } from '@/server/lib/email';
 
 /**
  * Fulfiller for the `/e/` reservation flow (ADR 0018) — separate endpoint and
@@ -87,10 +87,8 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
         { reservationId, paymentIntentId, fulfilledVia: 'webhook' },
         serverAnalytics()
       );
-      if (state.kind === 'order') {
+      if (state.kind === 'order' || state.kind === 'refunded') {
         after(dispatchDueEmails);
-      } else if (state.kind === 'refunded') {
-        after(() => sendRefundNoticeEmail(reservationId));
       }
       return;
     }
@@ -102,15 +100,8 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
       console.error(
         `[ReservationWebhook] Dispute ${dispute.id} opened on charge ${charge}`
       );
-      after(() =>
-        sendDisputeNoticeEmail({
-          id: dispute.id,
-          amount: dispute.amount,
-          currency: dispute.currency,
-          reason: dispute.reason,
-          charge,
-        })
-      );
+      await enqueueDisputeNotice(prisma, dispute.id);
+      after(dispatchDueEmails);
       return;
     }
 
