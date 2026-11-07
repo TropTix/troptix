@@ -22,20 +22,25 @@ import type {
 } from '../contracts/payments';
 import type { CheckoutAnalytics, FulfilledVia } from '../contracts/analytics';
 
+const STRIPE_REJECTED_CHARS = /[<>\\'"*]/g;
+const NON_PRINTABLE_ASCII = /[^\x20-\x7e]/g;
+const WHITESPACE_RUN = /\s+/g;
+const HAS_ALPHANUMERIC = /[A-Z0-9]/;
+
 /**
  * Stripe truncates `PREFIX* SUFFIX` at 22 chars: TROPTIX (7) + `* ` (2) leaves
  * 13. Stripe rejects `<>\'"*` and non-Latin — strip; null if nothing survives.
  */
 export function statementDescriptorSuffix(eventName: string): string | null {
   const cleaned = eventName
-    .replace(/[<>\\'"*]/g, '')
-    .replace(/[^\x20-\x7e]/g, '')
-    .replace(/\s+/g, ' ')
+    .replace(STRIPE_REJECTED_CHARS, '')
+    .replace(NON_PRINTABLE_ASCII, '')
+    .replace(WHITESPACE_RUN, ' ')
     .trim()
     .toUpperCase()
     .slice(0, 13)
     .trim();
-  return /[A-Z0-9]/.test(cleaned) ? cleaned : null;
+  return HAS_ALPHANUMERIC.test(cleaned) ? cleaned : null;
 }
 
 async function orderCheckoutState(

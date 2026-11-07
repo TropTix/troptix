@@ -13,12 +13,16 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 const PUBLIC_BASE = `${SUPABASE_URL}/storage/v1/object/public`;
 
-const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value);
+const ABSOLUTE_URL = /^https?:\/\//i;
+const LEADING_SLASHES = /^\/+/;
+const NOT_FOUND = /not\s*found/i;
+
+const isAbsoluteUrl = (value: string) => ABSOLUTE_URL.test(value);
 
 export function eventFlyerUrl(value: string | null | undefined): string | null {
   if (!value) return null;
   if (isAbsoluteUrl(value)) return value;
-  const path = value.replace(/^\/+/, '');
+  const path = value.replace(LEADING_SLASHES, '');
   return `${PUBLIC_BASE}/${EVENT_FLYERS_BUCKET}/${path}`;
 }
 
@@ -29,7 +33,7 @@ export function organizationLogoUrl(
 ): string | null {
   if (!value) return null;
   if (isAbsoluteUrl(value)) return value;
-  const path = value.replace(/^\/+/, '');
+  const path = value.replace(LEADING_SLASHES, '');
   return `${PUBLIC_BASE}/${ORGANIZATION_LOGOS_BUCKET}/${path}`;
 }
 
@@ -57,11 +61,11 @@ export async function deleteOrganizationLogo(
 ): Promise<void> {
   if (!value || isAbsoluteUrl(value)) return;
   const supabase = createClient();
-  const path = value.replace(/^\/+/, '');
+  const path = value.replace(LEADING_SLASHES, '');
   const { error } = await supabase.storage
     .from(ORGANIZATION_LOGOS_BUCKET)
     .remove([path]);
-  if (error && !/not\s*found/i.test(error.message)) throw error;
+  if (error && !NOT_FOUND.test(error.message)) throw error;
 }
 
 export async function uploadEventFlyer(file: File): Promise<string> {
@@ -88,9 +92,9 @@ export async function deleteEventFlyer(
 ): Promise<void> {
   if (!value || isAbsoluteUrl(value)) return;
   const supabase = createClient();
-  const path = value.replace(/^\/+/, '');
+  const path = value.replace(LEADING_SLASHES, '');
   const { error } = await supabase.storage
     .from(EVENT_FLYERS_BUCKET)
     .remove([path]);
-  if (error && !/not\s*found/i.test(error.message)) throw error;
+  if (error && !NOT_FOUND.test(error.message)) throw error;
 }

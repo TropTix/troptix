@@ -30,18 +30,21 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
 ]);
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const EDGE_HYPHENS = /^-+|-+$/g;
+// Combining diacritical marks (U+0300–U+036F); a plain BMP range so this
+// needs no `u` flag / property escape (apps/web compiles at target es5).
+const COMBINING_MARKS = /[\u0300-\u036f]/g;
+const NON_ALPHANUMERIC_RUN = /[^a-z0-9]+/g;
 
-const trimHyphens = (s: string): string => s.replace(/^-+|-+$/g, '');
+const trimHyphens = (s: string): string => s.replace(EDGE_HYPHENS, '');
 
 export function slugify(input: string): string {
   return trimHyphens(
     input
       .normalize('NFKD')
-      // Combining diacritical marks (U+0300–U+036F); a plain BMP range so this
-      // needs no `u` flag / property escape (apps/web compiles at target es5).
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(COMBINING_MARKS, '')
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
+      .replace(NON_ALPHANUMERIC_RUN, '-')
   );
 }
 

@@ -22,6 +22,9 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const NAME_SEPARATORS = /[._-]/g;
+const WORD_STARTS = /\b\w/g;
+
 function userFromSession(session: Session): User {
   const { id, email, user_metadata } = session.user;
   const fullName: string =
@@ -30,8 +33,8 @@ function userFromSession(session: Session): User {
     (email
       ? email
           .split('@')[0]
-          .replace(/[._-]/g, ' ')
-          .replace(/\b\w/g, (c) => c.toUpperCase())
+          .replace(NAME_SEPARATORS, ' ')
+          .replace(WORD_STARTS, (c) => c.toUpperCase())
       : '');
   return { id, email: email ?? '', name: fullName };
 }

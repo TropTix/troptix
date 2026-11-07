@@ -2,6 +2,9 @@ import { clsx, type ClassValue } from 'clsx';
 import ShortUniqueId from 'short-unique-id';
 import { twMerge } from 'tailwind-merge';
 
+const UUID_HYPHENS = /-/g;
+const WHITESPACE_RUN = /\s+/;
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -23,13 +26,13 @@ export function priceLabelFor(fromPriceCents: number | null): string {
 
 /** Display-only reference; the id stays the real key in URLs. */
 export function formatOrderNumber(id: string): string {
-  return `TT-${id.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+  return `TT-${id.replace(UUID_HYPHENS, '').slice(0, 6).toUpperCase()}`;
 }
 
 export function initials(name: string): string {
   const result = name
     .trim()
-    .split(/\s+/)
+    .split(WHITESPACE_RUN)
     .filter(Boolean)
     .map((w) => w[0])
     .slice(0, 2)
