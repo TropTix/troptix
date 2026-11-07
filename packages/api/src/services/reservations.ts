@@ -22,6 +22,11 @@ import { generateId } from './_shared/ids';
 import { calculateFeesCents } from './_shared/fees';
 import { accessibleTicketTypesWhere } from './_shared/access-code';
 import { NotFoundError } from './_shared/errors';
+import {
+  EMAIL_TYPES,
+  enqueueEmail,
+  orderConfirmationKey,
+} from './_shared/emails';
 
 /**
  * Longer than the client's 10-min countdown on purpose: a payment submitted at
@@ -309,7 +314,7 @@ type ReservationWithItems = Prisma.ReservationGetPayload<{
 
 /**
  * Caller has already checked the reservation is HELD. The confirmation email
- * is the caller's job, after commit — never inside this transaction.
+ * is enqueued here and sent after commit — never inside this transaction.
  */
 async function materializeOrder(
   tx: Prisma.TransactionClient,
@@ -390,6 +395,15 @@ async function materializeOrder(
         : {}),
     },
   });
+
+  if (reservation.email) {
+    await enqueueEmail(tx, {
+      type: EMAIL_TYPES.orderConfirmation,
+      subjectId: orderId,
+      to: reservation.email,
+      idempotencyKey: orderConfirmationKey(orderId),
+    });
+  }
 
   return orderId;
 }

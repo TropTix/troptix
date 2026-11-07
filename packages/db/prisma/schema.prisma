@@ -236,10 +236,16 @@ enum ReservationStatus {
   REFUNDED
 }
 
-enum OutboxStatus {
+enum EmailStatus {
   PENDING
+  SENDING
   SENT
+  DELAYED
+  DELIVERED
+  BOUNCED
+  SUPPRESSED
   FAILED
+  COMPLAINED
 }
 
 model Tickets {
@@ -474,19 +480,28 @@ model ReservationItem {
   @@index([ticketTypeId])
 }
 
-// Transactional outbox — rows are written in the same transaction as
-// confirm_reservation and dispatched after commit, so a slow/failed email can never roll back a confirmed payment.
-model OutboxMessage {
-  id          String       @id @default(uuid())
-  createdAt   DateTime     @default(now())
-  type        String
-  payload     Json
-  status      OutboxStatus @default(PENDING)
-  attempts    Int          @default(0)
-  lastError   String?
-  processedAt DateTime?
+// The email outbox and delivery log in one (plan: 2026-06-transactional-email-outbox).
+// A row is written in the same transaction as what it is about, sent after
+// commit, and Resend's webhook moves its status on from SENT.
+model Email {
+  id             String      @id @default(uuid())
+  createdAt      DateTime    @default(now())
+  type           String
+  subjectId      String
+  to             String
+  idempotencyKey String      @unique
+  priority       Int         @default(0)
+  status         EmailStatus @default(PENDING)
+  attempts       Int         @default(0)
+  nextAttemptAt  DateTime    @default(now())
+  claimedAt      DateTime?
+  lastError      String?
+  resendId       String?     @unique
+  sentAt         DateTime?
+  statusAt       DateTime?
 
-  @@index([status])
+  @@index([status, nextAttemptAt])
+  @@index([subjectId])
 }
 
 // Stripe webhook idempotency ledger (deliveries are at-least-once). The PK IS

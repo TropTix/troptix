@@ -1,69 +1,42 @@
 import prisma from '@/server/prisma';
+import { dispatchEmails, EMAIL_TYPES } from '@troptix/api/server';
+import type { EmailSender, SendOutcome } from '@troptix/api/server';
 import { Prisma } from '@troptix/db';
-import {
-  buildOrderConfirmation,
-  type EmailAttachment,
-} from '@troptix/transactional';
+import type { Email } from '@troptix/db';
+import { buildOrderConfirmation } from '@troptix/transactional';
 import { getAppBaseUrl } from '@/lib/appUrl';
 import { formatCents } from '@/lib/dateUtils';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
-import { Resend } from 'resend';
+import { Resend, type ErrorResponse } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
- * Hybrid fulfillment sends the same email from the Stripe webhook AND the
- * client success poll; Resend 409s the loser (`concurrent_idempotent_requests`)
- * while the winner sends it — benign, treat as success.
+ * The webhook and the checkout screen can both send the same notice; Resend
+ * 409s the loser while the winner sends it — benign, treat as success.
  */
 function isConcurrentIdempotencyConflict(error: { name?: string } | null) {
   return error?.name === 'concurrent_idempotent_requests';
 }
 
-async function sendEmail(
-  to: string,
-  subject: string,
-  html: string,
-  orderId: string,
-  attachments: EmailAttachment[] = []
-) {
-  const { data, error } = await resend.emails.send(
-    {
-      from: 'TropTix <info@usetroptix.com>',
-      to,
-      subject,
-      html,
-      attachments: attachments.map((attachment) => ({
-        filename: attachment.filename,
-        content: Buffer.from(attachment.content, 'utf-8'),
-        contentType: attachment.contentType,
-      })),
-    },
-    { idempotencyKey: `confirmation-${orderId}` }
-  );
-  if (error) {
-    if (isConcurrentIdempotencyConflict(error)) {
-      console.log(
-        `Confirmation email for ${orderId} already in progress (idempotent) — skipping duplicate.`
-      );
-      return null;
-    }
-    throw new Error(`Resend failed to send email: ${error.message}`);
+function outcomeOf(error: ErrorResponse): SendOutcome {
+  switch (error.name) {
+    case 'rate_limit_exceeded':
+      return { ok: false, reason: 'rate_limited', message: error.message };
+    case 'daily_quota_exceeded':
+      return { ok: false, reason: 'daily_quota', message: error.message };
+    case 'monthly_quota_exceeded':
+      return { ok: false, reason: 'monthly_quota', message: error.message };
+    case 'concurrent_idempotent_requests':
+      return { ok: false, reason: 'in_progress', message: error.message };
+    default:
+      return { ok: false, reason: 'error', message: error.message };
   }
-  console.log('Email sent successfully:', data);
-  return data;
 }
 
-export async function sendEmailConfirmationEmailToUser(orderId: string) {
+async function buildOrderConfirmationEmail(orderId: string) {
   const orderDetails = await getOrderDetails(orderId);
-  if (!orderDetails) {
-    console.error('Order not found');
-    return;
-  }
-  if (!orderDetails.email) {
-    console.error('Order email not found');
-    return;
-  }
+  if (!orderDetails) throw new Error(`Order ${orderId} not found`);
 
   // imageUrl now stores a Supabase bucket PATH (ADR 0016), and email clients
   // can't resolve a relative src — resolve it to an absolute URL before render.
@@ -74,16 +47,51 @@ export async function sendEmailConfirmationEmailToUser(orderId: string) {
       imageUrl: eventFlyerUrl(orderDetails.event.imageUrl),
     },
   };
-  const { subject, html, attachments } = await buildOrderConfirmation(order, {
-    baseUrl: getAppBaseUrl(),
-  });
+  return buildOrderConfirmation(order, { baseUrl: getAppBaseUrl() });
+}
 
-  // A failed confirmation email must never break the order — the Stripe webhook
-  // re-throws, and Stripe would retry and re-process an already-complete order.
-  try {
-    await sendEmail(orderDetails.email, subject, html, orderId, attachments);
-  } catch (error) {
-    console.error('Failed to send order confirmation email:', error);
+async function buildEmail(email: Email) {
+  switch (email.type) {
+    case EMAIL_TYPES.orderConfirmation:
+      return buildOrderConfirmationEmail(email.subjectId);
+    default:
+      throw new Error(`No builder for email type ${email.type}`);
+  }
+}
+
+const sendEmail: EmailSender = async (email) => {
+  const { subject, html, attachments } = await buildEmail(email);
+  const { data, error } = await resend.emails.send(
+    {
+      from: 'TropTix <info@usetroptix.com>',
+      to: email.to,
+      subject,
+      html,
+      attachments: attachments.map((attachment) => ({
+        filename: attachment.filename,
+        content: Buffer.from(attachment.content, 'utf-8'),
+        contentType: attachment.contentType,
+      })),
+      tags: [{ name: 'email_id', value: email.id }],
+    },
+    { idempotencyKey: email.idempotencyKey }
+  );
+  if (error) return outcomeOf(error);
+  return { ok: true, resendId: data.id };
+};
+
+export async function dispatchDueEmails(): Promise<void> {
+  const result = await dispatchEmails(prisma, sendEmail);
+  for (const email of result.failed) {
+    console.error(
+      `[Email] Gave up on ${email.type} ${email.id} after ${email.attempts} attempts:`,
+      email.lastError
+    );
+  }
+  if (result.quotaExceeded) {
+    console.error(
+      `[Email] Resend ${result.quotaExceeded} exceeded; sending paused.`
+    );
   }
 }
 
