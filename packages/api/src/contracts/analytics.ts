@@ -31,6 +31,11 @@ export const AUTH_EVENTS = {
   userUnprovisioned: 'auth_user_unprovisioned',
 } as const;
 
+export const EMAIL_EVENTS = {
+  /** An email we gave up on, or Resend bounced, suppressed or saw marked as spam. */
+  failed: 'email_failed',
+} as const;
+
 export type AnalyticsEventName =
   (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
 
