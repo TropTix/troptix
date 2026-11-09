@@ -32,6 +32,14 @@ export {
 
 export { captureOrderCompleted } from './services/reservations';
 
+export {
+  dispatchEmails,
+  type DispatchResult,
+  type EmailSender,
+  type SendOutcome,
+} from './services/emails';
+export { EMAIL_TYPES } from './services/_shared/emails';
+
 export { applyCode } from './services/checkout';
 export {
   getEventDetail,

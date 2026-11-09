@@ -208,12 +208,6 @@ export default function CheckoutSheet({
         });
       }
       setStep('success');
-      // Nudge the confirmation email (idempotent server-side).
-      void fetch('/api/checkout/confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.orderId }),
-      }).catch(() => {});
     },
     [capture]
   );

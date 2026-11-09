@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { appRouter, createContext } from '@troptix/api/server';
 import type { Actor } from '@troptix/api/server';
@@ -5,6 +6,7 @@ import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { serverAnalytics } from '@/server/lib/analytics';
+import { dispatchDueEmails } from '@/server/lib/email';
 import { getAppBaseUrl } from '@/lib/appUrl';
 
 async function resolveActor(req: Request): Promise<Actor> {
@@ -40,6 +42,7 @@ async function handler(req: Request) {
         stripe,
         siteUrl: getAppBaseUrl(),
         analytics: serverAnalytics(),
+        sendEmails: () => after(dispatchDueEmails),
       }),
   });
 }

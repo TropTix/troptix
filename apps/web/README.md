@@ -107,6 +107,8 @@ Event times are venue-local and render through the shared formatter. Operational
 
 `POST /api/cron/expire-reservations` releases expired ticket holds. A Supabase `pg_cron` job calls it with the `CRON_SECRET` bearer token. Setup and checks are in [docs/runbooks/expire-reservations-cron.md](../../docs/runbooks/expire-reservations-cron.md).
 
+`POST /api/cron/dispatch-email` sends due emails from the `Email` table and retries failed ones. A second `pg_cron` job calls it every minute. Setup is in [docs/runbooks/dispatch-email-cron.md](../../docs/runbooks/dispatch-email-cron.md).
+
 ## More
 
 - [docs/](../../docs) for the roadmap, ADRs, plans, and runbooks

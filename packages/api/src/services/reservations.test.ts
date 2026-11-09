@@ -50,6 +50,13 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  const orders = await prisma.orders.findMany({
+    where: { eventId: TEST_EVENT_ID },
+    select: { id: true },
+  });
+  await prisma.email.deleteMany({
+    where: { subjectId: { in: orders.map((o) => o.id) } },
+  });
   await prisma.tickets.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.orders.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.reservation.deleteMany({ where: { eventId: TEST_EVENT_ID } });
@@ -205,6 +212,18 @@ describe('confirm — atomic + idempotent', () => {
     });
     expect(resAfter?.status).toBe(ReservationStatus.CONVERTED);
     expect(resAfter?.orderId).toBe(first.orderId);
+
+    const emails = await prisma.email.findMany({
+      where: { subjectId: first.orderId },
+    });
+    expect(emails).toEqual([
+      expect.objectContaining({
+        type: 'order_confirmation',
+        to: 'buyer@example.com',
+        idempotencyKey: `confirmation-${first.orderId}`,
+        status: 'PENDING',
+      }),
+    ]);
   });
 });
 
@@ -430,6 +449,9 @@ describe('completeFree', () => {
     expect(
       (await prisma.ticketTypes.findUnique({ where: { id: tt.id } }))?.sold
     ).toBe(2);
+    expect(
+      await prisma.email.count({ where: { subjectId: done.orderId } })
+    ).toBe(1);
   });
 
   it('rejects a paid reservation', async () => {
