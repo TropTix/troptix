@@ -1,5 +1,6 @@
 import { EmailStatus, Prisma } from '@troptix/db';
 import type { Email, PrismaClient } from '@troptix/db';
+import { EMAIL_TYPES, enqueueEmail } from './_shared/emails';
 
 const RETRY_DELAY_MINUTES = [1, 5, 30, 120, 360];
 export const MAX_EMAIL_ATTEMPTS = RETRY_DELAY_MINUTES.length + 1;
@@ -32,6 +33,21 @@ export interface DispatchResult {
 }
 
 const MINUTE = 60_000;
+
+const PLATFORM_INBOX = 'info@usetroptix.com';
+
+/** A chargeback notice for the Platform Owners; its builder reads Stripe. */
+export function enqueueDisputeNotice(
+  prisma: PrismaClient,
+  disputeId: string
+): Promise<void> {
+  return enqueueEmail(prisma, {
+    type: EMAIL_TYPES.disputeNotice,
+    subjectId: disputeId,
+    to: PLATFORM_INBOX,
+    idempotencyKey: `dispute-${disputeId}`,
+  });
+}
 
 function nextMidnightUtc(now: Date): Date {
   return new Date(

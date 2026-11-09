@@ -21,6 +21,7 @@ import type {
   CheckoutState,
 } from '../contracts/payments';
 import type { CheckoutAnalytics, FulfilledVia } from '../contracts/analytics';
+import { EMAIL_TYPES, enqueueEmail, refundNoticeKey } from './_shared/emails';
 
 /**
  * Stripe truncates `PREFIX* SUFFIX` at 22 chars: TROPTIX (7) + `* ` (2) leaves
@@ -251,9 +252,20 @@ export async function confirmPaid(
     { payment_intent: input.paymentIntentId },
     { idempotencyKey: `refund-${input.reservationId}` }
   );
-  await prisma.reservation.update({
-    where: { id: input.reservationId },
-    data: { status: ReservationStatus.REFUNDED, stripeRefundId: refund.id },
+  await prisma.$transaction(async (tx) => {
+    const reservation = await tx.reservation.update({
+      where: { id: input.reservationId },
+      data: { status: ReservationStatus.REFUNDED, stripeRefundId: refund.id },
+      select: { email: true },
+    });
+    if (reservation.email) {
+      await enqueueEmail(tx, {
+        type: EMAIL_TYPES.refundNotice,
+        subjectId: input.reservationId,
+        to: reservation.email,
+        idempotencyKey: refundNoticeKey(input.reservationId),
+      });
+    }
   });
   console.warn('[Checkout] expiry-race refund issued', {
     reservationId: input.reservationId,

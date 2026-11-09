@@ -74,6 +74,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  const subjects = [
+    ...(await prisma.orders.findMany({ where: { eventId: TEST_EVENT_ID } })),
+    ...(await prisma.reservation.findMany({
+      where: { eventId: TEST_EVENT_ID },
+    })),
+  ];
+  await prisma.email.deleteMany({
+    where: { subjectId: { in: subjects.map((s) => s.id) } },
+  });
   await prisma.tickets.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.orders.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.reservation.deleteMany({ where: { eventId: TEST_EVENT_ID } });
@@ -390,6 +399,17 @@ describe('confirmPaid — auto-refund on the expiry race', () => {
     });
     expect(second.kind).toBe('refunded');
     expect(fake.calls.refund).toHaveLength(1);
+
+    const emails = await prisma.email.findMany({
+      where: { subjectId: reservationId },
+    });
+    expect(emails).toEqual([
+      expect.objectContaining({
+        type: 'refund_notice',
+        to: 'buyer@example.com',
+        idempotencyKey: `refund-${reservationId}`,
+      }),
+    ]);
   });
 });
 
