@@ -6,6 +6,7 @@ import { generateId } from './_shared/ids';
 import {
   dispatchEmails,
   MAX_EMAIL_ATTEMPTS,
+  recordDeliveryEvent,
   type EmailSender,
   type SendOutcome,
 } from './emails';
@@ -237,5 +238,167 @@ describe('dispatchEmails', () => {
     const after = await reload(stuck.id);
     expect(after.status).toBe(EmailStatus.FAILED);
     expect(after.lastError).toBe('Send never finished');
+  });
+
+  it('keeps delivered when the send reports an error late', async () => {
+    const email = await makeEmail();
+    const send: EmailSender = async (row) => {
+      await recordDeliveryEvent(prisma, {
+        type: 'email.delivered',
+        resendId: `re_${row.id}`,
+        emailId: row.id,
+        at: new Date(),
+      });
+      return { ok: false, reason: 'error', message: 'timed out' };
+    };
+
+    const result = await dispatchEmails(prisma, send);
+
+    expect(result.retrying).toBe(0);
+    const after = await reload(email.id);
+    expect(after.status).toBe(EmailStatus.DELIVERED);
+    expect(after.attempts).toBe(0);
+  });
+});
+
+describe('recordDeliveryEvent', () => {
+  async function sentEmail() {
+    const email = await makeEmail();
+    return prisma.email.update({
+      where: { id: email.id },
+      data: {
+        status: EmailStatus.SENT,
+        resendId: `re_${email.id}`,
+        sentAt: new Date(),
+      },
+    });
+  }
+
+  it('moves a sent email to delivered', async () => {
+    const email = await sentEmail();
+    const at = new Date('2026-11-07T12:00:00Z');
+
+    const changed = await recordDeliveryEvent(prisma, {
+      type: 'email.delivered',
+      resendId: email.resendId!,
+      at,
+    });
+
+    expect(changed?.status).toBe(EmailStatus.DELIVERED);
+    expect(changed?.statusAt).toEqual(at);
+  });
+
+  it('ignores a late delayed after delivered, and a repeat', async () => {
+    const email = await sentEmail();
+    const event = { resendId: email.resendId!, at: new Date() };
+    await recordDeliveryEvent(prisma, { ...event, type: 'email.delivered' });
+
+    expect(
+      await recordDeliveryEvent(prisma, {
+        ...event,
+        type: 'email.delivery_delayed',
+      })
+    ).toBeNull();
+    expect(
+      await recordDeliveryEvent(prisma, { ...event, type: 'email.delivered' })
+    ).toBeNull();
+    expect((await reload(email.id)).status).toBe(EmailStatus.DELIVERED);
+  });
+
+  it('keeps a complaint that follows delivery', async () => {
+    const email = await sentEmail();
+    const event = { resendId: email.resendId!, at: new Date() };
+    await recordDeliveryEvent(prisma, { ...event, type: 'email.delivered' });
+
+    await recordDeliveryEvent(prisma, { ...event, type: 'email.complained' });
+
+    expect((await reload(email.id)).status).toBe(EmailStatus.COMPLAINED);
+  });
+
+  it('finds a row by its tag when the send never recorded the Resend id', async () => {
+    const email = await makeEmail({
+      status: EmailStatus.SENDING,
+      claimedAt: new Date(),
+    });
+
+    await recordDeliveryEvent(prisma, {
+      type: 'email.bounced',
+      resendId: 're_lost',
+      emailId: email.id,
+      at: new Date(),
+    });
+
+    const after = await reload(email.id);
+    expect(after.status).toBe(EmailStatus.BOUNCED);
+    expect(after.resendId).toBe('re_lost');
+  });
+
+  it('lets Resend correct an email we gave up on', async () => {
+    const email = await makeEmail({
+      status: EmailStatus.FAILED,
+      attempts: MAX_EMAIL_ATTEMPTS,
+    });
+
+    const changed = await recordDeliveryEvent(prisma, {
+      type: 'email.delivered',
+      resendId: 're_late',
+      emailId: email.id,
+      at: new Date(),
+    });
+
+    expect(changed?.status).toBe(EmailStatus.DELIVERED);
+  });
+
+  it('keeps a failure Resend reported after it sent', async () => {
+    const email = await makeEmail({
+      status: EmailStatus.FAILED,
+      resendId: 're_failed',
+      sentAt: new Date(),
+    });
+
+    expect(
+      await recordDeliveryEvent(prisma, {
+        type: 'email.delivered',
+        resendId: 're_failed',
+        at: new Date(),
+      })
+    ).toBeNull();
+    expect((await reload(email.id)).status).toBe(EmailStatus.FAILED);
+  });
+
+  it('ignores events for emails it never sent, and opens', async () => {
+    const email = await sentEmail();
+
+    expect(
+      await recordDeliveryEvent(prisma, {
+        type: 'email.delivered',
+        resendId: 're_sign_in_code',
+        at: new Date(),
+      })
+    ).toBeNull();
+    expect(
+      await recordDeliveryEvent(prisma, {
+        type: 'email.opened',
+        resendId: email.resendId!,
+        at: new Date(),
+      })
+    ).toBeNull();
+  });
+
+  it('keeps delivered when the dispatcher records the send late', async () => {
+    const email = await makeEmail();
+    const send: EmailSender = async (row) => {
+      await recordDeliveryEvent(prisma, {
+        type: 'email.delivered',
+        resendId: `re_${row.id}`,
+        emailId: row.id,
+        at: new Date(),
+      });
+      return { ok: true, resendId: `re_${row.id}` };
+    };
+
+    await dispatchEmails(prisma, send);
+
+    expect((await reload(email.id)).status).toBe(EmailStatus.DELIVERED);
   });
 });

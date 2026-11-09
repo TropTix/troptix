@@ -12,9 +12,10 @@ import { getAppBaseUrl } from '@/lib/appUrl';
 import { formatCents } from '@/lib/dateUtils';
 import { eventFlyerUrl } from '@/lib/supabase/storage';
 import { stripe } from '@/server/lib/stripe';
+import { captureEmailFailed } from '@/server/lib/analytics';
 import { Resend, type ErrorResponse } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+export const resend = new Resend(process.env.RESEND_API_KEY);
 
 function outcomeOf(error: ErrorResponse): SendOutcome {
   switch (error.name) {
@@ -120,16 +121,25 @@ const sendEmail: EmailSender = async (email) => {
 
 export async function dispatchDueEmails(): Promise<void> {
   const result = await dispatchEmails(prisma, sendEmail);
-  for (const email of result.failed) {
-    console.error(
-      `[Email] Gave up on ${email.type} ${email.id} after ${email.attempts} attempts:`,
-      email.lastError
-    );
-  }
+  await Promise.all(
+    result.failed.map((email) => {
+      console.error(
+        `[Email] Gave up on ${email.type} ${email.id} after ${email.attempts} attempts:`,
+        email.lastError
+      );
+      return captureEmailFailed({
+        emailId: email.id,
+        type: email.type,
+        status: email.status,
+        error: email.lastError,
+      });
+    })
+  );
   if (result.quotaExceeded) {
     console.error(
       `[Email] Resend ${result.quotaExceeded} exceeded; sending paused.`
     );
+    await captureEmailFailed({ status: result.quotaExceeded });
   }
 }
 

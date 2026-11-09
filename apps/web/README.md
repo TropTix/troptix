@@ -42,6 +42,7 @@ Next.js reads `.env` and `.env.local` in this directory. Both are gitignored.
 | `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`           | Stripe server and browser keys.                                             |
 | `STRIPE_RESERVATION_WEBHOOK_SECRET`                                 | Signing secret for `/api/stripe/reservation-webhook`.                       |
 | `RESEND_API_KEY`                                                    | Transactional email.                                                        |
+| `RESEND_WEBHOOK_SECRET`                                             | Signing secret for `/api/resend/webhook`, which records delivery status.    |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`               | PostHog. Requests proxy through `/ingest` (see `next.config.js`).           |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | Venue autocomplete and maps.                                                |
 | `CRON_SECRET`                                                       | Bearer token for `/api/cron/*`. The route fails closed when unset.          |

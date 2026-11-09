@@ -35,6 +35,9 @@ export { captureOrderCompleted } from './services/reservations';
 export {
   dispatchEmails,
   enqueueDisputeNotice,
+  recordDeliveryEvent,
+  UNDELIVERED_STATUSES,
+  type DeliveryEvent,
   type DispatchResult,
   type EmailSender,
   type SendOutcome,

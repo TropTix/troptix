@@ -2,6 +2,7 @@ import { PostHog } from 'posthog-node';
 import {
   ANALYTICS_EVENTS,
   AUTH_EVENTS,
+  EMAIL_EVENTS,
   type CheckoutAnalytics,
   type OrderCompletedProps,
 } from '@troptix/api/analytics';
@@ -47,6 +48,20 @@ export function captureSignInFailed(props: {
     source: 'callback',
     status: props.status,
     error_code: props.errorCode,
+  });
+}
+
+export function captureEmailFailed(props: {
+  emailId?: string;
+  type?: string;
+  status: string;
+  error?: string | null;
+}): Promise<void> {
+  return captureAnonymous('server:email', EMAIL_EVENTS.failed, {
+    email_id: props.emailId,
+    email_type: props.type,
+    status: props.status,
+    error: props.error,
   });
 }
 

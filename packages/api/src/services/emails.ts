@@ -172,8 +172,9 @@ export async function dispatchEmails(
     const now = new Date();
 
     if (outcome.ok) {
-      await prisma.email.update({
-        where: { id: email.id },
+      // Resend's webhook can land first and move the row past SENT.
+      await prisma.email.updateMany({
+        where: { id: email.id, status: EmailStatus.SENDING },
         data: {
           status: EmailStatus.SENT,
           resendId: outcome.resendId,
@@ -231,4 +232,89 @@ export async function dispatchEmails(
   }
 
   return result;
+}
+
+const DELIVERY_STATUS: Record<string, EmailStatus> = {
+  'email.delivery_delayed': EmailStatus.DELAYED,
+  'email.delivered': EmailStatus.DELIVERED,
+  'email.bounced': EmailStatus.BOUNCED,
+  'email.suppressed': EmailStatus.SUPPRESSED,
+  'email.failed': EmailStatus.FAILED,
+  'email.complained': EmailStatus.COMPLAINED,
+};
+
+const STATUS_RANK: Record<EmailStatus, number> = {
+  PENDING: 0,
+  SENDING: 1,
+  SENT: 2,
+  DELAYED: 3,
+  DELIVERED: 4,
+  BOUNCED: 5,
+  SUPPRESSED: 5,
+  FAILED: 5,
+  COMPLAINED: 6,
+};
+
+const ALL_STATUSES = Object.keys(STATUS_RANK) as EmailStatus[];
+const LOWER_STATUSES = Object.fromEntries(
+  ALL_STATUSES.map((status) => [
+    status,
+    ALL_STATUSES.filter((s) => STATUS_RANK[s] < STATUS_RANK[status]),
+  ])
+) as Record<EmailStatus, EmailStatus[]>;
+
+export const UNDELIVERED_STATUSES: EmailStatus[] = [
+  EmailStatus.BOUNCED,
+  EmailStatus.SUPPRESSED,
+  EmailStatus.FAILED,
+  EmailStatus.COMPLAINED,
+];
+
+export interface DeliveryEvent {
+  type: string;
+  resendId: string;
+  /** Our `Email.id`, from the tag every send carries. */
+  emailId?: string;
+  at: Date;
+}
+
+/**
+ * Resend's events can arrive late, twice or out of order, so a status only
+ * moves up the rank: a late "delayed" never undoes "delivered". The one
+ * exception is a row we gave up on before Resend ever confirmed it (FAILED,
+ * no `sentAt`): any Resend event about it is newer news. Returns the row when
+ * this event changed it.
+ */
+export async function recordDeliveryEvent(
+  prisma: PrismaClient,
+  event: DeliveryEvent
+): Promise<Email | null> {
+  const status = DELIVERY_STATUS[event.type];
+  if (!status) return null;
+
+  const match: Prisma.EmailWhereInput = event.emailId
+    ? { OR: [{ resendId: event.resendId }, { id: event.emailId }] }
+    : { resendId: event.resendId };
+  const { count } = await prisma.email.updateMany({
+    where: {
+      AND: [
+        match,
+        {
+          OR: [
+            { status: { in: LOWER_STATUSES[status] } },
+            ...(status === EmailStatus.FAILED
+              ? []
+              : [{ status: EmailStatus.FAILED, sentAt: null }]),
+          ],
+        },
+      ],
+    },
+    data: {
+      status,
+      statusAt: event.at,
+      resendId: event.resendId,
+      claimedAt: null,
+    },
+  });
+  return count ? prisma.email.findFirst({ where: match }) : null;
 }
