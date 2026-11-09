@@ -9,7 +9,8 @@ import {
 } from '@troptix/api/server';
 import { notFound } from 'next/navigation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
-import { eventFlyerUrl } from '@/lib/supabase/storage';
+import { absoluteUrl } from '@/lib/appUrl';
+import { eventFlyerPreviewUrl } from '@/lib/supabase/storage';
 import { eventDetailCacheTag } from '@/server/revalidateEventPages';
 import EventDetailView from './_components/EventDetailView';
 
@@ -29,15 +30,18 @@ export async function generateMetadata(props: {
   const { eventId } = await props.params;
   try {
     const event = await loadEventRaw(eventId);
-    const ogImage = eventFlyerUrl(event.imageUrl);
+    const ogImage = eventFlyerPreviewUrl(event.imageUrl);
     return {
       title: event.name,
       description: event.description,
       robots: event.isPrivate ? { index: false, follow: false } : undefined,
       openGraph: {
+        type: 'website',
+        siteName: 'TropTix',
+        url: absoluteUrl(`/e/${eventId}`),
         title: event.name,
         description: event.description,
-        images: ogImage ? [ogImage] : [],
+        images: ogImage ? [{ url: ogImage, type: 'image/jpeg' }] : [],
       },
     };
   } catch (err) {

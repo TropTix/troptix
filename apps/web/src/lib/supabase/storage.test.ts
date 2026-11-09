@@ -49,3 +49,33 @@ describe('eventFlyerUrl', () => {
     );
   });
 });
+
+describe('eventFlyerPreviewUrl', () => {
+  const original = process.env.NEXT_PUBLIC_APP_URL;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_APP_URL = 'https://app.test';
+  });
+
+  afterAll(() => {
+    process.env.NEXT_PUBLIC_APP_URL = original;
+  });
+
+  it('returns null when there is no flyer', () => {
+    const { eventFlyerPreviewUrl } = require('./storage');
+    expect(eventFlyerPreviewUrl(null)).toBeNull();
+  });
+
+  it('passes absolute URLs through untouched (legacy Firebase rows)', () => {
+    const { eventFlyerPreviewUrl } = require('./storage');
+    const firebase = 'https://firebasestorage.googleapis.com/v0/b/x/o/y';
+    expect(eventFlyerPreviewUrl(firebase)).toBe(firebase);
+  });
+
+  it('points a bucket path at the resizing route', () => {
+    const { eventFlyerPreviewUrl } = require('./storage');
+    expect(eventFlyerPreviewUrl('/abc.png')).toBe(
+      'https://app.test/api/og/flyer/abc.png'
+    );
+  });
+});

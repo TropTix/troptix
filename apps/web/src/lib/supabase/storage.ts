@@ -1,3 +1,4 @@
+import { absoluteUrl } from '@/lib/appUrl';
 import { createClient } from '@/lib/supabase/client';
 
 /**
@@ -20,6 +21,15 @@ export function eventFlyerUrl(value: string | null | undefined): string | null {
   if (isAbsoluteUrl(value)) return value;
   const path = value.replace(/^\/+/, '');
   return `${PUBLIC_BASE}/${EVENT_FLYERS_BUCKET}/${path}`;
+}
+
+export function eventFlyerPreviewUrl(
+  value: string | null | undefined
+): string | null {
+  if (!value) return null;
+  if (isAbsoluteUrl(value)) return value;
+  const path = value.replace(/^\/+/, '');
+  return absoluteUrl(`/api/og/flyer/${encodeURIComponent(path)}`);
 }
 
 export const ORGANIZATION_LOGOS_BUCKET = 'organization-logos';
