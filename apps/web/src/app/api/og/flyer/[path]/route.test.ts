@@ -2,7 +2,9 @@
  * @jest-environment node
  */
 import sharp from 'sharp';
-import { GET } from './route';
+
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://proj.supabase.co';
+const { GET } = require('./route') as typeof import('./route');
 
 const fetchMock = jest.fn();
 global.fetch = fetchMock;
@@ -70,6 +72,8 @@ describe('GET /api/og/flyer/[path]', () => {
     fetchMock.mockResolvedValue(new Response('not an image'));
     const res = await call('abc.heic');
     expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toMatch(/\/event-flyers\/abc\.heic$/);
+    expect(res.headers.get('location')).toBe(
+      'https://proj.supabase.co/storage/v1/object/public/event-flyers/abc.heic'
+    );
   });
 });
