@@ -57,6 +57,7 @@
     "react-hook-form": "^7.55.0",
     "recharts": "3.8.0",
     "resend": "^6.37.0",
+    "sharp": "0.35.5",
     "short-unique-id": "^5.0.3",
     "sonner": "^2.0.3",
     "stripe": "^22.3.0",

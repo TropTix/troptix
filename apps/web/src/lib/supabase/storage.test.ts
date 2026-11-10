@@ -49,3 +49,24 @@ describe('eventFlyerUrl', () => {
     );
   });
 });
+
+describe('eventFlyerPreviewImage', () => {
+  const { eventFlyerPreviewImage } = require('./storage');
+  const origin = 'https://app.test';
+
+  it('returns null when there is no flyer', () => {
+    expect(eventFlyerPreviewImage(null, origin)).toBeNull();
+  });
+
+  it('passes legacy absolute URLs through without a type', () => {
+    const firebase = 'https://firebasestorage.googleapis.com/v0/b/x/o/y';
+    expect(eventFlyerPreviewImage(firebase, origin)).toEqual({ url: firebase });
+  });
+
+  it('points a bucket path at the resizing route as a JPEG', () => {
+    expect(eventFlyerPreviewImage('/abc.png', origin)).toEqual({
+      url: 'https://app.test/api/og/flyer/abc.png',
+      type: 'image/jpeg',
+    });
+  });
+});
