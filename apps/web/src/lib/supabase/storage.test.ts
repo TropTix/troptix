@@ -50,32 +50,23 @@ describe('eventFlyerUrl', () => {
   });
 });
 
-describe('eventFlyerPreviewUrl', () => {
-  const original = process.env.NEXT_PUBLIC_APP_URL;
-
-  beforeEach(() => {
-    process.env.NEXT_PUBLIC_APP_URL = 'https://app.test';
-  });
-
-  afterAll(() => {
-    process.env.NEXT_PUBLIC_APP_URL = original;
-  });
+describe('eventFlyerPreviewImage', () => {
+  const { eventFlyerPreviewImage } = require('./storage');
+  const origin = 'https://app.test';
 
   it('returns null when there is no flyer', () => {
-    const { eventFlyerPreviewUrl } = require('./storage');
-    expect(eventFlyerPreviewUrl(null)).toBeNull();
+    expect(eventFlyerPreviewImage(null, origin)).toBeNull();
   });
 
-  it('passes absolute URLs through untouched (legacy Firebase rows)', () => {
-    const { eventFlyerPreviewUrl } = require('./storage');
+  it('passes legacy absolute URLs through without a type', () => {
     const firebase = 'https://firebasestorage.googleapis.com/v0/b/x/o/y';
-    expect(eventFlyerPreviewUrl(firebase)).toBe(firebase);
+    expect(eventFlyerPreviewImage(firebase, origin)).toEqual({ url: firebase });
   });
 
-  it('points a bucket path at the resizing route', () => {
-    const { eventFlyerPreviewUrl } = require('./storage');
-    expect(eventFlyerPreviewUrl('/abc.png')).toBe(
-      'https://app.test/api/og/flyer/abc.png'
-    );
+  it('points a bucket path at the resizing route as a JPEG', () => {
+    expect(eventFlyerPreviewImage('/abc.png', origin)).toEqual({
+      url: 'https://app.test/api/og/flyer/abc.png',
+      type: 'image/jpeg',
+    });
   });
 });

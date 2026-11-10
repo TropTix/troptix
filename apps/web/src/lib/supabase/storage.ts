@@ -1,4 +1,3 @@
-import { absoluteUrl } from '@/lib/appUrl';
 import { createClient } from '@/lib/supabase/client';
 
 /**
@@ -16,20 +15,36 @@ const PUBLIC_BASE = `${SUPABASE_URL}/storage/v1/object/public`;
 
 const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value);
 
-export function eventFlyerUrl(value: string | null | undefined): string | null {
-  if (!value) return null;
-  if (isAbsoluteUrl(value)) return value;
-  const path = value.replace(/^\/+/, '');
-  return `${PUBLIC_BASE}/${EVENT_FLYERS_BUCKET}/${path}`;
+function storagePath(value: string | null | undefined): string | null {
+  if (!value || isAbsoluteUrl(value)) return null;
+  return value.replace(/^\/+/, '');
 }
 
-export function eventFlyerPreviewUrl(
+function publicUrl(
+  bucket: string,
   value: string | null | undefined
 ): string | null {
-  if (!value) return null;
-  if (isAbsoluteUrl(value)) return value;
-  const path = value.replace(/^\/+/, '');
-  return absoluteUrl(`/api/og/flyer/${encodeURIComponent(path)}`);
+  const path = storagePath(value);
+  if (path) return `${PUBLIC_BASE}/${bucket}/${path}`;
+  return value || null;
+}
+
+export function eventFlyerUrl(value: string | null | undefined): string | null {
+  return publicUrl(EVENT_FLYERS_BUCKET, value);
+}
+
+export function eventFlyerPreviewImage(
+  value: string | null | undefined,
+  origin: string
+): { url: string; type?: string } | null {
+  const path = storagePath(value);
+  if (path) {
+    return {
+      url: `${origin}/api/og/flyer/${encodeURIComponent(path)}`,
+      type: 'image/jpeg',
+    };
+  }
+  return value ? { url: value } : null;
 }
 
 export const ORGANIZATION_LOGOS_BUCKET = 'organization-logos';
@@ -37,10 +52,7 @@ export const ORGANIZATION_LOGOS_BUCKET = 'organization-logos';
 export function organizationLogoUrl(
   value: string | null | undefined
 ): string | null {
-  if (!value) return null;
-  if (isAbsoluteUrl(value)) return value;
-  const path = value.replace(/^\/+/, '');
-  return `${PUBLIC_BASE}/${ORGANIZATION_LOGOS_BUCKET}/${path}`;
+  return publicUrl(ORGANIZATION_LOGOS_BUCKET, value);
 }
 
 export async function uploadOrganizationLogo(file: File): Promise<string> {
@@ -65,9 +77,9 @@ export async function uploadOrganizationLogo(file: File): Promise<string> {
 export async function deleteOrganizationLogo(
   value: string | null | undefined
 ): Promise<void> {
-  if (!value || isAbsoluteUrl(value)) return;
+  const path = storagePath(value);
+  if (!path) return;
   const supabase = createClient();
-  const path = value.replace(/^\/+/, '');
   const { error } = await supabase.storage
     .from(ORGANIZATION_LOGOS_BUCKET)
     .remove([path]);
@@ -96,9 +108,9 @@ export async function uploadEventFlyer(file: File): Promise<string> {
 export async function deleteEventFlyer(
   value: string | null | undefined
 ): Promise<void> {
-  if (!value || isAbsoluteUrl(value)) return;
+  const path = storagePath(value);
+  if (!path) return;
   const supabase = createClient();
-  const path = value.replace(/^\/+/, '');
   const { error } = await supabase.storage
     .from(EVENT_FLYERS_BUCKET)
     .remove([path]);
