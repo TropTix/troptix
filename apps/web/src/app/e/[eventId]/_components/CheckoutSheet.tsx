@@ -570,8 +570,13 @@ export default function CheckoutSheet({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="bottom"
-        className="flex h-dvh w-full flex-col gap-0 border-0 p-0 sm:inset-0 sm:m-auto sm:h-[85vh] sm:max-w-md sm:overflow-hidden sm:rounded-2xl sm:border sm:border-border"
+        className="flex h-dvh w-full flex-col gap-0 border-0 p-0 outline-hidden sm:inset-0 sm:m-auto sm:h-[85vh] sm:max-w-md sm:overflow-hidden sm:rounded-2xl sm:border sm:border-border"
         onInteractOutside={(e) => e.preventDefault()}
+        // Focusing the first field would open the phone keyboard over the tickets.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).focus();
+        }}
         onAnimationEnd={(e) => {
           if (
             e.target === e.currentTarget &&

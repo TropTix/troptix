@@ -96,6 +96,10 @@ function rotatingWordSize(word: string) {
   return `min(clamp(2.9rem, 10vw, 5.75rem), calc(min(88vw, 46rem) / ${widthEm}))`;
 }
 
+// CSS, not motion: the hero must show from the server HTML, before JS loads.
+const ENTER =
+  'animate-in fade-in slide-in-from-bottom-5 fill-mode-backwards duration-600 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:animate-none';
+
 function HeroCopy({ prefersReduced }: { prefersReduced: boolean }) {
   const [wordIndex, setWordIndex] = useState(0);
 
@@ -109,25 +113,13 @@ function HeroCopy({ prefersReduced }: { prefersReduced: boolean }) {
   }, [prefersReduced]);
 
   const word = prefersReduced ? ROTATING_WORDS[0] : ROTATING_WORDS[wordIndex];
-  const enter = (delay: number) =>
-    prefersReduced
-      ? {}
-      : {
-          initial: { opacity: 0, y: 20 },
-          animate: { opacity: 1, y: 0 },
-          transition: {
-            duration: 0.6,
-            delay,
-            ease: [0.22, 1, 0.36, 1] as const,
-          },
-        };
 
   return (
     <div className="mx-auto w-full max-w-3xl text-center">
-      <motion.h1
+      <h1
         id="hero-heading"
-        {...enter(0)}
         className={cn(
+          ENTER,
           'text-[clamp(2.9rem,10vw,5.75rem)] font-bold leading-[1.02] tracking-tight text-foreground',
           displayFont.className
         )}
@@ -165,19 +157,22 @@ function HeroCopy({ prefersReduced }: { prefersReduced: boolean }) {
         >
           sells out here.
         </span>
-      </motion.h1>
+      </h1>
 
-      <motion.p
-        {...enter(0.12)}
-        className="mx-auto mt-5 max-w-[44ch] text-pretty text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg"
+      <p
+        style={{ animationDelay: '120ms' }}
+        className={cn(
+          ENTER,
+          'mx-auto mt-5 max-w-[44ch] text-pretty text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg'
+        )}
       >
         Set up your event in minutes. TropTix handles ticket sales, check-in,
         and payouts, so you can focus on the vibes.
-      </motion.p>
+      </p>
 
-      <motion.div
-        {...enter(0.22)}
-        className="mt-8 flex flex-col items-center gap-4 sm:mt-10"
+      <div
+        style={{ animationDelay: '220ms' }}
+        className={cn(ENTER, 'mt-8 flex flex-col items-center gap-4 sm:mt-10')}
       >
         <Link
           href="/organizer/events/new"
@@ -196,7 +191,7 @@ function HeroCopy({ prefersReduced }: { prefersReduced: boolean }) {
             aria-hidden
           />
         </Link>
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -490,7 +485,7 @@ function FlyerMarquee({ prefersReduced }: { prefersReduced: boolean }) {
   return (
     <div
       aria-hidden
-      className="mt-12 w-full overflow-hidden md:hidden"
+      className="mt-6 w-full overflow-hidden py-6 md:hidden"
       style={{
         maskImage:
           'linear-gradient(90deg, transparent, black 12%, black 88%, transparent)',

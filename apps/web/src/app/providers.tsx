@@ -16,15 +16,13 @@ const queryClient = new QueryClient();
 
 function GlobalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isOrganizer = pathname?.startsWith('/organizer');
-  const offsetContent = !isOrganizer;
+  const hasHeaderOffset =
+    !pathname?.startsWith('/organizer') && !pathname?.startsWith('/auth');
 
   return (
     <div>
       <UnifiedHeader />
-      <div className={`grow border-x ${offsetContent ? 'mt-16' : ''}`}>
-        {children}
-      </div>
+      <div className={hasHeaderOffset ? 'mt-16' : undefined}>{children}</div>
     </div>
   );
 }

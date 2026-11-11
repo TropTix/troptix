@@ -29,7 +29,7 @@ function Stepper({
   onChange: (delta: number) => void;
 }) {
   return (
-    <div className="flex w-24 justify-end">
+    <div className="flex w-28 justify-end">
       <div className="flex items-center gap-0.5 rounded-full border border-border bg-card p-0.5">
         {value > 0 && (
           <div className="flex items-center gap-0.5 duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] animate-in fade-in slide-in-from-right-2 motion-reduce:[--tw-enter-translate-x:0]">
@@ -37,7 +37,7 @@ function Stepper({
               type="button"
               aria-label="Remove one"
               onClick={() => onChange(-1)}
-              className="grid h-7 w-7 place-items-center rounded-full bg-muted/70 text-foreground transition-colors hover:bg-muted"
+              className="grid h-9 w-9 place-items-center rounded-full bg-muted/70 text-foreground transition-colors hover:bg-muted"
             >
               <Minus className="h-4 w-4" />
             </button>
@@ -53,7 +53,7 @@ function Stepper({
           aria-label="Add one"
           disabled={value >= max}
           onClick={() => onChange(1)}
-          className="grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
+          className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
         >
           <Plus className="h-4 w-4" />
         </button>

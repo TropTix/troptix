@@ -212,7 +212,8 @@ export default function EventDetailView({
               fill
               sizes="100vw"
               className="object-cover"
-              priority
+              preload
+              fetchPriority="high"
             />
             <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-linear-to-b from-black/35 to-transparent" />
             <div className="absolute inset-x-3 top-3 flex items-center justify-between">
@@ -350,7 +351,7 @@ export default function EventDetailView({
       </main>
 
       <div className="fixed inset-x-0 bottom-0 z-40 animate-in border-t border-border bg-background/95 backdrop-blur-xl duration-300 slide-in-from-bottom">
-        <div className="mx-auto flex max-w-3xl items-center gap-4 px-5 py-3.5">
+        <div className="mx-auto flex max-w-5xl items-center gap-4 px-5 py-3.5 md:px-8">
           <div className="min-w-0 flex-1">
             {showPrice && (
               <div className="text-lg font-extrabold">{priceLabel}</div>

@@ -73,7 +73,11 @@ export default function ContactStep({
                 <FormItem>
                   <FormLabel>First name</FormLabel>
                   <FormControl>
-                    <Input placeholder="First name" {...field} />
+                    <Input
+                      placeholder="First name"
+                      autoComplete="given-name"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -86,7 +90,11 @@ export default function ContactStep({
                 <FormItem>
                   <FormLabel>Last name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Last name" {...field} />
+                    <Input
+                      placeholder="Last name"
+                      autoComplete="family-name"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -102,6 +110,7 @@ export default function ContactStep({
                 <FormControl>
                   <Input
                     type="email"
+                    autoComplete="email"
                     placeholder="you@example.com"
                     {...field}
                   />
