@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Ticket,
@@ -33,6 +33,14 @@ export function EventManagementNav({
   const router = useRouter();
   const [isPublished, setIsPublished] = useState(!isDraft);
   const [isLoading, setIsLoading] = useState(false);
+  const tabsRef = useRef<HTMLElement>(null);
+
+  // On phones the tab strip scrolls; keep the current tab in view.
+  useEffect(() => {
+    tabsRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [pathname]);
 
   const handleTogglePublish = async (checked: boolean) => {
     setIsLoading(true);
@@ -111,25 +119,26 @@ export function EventManagementNav({
   ].map((link) => ({ ...link, href: withScope(link.href) }));
 
   return (
-    <div className="border-b bg-card rounded-xl sticky top-0 z-10">
-      <div className="container flex items-center justify-between py-4">
-        <div className="flex items-center gap-4">
+    <div className="z-10 rounded-xl border-b bg-card sm:sticky sm:top-16">
+      <div className="container flex flex-col items-start gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
           <Link
             href="/organizer/events"
+            aria-label="Back to events"
             className="p-2 rounded-full hover:bg-accent"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-muted-foreground">Event</p>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight">{eventName}</h1>
-            </div>
+            <h1 className="text-xl font-bold tracking-tight wrap-break-word sm:text-2xl">
+              {eventName}
+            </h1>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground w-24 text-right">
+            <span className="text-sm text-muted-foreground sm:w-24 sm:text-right">
               {isPublished ? 'Published' : 'Unpublished'}
             </span>
             <Switch
@@ -141,11 +150,16 @@ export function EventManagementNav({
         </div>
       </div>
       <div className="container">
-        <nav className="-mb-px flex gap-8 overflow-x-auto" aria-label="Tabs">
+        <nav
+          ref={tabsRef}
+          aria-label="Tabs"
+          className="-mb-px flex gap-6 overflow-x-auto mask-[linear-gradient(to_right,black_calc(100%-2rem),transparent)] sm:gap-8 sm:mask-none"
+        >
           {links.map((link) => (
             <Link
               key={link.name}
               href={link.href}
+              aria-current={pathname === link.href ? 'page' : undefined}
               className={cn(
                 'whitespace-nowrap flex items-center gap-2 border-b-2 py-3 text-sm font-medium transition-colors',
                 pathname === link.href

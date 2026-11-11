@@ -51,16 +51,22 @@ const getUserInitials = (user?: {
 function UserMenu({
   user,
   isOrganizerRoute,
+  isPlatformOwner,
   onSignOut,
 }: {
   user: Parameters<typeof getUserInitials>[0];
   isOrganizerRoute: boolean;
+  isPlatformOwner: boolean;
   onSignOut: () => Promise<void>;
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+        <Button
+          variant="ghost"
+          aria-label="Account menu"
+          className="relative h-10 w-10 shrink-0 rounded-full"
+        >
           <Avatar className="h-10 w-10">
             <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
           </Avatar>
@@ -100,6 +106,23 @@ function UserMenu({
             </Link>
           </DropdownMenuItem>
         )}
+        {isPlatformOwner && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/organizer/platform/events">
+                <Shield className="mr-2 h-4 w-4" />
+                Platform Events
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/organizer/platform/payouts">
+                <Shield className="mr-2 h-4 w-4" />
+                Platform Payouts
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
@@ -112,7 +135,7 @@ function UserMenu({
 
 export default function UnifiedHeader() {
   const [hasScrolled, setHasScrolled] = useState<boolean>(false);
-  const { user } = useContext(TropTixContext);
+  const { user, loading } = useContext(TropTixContext);
   const pathname = usePathname();
   const payoutsEnabled = useFeatureFlagAfterMount(
     FeatureFlag.ORGANIZER_PAYOUTS
@@ -144,21 +167,6 @@ export default function UnifiedHeader() {
       : []),
     { label: 'Profile', href: '/organizer/profile', icon: Building2 },
   ];
-
-  if (userIsPlatformOwner) {
-    organizerNavItems.push(
-      {
-        label: 'Platform Events',
-        href: '/organizer/platform/events',
-        icon: Shield,
-      },
-      {
-        label: 'Platform Payouts',
-        href: '/organizer/platform/payouts',
-        icon: Shield,
-      }
-    );
-  }
 
   const handleSignOut = async () => {
     await supabaseSignOut();
@@ -202,7 +210,7 @@ export default function UnifiedHeader() {
                   asChild
                   key={item.href}
                 >
-                  <Link href={item.href}>
+                  <Link href={item.href} aria-label={item.label}>
                     <item.icon className="h-5 w-5 md:h-4 md:w-4" />
                     <span className="hidden md:inline ml-2 text-sm font-medium">
                       {item.label}
@@ -213,7 +221,7 @@ export default function UnifiedHeader() {
             ) : (
               <>
                 <Button variant="ghost" className="p-2 " asChild>
-                  <Link href="/discover">
+                  <Link href="/discover" aria-label="Explore events">
                     <Search className="h-5 w-5" />
                     <span className="hidden md:inline ml-2">
                       Explore Events
@@ -222,7 +230,7 @@ export default function UnifiedHeader() {
                 </Button>
                 {user && (
                   <Button variant="ghost" className="p-2 " asChild>
-                    <Link href="/orders">
+                    <Link href="/orders" aria-label="Tickets">
                       <Ticket className="h-5 w-5" />
                       <span className="hidden md:inline ml-2">Tickets</span>
                     </Link>
@@ -236,8 +244,12 @@ export default function UnifiedHeader() {
             <UserMenu
               user={user}
               isOrganizerRoute={!!isOrganizerRoute}
+              isPlatformOwner={userIsPlatformOwner}
               onSignOut={handleSignOut}
             />
+          ) : loading ? (
+            // Holds the avatar's space so a signed-in user never sees "Sign In".
+            <div aria-hidden className="h-10 w-10 shrink-0" />
           ) : (
             <>
               <Button variant="default" className="rounded-full" asChild>

@@ -95,7 +95,7 @@ export const OrderCard = ({ order }: OrderCardProps) => {
             'object-cover',
             isPastEvent && 'grayscale-[0.7] opacity-90'
           )}
-          sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
+          sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, (max-width: 1279px) 33vw, 320px"
         />
         {status && (
           <div className="absolute top-3 right-3">
