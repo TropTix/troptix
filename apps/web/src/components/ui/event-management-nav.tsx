@@ -35,11 +35,14 @@ export function EventManagementNav({
   const [isLoading, setIsLoading] = useState(false);
   const tabsRef = useRef<HTMLElement>(null);
 
-  // On phones the tab strip scrolls; keep the current tab in view.
   useEffect(() => {
-    tabsRef.current
-      ?.querySelector('[aria-current="page"]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    const nav = tabsRef.current;
+    const tab = nav?.querySelector('[aria-current="page"]');
+    if (!nav || !tab) return;
+    const navBox = nav.getBoundingClientRect();
+    const tabBox = tab.getBoundingClientRect();
+    nav.scrollLeft +=
+      tabBox.left - navBox.left - (navBox.width - tabBox.width) / 2;
   }, [pathname]);
 
   const handleTogglePublish = async (checked: boolean) => {
@@ -116,7 +119,7 @@ export function EventManagementNav({
       href: `/organizer/events/${eventId}/orders`,
       icon: ClipboardList,
     },
-  ].map((link) => ({ ...link, href: withScope(link.href) }));
+  ].map((link) => ({ ...link, path: link.href, href: withScope(link.href) }));
 
   return (
     <div className="z-10 rounded-xl border-b bg-card sm:sticky sm:top-16">
@@ -159,10 +162,10 @@ export function EventManagementNav({
             <Link
               key={link.name}
               href={link.href}
-              aria-current={pathname === link.href ? 'page' : undefined}
+              aria-current={pathname === link.path ? 'page' : undefined}
               className={cn(
                 'whitespace-nowrap flex items-center gap-2 border-b-2 py-3 text-sm font-medium transition-colors',
-                pathname === link.href
+                pathname === link.path
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:border-primary/30 hover:text-primary'
               )}
@@ -171,6 +174,8 @@ export function EventManagementNav({
               {link.name}
             </Link>
           ))}
+          {/* With gap-6 this clears the 2rem edge fade, so the last tab can scroll out from under it. */}
+          <span aria-hidden className="w-2 shrink-0 sm:hidden" />
         </nav>
       </div>
     </div>

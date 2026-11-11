@@ -98,7 +98,7 @@ export default function AccessCodeField({
           spellCheck={false}
           enterKeyHint="done"
           aria-invalid={!!error}
-          className="h-full min-w-0 flex-1 bg-transparent text-base font-medium tracking-wide uppercase sm:text-sm outline-none placeholder:font-normal placeholder:tracking-normal placeholder:normal-case placeholder:text-muted-foreground disabled:opacity-60"
+          className="h-full min-w-0 flex-1 bg-transparent text-base font-medium tracking-wide uppercase pointer-fine:text-sm outline-none placeholder:font-normal placeholder:tracking-normal placeholder:normal-case placeholder:text-muted-foreground disabled:opacity-60"
         />
         <button
           type="submit"

@@ -31,6 +31,10 @@ import { useFeatureFlagAfterMount } from '@/hooks/useFeatureFlagAfterMount';
 import { signOut as supabaseSignOut } from '@/lib/supabaseAuth';
 import { TropTixContext } from '../AuthProvider';
 
+export function isHeaderHidden(pathname: string | null) {
+  return !!pathname?.startsWith('/auth');
+}
+
 const getUserInitials = (user?: {
   firstName?: string | null;
   lastName?: string | null;
@@ -150,7 +154,7 @@ export default function UnifiedHeader() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  if (pathname?.startsWith('/auth')) {
+  if (isHeaderHidden(pathname)) {
     return null;
   }
 
@@ -228,7 +232,7 @@ export default function UnifiedHeader() {
                     </span>
                   </Link>
                 </Button>
-                {user && (
+                {user?.id && (
                   <Button variant="ghost" className="p-2 " asChild>
                     <Link href="/orders" aria-label="Tickets">
                       <Ticket className="h-5 w-5" />
@@ -247,12 +251,23 @@ export default function UnifiedHeader() {
               isPlatformOwner={userIsPlatformOwner}
               onSignOut={handleSignOut}
             />
-          ) : loading ? (
-            // Holds the avatar's space so a signed-in user never sees "Sign In".
-            <div aria-hidden className="h-10 w-10 shrink-0" />
           ) : (
             <>
-              <Button variant="default" className="rounded-full" asChild>
+              {loading && (
+                <div
+                  aria-hidden
+                  className="hidden h-10 w-10 shrink-0 [html[data-auth]_&]:block"
+                />
+              )}
+              <Button
+                variant="default"
+                className={cn(
+                  'rounded-full',
+                  // data-auth is set by authHintScript before first paint.
+                  loading && '[html[data-auth]_&]:hidden'
+                )}
+                asChild
+              >
                 <Link href="/auth/signin">
                   <span className=" ml-0 w-full">Sign In</span>
                 </Link>

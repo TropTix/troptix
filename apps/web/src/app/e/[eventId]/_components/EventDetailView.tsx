@@ -210,7 +210,8 @@ export default function EventDetailView({
               src={imageUrl}
               alt={event.name}
               fill
-              sizes="100vw"
+              // md:hidden above; 1vw makes desktop pick the smallest candidate, not a full-width copy.
+              sizes="(min-width: 768px) 1vw, 100vw"
               className="object-cover"
               preload
               fetchPriority="high"
