@@ -68,6 +68,7 @@ describe('handleConnectEvent', () => {
       expect(update).toHaveBeenCalledWith({
         where: { id: 'org-1' },
         data: { stripeTransfersStatus: stored },
+        select: { id: true },
       });
       expect(updateMany).not.toHaveBeenCalled();
     }
@@ -96,6 +97,7 @@ describe('handleConnectEvent', () => {
       expect(update).toHaveBeenCalledWith({
         where: { id: 'org-9' },
         data: { stripeTransfersStatus: 'active' },
+        select: { id: true },
       });
       expect(updateMany).toHaveBeenCalledWith({
         where: { id: 'org-9', payoutBankLinkedAt: null },

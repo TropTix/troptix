@@ -58,10 +58,15 @@ export async function GET(
         eventId: eventId,
         status: 'COMPLETED',
       },
-      include: {
+      select: {
         tickets: {
-          include: {
-            ticketType: true,
+          select: {
+            id: true,
+            orderId: true,
+            status: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
       },

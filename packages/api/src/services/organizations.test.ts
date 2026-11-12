@@ -52,9 +52,9 @@ describe('ensureOrganizationForUser', () => {
       ownerUserId: 'u1',
       displayName: 'Island Vibes',
     });
-    expect(org.ownerUserId).toBe('u1');
     expect(org.slug).toBe('island-vibes');
     expect(orgs).toHaveLength(1);
+    expect(orgs[0].ownerUserId).toBe('u1');
   });
 
   it('is idempotent — returns the existing org, never a second one', async () => {

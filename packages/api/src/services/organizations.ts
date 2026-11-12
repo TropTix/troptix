@@ -1,6 +1,6 @@
 // Organizations are lazy-created on first explicit write (event save or
 // profile save) — never on a page view.
-import type { PrismaClient } from '@troptix/db';
+import type { Prisma, PrismaClient } from '@troptix/db';
 import type { EventSummary } from '../contracts/events';
 import type {
   OrganizationDetail,
@@ -13,9 +13,29 @@ import { NotFoundError, UnauthorizedError } from './_shared/errors';
 import { resolveOrganizerScope } from './organizer-scope';
 import type { Actor } from '../trpc/context';
 
-type OrganizationRow = Awaited<
-  ReturnType<PrismaClient['organization']['create']>
->;
+export const OWNED_ORGANIZATION_SELECT = {
+  id: true,
+  slug: true,
+  displayName: true,
+  paidTicketingEnabled: true,
+} satisfies Prisma.OrganizationSelect;
+
+type OrganizationRow = Prisma.OrganizationGetPayload<{
+  select: typeof OWNED_ORGANIZATION_SELECT;
+}>;
+
+const ACTING_ORGANIZATION_SELECT = {
+  id: true,
+  displayName: true,
+  slug: true,
+  logoUrl: true,
+  bio: true,
+  website: true,
+  instagram: true,
+  twitter: true,
+  linkedin: true,
+  paidTicketingEnabled: true,
+} satisfies Prisma.OrganizationSelect;
 
 const FALLBACK_NAME = 'Organizer';
 
@@ -31,6 +51,7 @@ export function findOrganizationForOwner(
   return prisma.organization.findFirst({
     where: { ownerUserId },
     orderBy: { createdAt: 'asc' },
+    select: OWNED_ORGANIZATION_SELECT,
   });
 }
 
@@ -47,6 +68,7 @@ export async function ensureOrganizationForUser(
   try {
     return await prisma.organization.create({
       data: { ownerUserId, displayName: name, slug },
+      select: OWNED_ORGANIZATION_SELECT,
     });
   } catch (err) {
     // ownerUserId is unique (one org per owner): a concurrent ensure lost the
@@ -88,6 +110,7 @@ export async function updateOrganizationProfile(
   const org = scope.organizationId
     ? await prisma.organization.findUnique({
         where: { id: scope.organizationId },
+        select: { id: true, slug: true, displayName: true },
       })
     : null;
 
@@ -96,6 +119,7 @@ export async function updateOrganizationProfile(
     if (!isValidSlug(nextSlug)) return { ok: false, reason: 'slug_invalid' };
     const taken = await prisma.organization.findUnique({
       where: { slug: nextSlug },
+      select: { id: true },
     });
     if (taken && taken.id !== org?.id)
       return { ok: false, reason: 'slug_taken' };
@@ -115,10 +139,15 @@ export async function updateOrganizationProfile(
 
   try {
     if (org) {
-      await prisma.organization.update({ where: { id: org.id }, data });
+      await prisma.organization.update({
+        where: { id: org.id },
+        data,
+        select: { id: true },
+      });
     } else if (!scope.organizationId) {
       await prisma.organization.create({
         data: { ownerUserId: scope.userId, ...data },
+        select: { id: true },
       });
     }
   } catch (err) {
@@ -196,7 +225,10 @@ export async function findActingOrganization(
 ) {
   const scope = await resolveOrganizerScope(prisma, actor);
   return scope.organizationId
-    ? prisma.organization.findUnique({ where: { id: scope.organizationId } })
+    ? prisma.organization.findUnique({
+        where: { id: scope.organizationId },
+        select: ACTING_ORGANIZATION_SELECT,
+      })
     : null;
 }
 
@@ -215,7 +247,7 @@ export async function createOrganization(
   prisma: PrismaClient,
   actor: Actor,
   displayName: string
-): Promise<OrganizationRow> {
+): Promise<{ id: string }> {
   if (actor.kind !== 'user') {
     throw new UnauthorizedError('Sign in to create an organization');
   }
@@ -224,6 +256,7 @@ export async function createOrganization(
   const slug = generateUniqueSlug(name, (s) => taken.has(s));
   return prisma.organization.create({
     data: { displayName: name, slug, ownerUserId: actor.userId },
+    select: { id: true },
   });
 }
 

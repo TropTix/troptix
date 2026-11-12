@@ -56,10 +56,24 @@ export async function getEvent(
 
   const event = await prisma.events.findUnique({
     where: { id: eventId },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      startsAt: true,
+      venue: true,
+      address: true,
+      organizerUserId: true,
       tickets: {
         where: { order: { status: 'COMPLETED' } },
-        include: { ticketType: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          ticketsType: true,
+          checkinTimestamp: true,
+          ticketType: { select: { name: true } },
+        },
       },
     },
   });
