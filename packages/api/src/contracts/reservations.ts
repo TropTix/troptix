@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { codeRefusalSchemas } from './checkout';
 
 // No superjson transformer on the wire — ISO strings, never z.date().
 
@@ -42,19 +43,24 @@ export type CreateReservationInput = z.infer<
   typeof createReservationInputSchema
 >;
 
-export const createReservationResponseSchema = z.object({
-  reservationId: z.string(),
-  items: z.array(
-    z.object({
-      ticketTypeId: z.string(),
-      requested: z.number().int(),
-      granted: z.number().int(),
-    })
-  ),
-  totalCents: z.number().int(),
-  expiresAt: z.string().datetime(),
-  wasAdjusted: z.boolean(),
-});
+export const createReservationResponseSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('held'),
+    reservationId: z.string(),
+    items: z.array(
+      z.object({
+        ticketTypeId: z.string(),
+        requested: z.number().int(),
+        granted: z.number().int(),
+      })
+    ),
+    totalCents: z.number().int(),
+    expiresAt: z.string().datetime(),
+    wasAdjusted: z.boolean(),
+  }),
+  // The code's grant refused the hold; nothing was held.
+  ...codeRefusalSchemas,
+]);
 export type CreateReservationResponse = z.infer<
   typeof createReservationResponseSchema
 >;

@@ -24,7 +24,21 @@ const vipRow = {
 
 function fakePrisma(rows: unknown[]): PrismaClient {
   return {
-    ticketTypes: { findMany: async () => rows },
+    grant: {
+      findUnique: async () =>
+        rows.length === 0
+          ? null
+          : {
+              id: 'g-1',
+              maxUses: null,
+              usedCount: 0,
+              quantity: null,
+              expiresAt: null,
+              revokedAt: null,
+              holderEmail: null,
+              ticketTypes: rows.map((ticketType) => ({ ticketType })),
+            },
+    },
   } as unknown as PrismaClient;
 }
 

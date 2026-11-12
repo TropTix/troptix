@@ -16,6 +16,7 @@ import {
   release,
   reserve,
 } from './reservations';
+import type { CreateReservationResponse } from '../contracts/reservations';
 
 const TEST_EVENT_ID = `test-evt-${generateId()}`;
 const TEST_OWNER_ID = `test-evt-owner-${generateId()}`;
@@ -53,6 +54,7 @@ afterAll(async () => {
   await prisma.tickets.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.orders.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.reservation.deleteMany({ where: { eventId: TEST_EVENT_ID } });
+  await prisma.grant.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.ticketTypes.deleteMany({ where: { eventId: TEST_EVENT_ID } });
   await prisma.events.delete({ where: { id: TEST_EVENT_ID } });
   await prisma.organization.delete({ where: { id: TEST_ORG_ID } });
@@ -69,7 +71,7 @@ async function makeTicketType(
     accessCode?: string;
   } = {}
 ) {
-  return prisma.ticketTypes.create({
+  const tt = await prisma.ticketTypes.create({
     data: {
       id: generateId(),
       name: 'GA',
@@ -78,12 +80,31 @@ async function makeTicketType(
       capacity,
       price: priceCents / 100,
       priceCents,
-      accessCode: overrides.accessCode ?? null,
+      hidden: overrides.accessCode !== undefined,
       saleStartsAt: overrides.saleStartsAt ?? new Date(Date.now() - 86_400_000),
       saleEndsAt: overrides.saleEndsAt ?? new Date(Date.now() + 86_400_000),
       event: { connect: { id: TEST_EVENT_ID } },
     },
   });
+  if (overrides.accessCode !== undefined) {
+    const code = overrides.accessCode;
+    await prisma.grant.upsert({
+      where: { eventId_code: { eventId: TEST_EVENT_ID, code } },
+      create: {
+        id: generateId(),
+        eventId: TEST_EVENT_ID,
+        code,
+        ticketTypes: { create: { ticketTypeId: tt.id } },
+      },
+      update: { ticketTypes: { create: { ticketTypeId: tt.id } } },
+    });
+  }
+  return tt;
+}
+
+function held(res: CreateReservationResponse) {
+  if (res.type !== 'held') throw new Error(`expected a hold, got ${res.type}`);
+  return res;
 }
 
 describe('reserve — concurrency (the headline guarantee)', () => {
@@ -275,18 +296,20 @@ describe('expire', () => {
 describe('createReservation — server pricing authority', () => {
   it('derives fees from the ticket type and holds inventory', async () => {
     const tt = await makeTicketType(5, 5000);
-    const res = await createReservation(
-      prisma,
-      {
-        eventId: TEST_EVENT_ID,
-        items: [{ ticketTypeId: tt.id, quantity: 2 }],
-        contact: {
-          firstName: 'Bud',
-          lastName: 'Buyer',
-          email: 'bud@example.com',
+    const res = held(
+      await createReservation(
+        prisma,
+        {
+          eventId: TEST_EVENT_ID,
+          items: [{ ticketTypeId: tt.id, quantity: 2 }],
+          contact: {
+            firstName: 'Bud',
+            lastName: 'Buyer',
+            email: 'bud@example.com',
+          },
         },
-      },
-      null
+        null
+      )
     );
 
     expect(res.wasAdjusted).toBe(false);
@@ -298,14 +321,16 @@ describe('createReservation — server pricing authority', () => {
 
   it('clamps to availability and flags wasAdjusted', async () => {
     const tt = await makeTicketType(1, 5000);
-    const res = await createReservation(
-      prisma,
-      {
-        eventId: TEST_EVENT_ID,
-        items: [{ ticketTypeId: tt.id, quantity: 3 }],
-        contact: { firstName: 'A', lastName: 'B', email: 'a@b.com' },
-      },
-      null
+    const res = held(
+      await createReservation(
+        prisma,
+        {
+          eventId: TEST_EVENT_ID,
+          items: [{ ticketTypeId: tt.id, quantity: 3 }],
+          contact: { firstName: 'A', lastName: 'B', email: 'a@b.com' },
+        },
+        null
+      )
     );
 
     expect(res.items[0].granted).toBe(1);
@@ -363,18 +388,24 @@ describe('createReservation — server pricing authority', () => {
   it('holds a gated ticket type when the code matches, whatever its case', async () => {
     const gated = await makeTicketType(5, 5000, { accessCode: 'VIPLIST' });
     const open = await makeTicketType(5, 1000);
-    const res = await createReservation(
-      prisma,
-      {
-        eventId: TEST_EVENT_ID,
-        items: [
-          { ticketTypeId: gated.id, quantity: 1 },
-          { ticketTypeId: open.id, quantity: 1 },
-        ],
-        accessCode: ' viplist ',
-        contact: { firstName: 'Has', lastName: 'Code', email: 'has@code.com' },
-      },
-      null
+    const res = held(
+      await createReservation(
+        prisma,
+        {
+          eventId: TEST_EVENT_ID,
+          items: [
+            { ticketTypeId: gated.id, quantity: 1 },
+            { ticketTypeId: open.id, quantity: 1 },
+          ],
+          accessCode: ' viplist ',
+          contact: {
+            firstName: 'Has',
+            lastName: 'Code',
+            email: 'has@code.com',
+          },
+        },
+        null
+      )
     );
 
     expect(res.wasAdjusted).toBe(false);
@@ -385,18 +416,20 @@ describe('createReservation — server pricing authority', () => {
 describe('completeFree', () => {
   it('materializes a free order + tickets, idempotently', async () => {
     const tt = await makeTicketType(5, 0);
-    const res = await createReservation(
-      prisma,
-      {
-        eventId: TEST_EVENT_ID,
-        items: [{ ticketTypeId: tt.id, quantity: 2 }],
-        contact: {
-          firstName: 'Free',
-          lastName: 'Guest',
-          email: 'free@example.com',
+    const res = held(
+      await createReservation(
+        prisma,
+        {
+          eventId: TEST_EVENT_ID,
+          items: [{ ticketTypeId: tt.id, quantity: 2 }],
+          contact: {
+            firstName: 'Free',
+            lastName: 'Guest',
+            email: 'free@example.com',
+          },
         },
-      },
-      null
+        null
+      )
     );
     expect(res.totalCents).toBe(0);
 
@@ -434,14 +467,16 @@ describe('completeFree', () => {
 
   it('rejects a paid reservation', async () => {
     const tt = await makeTicketType(5, 5000);
-    const res = await createReservation(
-      prisma,
-      {
-        eventId: TEST_EVENT_ID,
-        items: [{ ticketTypeId: tt.id, quantity: 1 }],
-        contact: { firstName: 'P', lastName: 'Q', email: 'p@q.com' },
-      },
-      null
+    const res = held(
+      await createReservation(
+        prisma,
+        {
+          eventId: TEST_EVENT_ID,
+          items: [{ ticketTypeId: tt.id, quantity: 1 }],
+          contact: { firstName: 'P', lastName: 'Q', email: 'p@q.com' },
+        },
+        null
+      )
     );
 
     await expect(
