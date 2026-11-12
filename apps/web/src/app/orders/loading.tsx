@@ -1,40 +1,40 @@
+import type { CSSProperties } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Ticket } from 'lucide-react';
 
-const SkeletonOrderCard = () => {
-  return (
-    <div className="max-w-lg bg-white rounded-xl shadow-lg p-4 flex flex-row items-center space-y-0 space-x-4 mx-auto">
-      <div className="my-auto">
-        <Skeleton className="w-[150px] h-[150px] rounded" />
-      </div>
-      <div className="ml-4 my-auto grow w-full space-y-2">
-        <Skeleton className="h-6 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
-        <Skeleton className="h-4 w-1/3" />
-        <Skeleton className="h-4 w-1/4" />
-        <Skeleton className="h-4 w-1/2" />
-        <div className="flex items-center pt-1">
-          <Ticket className="w-4 h-4 mr-1 text-muted-foreground/50" />
-          <Skeleton className="h-4 w-16" />
-        </div>
+// Same grid and card geometry as the orders page, so the real cards land in
+// place. Each card's bones pulse a beat after the previous card's.
+const SkeletonOrderCard = ({ index }: { index: number }) => (
+  <div
+    className="overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/6"
+    style={{ '--stagger': `${index * 120}ms` } as CSSProperties}
+  >
+    <Skeleton className="aspect-4/5 w-full rounded-none" />
+    <div className="space-y-2 px-4 pt-3.5 pb-4">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-3 w-1/2" />
+      <div className="flex items-center justify-between pt-2">
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-6 w-6 rounded-full" />
       </div>
     </div>
-  );
-};
+  </div>
+);
 
 export default function OrdersLoading() {
   return (
-    <div className="container mt-20 w-full md:mt-28 min-h-screen px-4 py-8">
+    <div className="container mt-16 w-full md:mt-20 min-h-screen px-4 py-8">
       <div className="mb-12 text-center">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Your Tickets
+        <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
+          My Orders
         </h1>
       </div>
 
-      <div className="grid items-center justify-center grid-cols-1 gap-4 w-full mx-auto">
-        <SkeletonOrderCard />
-        <SkeletonOrderCard />
-        <SkeletonOrderCard />
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <SkeletonOrderCard key={i} index={i} />
+          ))}
+        </div>
       </div>
     </div>
   );
