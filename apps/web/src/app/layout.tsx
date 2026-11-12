@@ -7,6 +7,7 @@ import { Inter } from 'next/font/google';
 import Providers from './providers';
 import '../styles/globals.css';
 import Toaster from '@/components/toaster';
+import { authHintScript } from '@/lib/authCookie';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -38,7 +39,10 @@ export default async function RootLayout({
   const shouldInjectToolbar = process.env.NODE_ENV === 'development';
 
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: authHintScript }} />
+      </head>
       <body>
         <Providers>
           {children}

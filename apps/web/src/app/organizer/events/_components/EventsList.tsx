@@ -89,7 +89,7 @@ function EventCard({ event }: { event: OrganizerEventSummary }) {
 
   return (
     <Link href={`/organizer/events/${event.id}`} className="group">
-      <Card className="flex h-full flex-col overflow-hidden transition-colors group-hover:border-primary/50">
+      <Card className="flex h-full flex-col gap-0 overflow-hidden py-0 transition-colors group-hover:border-primary/50">
         <div className="relative aspect-video w-full shrink-0 bg-muted">
           <Image
             src={flyerUrl}

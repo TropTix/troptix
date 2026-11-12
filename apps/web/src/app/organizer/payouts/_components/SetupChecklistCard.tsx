@@ -85,7 +85,7 @@ export function SetupChecklistCard({
           </span>
           <Progress
             value={(done / SETUP_STEP_COUNT) * 100}
-            className="h-1.5 w-36"
+            className="h-1.5 w-20 sm:w-36"
           />
         </CardAction>
       </CardHeader>

@@ -244,7 +244,8 @@ function CheckInCard({
         <CardTitle className="text-base">Check-in</CardTitle>
         <Link
           href={`/organizer/events/${eventId}/attendees${scope}`}
-          className="text-sm text-muted-foreground hover:text-foreground"
+          aria-label="Check in attendees"
+          className="-m-2 p-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ScanLine className="h-4 w-4" />
         </Link>

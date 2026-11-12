@@ -4,6 +4,7 @@ import { User } from '@/hooks/types/User';
 import { createClient } from '@/lib/supabase/client';
 import { usePostHog } from 'posthog-js/react';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { hasSupabaseAuthCookie } from '@/lib/authCookie';
 
 const emptyUser: User = { id: '' };
 
@@ -13,15 +14,6 @@ export const TropTixContext = createContext<{ user: User; loading: boolean }>({
 });
 
 export const useAuth = () => useContext(TropTixContext);
-
-// Mirrors the server's fast-path predicate (see server/authUser.ts): a
-// `sb-<ref>-auth-token` cookie (possibly chunked) is what getClaims reads.
-function hasSupabaseAuthCookie() {
-  return document.cookie.split('; ').some((entry) => {
-    const name = entry.split('=')[0];
-    return name.startsWith('sb-') && name.includes('-auth-token');
-  });
-}
 
 /**
  * /api/user/me is the single source of truth. Protected routes are gated

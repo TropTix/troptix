@@ -49,7 +49,7 @@ export default async function DiscoverPage() {
     <section className="relative isolate min-h-screen overflow-hidden bg-background text-foreground">
       <DiscoverBackground />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-5 pb-20 pt-28 sm:px-6 sm:pt-32 lg:px-8">
+      <div className="relative z-10 mx-auto max-w-6xl px-5 pb-20 pt-12 sm:px-6 sm:pt-16 lg:px-8">
         <header className="mb-12 sm:mb-16">
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
             Discover
