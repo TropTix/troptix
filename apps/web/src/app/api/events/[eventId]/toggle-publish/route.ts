@@ -4,8 +4,8 @@ import {
 } from '@/lib/validations/publishValidation';
 import { getUserFromIdTokenCookie } from '@/server/authUser';
 import prisma from '@/server/prisma';
-import { resolveActingScope, userToActor } from '@/server/actor';
-import { eventsInScope, findActingOrganization } from '@troptix/api/server';
+import { resolveActingScope } from '@/server/actor';
+import { eventsInScope } from '@troptix/api/server';
 import { revalidateEventPublicPages } from '@/server/revalidateEventPages';
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
@@ -29,10 +29,8 @@ export async function PATCH(
     }
 
     // Paid ticketing is the Organization's approval, not a user role — the
-    // same flag the @troptix/api write services enforce.
-    const org = await findActingOrganization(prisma, userToActor(user));
-    const paidEventsEnabled = org?.paidTicketingEnabled ?? false;
-
+    // same flag the @troptix/api write services enforce. The scope filter
+    // makes the event's own Organization the acting one, so it is read here.
     const event = await prisma.events.findFirst({
       where: {
         id: eventId,
@@ -49,7 +47,7 @@ export async function PATCH(
         venue: true,
         address: true,
         imageUrl: true,
-        organization: { select: { slug: true } },
+        organization: { select: { slug: true, paidTicketingEnabled: true } },
         ticketTypes: {
           select: {
             id: true,
@@ -74,7 +72,7 @@ export async function PATCH(
     if (event.isDraft) {
       const validationResult = validateEventForPublish(
         event,
-        paidEventsEnabled
+        event.organization?.paidTicketingEnabled ?? false
       );
 
       if (!validationResult.isValid) {

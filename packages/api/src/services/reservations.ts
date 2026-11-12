@@ -596,20 +596,21 @@ export async function completeFree(
     return { orderId: await materializeOrder(tx, reservation), fresh: true };
   });
 
-  if (fresh && analytics) {
-    await captureOrderCompleted(
-      prisma,
-      analytics,
-      input.reservationId,
-      orderId,
-      'free'
-    );
-  }
-
-  const tickets = await prisma.tickets.findMany({
-    where: { orderId },
-    select: { id: true, ticketType: { select: { name: true } } },
-  });
+  const [tickets] = await Promise.all([
+    prisma.tickets.findMany({
+      where: { orderId },
+      select: { id: true, ticketType: { select: { name: true } } },
+    }),
+    fresh && analytics
+      ? captureOrderCompleted(
+          prisma,
+          analytics,
+          input.reservationId,
+          orderId,
+          'free'
+        )
+      : undefined,
+  ]);
 
   return {
     orderId,

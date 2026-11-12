@@ -2,7 +2,6 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import prisma from '@/server/prisma';
 import {
-  isPlatformOwner,
   listOwnedOrganizations,
   resolveOrganizerScope,
 } from '@troptix/api/server';
@@ -22,13 +21,12 @@ export default async function OrganizerLayout({
   }
 
   const actor = userToActor(user);
-  const [organizations, scope, platformOwner] = await Promise.all([
+  const [organizations, scope] = await Promise.all([
     listOwnedOrganizations(prisma, actor),
     resolveOrganizerScope(prisma, actor),
-    isPlatformOwner(prisma, user.uid),
   ]);
 
-  if (organizations.length === 0 && !platformOwner) {
+  if (organizations.length === 0 && !user.isPlatformOwner) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <main className="flex-1 md:container px-4 py-8 mt-16">
