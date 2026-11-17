@@ -7,6 +7,7 @@ import {
   PaymentElement,
   useCheckoutElements,
 } from '@stripe/react-stripe-js/checkout';
+import { motion } from 'motion/react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn, getFormattedCurrency } from '@/lib/utils';
 import type { EventDetail } from '@troptix/api';
@@ -113,6 +114,8 @@ function PaymentInner({
   const checkoutState = useCheckoutElements();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [shake, setShake] = useState(false);
   const softDeadline = new Date(
     new Date(expiresAt).getTime() - CLIENT_HOLD_BUFFER_MS
   ).toISOString();
@@ -174,14 +177,18 @@ function PaymentInner({
         'We could not reach the payment service. Check your connection and try again; if you were charged, your tickets will arrive by email.'
       );
       setSubmitting(false);
+      setShake(true);
       return;
     }
     if (result.type === 'error') {
       setError(result.error.message ?? 'Your payment could not be processed.');
       setSubmitting(false);
+      setShake(true);
       return;
     }
-    onPaid();
+    // Let the button read Paid for a beat before the sheet moves on.
+    setPaid(true);
+    setTimeout(onPaid, 700);
   }
 
   return (
@@ -215,14 +222,55 @@ function PaymentInner({
       <button
         type="button"
         onClick={pay}
-        disabled={submitting || expired || !checkout.canConfirm}
-        className="mt-4 w-full rounded-full bg-primary py-3 text-center font-semibold text-primary-foreground disabled:opacity-50"
+        onAnimationEnd={() => setShake(false)}
+        disabled={submitting || paid || expired || !checkout.canConfirm}
+        className={cn(
+          'mx-auto mt-4 grid h-12 shrink-0 place-items-center overflow-hidden rounded-full font-semibold text-primary-foreground transition-[width,background-color,opacity,transform] duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] active:scale-[0.98] disabled:opacity-50',
+          paid
+            ? 'w-32 bg-success disabled:opacity-100'
+            : submitting
+              ? 'w-12 bg-primary disabled:opacity-100'
+              : 'w-full bg-primary',
+          shake && 'animate-cta-shake'
+        )}
       >
-        {expired
-          ? 'Hold expired'
-          : submitting
-            ? 'Processing…'
-            : `Pay ${money(summary.totalCents)}`}
+        <span
+          className={cn(
+            'col-start-1 row-start-1 transition-[opacity,filter] duration-200',
+            (submitting || paid) && 'opacity-0 blur-[3px]'
+          )}
+        >
+          {expired ? 'Hold expired' : `Pay ${money(summary.totalCents)}`}
+        </span>
+        {submitting && !paid && (
+          <Spinner className="col-start-1 row-start-1 size-5 animate-in fade-in delay-150 duration-200 fill-mode-backwards text-primary-foreground" />
+        )}
+        {paid && (
+          <span className="col-start-1 row-start-1 inline-flex items-center gap-1.5 animate-in fade-in delay-150 duration-200 fill-mode-backwards">
+            <svg
+              className="size-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.6}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <motion.path
+                d="M5 12.5l4.5 4.5L19 7"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{
+                  duration: 0.3,
+                  delay: 0.2,
+                  ease: [0.23, 1, 0.32, 1],
+                }}
+              />
+            </svg>
+            Paid
+          </span>
+        )}
       </button>
     </div>
   );
