@@ -5,7 +5,7 @@ const mockPrisma = {
   processedStripeEvent: { findUnique: jest.fn(), create: jest.fn() },
 };
 const mockConfirmPaid = jest.fn();
-const mockSendConfirmation = jest.fn();
+const mockDispatchEmails = jest.fn();
 const mockSendRefundNotice = jest.fn();
 const mockAfterTasks: Promise<unknown>[] = [];
 
@@ -18,7 +18,7 @@ jest.mock('@troptix/api/server', () => ({
       : (session.payment_intent?.id ?? null),
 }));
 jest.mock('@/server/lib/email', () => ({
-  sendEmailConfirmationEmailToUser: mockSendConfirmation,
+  dispatchDueEmails: mockDispatchEmails,
   sendRefundNoticeEmail: mockSendRefundNotice,
 }));
 jest.mock('@/server/lib/analytics', () => ({
@@ -80,7 +80,7 @@ beforeEach(() => {
 });
 
 describe('reservation webhook', () => {
-  it('settles, records the event, answers 200, and emails after the response', async () => {
+  it('settles, records the event, answers 200, and sends due emails after the response', async () => {
     mockConfirmPaid.mockResolvedValue({
       kind: 'order',
       orderId: 'ord_1',
@@ -104,7 +104,7 @@ describe('reservation webhook', () => {
       undefined
     );
     await Promise.all(mockAfterTasks);
-    expect(mockSendConfirmation).toHaveBeenCalledWith('ord_1');
+    expect(mockDispatchEmails).toHaveBeenCalled();
   });
 
   it('is a no-op on a redelivery of an event already recorded', async () => {
@@ -126,7 +126,7 @@ describe('reservation webhook', () => {
 
     expect(res.status).toBe(500);
     expect(mockPrisma.processedStripeEvent.create).not.toHaveBeenCalled();
-    expect(mockSendConfirmation).not.toHaveBeenCalled();
+    expect(mockDispatchEmails).not.toHaveBeenCalled();
   });
 
   it('acknowledges an unpaid completion without settling', async () => {

@@ -61,6 +61,15 @@ function requireStripe(ctx: Context): {
  * The commit mutations are deliberately public: a guest authorizes by possession
  * of the unguessable `reservationId`; `userId` comes from `ctx.actor`, never the client.
  */
+/** The email kick must never turn a committed order into an error. */
+function sendEmails(ctx: Context): void {
+  try {
+    ctx.sendEmails?.();
+  } catch (error) {
+    console.error('[Checkout] Email kick failed:', error);
+  }
+}
+
 export const checkoutRouter = router({
   // A mutation so the code rides in the body, not a logged query string (ADR 0035).
   applyCode: publicProcedure
@@ -79,9 +88,11 @@ export const checkoutRouter = router({
 
   completeFree: publicProcedure
     .input(completeFreeInputSchema)
-    .mutation(({ ctx, input }) =>
-      completeFree(ctx.prisma, input, ctx.analytics)
-    ),
+    .mutation(async ({ ctx, input }) => {
+      const result = await completeFree(ctx.prisma, input, ctx.analytics);
+      sendEmails(ctx);
+      return result;
+    }),
 
   release: publicProcedure
     .input(releaseInputSchema)
@@ -99,14 +110,16 @@ export const checkoutRouter = router({
 
   finalizePayment: publicProcedure
     .input(finalizePaymentInputSchema)
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { stripe } = requireStripe(ctx);
-      return finalizePayment(
+      const state = await finalizePayment(
         ctx.prisma,
         stripe,
         { reservationId: input.reservationId },
         ctx.analytics
       ).catch(checkoutError);
+      if (state.kind === 'order') sendEmails(ctx);
+      return state;
     }),
 
   getCheckoutState: publicProcedure

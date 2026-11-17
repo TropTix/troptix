@@ -18,6 +18,8 @@ export interface Context {
   siteUrl?: string;
   /** Missing means analytics is off — captures are silently skipped. */
   analytics?: CheckoutAnalytics;
+  /** Sends due emails after the response; missing means they wait for the cron. */
+  sendEmails?: () => void;
 }
 
 export function createContext(opts: {
@@ -26,6 +28,7 @@ export function createContext(opts: {
   stripe?: Stripe;
   siteUrl?: string;
   analytics?: CheckoutAnalytics;
+  sendEmails?: () => void;
 }): Context {
   return {
     prisma: opts.prisma,
@@ -33,5 +36,6 @@ export function createContext(opts: {
     stripe: opts.stripe,
     siteUrl: opts.siteUrl,
     analytics: opts.analytics,
+    sendEmails: opts.sendEmails,
   };
 }

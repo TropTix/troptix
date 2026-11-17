@@ -5,8 +5,8 @@ import prisma from '@/server/prisma';
 import { stripe } from '@/server/lib/stripe';
 import { serverAnalytics } from '@/server/lib/analytics';
 import {
+  dispatchDueEmails,
   sendDisputeNoticeEmail,
-  sendEmailConfirmationEmailToUser,
   sendRefundNoticeEmail,
 } from '@/server/lib/email';
 
@@ -88,17 +88,7 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
         serverAnalytics()
       );
       if (state.kind === 'order') {
-        const { orderId } = state;
-        after(async () => {
-          try {
-            await sendEmailConfirmationEmailToUser(orderId);
-          } catch (emailErr) {
-            console.error(
-              '[ReservationWebhook] Confirmation email failed:',
-              emailErr
-            );
-          }
-        });
+        after(dispatchDueEmails);
       } else if (state.kind === 'refunded') {
         after(() => sendRefundNoticeEmail(reservationId));
       }
