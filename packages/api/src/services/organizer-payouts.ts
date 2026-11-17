@@ -39,6 +39,18 @@ const ORG_PAYOUT_SELECT = {
   payoutHoldbackDays: true,
 } as const;
 
+export const PAYOUT_REQUEST_SELECT = {
+  id: true,
+  createdAt: true,
+  status: true,
+  amountCents: true,
+  note: true,
+  resolvedAt: true,
+  rail: true,
+  reference: true,
+  adminNote: true,
+} as const;
+
 interface EarnedRow {
   eventId: string;
   endsAt: Date;
@@ -233,6 +245,7 @@ export async function getPayouts(
     prisma.payoutRequest.findMany({
       where: { organizationId: org.id },
       orderBy: { createdAt: 'desc' },
+      select: PAYOUT_REQUEST_SELECT,
     }),
   ]);
 
@@ -303,6 +316,7 @@ export async function requestPayout(
         amountCents: input.amountCents,
         note: input.note?.trim() || null,
       },
+      select: PAYOUT_REQUEST_SELECT,
     });
     return toRequestDto(created);
   } catch (err) {

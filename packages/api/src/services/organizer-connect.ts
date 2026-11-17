@@ -108,6 +108,7 @@ export async function recordTransfersStatus(
   await prisma.organization.update({
     where: { id: organizationId },
     data: { stripeTransfersStatus: status ?? null },
+    select: { id: true },
   });
   if (status === 'active') await stampBankLinked(prisma, organizationId, now);
 }

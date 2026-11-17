@@ -32,7 +32,7 @@ export async function scanTicket(
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: input.ticketId, eventId: input.eventId },
-    include: { ticketType: true },
+    select: { ticketType: { select: { name: true, description: true } } },
   });
   if (!ticket) {
     return {
@@ -97,6 +97,16 @@ export async function toggleTicketCheckIn(
     data: {
       status: checkingIn ? TicketStatus.NOT_AVAILABLE : TicketStatus.AVAILABLE,
       checkinTimestamp: checkingIn ? new Date() : null,
+    },
+    select: {
+      id: true,
+      eventId: true,
+      orderId: true,
+      status: true,
+      checkinTimestamp: true,
+      firstName: true,
+      lastName: true,
+      email: true,
     },
   });
   if (!updated) {

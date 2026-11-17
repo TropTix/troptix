@@ -163,6 +163,7 @@ export async function reserve(
         ...(input.userId ? { user: { connect: { id: input.userId } } } : {}),
         items: { createMany: { data: itemRows } },
       },
+      select: { id: true },
     });
 
     return {
@@ -308,8 +309,30 @@ export interface ConfirmResult {
   alreadyProcessed: boolean;
 }
 
+const RESERVATION_FOR_ORDER = {
+  id: true,
+  status: true,
+  orderId: true,
+  totalCents: true,
+  subtotalCents: true,
+  feesCents: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  eventId: true,
+  userId: true,
+  items: {
+    select: {
+      ticketTypeId: true,
+      quantity: true,
+      unitPriceCents: true,
+      feesCents: true,
+    },
+  },
+} satisfies Prisma.ReservationSelect;
+
 type ReservationWithItems = Prisma.ReservationGetPayload<{
-  include: { items: true };
+  select: typeof RESERVATION_FOR_ORDER;
 }>;
 
 /**
@@ -337,6 +360,7 @@ async function materializeOrder(
         reserved: { decrement: item.quantity },
         sold: { increment: item.quantity },
       },
+      select: { id: true },
     });
 
     for (let i = 0; i < item.quantity; i++) {
@@ -381,6 +405,7 @@ async function materializeOrder(
         : {}),
       tickets: { createMany: { data: ticketRows } },
     },
+    select: { id: true },
   });
 
   await tx.reservation.update({
@@ -394,6 +419,7 @@ async function materializeOrder(
         ? { stripePaymentIntentId: opts.paymentIntentId }
         : {}),
     },
+    select: { id: true },
   });
 
   if (reservation.email) {
@@ -415,7 +441,7 @@ export async function confirm(
   return prisma.$transaction(async (tx) => {
     const reservation = await tx.reservation.findUnique({
       where: { stripePaymentIntentId: input.paymentIntentId },
-      include: { items: true },
+      select: RESERVATION_FOR_ORDER,
     });
 
     if (!reservation) {
@@ -480,7 +506,7 @@ export async function settle(
 
       const reservation = await tx.reservation.findUnique({
         where: { id: input.reservationId },
-        include: { items: true },
+        select: RESERVATION_FOR_ORDER,
       });
 
       if (!reservation) {
@@ -550,7 +576,15 @@ export async function captureOrderCompleted(
   try {
     const reservation = await prisma.reservation.findUnique({
       where: { id: reservationId },
-      include: { items: { select: { quantity: true } } },
+      select: {
+        eventId: true,
+        totalCents: true,
+        subtotalCents: true,
+        feesCents: true,
+        posthogDistinctId: true,
+        posthogSessionId: true,
+        items: { select: { quantity: true } },
+      },
     });
     if (!reservation) return;
     await analytics.orderCompleted({
@@ -579,7 +613,7 @@ export async function completeFree(
   const { orderId, fresh } = await prisma.$transaction(async (tx) => {
     const reservation = await tx.reservation.findUnique({
       where: { id: input.reservationId },
-      include: { items: true },
+      select: RESERVATION_FOR_ORDER,
     });
 
     if (!reservation) {
@@ -641,7 +675,10 @@ async function releaseHeldInTx(
 ): Promise<boolean> {
   const reservation = await tx.reservation.findUnique({
     where: { id: reservationId },
-    include: { items: true },
+    select: {
+      status: true,
+      items: { select: { ticketTypeId: true, quantity: true } },
+    },
   });
   if (!reservation || reservation.status !== ReservationStatus.HELD) {
     return false;
@@ -650,11 +687,13 @@ async function releaseHeldInTx(
     await tx.ticketTypes.update({
       where: { id: item.ticketTypeId },
       data: { reserved: { decrement: item.quantity } },
+      select: { id: true },
     });
   }
   await tx.reservation.update({
     where: { id: reservationId },
     data: { status: toStatus },
+    select: { id: true },
   });
   return true;
 }

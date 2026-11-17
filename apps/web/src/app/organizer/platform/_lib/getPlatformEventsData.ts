@@ -8,11 +8,8 @@ export type PlatformEventData = {
   startsAt: Date;
   endsAt: Date;
   venue: string | null;
-  description: string | null;
-  imageUrl: string | null;
   isDraft: boolean;
   status: 'Active' | 'Upcoming' | 'Past' | 'Draft';
-  createdAt: Date;
   organizer: {
     id: string;
     name: string;
@@ -32,42 +29,54 @@ export async function getAllPlatformEvents(
     notFound();
   }
 
-  const eventsRaw = await prisma.events.findMany({
-    select: {
-      id: true,
-      name: true,
-      startsAt: true,
-      endsAt: true,
-      venue: true,
-      description: true,
-      imageUrl: true,
-      isDraft: true,
-      createdAt: true,
+  const [eventsRaw, orderTotals, ticketTotals] = await Promise.all([
+    prisma.events.findMany({
+      select: {
+        id: true,
+        name: true,
+        startsAt: true,
+        endsAt: true,
+        venue: true,
+        isDraft: true,
 
-      // The canonical organizer (ADR 0022) — not the stale `organizer` name
-      // snapshot on the event row, and not the legacy organizerUserId key.
-      organization: {
-        select: {
-          displayName: true,
-          owner: { select: { id: true, email: true } },
+        // The canonical organizer (ADR 0022) — not the stale `organizer` name
+        // snapshot on the event row, and not the legacy organizerUserId key.
+        organization: {
+          select: {
+            displayName: true,
+            owner: { select: { id: true, email: true } },
+          },
         },
       },
+      orderBy: [{ isDraft: 'asc' }, { startsAt: 'desc' }],
+    }),
+    prisma.orders.groupBy({
+      by: ['eventId'],
+      where: { status: 'COMPLETED' },
+      _count: { _all: true },
+      _sum: { total: true },
+    }),
+    prisma.tickets.groupBy({
+      by: ['eventId'],
+      where: { order: { status: 'COMPLETED' } },
+      _count: { _all: true },
+    }),
+  ]);
 
-      orders: {
-        where: { status: 'COMPLETED' },
-        select: {
-          total: true,
-          _count: { select: { tickets: true } },
-        },
-      },
-    },
-    orderBy: [{ isDraft: 'asc' }, { startsAt: 'desc' }],
-  });
+  const ordersByEvent = new Map(
+    orderTotals.map((row) => [
+      row.eventId,
+      { totalOrders: row._count._all, totalRevenue: row._sum.total ?? 0 },
+    ])
+  );
+  const ticketsByEvent = new Map(
+    ticketTotals.map((row) => [row.eventId, row._count._all])
+  );
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const processedEvents: PlatformEventData[] = eventsRaw.map((event) => {
+  return eventsRaw.map((event) => {
     let status: PlatformEventData['status'];
     if (event.isDraft) {
       status = 'Draft';
@@ -79,14 +88,7 @@ export async function getAllPlatformEvents(
       status = 'Upcoming';
     }
 
-    const totalRevenue = event.orders.reduce(
-      (sum, order) => sum + order.total,
-      0
-    );
-    const ticketsSold = event.orders.reduce(
-      (sum, order) => sum + order._count.tickets,
-      0
-    );
+    const orders = ordersByEvent.get(event.id);
 
     return {
       id: event.id,
@@ -94,23 +96,18 @@ export async function getAllPlatformEvents(
       startsAt: event.startsAt,
       endsAt: event.endsAt,
       venue: event.venue,
-      description: event.description,
-      imageUrl: event.imageUrl,
       isDraft: event.isDraft,
       status,
-      createdAt: event.createdAt,
       organizer: {
         id: event.organization.owner.id,
         name: event.organization.displayName,
         email: event.organization.owner.email,
       },
       stats: {
-        totalOrders: event.orders.length,
-        totalRevenue,
-        ticketsSold,
+        totalOrders: orders?.totalOrders ?? 0,
+        totalRevenue: orders?.totalRevenue ?? 0,
+        ticketsSold: ticketsByEvent.get(event.id) ?? 0,
       },
     };
   });
-
-  return processedEvents;
 }

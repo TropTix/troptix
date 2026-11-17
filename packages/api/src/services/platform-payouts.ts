@@ -20,7 +20,11 @@ import {
 } from './_shared/errors';
 import { resolvePayoutPolicy } from './_shared/payouts';
 import { connectStateOf } from './organizer-connect';
-import { toRequestDto, toSetupState } from './organizer-payouts';
+import {
+  PAYOUT_REQUEST_SELECT,
+  toRequestDto,
+  toSetupState,
+} from './organizer-payouts';
 import { requirePlatformOwner } from './organizer-scope';
 
 export async function listPayoutRequests(
@@ -31,7 +35,9 @@ export async function listPayoutRequests(
 
   const rows = await prisma.payoutRequest.findMany({
     orderBy: { createdAt: 'desc' },
-    include: {
+    select: {
+      ...PAYOUT_REQUEST_SELECT,
+      organizationId: true,
       organization: {
         select: {
           displayName: true,

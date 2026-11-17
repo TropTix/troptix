@@ -63,7 +63,25 @@ export async function beginPayment(
 ): Promise<BeginPaymentResponse> {
   const reservation = await prisma.reservation.findUnique({
     where: { id: input.reservationId },
-    include: { items: true },
+    select: {
+      id: true,
+      status: true,
+      expiresAt: true,
+      totalCents: true,
+      subtotalCents: true,
+      feesCents: true,
+      stripeCheckoutSessionId: true,
+      eventId: true,
+      email: true,
+      items: {
+        select: {
+          ticketTypeId: true,
+          quantity: true,
+          unitPriceCents: true,
+          feesCents: true,
+        },
+      },
+    },
   });
 
   if (!reservation) {
@@ -117,6 +135,7 @@ export async function beginPayment(
       await prisma.reservation.update({
         where: { id: reservation.id },
         data: { expiresAt: extendedExpiresAt },
+        select: { id: true },
       });
       return {
         clientSecret: existing.client_secret,
@@ -197,6 +216,7 @@ export async function beginPayment(
       stripeCheckoutSessionId: session.id,
       expiresAt: extendedExpiresAt,
     },
+    select: { id: true },
   });
 
   return {
@@ -254,6 +274,7 @@ export async function confirmPaid(
   await prisma.reservation.update({
     where: { id: input.reservationId },
     data: { status: ReservationStatus.REFUNDED, stripeRefundId: refund.id },
+    select: { id: true },
   });
   console.warn('[Checkout] expiry-race refund issued', {
     reservationId: input.reservationId,

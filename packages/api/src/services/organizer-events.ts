@@ -69,7 +69,22 @@ export async function getEventForEdit(
   const [event, organization] = await Promise.all([
     prisma.events.findFirst({
       where: { id: eventId, ...eventsInScope(scope) },
-      include: {
+      select: {
+        name: true,
+        description: true,
+        startsAt: true,
+        endsAt: true,
+        venue: true,
+        address: true,
+        country: true,
+        countryCode: true,
+        latitude: true,
+        longitude: true,
+        imageUrl: true,
+        pageTheme: true,
+        flyerPalette: true,
+        isPrivate: true,
+        isDraft: true,
         ticketTypes: {
           select: {
             name: true,

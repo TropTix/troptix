@@ -29,7 +29,10 @@ export async function createTicketType(
 
   const [, org] = await Promise.all([
     requireOwnedEvent(prisma, scope, eventId),
-    prisma.organization.findFirst({ where: organizationInScope(scope) }),
+    prisma.organization.findFirst({
+      where: organizationInScope(scope),
+      select: { paidTicketingEnabled: true },
+    }),
   ]);
   assertPaidTicketingAllowed(
     { paidTicketingEnabled: org?.paidTicketingEnabled ?? false },
@@ -39,6 +42,7 @@ export async function createTicketType(
   const ticketTypeId = generateId();
   await prisma.ticketTypes.create({
     data: { id: ticketTypeId, eventId, ...ticketTypeWriteFields(data) },
+    select: { id: true },
   });
 
   return { ticketTypeId };
@@ -63,7 +67,10 @@ export async function updateTicketType(
       },
       select: { id: true, price: true, priceCents: true },
     }),
-    prisma.organization.findFirst({ where: organizationInScope(scope) }),
+    prisma.organization.findFirst({
+      where: organizationInScope(scope),
+      select: { paidTicketingEnabled: true },
+    }),
   ]);
   if (!owned) {
     throw new NotFoundError('Ticket type not found');
@@ -81,5 +88,6 @@ export async function updateTicketType(
   await prisma.ticketTypes.update({
     where: { id: ticketTypeId },
     data: ticketTypeWriteFields(data),
+    select: { id: true },
   });
 }
