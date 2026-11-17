@@ -17,11 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { getDateFormatter } from '@/lib/dateUtils';
 import { getFormattedCurrency, formatOrderNumber } from '@/lib/utils';
-import {
-  getOrder,
-  getOrderTickets,
-  aggregateTicketsForReceipt,
-} from '@/server/orders';
+import { getOrder, aggregateTicketsForReceipt } from '@/server/orders';
 
 function CenteredState({ children }: { children: React.ReactNode }) {
   return (
@@ -105,13 +101,11 @@ export default async function OrderPage(props: {
   const isFree = order.type === OrderType.FREE || totalCents === 0;
   const totalDisplay = getFormattedCurrency(totalCents / 100);
   const isCompleted = order.status === OrderStatus.COMPLETED;
-  const ticketCount = order._count.tickets;
+  const ticketCount = order.tickets.length;
   const poster = eventFlyerUrl(order.event.imageUrl) || DEFAULT_EVENT_IMAGE;
   const orderNumber = formatOrderNumber(order.id);
 
-  const lines = isFree
-    ? []
-    : aggregateTicketsForReceipt(await getOrderTickets(orderId));
+  const lines = isFree ? [] : aggregateTicketsForReceipt(order.tickets);
   const subtotalCents =
     order.subtotalCents ?? Math.round((order.subtotal ?? 0) * 100);
   const feesCents = order.feesCents ?? Math.round((order.fees ?? 0) * 100);

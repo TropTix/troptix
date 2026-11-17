@@ -38,10 +38,11 @@ export async function getEventNavSummary(
   actor: Actor,
   eventId: string
 ) {
-  const scope = await resolveOrganizerScope(prisma, actor);
-  const ownership = (await isPlatformOwner(prisma, scope.userId))
-    ? { deletedAt: null }
-    : eventsInScope(scope);
+  const [scope, platformOwner] = await Promise.all([
+    resolveOrganizerScope(prisma, actor),
+    actor.kind === 'user' ? isPlatformOwner(prisma, actor.userId) : false,
+  ]);
+  const ownership = platformOwner ? { deletedAt: null } : eventsInScope(scope);
   return prisma.events.findFirst({
     where: { id: eventId, ...ownership },
     select: { name: true, isDraft: true },

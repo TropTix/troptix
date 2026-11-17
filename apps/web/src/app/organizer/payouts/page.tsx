@@ -42,17 +42,21 @@ export default async function OrganizerPayoutsPage({
   // Email included so the staff release condition matches without PostHog
   // having seen this user before.
   const flagUser = { id: user.uid, email: user.email };
-  const [payoutsEnabled, connectEnabled] = await Promise.all([
-    isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, flagUser),
-    isFlagEnabled(FeatureFlag.STRIPE_CONNECT_ONBOARDING, flagUser),
-  ]);
+  const actor = userToActor(user);
+  const { viewAs, stripe: stripeParam, tab: tabParam } = await searchParams;
+  const tab = parsePayoutTab(tabParam);
+
+  const [payoutsEnabled, connectEnabled, payouts, connectSetup] =
+    await Promise.all([
+      isFlagEnabled(FeatureFlag.ORGANIZER_PAYOUTS, flagUser),
+      isFlagEnabled(FeatureFlag.STRIPE_CONNECT_ONBOARDING, flagUser),
+      getPayouts(prisma, actor, { viewAsOrganizerUserId: viewAs }),
+      getConnectSetup(prisma, actor, { viewAsOrganizerUserId: viewAs }),
+    ]);
   if (!payoutsEnabled) {
     notFound();
   }
-  const actor = userToActor(user);
-
-  const { viewAs, stripe: stripeParam, tab: tabParam } = await searchParams;
-  const tab = parsePayoutTab(tabParam);
+  const connect = connectEnabled ? connectSetup : null;
 
   // Writes never take a View-as target (the seam's rule), so the write
   // controls disappear when viewing another organizer — they would act on the
@@ -60,12 +64,6 @@ export default async function OrganizerPayoutsPage({
   const readOnly =
     Boolean(viewAs) && (actor.kind !== 'user' || viewAs !== actor.userId);
 
-  const [payouts, connect] = await Promise.all([
-    getPayouts(prisma, actor, { viewAsOrganizerUserId: viewAs }),
-    connectEnabled
-      ? getConnectSetup(prisma, actor, { viewAsOrganizerUserId: viewAs })
-      : Promise.resolve(null),
-  ]);
   const { policy, setup } = payouts;
   const terms = currentPayoutTerms();
   const returnOutcome = connectReturnOutcomeSchema.safeParse(stripeParam);
