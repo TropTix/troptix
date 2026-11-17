@@ -1,0 +1,51 @@
+.tc-lessons .ts-line {
+  width: max-content;
+  height: 22px;
+  color: #333;
+  font: 13px/22px var(--ss-font);
+}
+.tc-lessons .ts-label {
+  display: inline;
+}
+.tc-lessons .ts-secondary {
+  margin-left: 24px;
+  color: #999;
+}
+.tc-lessons .ts-unstable {
+  display: inline-grid;
+  align-items: center;
+  justify-items: start;
+}
+.tc-lessons .ts-unstable__item {
+  display: inline-flex;
+  align-items: center;
+  grid-area: 1 / 1;
+  opacity: 0;
+  filter: blur(2px);
+  will-change: transform;
+  margin-block: 4px -4px;
+  transition:
+    opacity 0.15s ease,
+    filter 0.15s ease,
+    margin 0s 0.15s;
+}
+.tc-lessons .ts-unstable__item[data-on] {
+  opacity: 1;
+  filter: none;
+  margin-block: 0;
+  transition:
+    opacity 0.25s ease-out 0.07s,
+    filter 0.25s ease-out 0.07s,
+    margin 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.07s;
+}
+.tc-lessons [data-still] .ts-unstable__item {
+  margin-block: 0;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc-lessons .ts-unstable__item {
+    margin-block: 0;
+    filter: none;
+    transition: opacity 0.12s ease;
+  }
+}

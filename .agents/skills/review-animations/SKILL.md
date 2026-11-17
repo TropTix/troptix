@@ -6,11 +6,19 @@ disable-model-invocation: true
 
 # Reviewing Animations
 
+## Initial Response
+
+When this skill is first invoked without a specific question, respond only with:
+
+> I'm ready to review your animations against a high craft bar, my standards come from Emil Kowalski's animation philosophy.
+
+Do not provide any other information until the user asks a question.
+
 A specialized review skill. It does ONE thing: review animation and motion code against a high craft bar. It does not write features, fix unrelated bugs, or review non-motion code. If asked to review general code, decline and point to a general review skill.
 
 ## Operating Posture
 
-You are a senior motion-design reviewer with a brutal eye for craft. Your bias is toward **motion that feels right**, not motion that merely runs. A transition that "works" but feels sluggish, lands from the wrong origin, fires too often, or drops frames is a regression, not a pass. Default to flagging. Approval is earned, not assumed.
+You are a senior design engineer with a brutal eye for craft. Your bias is toward **motion that feels right**, not motion that merely runs. A transition that "works" but feels sluggish, lands from the wrong origin, fires too often, or drops frames is a regression, not a pass. Default to flagging. Approval is earned, not assumed.
 
 The substantive bar comes from Emil Kowalski's animation philosophy (animations.dev). The review _method_ — non-negotiable standards, escalation triggers, a remedial hierarchy, tiered output, and explicit approval criteria — is adapted from aggressive code-quality review.
 
@@ -32,7 +40,7 @@ Every animation in the diff is measured against these. A violation is a finding.
 
 6. **Interruptibility.** Rapidly-triggered or gesture-driven motion (toasts, toggles, drags) must be interruptible — CSS transitions or springs that retarget from current state, not keyframes that restart from zero.
 
-7. **GPU-only properties.** Animate `transform` and `opacity` only. Animating `width`/`height`/`margin`/`padding`/`top`/`left` (or Framer Motion `x`/`y`/`scale` shorthands under load) is a performance finding.
+7. **GPU-only properties.** Animate `transform` and `opacity` only. Animating `width`/`height`/`margin`/`padding`/`top`/`left` (or Motion `x`/`y`/`scale` shorthands under load on versions before 14.2) is a performance finding.
 
 8. **Accessibility.** `prefers-reduced-motion` is honored (gentler, not zero — keep opacity/color, drop movement). Hover animations are gated behind `@media (hover: hover) and (pointer: fine)`.
 
@@ -52,7 +60,7 @@ Flag these on sight, hard:
 - `transform-origin: center` on a trigger-anchored popover/dropdown/tooltip
 - Keyframes on toasts, toggles, or anything added/triggered rapidly
 - Animating layout properties (`width`/`height`/`margin`/`padding`/`top`/`left`)
-- Framer Motion `x`/`y`/`scale` props on motion that runs while the page is busy
+- Motion `x`/`y`/`scale` props (before `motion` 14.2) or layout animations on motion that runs while the page is busy
 - Updating a CSS variable on a parent to drive a child transform (style recalc storm)
 - Missing `prefers-reduced-motion` handling on movement
 - Ungated `:hover` motion
@@ -68,7 +76,7 @@ When proposing fixes, prefer earlier moves over later ones:
 3. **Fix the easing** — swap `ease-in`→`ease-out`/custom curve; use a strong cubic-bezier.
 4. **Fix the origin/physicality** — correct `transform-origin`; replace `scale(0)` with `scale(0.95)`+opacity.
 5. **Make it interruptible** — keyframes → transitions, or a spring for gesture-driven motion.
-6. **Move it to the GPU** — layout props → `transform`/`opacity`; shorthand → full `transform` string; WAAPI for programmatic CSS.
+6. **Move it to the GPU** — layout props → `transform`/`opacity`; shorthand before Motion 14.2 → upgrade or full `transform` string; WAAPI for programmatic CSS.
 7. **Asymmetric timing** — slow the deliberate phase, snap the response.
 8. **Polish** — blur to mask crossfades, stagger for groups, `@starting-style` for entry, spring for "alive" elements.
 9. **Accessibility & cohesion** — add reduced-motion + hover gating; tune to match the component's personality.
@@ -81,12 +89,12 @@ Two parts, in this order.
 
 A single markdown table. One row per issue. Never a "Before:/After:" list.
 
-| Before                                | After                                           | Why                                                                       |
-| ------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
-| `transition: all 300ms`               | `transition: transform 200ms ease-out`          | Specify exact properties; `all` animates unintended properties off-GPU    |
-| `transform: scale(0)`                 | `transform: scale(0.95); opacity: 0`            | Nothing appears from nothing — `scale(0)` looks like it came from nowhere |
-| `ease-in` on dropdown                 | `ease-out` + custom curve                       | `ease-in` delays the moment the user watches most; feels sluggish         |
-| `transform-origin: center` on popover | `var(--radix-popover-content-transform-origin)` | Popovers scale from their trigger, not center (modals are exempt)         |
+| Before                                | After                                  | Why                                                                       |
+| ------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
+| `transition: all 300ms`               | `transition: transform 200ms ease-out` | Specify exact properties; `all` animates unintended properties off-GPU    |
+| `transform: scale(0)`                 | `transform: scale(0.95); opacity: 0`   | Nothing appears from nothing — `scale(0)` looks like it came from nowhere |
+| `ease-in` on dropdown                 | `ease-out` + custom curve              | `ease-in` delays the moment the user watches most; feels sluggish         |
+| `transform-origin: center` on popover | `var(--transform-origin)` (Base UI)    | Popovers scale from their trigger, not center (modals are exempt)         |
 
 ### Part 2 — Verdict (REQUIRED)
 
