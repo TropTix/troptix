@@ -34,6 +34,7 @@ export { captureOrderCompleted } from './services/reservations';
 
 export {
   dispatchEmails,
+  enqueueDisputeNotice,
   type DispatchResult,
   type EmailSender,
   type SendOutcome,

@@ -12,3 +12,6 @@ export {
   calendarFileName,
 } from './calendar';
 export type { CalendarLinks } from './calendar';
+export { buildRefundNotice, buildDisputeNotice } from './notices';
+export type { RefundNotice } from '../emails/RefundNotice';
+export type { DisputeNotice } from '../emails/DisputeNotice';

@@ -276,13 +276,6 @@ export default function CheckoutSheet({
       );
     } else if (state.kind === 'refunded') {
       setStep('refunded');
-      // The sync finalize can be what performs the refund (webhook slow/down) —
-      // nudge the notice here too; Resend dedupes on refund-<reservationId>.
-      void fetch('/api/checkout/refund-notice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reservationId: forReservationId }),
-      }).catch(() => {});
     } else if (state.kind === 'expired') {
       setStep('expired');
     } else if (state.kind === 'held' && !reopenInFlightRef.current) {
