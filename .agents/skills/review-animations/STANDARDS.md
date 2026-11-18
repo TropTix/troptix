@@ -1,6 +1,6 @@
 # Animation Standards Reference
 
-The precise values, curves, and rules behind the review. Cite these in findings instead of approximating. Distilled from Emil Kowalski's design engineering philosophy ([animations.dev](https://animations.dev/)).
+The precise values, curves, and rules behind the review. Cite these in findings instead of approximating. Distilled from Emil Kowalski's design engineering philosophy.
 
 ## Should it animate? (frequency table)
 
@@ -64,9 +64,6 @@ Find curves at [easing.dev](https://easing.dev/) or [easings.co](https://easings
 - **Never `scale(0)`.** Start from `scale(0.9–0.97)` + `opacity: 0`. Nothing in the real world appears from nothing.
 - **Origin-aware popovers.** Scale from the trigger, not center:
   ```css
-  .popover {
-    transform-origin: var(--radix-popover-content-transform-origin);
-  } /* Radix */
   .popover {
     transform-origin: var(--transform-origin);
   } /* Base UI */
@@ -150,10 +147,10 @@ Slow where the user is deciding, fast where the system responds.
   element.style.setProperty('--swipe-amount', `${d}px`); // bad: recalc on all children
   element.style.transform = `translateY(${d}px)`; // good: only this element
   ```
-- **Framer Motion shorthands are NOT hardware-accelerated.** `x`/`y`/`scale` run on the main thread via rAF and drop frames under load. Use the full transform string:
+- **Motion shorthands are hardware-accelerated from `motion` 14.2.** Before 14.2, `x`/`y`/`scale` run on the main thread via rAF and drop frames under load, so on those versions upgrade or use the full transform string. Layout animations (`layout`, `layoutId`) run on the main thread in every version:
   ```jsx
-  <motion.div animate={{ x: 100 }} />                          // drops frames under load
-  <motion.div animate={{ transform: "translateX(100px)" }} />  // hardware accelerated
+  <motion.div animate={{ x: 100 }} />                          // motion 14.2+: hardware accelerated
+  <motion.div animate={{ transform: "translateX(100px)" }} />  // hardware accelerated in every version
   ```
 - **CSS animations beat JS under load** — they run off the main thread; rAF-based animations stutter while the browser loads/scripts/paints. Use CSS for predetermined motion, JS for dynamic/interruptible.
 - **WAAPI** gives JS control with CSS performance (hardware-accelerated, interruptible, no library):
